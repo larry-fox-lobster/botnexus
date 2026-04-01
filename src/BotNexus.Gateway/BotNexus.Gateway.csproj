@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-BotNexus.Gateway-9dcb1719-1ba6-4115-887c-ff61cdfb10e9</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BotNexus.Core\BotNexus.Core.csproj" />
+    <ProjectReference Include="..\BotNexus.Agent\BotNexus.Agent.csproj" />
+    <ProjectReference Include="..\BotNexus.Session\BotNexus.Session.csproj" />
+    <ProjectReference Include="..\BotNexus.Channels.Base\BotNexus.Channels.Base.csproj" />
+    <ProjectReference Include="..\BotNexus.Providers.Base\BotNexus.Providers.Base.csproj" />
+    <ProjectReference Include="..\BotNexus.Command\BotNexus.Command.csproj" />
+    <ProjectReference Include="..\BotNexus.Cron\BotNexus.Cron.csproj" />
+    <ProjectReference Include="..\BotNexus.Heartbeat\BotNexus.Heartbeat.csproj" />
+  </ItemGroup>
+</Project>
