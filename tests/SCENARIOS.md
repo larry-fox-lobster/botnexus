@@ -14,14 +14,14 @@
 | Multi-Agent Simulation | 8 | 8 | 0 | 0 |
 | Agent Workspace & Memory | 10 | 7 | 3 | 0 |
 | Dynamic Extension Loading | 8 | 8 | 0 | 0 |
-| Deployment Lifecycle | 10 | 0 | 10 | 0 |
+| Deployment Lifecycle | 10 | 10 | 0 | 0 |
 | Provider Integration | 7 | 6 | 0 | 1 |
 | Channel Integration | 4 | 2 | 1 | 1 |
 | Security & Auth | 5 | 5 | 0 | 0 |
 | Observability | 4 | 2 | 2 | 0 |
-| **TOTAL** | **56** | **38** | **16** | **2** |
+| **TOTAL** | **56** | **48** | **6** | **2** |
 
-**Coverage: 68% covered, 4% partial, 28% planned.**
+**Coverage: 86% covered, 4% partial, 10% planned.**
 
 ---
 
@@ -416,8 +416,8 @@ Real-process deployment scenarios — start, stop, restart, configuration, persi
 ### SC-DPL-001: First Install — Home Directory Created
 
 - **Category:** Deployment Lifecycle
-- **Status:** 🔲 Planned
-- **Test location:** Not yet implemented
+- **Status:** ✅ Covered
+- **Test location:** `tests/BotNexus.Tests.Deployment/Tests/FirstInstallTests.cs`
 - **Description:** On first launch, Gateway creates `~/.botnexus/` directory structure if it doesn't exist.
 - **Steps:**
   1. Set BOTNEXUS_HOME to a clean temp directory.
@@ -430,8 +430,8 @@ Real-process deployment scenarios — start, stop, restart, configuration, persi
 ### SC-DPL-002: Clean Gateway Start — Health/Ready 200
 
 - **Category:** Deployment Lifecycle
-- **Status:** 🔲 Planned
-- **Test location:** Not yet implemented
+- **Status:** ✅ Covered
+- **Test location:** `tests/BotNexus.Tests.Deployment/Tests/CleanStartTests.cs`
 - **Description:** A freshly started Gateway returns 200 from /health and /ready endpoints.
 - **Steps:**
   1. Start Gateway process with minimal config.
@@ -444,8 +444,8 @@ Real-process deployment scenarios — start, stop, restart, configuration, persi
 ### SC-DPL-003: Configure Agents via config.json
 
 - **Category:** Deployment Lifecycle
-- **Status:** 🔲 Planned
-- **Test location:** Not yet implemented
+- **Status:** ✅ Covered
+- **Test location:** `tests/BotNexus.Tests.Deployment/Tests/AgentConfigurationTests.cs`
 - **Description:** Agent configuration in config file is reflected in running Gateway behavior.
 - **Steps:**
   1. Create config with 2 named agents.
@@ -458,8 +458,8 @@ Real-process deployment scenarios — start, stop, restart, configuration, persi
 ### SC-DPL-004: Graceful Stop — Sessions Persisted
 
 - **Category:** Deployment Lifecycle
-- **Status:** 🔲 Planned
-- **Test location:** Not yet implemented
+- **Status:** ✅ Covered
+- **Test location:** `tests/BotNexus.Tests.Deployment/Tests/GracefulShutdownTests.cs`
 - **Description:** Graceful Gateway shutdown persists all active sessions to storage.
 - **Steps:**
   1. Start Gateway; conduct conversation creating session state.
@@ -471,8 +471,8 @@ Real-process deployment scenarios — start, stop, restart, configuration, persi
 ### SC-DPL-005: Restart — Sessions Restored
 
 - **Category:** Deployment Lifecycle
-- **Status:** 🔲 Planned
-- **Test location:** Not yet implemented
+- **Status:** ✅ Covered
+- **Test location:** `tests/BotNexus.Tests.Deployment/Tests/RestartPersistenceTests.cs`
 - **Description:** After restart, previously persisted sessions are restored and conversation can continue.
 - **Steps:**
   1. Start Gateway; create session state; stop gracefully.
@@ -484,8 +484,8 @@ Real-process deployment scenarios — start, stop, restart, configuration, persi
 ### SC-DPL-006: Add Extension → Restart → Loaded
 
 - **Category:** Deployment Lifecycle
-- **Status:** 🔲 Planned
-- **Test location:** Not yet implemented
+- **Status:** ✅ Covered
+- **Test location:** `tests/BotNexus.Tests.Deployment/Tests/ExtensionAddTests.cs`
 - **Description:** Adding an extension folder and restarting causes the new extension to be loaded.
 - **Steps:**
   1. Start Gateway with no extensions; verify clean state.
@@ -499,8 +499,8 @@ Real-process deployment scenarios — start, stop, restart, configuration, persi
 ### SC-DPL-007: Remove Extension → Restart → Gone
 
 - **Category:** Deployment Lifecycle
-- **Status:** 🔲 Planned
-- **Test location:** Not yet implemented
+- **Status:** ✅ Covered
+- **Test location:** `tests/BotNexus.Tests.Deployment/Tests/ExtensionRemoveTests.cs`
 - **Description:** Removing an extension folder and restarting causes the extension to no longer be available.
 - **Steps:**
   1. Start Gateway with extension loaded.
@@ -514,8 +514,8 @@ Real-process deployment scenarios — start, stop, restart, configuration, persi
 ### SC-DPL-008: Config Change → Restart → Applied
 
 - **Category:** Deployment Lifecycle
-- **Status:** 🔲 Planned
-- **Test location:** Not yet implemented
+- **Status:** ✅ Covered
+- **Test location:** `tests/BotNexus.Tests.Deployment/Tests/ConfigChangeTests.cs`
 - **Description:** Configuration changes take effect after Gateway restart.
 - **Steps:**
   1. Start Gateway with initial config.
@@ -528,8 +528,8 @@ Real-process deployment scenarios — start, stop, restart, configuration, persi
 ### SC-DPL-009: Health/Ready Probes During Startup
 
 - **Category:** Deployment Lifecycle
-- **Status:** 🔲 Planned
-- **Test location:** Not yet implemented
+- **Status:** ✅ Covered
+- **Test location:** `tests/BotNexus.Tests.Deployment/Tests/HealthDuringStartupTests.cs`
 - **Description:** Health and ready probes behave correctly during the startup sequence — ready should return non-200 until initialization completes.
 - **Steps:**
   1. Start Gateway.
@@ -542,8 +542,8 @@ Real-process deployment scenarios — start, stop, restart, configuration, persi
 ### SC-DPL-010: Concurrent Message Handling Under Load
 
 - **Category:** Deployment Lifecycle
-- **Status:** 🔲 Planned
-- **Test location:** Not yet implemented
+- **Status:** ✅ Covered
+- **Test location:** `tests/BotNexus.Tests.Deployment/Tests/ConcurrentHandlingTests.cs`
 - **Description:** Gateway handles multiple concurrent messages without failures, deadlocks, or lost messages.
 - **Steps:**
   1. Start Gateway with a configured agent.
@@ -872,3 +872,13 @@ Quick reference mapping test files to the scenarios they cover.
 | `tests/BotNexus.Tests.Unit/Tests/WebSocketChannelTests.cs` | SC-CHN-001 |
 | `tests/BotNexus.Tests.Unit/Tests/SlackWebhookHandlerTests.cs` | SC-CHN-002 |
 | `tests/BotNexus.Tests.Integration/Tests/GatewayApiKeyAuthTests.cs` | SC-SEC-001, SC-SEC-002, SC-SEC-003, SC-SEC-004, SC-OBS-001, SC-OBS-002 |
+| `tests/BotNexus.Tests.Deployment/Tests/FirstInstallTests.cs` | SC-DPL-001 |
+| `tests/BotNexus.Tests.Deployment/Tests/CleanStartTests.cs` | SC-DPL-002 |
+| `tests/BotNexus.Tests.Deployment/Tests/AgentConfigurationTests.cs` | SC-DPL-003 |
+| `tests/BotNexus.Tests.Deployment/Tests/GracefulShutdownTests.cs` | SC-DPL-004 |
+| `tests/BotNexus.Tests.Deployment/Tests/RestartPersistenceTests.cs` | SC-DPL-005 |
+| `tests/BotNexus.Tests.Deployment/Tests/ExtensionAddTests.cs` | SC-DPL-006 |
+| `tests/BotNexus.Tests.Deployment/Tests/ExtensionRemoveTests.cs` | SC-DPL-007 |
+| `tests/BotNexus.Tests.Deployment/Tests/ConfigChangeTests.cs` | SC-DPL-008 |
+| `tests/BotNexus.Tests.Deployment/Tests/HealthDuringStartupTests.cs` | SC-DPL-009 |
+| `tests/BotNexus.Tests.Deployment/Tests/ConcurrentHandlingTests.cs` | SC-DPL-010 |
