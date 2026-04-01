@@ -146,3 +146,11 @@ All 7 foundation items completed (Farnsworth: 5, Bender: 2). Decisions merged an
 - Loader now validates assembly metadata before load, optionally enforces strong-name signature presence, logs full assembly path/version/discovered types, and supports dry-run validation without runtime loading.
 - Extension AssemblyLoadContext now only shares approved contract assemblies (BotNexus.Core*, Microsoft.Extensions.*) to reduce host-internal exposure.
 - Added unit coverage for invalid assemblies, strong-name enforcement, folder assembly cap, dry-run behavior, reparse-point escape rejection, detailed assembly logging, and host assembly isolation behavior.
+
+### 2026-04-01 — Extension Loader Security Hardening (corrected)
+
+- Added extension security controls under BotNexus:Extensions: RequireSignedAssemblies (default false), MaxAssembliesPerExtension (default 50), and DryRun (default false).
+- Extension folder resolution now rejects escaping reparse points (symlink/junction targets outside extensions root) in addition to traversal segment checks.
+- Loader now validates assembly metadata before load, optionally enforces strong-name signature presence, logs full assembly path/version/discovered types, and supports dry-run validation without runtime loading.
+- Extension AssemblyLoadContext now only shares approved contract assemblies (BotNexus.Core*, Microsoft.Extensions.*) to reduce host-internal exposure.
+- Added unit coverage for invalid assemblies, strong-name enforcement, folder assembly cap, dry-run behavior, reparse-point escape rejection, detailed assembly logging, and host assembly isolation behavior.

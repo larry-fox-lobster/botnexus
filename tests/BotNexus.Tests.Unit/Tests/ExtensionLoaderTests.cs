@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Reflection;
 using BotNexus.Core.Abstractions;
 using BotNexus.Core.Extensions;
 using BotNexus.Tests.Extensions.Convention;
@@ -11,11 +13,14 @@ namespace BotNexus.Tests.Unit.Tests;
 public class ExtensionLoaderTests : IDisposable
 {
     private readonly string _testRoot;
+    private readonly string _outsideRoot;
 
     public ExtensionLoaderTests()
     {
         _testRoot = Path.Combine(AppContext.BaseDirectory, "extension-loader-tests", Guid.NewGuid().ToString("N"));
+        _outsideRoot = Path.Combine(AppContext.BaseDirectory, "extension-loader-tests-outside", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_testRoot);
+        Directory.CreateDirectory(_outsideRoot);
     }
 
     [Fact]
@@ -111,6 +116,169 @@ public class ExtensionLoaderTests : IDisposable
     }
 
     [Fact]
+    public void AddBotNexusExtensions_InvalidAssembly_IsRejectedGracefully()
+    {
+        var extensionFolder = Path.Combine(_testRoot, "tools", "invalid");
+        Directory.CreateDirectory(extensionFolder);
+        File.WriteAllText(Path.Combine(extensionFolder, "not-an-assembly.dll"), "this is not a .NET assembly");
+
+        var config = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["BotNexus:ExtensionsPath"] = _testRoot,
+            ["BotNexus:Tools:Extensions:invalid:Enabled"] = "true"
+        });
+
+        var services = new ServiceCollection();
+        var logs = CaptureConsole(() => services.AddBotNexusExtensions(config));
+
+        logs.Should().Contain("Not a valid .NET assembly");
+    }
+
+    [Fact]
+    public void AddBotNexusExtensions_RequireSignedAssemblies_RejectsUnsignedAssembly()
+    {
+        var extensionFolder = Path.Combine(_testRoot, "tools", "unsigned");
+        Directory.CreateDirectory(extensionFolder);
+        File.Copy(typeof(ConventionEchoTool).Assembly.Location, Path.Combine(extensionFolder, "BotNexus.Tests.Extensions.Convention.dll"), overwrite: true);
+
+        var config = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["BotNexus:ExtensionsPath"] = _testRoot,
+            ["BotNexus:Extensions:RequireSignedAssemblies"] = "true",
+            ["BotNexus:Tools:Extensions:unsigned:Enabled"] = "true"
+        });
+
+        var services = new ServiceCollection();
+        var logs = CaptureConsole(() => services.AddBotNexusExtensions(config));
+
+        logs.Should().Contain("Assembly is not strong-name signed");
+    }
+
+    [Fact]
+    public void AddBotNexusExtensions_MaxAssembliesPerExtension_IsEnforced()
+    {
+        var extensionFolder = Path.Combine(_testRoot, "tools", "too-many");
+        Directory.CreateDirectory(extensionFolder);
+
+        for (var i = 0; i < 51; i++)
+            File.Copy(typeof(ConventionEchoTool).Assembly.Location, Path.Combine(extensionFolder, $"copy-{i}.dll"), overwrite: true);
+
+        var config = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["BotNexus:ExtensionsPath"] = _testRoot,
+            ["BotNexus:Extensions:MaxAssembliesPerExtension"] = "50",
+            ["BotNexus:Tools:Extensions:too-many:Enabled"] = "true"
+        });
+
+        var services = new ServiceCollection();
+        var logs = CaptureConsole(() => services.AddBotNexusExtensions(config));
+
+        logs.Should().Contain("exceeds limit 50");
+    }
+
+    [Fact]
+    public void AddBotNexusExtensions_DryRun_DoesNotLoadOrRegisterAssemblies()
+    {
+        var extensionFolder = Path.Combine(_testRoot, "tools", "dryrun");
+        Directory.CreateDirectory(extensionFolder);
+        File.Copy(typeof(ConventionEchoTool).Assembly.Location, Path.Combine(extensionFolder, "BotNexus.Tests.Extensions.Convention.dll"), overwrite: true);
+
+        var config = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["BotNexus:ExtensionsPath"] = _testRoot,
+            ["BotNexus:Extensions:DryRun"] = "true",
+            ["BotNexus:Tools:Extensions:dryrun:Enabled"] = "true"
+        });
+
+        var services = new ServiceCollection();
+        var logs = CaptureConsole(() => services.AddBotNexusExtensions(config));
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetServices<ITool>().Should().BeEmpty();
+        logs.Should().Contain("Dry run would load assembly");
+    }
+
+    [Fact]
+    public void AddBotNexusExtensions_LogsAssemblyPathVersionAndTypes()
+    {
+        var extensionFolder = Path.Combine(_testRoot, "tools", "logging");
+        Directory.CreateDirectory(extensionFolder);
+        File.Copy(typeof(ConventionEchoTool).Assembly.Location, Path.Combine(extensionFolder, "BotNexus.Tests.Extensions.Convention.dll"), overwrite: true);
+
+        var config = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["BotNexus:ExtensionsPath"] = _testRoot,
+            ["BotNexus:Tools:Extensions:logging:Enabled"] = "true"
+        });
+
+        var services = new ServiceCollection();
+        var logs = CaptureConsole(() => services.AddBotNexusExtensions(config));
+
+        logs.Should().Contain("Path=");
+        logs.Should().Contain("Version=");
+        logs.Should().Contain("DiscoveredTypes=[");
+    }
+
+    [Fact]
+    public void AddBotNexusExtensions_JunctionEscapingRoot_IsRejected()
+    {
+        var outsideFolder = Path.Combine(_outsideRoot, "outside");
+        var junctionLink = Path.Combine(_testRoot, "tools", "linked");
+        Directory.CreateDirectory(outsideFolder);
+        Directory.CreateDirectory(Path.GetDirectoryName(junctionLink)!);
+
+        var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = $"/c mklink /J \"{junctionLink}\" \"{outsideFolder}\"",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        });
+
+        process.Should().NotBeNull();
+        process!.WaitForExit();
+        process.ExitCode.Should().Be(0, $"mklink output: {process.StandardOutput.ReadToEnd()} {process.StandardError.ReadToEnd()}");
+
+        var config = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["BotNexus:ExtensionsPath"] = _testRoot,
+            ["BotNexus:Tools:Extensions:linked:Enabled"] = "true"
+        });
+
+        var services = new ServiceCollection();
+        var logs = CaptureConsole(() => services.AddBotNexusExtensions(config));
+
+        logs.Should().Contain("escapes extensions root");
+    }
+
+    [Fact]
+    public void AddBotNexusExtensions_LoadContext_DoesNotResolveArbitraryHostAssemblies()
+    {
+        var extensionFolder = Path.Combine(_testRoot, "tools", "isolation");
+        Directory.CreateDirectory(extensionFolder);
+        File.Copy(typeof(ConventionEchoTool).Assembly.Location, Path.Combine(extensionFolder, "BotNexus.Tests.Extensions.Convention.dll"), overwrite: true);
+
+        var config = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["BotNexus:ExtensionsPath"] = _testRoot,
+            ["BotNexus:Tools:Extensions:isolation:Enabled"] = "true"
+        });
+
+        var services = new ServiceCollection();
+        services.AddBotNexusExtensions(config);
+        using var provider = services.BuildServiceProvider();
+
+        var contextStore = provider.GetRequiredService<ExtensionLoadContextStore>();
+        var context = contextStore.Contexts.Should().ContainSingle().Which;
+        var hostAssemblyName = typeof(ExtensionLoaderTests).Assembly.GetName().Name!;
+
+        Action attempt = () => context.LoadFromAssemblyName(new AssemblyName(hostAssemblyName));
+        attempt.Should().Throw<FileNotFoundException>();
+    }
+
+    [Fact]
     public async Task AddBotNexusExtensions_ConfigBinding_ExtensionReceivesConfigSection()
     {
         var result = await ExecuteSingleToolAsync(
@@ -187,11 +355,46 @@ public class ExtensionLoaderTests : IDisposable
         {
             try
             {
+                DeleteReparsePointsUnderRoot();
                 Directory.Delete(_testRoot, recursive: true);
             }
             catch
             {
                 // Best-effort cleanup for collectible AssemblyLoadContext file locks.
+            }
+        }
+
+        if (Directory.Exists(_outsideRoot))
+        {
+            try
+            {
+                Directory.Delete(_outsideRoot, recursive: true);
+            }
+            catch
+            {
+                // Best effort cleanup.
+            }
+        }
+    }
+
+    private void DeleteReparsePointsUnderRoot()
+    {
+        var allDirectories = Directory
+            .EnumerateDirectories(_testRoot, "*", SearchOption.AllDirectories)
+            .OrderByDescending(path => path.Length)
+            .ToList();
+
+        foreach (var directory in allDirectories)
+        {
+            try
+            {
+                var attributes = File.GetAttributes(directory);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    Directory.Delete(directory, recursive: false);
+            }
+            catch
+            {
+                // Best effort cleanup.
             }
         }
     }
