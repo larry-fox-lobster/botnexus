@@ -43,6 +43,14 @@ public sealed class AgentWorkspace : IAgentWorkspace
 
 """;
 
+    private const string MemoryStub = """
+# Memory
+
+<!-- Capture durable, reusable learnings over time.
+     Use this file for concise summaries distilled from daily memory notes. -->
+
+""";
+
     public AgentWorkspace(string agentName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(agentName);
@@ -65,7 +73,7 @@ public sealed class AgentWorkspace : IAgentWorkspace
         foreach (var (fileName, content) in BootstrapFiles)
             await CreateFileIfMissingAsync(fileName, content, cancellationToken).ConfigureAwait(false);
 
-        await CreateFileIfMissingAsync("MEMORY.md", string.Empty, cancellationToken).ConfigureAwait(false);
+        await CreateFileIfMissingAsync("MEMORY.md", MemoryStub, cancellationToken).ConfigureAwait(false);
         await CreateFileIfMissingAsync("HEARTBEAT.md", HeartbeatStub, cancellationToken).ConfigureAwait(false);
     }
 
