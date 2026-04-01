@@ -149,6 +149,74 @@ public class AgentLoopTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessAsync_EnableMemoryTrue_IncludesMemoryToolsInChatRequest()
+    {
+        ChatRequest? capturedRequest = null;
+        var memoryStore = new Mock<IMemoryStore>();
+
+        var mockProvider = new Mock<ILlmProvider>();
+        mockProvider.Setup(p => p.Generation).Returns(new GenerationSettings());
+        mockProvider.Setup(p => p.ChatAsync(It.IsAny<ChatRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<ChatRequest, CancellationToken>((request, _) => capturedRequest = request)
+            .ReturnsAsync(new LlmResponse("ok", FinishReason.Stop));
+
+        var registry = new ProviderRegistry();
+        registry.Register("test", mockProvider.Object);
+        var loop = new AgentLoop(
+            agentName: "test-agent",
+            systemPrompt: null,
+            providerRegistry: registry,
+            sessionManager: _sessionManager,
+            contextBuilder: new ContextBuilder(NullLogger<ContextBuilder>.Instance),
+            toolRegistry: new ToolRegistry(),
+            settings: new GenerationSettings(),
+            enableMemory: true,
+            memoryStore: memoryStore.Object,
+            logger: NullLogger<AgentLoop>.Instance,
+            maxToolIterations: 5);
+
+        await loop.ProcessAsync(MakeMessage("hello"));
+
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Tools.Should().NotBeNull();
+        capturedRequest.Tools!.Select(t => t.Name).Should().Contain(["memory_search", "memory_save", "memory_get"]);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_EnableMemoryFalse_DoesNotIncludeMemoryToolsInChatRequest()
+    {
+        ChatRequest? capturedRequest = null;
+        var memoryStore = new Mock<IMemoryStore>();
+
+        var mockProvider = new Mock<ILlmProvider>();
+        mockProvider.Setup(p => p.Generation).Returns(new GenerationSettings());
+        mockProvider.Setup(p => p.ChatAsync(It.IsAny<ChatRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<ChatRequest, CancellationToken>((request, _) => capturedRequest = request)
+            .ReturnsAsync(new LlmResponse("ok", FinishReason.Stop));
+
+        var registry = new ProviderRegistry();
+        registry.Register("test", mockProvider.Object);
+        var loop = new AgentLoop(
+            agentName: "test-agent",
+            systemPrompt: null,
+            providerRegistry: registry,
+            sessionManager: _sessionManager,
+            contextBuilder: new ContextBuilder(NullLogger<ContextBuilder>.Instance),
+            toolRegistry: new ToolRegistry(),
+            settings: new GenerationSettings(),
+            enableMemory: false,
+            memoryStore: memoryStore.Object,
+            logger: NullLogger<AgentLoop>.Instance,
+            maxToolIterations: 5);
+
+        await loop.ProcessAsync(MakeMessage("hello"));
+
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Tools.Should().NotBeNull();
+        capturedRequest.Tools!.Select(t => t.Name).Should().NotContain(["memory_search", "memory_save", "memory_get"]);
+    }
+
+    [Fact]
     public async Task ProcessAsync_CallsHooks()
     {
         var mockHook = new Mock<IAgentHook>();

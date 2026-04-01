@@ -165,6 +165,8 @@ public sealed class MultiAgentFixture : IAsyncLifetime
                     toolRegistry: new ToolRegistry(),
                     settings: generation,
                     providerName: "mock",
+                    enableMemory: agentCfg?.EnableMemory == true,
+                    memoryStore: sp.GetRequiredService<IMemoryStore>(),
                     logger: NullLogger<AgentLoop>.Instance,
                     maxToolIterations: cfg.Agents.MaxToolIterations);
 

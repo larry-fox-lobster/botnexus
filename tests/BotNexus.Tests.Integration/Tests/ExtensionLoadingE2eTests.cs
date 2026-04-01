@@ -246,6 +246,7 @@ public sealed class ExtensionLoadingE2eTests : IAsyncLifetime
                         services.AddSingleton<IAgentRunner>(sp =>
                         {
                             var cfg = sp.GetRequiredService<IOptions<BotNexusConfig>>().Value;
+                            var agentCfg = cfg.Agents.Named.GetValueOrDefault("default");
                             var generation = new GenerationSettings
                             {
                                 Model = cfg.Agents.Model,
@@ -264,6 +265,8 @@ public sealed class ExtensionLoadingE2eTests : IAsyncLifetime
                                 toolRegistry: new ToolRegistry(),
                                 settings: generation,
                                 additionalTools: sp.GetServices<ITool>().ToList(),
+                                enableMemory: agentCfg?.EnableMemory == true,
+                                memoryStore: sp.GetRequiredService<IMemoryStore>(),
                                 logger: NullLogger<AgentLoop>.Instance,
                                 maxToolIterations: cfg.Agents.MaxToolIterations);
 

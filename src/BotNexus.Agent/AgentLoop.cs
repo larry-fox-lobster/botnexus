@@ -27,6 +27,8 @@ public sealed class AgentLoop
     private readonly ContextBuilder _contextBuilder;
     private readonly ToolRegistry _toolRegistry;
     private readonly IReadOnlyList<ITool> _additionalTools;
+    private readonly bool _enableMemory;
+    private readonly IMemoryStore? _memoryStore;
     private readonly IReadOnlyList<IAgentHook> _hooks;
     private readonly ILogger<AgentLoop> _logger;
     private readonly GenerationSettings _settings;
@@ -44,6 +46,8 @@ public sealed class AgentLoop
         string? model = null,
         string? providerName = null,
         IEnumerable<ITool>? additionalTools = null,
+        bool enableMemory = false,
+        IMemoryStore? memoryStore = null,
         IReadOnlyList<IAgentHook>? hooks = null,
         ILogger<AgentLoop>? logger = null,
         IBotNexusMetrics? metrics = null,
@@ -59,6 +63,8 @@ public sealed class AgentLoop
         _model = model;
         _providerName = providerName;
         _additionalTools = [.. (additionalTools ?? [])];
+        _enableMemory = enableMemory;
+        _memoryStore = memoryStore;
         _hooks = hooks ?? [];
         _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<AgentLoop>.Instance;
         _metrics = metrics;
@@ -87,8 +93,7 @@ public sealed class AgentLoop
             // Add user message to history
             session.AddEntry(new SessionEntry(MessageRole.User, message.Content, message.Timestamp));
 
-            if (_additionalTools.Count > 0)
-                _toolRegistry.RegisterRange(_additionalTools);
+            RegisterTools();
 
             var tools = _toolRegistry.GetDefinitions();
             var response = string.Empty;
@@ -155,6 +160,26 @@ public sealed class AgentLoop
                 await hook.OnErrorAsync(errorContext, cancellationToken).ConfigureAwait(false);
             throw;
         }
+    }
+
+    private void RegisterTools()
+    {
+        if (_enableMemory)
+        {
+            if (_memoryStore is null)
+            {
+                _logger.LogWarning("Memory is enabled for agent {AgentName} but no IMemoryStore is configured", _agentName);
+            }
+            else
+            {
+                _toolRegistry.Register(new MemorySearchTool(_memoryStore, _agentName));
+                _toolRegistry.Register(new MemorySaveTool(_memoryStore, _agentName));
+                _toolRegistry.Register(new MemoryGetTool(_memoryStore, _agentName));
+            }
+        }
+
+        if (_additionalTools.Count > 0)
+            _toolRegistry.RegisterRange(_additionalTools);
     }
 
     private ILlmProvider ResolveProvider()

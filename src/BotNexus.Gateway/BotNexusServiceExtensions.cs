@@ -1,13 +1,17 @@
+using BotNexus.Agent;
 using BotNexus.Core.Abstractions;
 using BotNexus.Core.Extensions;
 using BotNexus.Channels.Base;
 using BotNexus.Cron;
 using BotNexus.Heartbeat;
 using BotNexus.Gateway.HealthChecks;
+using BotNexus.Core.Configuration;
 using BotNexus.Session;
 using BotNexus.Providers.Base;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace BotNexus.Gateway;
 
@@ -38,6 +42,13 @@ public static class BotNexusServiceExtensions
 
         // Session
         services.AddBotNexusSession();
+        services.AddSingleton<IMemoryStore>(sp =>
+        {
+            var config = sp.GetRequiredService<IOptions<BotNexusConfig>>().Value;
+            var legacyBasePath = BotNexusHome.ResolvePath(config.Agents.Workspace);
+            var logger = sp.GetRequiredService<ILogger<MemoryStore>>();
+            return new MemoryStore(legacyBasePath, logger);
+        });
 
         // WebSocket channel (singleton registered as both concrete type and IChannel so the
         // handler can manage connections while AgentRunner can route responses through it)
