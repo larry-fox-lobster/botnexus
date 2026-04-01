@@ -212,8 +212,8 @@ app.MapGet("/api/cron", (ICronService cronService) =>
         type = j.Type,
         schedule = j.Schedule,
         enabled = j.Enabled,
-        lastRun = j.LastRun,
-        nextRun = j.NextRun,
+        lastRun = j.LastRunStartedAt,
+        nextRun = j.NextOccurrence,
         lastResult = j.LastRunSuccess switch
         {
             true => "success",
@@ -267,8 +267,8 @@ app.MapGet("/api/cron/{name}", (string name, ICronService cronService) =>
         type = job.Type,
         schedule = job.Schedule,
         enabled = job.Enabled,
-        lastRun = job.LastRun,
-        nextRun = job.NextRun,
+        lastRun = job.LastRunStartedAt,
+        nextRun = job.NextOccurrence,
         lastResult = job.LastRunSuccess switch
         {
             true => "success",

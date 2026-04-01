@@ -12,8 +12,8 @@ public sealed class HeartbeatService(ICronService cronService) : IHeartbeatServi
 
     /// <inheritdoc/>
     public DateTimeOffset? LastBeat => _cronService.GetJobs()
-        .Where(static job => job.LastRun.HasValue)
-        .Select(static job => job.LastRun)
+        .Where(static job => job.LastRunStartedAt.HasValue)
+        .Select(static job => job.LastRunStartedAt)
         .Max();
 
     /// <inheritdoc/>
