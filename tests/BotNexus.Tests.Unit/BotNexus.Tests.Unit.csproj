@@ -34,6 +34,7 @@
     <ProjectReference Include="..\..\src\BotNexus.Command\BotNexus.Command.csproj" />
     <ProjectReference Include="..\..\src\BotNexus.Channels.Base\BotNexus.Channels.Base.csproj" />
     <ProjectReference Include="..\..\src\BotNexus.Providers.Base\BotNexus.Providers.Base.csproj" />
+    <ProjectReference Include="..\..\src\BotNexus.Providers.Copilot\BotNexus.Providers.Copilot.csproj" />
     <ProjectReference Include="..\..\src\BotNexus.Tools.GitHub\BotNexus.Tools.GitHub.csproj" />
     <ProjectReference Include="..\..\src\BotNexus.Gateway\BotNexus.Gateway.csproj" />
     <ProjectReference Include="..\BotNexus.Tests.Extensions.Convention\BotNexus.Tests.Extensions.Convention.csproj" />

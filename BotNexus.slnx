@@ -13,6 +13,7 @@
     <Project Path="src/BotNexus.Heartbeat/BotNexus.Heartbeat.csproj" />
     <Project Path="src/BotNexus.Providers.Anthropic/BotNexus.Providers.Anthropic.csproj" />
     <Project Path="src/BotNexus.Providers.Base/BotNexus.Providers.Base.csproj" />
+    <Project Path="src/BotNexus.Providers.Copilot/BotNexus.Providers.Copilot.csproj" />
     <Project Path="src/BotNexus.Providers.OpenAI/BotNexus.Providers.OpenAI.csproj" />
     <Project Path="src/BotNexus.Session/BotNexus.Session.csproj" />
     <Project Path="src/BotNexus.Tools.GitHub/BotNexus.Tools.GitHub.csproj" />
