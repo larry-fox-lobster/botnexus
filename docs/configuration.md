@@ -115,6 +115,7 @@ services.AddSingleton(botNexusConfig);
 | `Gateway` | GatewayConfig | — | WebSocket gateway server settings |
 | `Tools` | ToolsConfig | — | Tool/extension tool settings (exec, web search, MCP) |
 | `Api` | ApiConfig | — | OpenAI-compatible REST API (optional) |
+| `Cron` | CronConfig | — | Scheduled job execution (agent prompts, system actions, maintenance) |
 
 ---
 
@@ -1036,6 +1037,7 @@ export BotNexus__Gateway__ApiKey="$(openssl rand -hex 32)"
 ## See Also
 
 - [BotNexus README](../README.md) — Project overview
-- [Architecture Guide](./) — System design and component overview
+- [Architecture Guide](./architecture.md) — System design and component overview
+- [Cron and Scheduling Guide](./cron-and-scheduling.md) — Scheduled jobs and automation
 - [API Reference](./) — Gateway WebSocket and REST API docs
-- [Extension Development](./) — Building custom channels, providers, and tools
+- [Extension Development](./extension-development.md) — Building custom channels, providers, and tools

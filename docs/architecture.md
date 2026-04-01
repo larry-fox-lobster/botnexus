@@ -18,9 +18,10 @@
 8. [Provider Architecture](#provider-architecture)
 9. [Agent Workspace and Memory](#agent-workspace-and-memory)
 10. [Session Management](#session-management)
-11. [Security Model](#security-model)
-12. [Observability](#observability)
-13. [Installation Layout](#installation-layout)
+11. [Cron and Scheduling](#cron-and-scheduling)
+12. [Security Model](#security-model)
+13. [Observability](#observability)
+14. [Installation Layout](#installation-layout)
 
 ---
 
@@ -999,7 +1000,107 @@ Each line is a `SessionEntry` JSON object:
 
 ---
 
-## 11. Security Model
+## 11. Cron and Scheduling
+
+BotNexus provides a centralized **cron service** (`ICronService`) that schedules and executes jobs on a fixed tick interval, enabling automated agent prompts, system actions, and maintenance tasks.
+
+### CronService Overview
+
+**File:** `BotNexus.Cron/CronService.cs`
+
+- **Lifecycle**: Hosted background service (starts with application)
+- **Evaluation**: Ticks every N seconds (default 10) to check for due jobs
+- **Execution**: Jobs run concurrently; scheduler does not block
+- **Persistence**: In-memory execution history per job (configurable size, default 100 entries)
+- **Correlation**: Every execution gets a unique correlation ID for tracing
+- **Activity Events**: Publishes `cron.started`, `cron.completed`, `cron.failed` events
+
+### Job Types
+
+There are three job types, each with distinct execution models:
+
+#### **Agent Jobs** (`type: "agent"`)
+
+Execute a prompt through the agent runner pipeline.
+
+- **Trigger**: Cron schedule
+- **Execution**: Agent runner processes prompt, routes output to channels
+- **Session Modes**: `new` (isolated), `persistent` (accumulated), or `named:<key>` (custom)
+- **Output**: Agent response optionally routed to channels (Slack, Discord, email, etc.)
+
+#### **System Jobs** (`type: "system"`)
+
+Execute a built-in or custom system action (non-LLM).
+
+- **Trigger**: Cron schedule
+- **Execution**: System action registry resolves action by name and executes
+- **Built-in Actions**: `check-updates`, `health-audit`, `extension-scan`
+- **Output**: Action result optionally routed to channels
+
+#### **Maintenance Jobs** (`type: "maintenance"`)
+
+Execute internal housekeeping tasks.
+
+- **Trigger**: Cron schedule
+- **Built-in Actions**:
+  - `consolidate-memory` — Consolidate agent memory files
+  - `cleanup-sessions` — Delete old sessions (retention-based)
+  - `rotate-logs` — Archive old log files
+- **Configuration**: Per-action parameters (retention days, paths, agent lists)
+
+### Central Registry
+
+**File:** `BotNexus.Cron/CronJobFactory.cs`
+
+All jobs are configured in a centralized section:
+
+```json
+{
+  "BotNexus": {
+    "Cron": {
+      "Enabled": true,
+      "TickIntervalSeconds": 10,
+      "ExecutionHistorySize": 100,
+      "Jobs": {
+        "morning-briefing": { ... },
+        "health-check": { ... },
+        "memory-consolidation": { ... }
+      }
+    }
+  }
+}
+```
+
+The factory reads this configuration at startup and registers all enabled jobs with the cron service.
+
+### Backwards Compatibility
+
+Legacy `AgentConfig.CronJobs` entries are automatically migrated to the centralized `Cron.Jobs` section on startup. A deprecation warning is logged, but existing configs continue to work.
+
+### Runtime Job Management
+
+**Tool:** `CronTool`
+
+Agents can schedule, remove, or list cron jobs dynamically:
+
+```json
+{
+  "action": "schedule",
+  "name": "dynamic-report",
+  "agent": "analyst",
+  "prompt": "Generate a real-time report",
+  "schedule": "*/30 * * * *",
+  "session": "persistent"
+}
+```
+
+### See Also
+
+For detailed configuration, examples, and troubleshooting, see [Cron and Scheduling Guide](./cron-and-scheduling.md).
+
+---
+
+## 12. Security Model
 
 ### Authentication
 
@@ -1051,7 +1152,7 @@ Currently not implemented. Future consideration:
 
 ---
 
-## 12. Observability
+## 13. Observability
 
 BotNexus provides multiple observability mechanisms to monitor health and behavior.
 
@@ -1122,7 +1223,7 @@ public enum ActivityEventType
 
 ---
 
-## 13. Installation Layout
+## 14. Installation Layout
 
 ### Runtime Directory Structure
 
@@ -1175,7 +1276,7 @@ On first run:
 
 ---
 
-## 14. Component Reference
+## 15. Component Reference
 
 ### Class Hierarchy
 
