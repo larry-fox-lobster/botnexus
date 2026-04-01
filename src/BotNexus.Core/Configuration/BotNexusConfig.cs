@@ -1,6 +1,6 @@
 namespace BotNexus.Core.Configuration;
 
-/// <summary>Root configuration object bound from appsettings.json under "BotNexus".</summary>
+/// <summary>Root configuration object bound from the "BotNexus" section (appsettings.json + ~/.botnexus/config.json).</summary>
 public class BotNexusConfig
 {
     public const string SectionName = "BotNexus";

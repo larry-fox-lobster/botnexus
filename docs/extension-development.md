@@ -32,7 +32,7 @@ The extension system is built on **dynamic assembly loading** with folder conven
 
 **Key principles:**
 - Extensions are isolated in their own `AssemblyLoadContext` for future hot-reload capability
-- No default loading — extensions must be explicitly enabled in `appsettings.json`
+- No default loading — extensions must be explicitly enabled in configuration (`~/.botnexus/config.json` or `appsettings.json`)
 - Folder structure follows the pattern: `extensions/{type}/{name}/`
 - Build artifacts are automatically copied to the extensions folder by the build pipeline
 
@@ -110,8 +110,8 @@ Every extension must include metadata properties and import the shared build tar
 ### Extension.targets Build Behavior
 
 The `Extension.targets` file automatically:
-1. After `Build`: Copies all compiled binaries to `extensions/{type}/{name}/`
-2. After `Publish`: Copies binaries to `{PublishDir}/extensions/{type}/{name}/`
+1. After `Build`: Copies all compiled binaries to `extensions/{type}/{name}/` in the repository root (for development)
+2. After `Publish`: Copies binaries to `{BOTNEXUS_HOME}/extensions/{type}/{name}/` (for deployment)
 3. Excludes reference assemblies (`ref/`, `refint/`)
 
 This means you never manually copy DLLs — they appear in the extension folder when you build.
@@ -219,7 +219,7 @@ public sealed class DiscordChannel : BaseChannel
 
 ### Step 2: Define a Configuration Class
 
-Create a strongly-typed config class for your channel. This will be bound from `appsettings.json`.
+Create a strongly-typed config class for your channel. This will be bound from configuration (`~/.botnexus/config.json` or `appsettings.json`).
 
 ```csharp
 namespace BotNexus.Channels.Discord;
@@ -232,15 +232,17 @@ public class DiscordChannelConfig
 }
 ```
 
-In `appsettings.json`:
+In configuration:
 ```json
 {
   "BotNexus": {
     "Channels": {
-      "discord": {
-        "enabled": true,
-        "botToken": "your-discord-bot-token",
-        "allowFrom": ["admin-user-id"]
+      "Instances": {
+        "discord": {
+          "enabled": true,
+          "botToken": "your-discord-bot-token",
+          "allowFrom": ["admin-user-id"]
+        }
       }
     }
   }
@@ -293,7 +295,7 @@ dotnet build src/BotNexus.Channels.Discord
 # extensions/channels/discord/
 ```
 
-Enable the extension in `appsettings.json`:
+Enable the extension in `~/.botnexus/config.json` (or `appsettings.json`):
 ```json
 {
   "BotNexus": {
@@ -978,7 +980,7 @@ Console.WriteLine($"{attr?.Name} v{attr?.Version} by {attr?.Author}");
 
 ## Accessing Configuration
 
-Extensions receive configuration from `appsettings.json` scoped to their own section.
+Extensions receive configuration scoped to their own section (from `~/.botnexus/config.json` or `appsettings.json`).
 
 ### Configuration Binding in IExtensionRegistrar
 
@@ -996,22 +998,24 @@ public void Register(IServiceCollection services, IConfiguration configuration)
 }
 ```
 
-### Configuration Shape in appsettings.json
+### Configuration Shape in config.json
 
 ```json
 {
   "BotNexus": {
-    "ExtensionsPath": "./extensions",
+    "ExtensionsPath": "~/.botnexus/extensions",
     "Extensions": {
       "channels:discord": { "enabled": true },
       "providers:openai": { "enabled": true },
       "tools:github": { "enabled": true }
     },
     "Channels": {
-      "discord": {
-        "enabled": true,
-        "botToken": "your-token",
-        "allowFrom": ["user-id"]
+      "Instances": {
+        "discord": {
+          "enabled": true,
+          "botToken": "your-token",
+          "allowFrom": ["user-id"]
+        }
       }
     },
     "Providers": {
@@ -1022,9 +1026,11 @@ public void Register(IServiceCollection services, IConfiguration configuration)
       }
     },
     "Tools": {
-      "github": {
-        "token": "ghp_...",
-        "defaultOwner": "your-org"
+      "Extensions": {
+        "github": {
+          "token": "ghp_...",
+          "defaultOwner": "your-org"
+        }
       }
     }
   }
@@ -1160,6 +1166,7 @@ public sealed class CopilotOAuthProvider : IOAuthProvider
 
 ```csharp
 using BotNexus.Core.Abstractions;
+using BotNexus.Core.Configuration;
 using System.Text.Json;
 
 namespace BotNexus.Providers.Copilot;
@@ -1168,11 +1175,10 @@ public sealed class FileOAuthTokenStore : IOAuthTokenStore
 {
     private readonly string _storePath;
 
-    public FileOAuthTokenStore()
+    public FileOAuthTokenStore(string? tokenDirectory = null)
     {
-        _storePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".botnexus", "tokens");
+        _storePath = tokenDirectory
+            ?? Path.Combine(BotNexusHome.ResolveHomePath(), "tokens");
         Directory.CreateDirectory(_storePath);
     }
 
@@ -1429,7 +1435,7 @@ dotnet publish src/BotNexus.Gateway -o ./publish
 **Symptom:** Extension folder exists but the extension doesn't register.
 
 **Checks:**
-1. Is the extension enabled in `appsettings.json`?
+1. Is the extension enabled in configuration (`~/.botnexus/config.json` or `appsettings.json`)?
    ```json
    "Extensions": {
      "channels:discord": { "enabled": true }
@@ -1443,8 +1449,8 @@ dotnet publish src/BotNexus.Gateway -o ./publish
 
 3. Check the Gateway logs for loading errors:
    ```
-   Extension loader root: ./extensions
-   Scanning extension folder: ./extensions/channels/discord
+   Extension loader root: ~/.botnexus/extensions
+   Scanning extension folder: ~/.botnexus/extensions/channels/discord
    Rejected extension 'channels/discord': Assembly version mismatch
    ```
 
@@ -1473,16 +1479,18 @@ dotnet publish src/BotNexus.Gateway -o ./publish
 
 ### "Configuration section not found"
 
-**Cause:** Extension config is missing from `appsettings.json`.
+**Cause:** Extension config is missing from `~/.botnexus/config.json` (or `appsettings.json`).
 
 **Fix:**
 ```json
 {
   "BotNexus": {
     "Channels": {
-      "discord": {
-        "enabled": true,
-        "botToken": "your-token"
+      "Instances": {
+        "discord": {
+          "enabled": true,
+          "botToken": "your-token"
+        }
       }
     }
   }
@@ -1533,7 +1541,7 @@ To create a BotNexus extension:
 3. **Import `Extension.targets`** to auto-copy binaries
 4. **Implement the interface** (`IChannel`, `ILlmProvider`, or `ITool`)
 5. **Optionally implement `IExtensionRegistrar`** for advanced DI
-6. **Add configuration** to `appsettings.json`
+6. **Add configuration** to `~/.botnexus/config.json` (or `appsettings.json`)
 7. **Build** and binaries appear in `extensions/{type}/{name}/`
 8. **Enable in config** and the Gateway loads it at startup
 

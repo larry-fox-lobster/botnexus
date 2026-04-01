@@ -136,7 +136,7 @@
 └──────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────┐
-│ Configuration (appsettings.json → BotNexusConfig)            │
+│ Configuration (~/.botnexus/config.json → BotNexusConfig)      │
 │ - Agents, Providers, Channels, Tools                         │
 │ - Gateway (host, port, authentication)                       │
 │ - Extensions (loader path, security settings)                │
@@ -326,32 +326,33 @@ extensions/
 ```json
 {
   "BotNexus": {
+    "ExtensionsPath": "~/.botnexus/extensions",
     "Extensions": {
-      "LoadPath": "./extensions",
       "RequireSignedAssemblies": false,
-      "Providers": ["copilot", "openai"],
-      "Channels": ["discord", "slack"],
-      "Tools": ["github"]
+      "MaxAssembliesPerExtension": 50,
+      "DryRun": false
     },
     "Providers": {
       "copilot": {
-        "Enabled": true,
-        "Auth": "oauth"
+        "Auth": "oauth",
+        "ApiBase": "https://api.githubcopilot.com"
       },
       "openai": {
-        "Enabled": true,
-        "ApiKey": "sk-...",
-        "Auth": "apikey"
+        "Auth": "apikey",
+        "ApiKey": "sk-..."
       }
     },
     "Channels": {
-      "discord": {
-        "Enabled": true,
-        "Token": "discord_bot_token"
-      },
-      "slack": {
-        "Enabled": true,
-        "AppId": "slack_app_id"
+      "Instances": {
+        "discord": {
+          "Enabled": true,
+          "BotToken": "discord_bot_token"
+        },
+        "slack": {
+          "Enabled": true,
+          "BotToken": "slack_bot_token",
+          "SigningSecret": "slack_signing_secret"
+        }
       }
     }
   }
@@ -455,7 +456,7 @@ public static IServiceCollection AddBotNexusCore(
     BotNexusConfig config)
 {
     services.Configure<BotNexusConfig>(options =>
-        // Bind from appsettings.json "BotNexus" section
+        // Bind from "BotNexus" config section (~/.botnexus/config.json overrides appsettings.json)
     );
     
     services.AddSingleton<IMessageBus>(_ =>
@@ -791,7 +792,7 @@ Conversations are persisted to disk in a structured format, enabling session rec
 **File:** `BotNexus.Session/SessionManager.cs`
 
 - **Storage**: File-backed JSONL (one file per session)
-- **Location**: Configurable path (default: `./sessions`)
+- **Location**: `~/.botnexus/workspace/sessions` (resolved from `AgentDefaults.Workspace`)
 - **Thread-Safety**: Per-session `SemaphoreSlim` lock
 - **Caching**: In-memory cache with weak references
 - **Key Encoding**: URI escaping (`%` → `_`) to sanitize filesystem paths
@@ -899,7 +900,7 @@ Currently not implemented. Future consideration:
 ### API Key Security
 
 - **Never log full keys**: Log last 4 characters only
-- **Rotate regularly**: Manual process (update appsettings.json + restart)
+- **Rotate regularly**: Manual process (update `~/.botnexus/config.json` + restart)
 - **Secrets management**: Use OS environment variables or secrets manager
 
 ---
@@ -983,17 +984,7 @@ BotNexus installs under `~/.botnexus/` (user home directory):
 
 ```
 ~/.botnexus/
-├── config/
-│   ├── appsettings.json         # Main configuration
-│   ├── appsettings.prod.json    # Production overrides
-│   └── agents/
-│       └── system_prompts/      # Agent prompts
-├── sessions/                    # Persistent conversation data
-│   ├── discord_12345.jsonl
-│   ├── slack_U123ABC.jsonl
-│   └── ...
-├── tokens/                      # OAuth token storage (encrypted)
-│   └── oauth_tokens.json
+├── config.json                  # User configuration (overrides appsettings.json defaults)
 ├── extensions/                  # Dynamic extensions
 │   ├── providers/
 │   │   ├── copilot/
@@ -1005,29 +996,32 @@ BotNexus installs under `~/.botnexus/` (user home directory):
 │   │   └── telegram/
 │   └── tools/
 │       └── github/
-├── logs/                        # Log files
-│   ├── botnexus.log
-│   ├── botnexus.error.log
-│   └── ...
-└── cache/                       # Transient cache
-    ├── web_fetch/              # Cached web content
-    └── ...
+├── tokens/                      # OAuth token storage (encrypted)
+│   └── copilot.json
+├── workspace/                   # Agent workspace and session data
+│   └── sessions/
+│       ├── discord_12345.jsonl
+│       ├── slack_U123ABC.jsonl
+│       └── ...
+├── sessions/                    # (Legacy) top-level session data
+└── logs/                        # Log files
 ```
 
 ### Configuration Resolution
 
-Startup loads configuration in this order:
+Startup loads configuration in this order (later sources override earlier ones):
 
-1. `appsettings.json` (base)
+1. `appsettings.json` (project defaults in `src/BotNexus.Gateway/`)
 2. `appsettings.{ASPNETCORE_ENV}.json` (environment-specific overrides)
-3. Environment variables (highest priority)
+3. `~/.botnexus/config.json` (user configuration — primary config location)
+4. Environment variables (highest priority)
 
 ### First-Run Setup
 
 On first run:
 
-1. Create `~/.botnexus/` directory
-2. Generate default `appsettings.json`
+1. Create `~/.botnexus/` directory structure
+2. Generate default `config.json` with Copilot provider preset
 3. Scan `extensions/` folder
 4. Initialize extension registry
 5. Set up session storage

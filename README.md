@@ -1,2 +1,107 @@
-# botnexus
-C# Claw implementation designed to be easy to understand with a small modular code base that allows transparency and extensability while making security a priority.
+# BotNexus
+
+A modular, extensible AI agent execution platform built in C#/.NET. BotNexus enables running multiple AI agents concurrently, each powered by configurable LLM providers, receiving messages from multiple channels, and executing tools dynamically.
+
+## Key Features
+
+- **Multi-Agent** — Run multiple agents with independent configs (model, provider, system prompt, tools)
+- **Multi-Channel** — Discord, Slack, Telegram, WebSocket, and REST API
+- **Multi-Provider** — GitHub Copilot (OAuth), OpenAI, Anthropic, Azure OpenAI
+- **Extensible** — Dynamic assembly loading with folder-based extension system
+- **MCP Support** — Model Context Protocol servers (stdio and SSE transports)
+- **Session Persistence** — Conversation history persisted to disk (JSONL format)
+- **Observable** — Correlation IDs, health checks, real-time activity stream via WebUI
+
+## Quick Start
+
+```bash
+# Build the solution
+dotnet build BotNexus.slnx
+
+# Run the Gateway
+dotnet run --project src/BotNexus.Gateway
+```
+
+On first run, BotNexus creates `~/.botnexus/` with a default `config.json`. Edit this file to configure providers, channels, and agents:
+
+```
+~/.botnexus/
+├── config.json          # Your configuration (primary)
+├── extensions/          # Channel, provider, and tool plugins
+├── tokens/              # OAuth token storage
+├── workspace/sessions/  # Conversation history
+└── logs/
+```
+
+### Minimal Configuration (`~/.botnexus/config.json`)
+
+```json
+{
+  "BotNexus": {
+    "Agents": {
+      "Model": "gpt-4o"
+    },
+    "Providers": {
+      "copilot": {
+        "Auth": "oauth",
+        "DefaultModel": "gpt-4o",
+        "ApiBase": "https://api.githubcopilot.com"
+      }
+    },
+    "Gateway": {
+      "Host": "0.0.0.0",
+      "Port": 18790
+    }
+  }
+}
+```
+
+## Architecture
+
+| Component | Description |
+|-----------|-------------|
+| **Gateway** | Main orchestrator — message bus, agent routing, channel management |
+| **Agent** | Per-agent processing loop with context building and tool execution |
+| **Core** | 13 interface contracts, configuration, extension loading |
+| **Channels** | Discord, Slack, Telegram, WebSocket implementations |
+| **Providers** | Copilot (OAuth), OpenAI, Anthropic LLM backends |
+| **Session** | JSONL-based conversation persistence |
+| **WebUI** | Real-time activity monitoring dashboard |
+
+## Documentation
+
+- [Architecture Overview](docs/architecture.md)
+- [Configuration Guide](docs/configuration.md)
+- [Extension Development](docs/extension-development.md)
+
+## Project Structure
+
+```
+src/
+├── BotNexus.Core          # Abstractions, config, extension loader
+├── BotNexus.Gateway       # Main host, agent router, WebSocket
+├── BotNexus.Api           # OpenAI-compatible REST API
+├── BotNexus.Agent         # Agent loop, tool registry, MCP
+├── BotNexus.Session       # JSONL session persistence
+├── BotNexus.Channels.*    # Channel implementations
+├── BotNexus.Providers.*   # LLM provider implementations
+├── BotNexus.Tools.*       # Tool extensions
+└── BotNexus.WebUI         # Real-time monitoring UI
+extensions/                # Built extension binaries (auto-populated)
+tests/                     # Unit, integration, and E2E tests
+```
+
+## Configuration
+
+BotNexus uses a layered configuration model:
+
+1. **Code defaults** — Built-in constants
+2. **appsettings.json** — Project defaults
+3. **~/.botnexus/config.json** — User configuration (primary)
+4. **Environment variables** — Override any setting via `BotNexus__Path__To__Property`
+
+Set `BOTNEXUS_HOME` environment variable to override the `~/.botnexus/` location.
+
+## License
+
+See [LICENSE](LICENSE) for details.

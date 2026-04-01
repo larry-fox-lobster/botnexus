@@ -54,7 +54,7 @@ BotNexus follows a **defaults → overrides** pattern:
 
 **Example:**
 ```
-Global Model (appsettings.json) = "gpt-4o"
+Global Model (config.json) = "gpt-4o"
   ↓
 Agent "planner" override (Agents.Named.planner.Model) = "gpt-4-turbo"
   ↓
@@ -619,16 +619,19 @@ extensions/
 
 ### Extension Registration
 
-Each extension assembly must implement `IExtensionRegistrar` to register types in the DI container:
+Each extension assembly can implement `IExtensionRegistrar` to register types in the DI container:
 
 ```csharp
 public class CopilotExtensionRegistrar : IExtensionRegistrar
 {
-    public void RegisterServices(IServiceCollection services, ProviderConfig config)
+    public void Register(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddScoped<ILlmProvider, CopilotProvider>();
-        services.AddScoped<IOAuthProvider>(sp => sp.GetRequiredService<ILlmProvider>() as CopilotProvider);
-        services.AddSingleton<IOAuthTokenStore>(new FileOAuthTokenStore("copilot"));
+        services.AddSingleton<ILlmProvider>(sp =>
+        {
+            var tokenStore = new FileOAuthTokenStore();
+            // ... create and return CopilotProvider
+        });
+        services.AddSingleton<IOAuthTokenStore>(new FileOAuthTokenStore());
     }
 }
 ```
@@ -700,11 +703,13 @@ export BotNexus__Tools__McpServers__filesystem__Command=/usr/local/bin/mcp-files
 
 ### Precedence
 
-Environment variables override all configuration sources:
+Configuration sources are loaded in order — later sources override earlier ones:
 
-1. **appsettings.json** (lowest priority)
-2. **Environment variables** (highest priority)
-3. **Code defaults** (built-in fallbacks)
+1. **Code defaults** (built-in fallbacks, lowest priority)
+2. **appsettings.json** (project defaults in `src/BotNexus.Gateway/`)
+3. **appsettings.{Environment}.json** (environment-specific overrides)
+4. **~/.botnexus/config.json** (user configuration)
+5. **Environment variables** (highest priority)
 
 ---
 
