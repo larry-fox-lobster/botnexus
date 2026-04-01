@@ -158,10 +158,9 @@ public sealed class MultiAgentFixture : IAsyncLifetime
 
                 var loop = new AgentLoop(
                     agentName: agentName,
-                    systemPrompt: agentCfg?.SystemPrompt,
                     providerRegistry: registry,
                     sessionManager: sp.GetRequiredService<ISessionManager>(),
-                    contextBuilder: new ContextBuilder(NullLogger<ContextBuilder>.Instance),
+                    contextBuilder: new FixtureContextBuilder(agentName, agentCfg?.SystemPrompt),
                     toolRegistry: new ToolRegistry(),
                     settings: generation,
                     providerName: "mock",
@@ -227,5 +226,32 @@ internal static class ServiceCollectionExtensions
         var descriptors = services.Where(d => d.ServiceType == typeof(T) && predicate(d)).ToList();
         foreach (var d in descriptors)
             services.Remove(d);
+    }
+}
+
+internal sealed class FixtureContextBuilder(string agentName, string? configuredSystemPrompt) : IContextBuilder
+{
+    private readonly string _systemPrompt = string.IsNullOrWhiteSpace(configuredSystemPrompt)
+        ? $"You are {agentName}"
+        : configuredSystemPrompt;
+
+    public Task<string> BuildSystemPromptAsync(string _, CancellationToken cancellationToken = default)
+        => Task.FromResult(_systemPrompt);
+
+    public Task<List<ChatMessage>> BuildMessagesAsync(
+        string _,
+        IReadOnlyList<ChatMessage> history,
+        string currentMessage,
+        string? channel = null,
+        string? chatId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var messages = new List<ChatMessage>(history.Count + 2)
+        {
+            new("system", _systemPrompt)
+        };
+        messages.AddRange(history);
+        messages.Add(new("user", currentMessage));
+        return Task.FromResult(messages);
     }
 }

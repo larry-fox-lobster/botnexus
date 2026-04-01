@@ -19,12 +19,11 @@ namespace BotNexus.Agent;
 public sealed class AgentLoop
 {
     private readonly string _agentName;
-    private readonly string? _systemPrompt;
     private readonly string? _model;
     private readonly string? _providerName;
     private readonly ProviderRegistry _providerRegistry;
     private readonly ISessionManager _sessionManager;
-    private readonly ContextBuilder _contextBuilder;
+    private readonly IContextBuilder _contextBuilder;
     private readonly ToolRegistry _toolRegistry;
     private readonly IReadOnlyList<ITool> _additionalTools;
     private readonly bool _enableMemory;
@@ -37,10 +36,9 @@ public sealed class AgentLoop
 
     public AgentLoop(
         string agentName,
-        string? systemPrompt,
         ProviderRegistry providerRegistry,
         ISessionManager sessionManager,
-        ContextBuilder contextBuilder,
+        IContextBuilder contextBuilder,
         ToolRegistry toolRegistry,
         GenerationSettings settings,
         string? model = null,
@@ -54,7 +52,6 @@ public sealed class AgentLoop
         int maxToolIterations = 40)
     {
         _agentName = agentName;
-        _systemPrompt = systemPrompt;
         _providerRegistry = providerRegistry;
         _sessionManager = sessionManager;
         _contextBuilder = contextBuilder;
@@ -92,6 +89,7 @@ public sealed class AgentLoop
         {
             // Add user message to history
             session.AddEntry(new SessionEntry(MessageRole.User, message.Content, message.Timestamp));
+            var systemPrompt = await _contextBuilder.BuildSystemPromptAsync(_agentName, cancellationToken).ConfigureAwait(false);
 
             RegisterTools();
 
@@ -100,17 +98,34 @@ public sealed class AgentLoop
 
             for (int iteration = 0; iteration < _maxToolIterations; iteration++)
             {
-                var messages = _contextBuilder.Build(session, message, _settings);
-
-                // Build fresh request from current session state
-                var userMessages = session.History
-                    .Where(e => e.Role != MessageRole.System)
-                    .Select(e => new ChatMessage(
-                        e.Role == MessageRole.Assistant ? "assistant" : "user",
-                        e.Content))
+                var history = session.History
+                    .Where(entry =>
+                        entry.Role != MessageRole.System &&
+                        !(entry.Role == MessageRole.User &&
+                          entry.Timestamp == message.Timestamp &&
+                          string.Equals(entry.Content, message.Content, StringComparison.Ordinal)))
+                    .Select(static entry => new ChatMessage(entry.Role switch
+                    {
+                        MessageRole.User => "user",
+                        MessageRole.Assistant => "assistant",
+                        MessageRole.Tool => "tool",
+                        _ => "user"
+                    }, entry.Content))
                     .ToList();
 
-                var request = new ChatRequest(userMessages, _settings, tools, _systemPrompt);
+                var messages = await _contextBuilder.BuildMessagesAsync(
+                    _agentName,
+                    history,
+                    message.Content,
+                    message.Channel,
+                    message.ChatId,
+                    cancellationToken).ConfigureAwait(false);
+
+                var requestMessages = messages
+                    .Where(static m => !string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                var request = new ChatRequest(requestMessages, _settings, tools, systemPrompt);
                 var provider = ResolveProvider();
                 _logger.LogInformation("Calling provider {ProviderName} for agent {AgentName}", provider.GetType().Name, _agentName);
                 var providerTimer = Stopwatch.StartNew();

@@ -258,10 +258,9 @@ public sealed class ExtensionLoadingE2eTests : IAsyncLifetime
 
                             var loop = new AgentLoop(
                                 agentName: "default",
-                                systemPrompt: null,
                                 providerRegistry: sp.GetRequiredService<ProviderRegistry>(),
                                 sessionManager: sp.GetRequiredService<ISessionManager>(),
-                                contextBuilder: new ContextBuilder(NullLogger<ContextBuilder>.Instance),
+                                contextBuilder: new IntegrationContextBuilder("default", agentCfg?.SystemPrompt),
                                 toolRegistry: new ToolRegistry(),
                                 settings: generation,
                                 additionalTools: sp.GetServices<ITool>().ToList(),
@@ -407,5 +406,32 @@ public sealed class ExtensionLoadingE2eTests : IAsyncLifetime
             foreach (var (key, value) in _original)
                 Environment.SetEnvironmentVariable(key, value);
         }
+    }
+}
+
+internal sealed class IntegrationContextBuilder(string agentName, string? configuredSystemPrompt) : IContextBuilder
+{
+    private readonly string _systemPrompt = string.IsNullOrWhiteSpace(configuredSystemPrompt)
+        ? $"You are {agentName}"
+        : configuredSystemPrompt;
+
+    public Task<string> BuildSystemPromptAsync(string _, CancellationToken cancellationToken = default)
+        => Task.FromResult(_systemPrompt);
+
+    public Task<List<ChatMessage>> BuildMessagesAsync(
+        string _,
+        IReadOnlyList<ChatMessage> history,
+        string currentMessage,
+        string? channel = null,
+        string? chatId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var messages = new List<ChatMessage>(history.Count + 2)
+        {
+            new("system", _systemPrompt)
+        };
+        messages.AddRange(history);
+        messages.Add(new("user", currentMessage));
+        return Task.FromResult(messages);
     }
 }

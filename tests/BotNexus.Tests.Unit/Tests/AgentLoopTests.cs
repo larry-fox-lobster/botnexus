@@ -73,6 +73,46 @@ public class AgentLoopTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessAsync_BuildsSystemPromptAtRunStart()
+    {
+        var mockProvider = new Mock<ILlmProvider>();
+        mockProvider.Setup(p => p.Generation).Returns(new GenerationSettings());
+        mockProvider.Setup(p => p.ChatAsync(It.IsAny<ChatRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LlmResponse("ok", FinishReason.Stop));
+
+        var contextBuilder = new Mock<IContextBuilder>(MockBehavior.Strict);
+        contextBuilder
+            .Setup(cb => cb.BuildSystemPromptAsync("test-agent", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("You are test-agent")
+            .Verifiable();
+        contextBuilder
+            .Setup(cb => cb.BuildMessagesAsync(
+                "test-agent",
+                It.IsAny<IReadOnlyList<ChatMessage>>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ChatMessage> { new("system", "You are test-agent"), new("user", "hello") });
+
+        var registry = new ProviderRegistry();
+        registry.Register("test", mockProvider.Object);
+        var loop = new AgentLoop(
+            agentName: "test-agent",
+            providerRegistry: registry,
+            sessionManager: _sessionManager,
+            contextBuilder: contextBuilder.Object,
+            toolRegistry: new ToolRegistry(),
+            settings: new GenerationSettings(),
+            logger: NullLogger<AgentLoop>.Instance,
+            maxToolIterations: 5);
+
+        await loop.ProcessAsync(MakeMessage("hello"));
+
+        contextBuilder.Verify(cb => cb.BuildSystemPromptAsync("test-agent", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task ProcessAsync_ExecutesToolCalls_AddsToolResultToSession()
     {
         var toolRegistry = new ToolRegistry();
@@ -132,10 +172,9 @@ public class AgentLoopTests : IDisposable
         registry.Register("test", mockProvider.Object);
         var loop = new AgentLoop(
             agentName: "test-agent",
-            systemPrompt: null,
             providerRegistry: registry,
             sessionManager: _sessionManager,
-            contextBuilder: new ContextBuilder(NullLogger<ContextBuilder>.Instance),
+            contextBuilder: CreateContextBuilder("test-agent"),
             toolRegistry: new ToolRegistry(),
             settings: new GenerationSettings(),
             additionalTools: [dynamicTool.Object],
@@ -164,10 +203,9 @@ public class AgentLoopTests : IDisposable
         registry.Register("test", mockProvider.Object);
         var loop = new AgentLoop(
             agentName: "test-agent",
-            systemPrompt: null,
             providerRegistry: registry,
             sessionManager: _sessionManager,
-            contextBuilder: new ContextBuilder(NullLogger<ContextBuilder>.Instance),
+            contextBuilder: CreateContextBuilder("test-agent"),
             toolRegistry: new ToolRegistry(),
             settings: new GenerationSettings(),
             enableMemory: true,
@@ -198,10 +236,9 @@ public class AgentLoopTests : IDisposable
         registry.Register("test", mockProvider.Object);
         var loop = new AgentLoop(
             agentName: "test-agent",
-            systemPrompt: null,
             providerRegistry: registry,
             sessionManager: _sessionManager,
-            contextBuilder: new ContextBuilder(NullLogger<ContextBuilder>.Instance),
+            contextBuilder: CreateContextBuilder("test-agent"),
             toolRegistry: new ToolRegistry(),
             settings: new GenerationSettings(),
             enableMemory: false,
@@ -258,10 +295,9 @@ public class AgentLoopTests : IDisposable
 
         var loop = new AgentLoop(
             agentName: "test-agent",
-            systemPrompt: null,
             providerRegistry: registry,
             sessionManager: _sessionManager,
-            contextBuilder: new ContextBuilder(NullLogger<ContextBuilder>.Instance),
+            contextBuilder: CreateContextBuilder("test-agent"),
             toolRegistry: new ToolRegistry(),
             settings: new GenerationSettings { Model = "openai:gpt-4o" },
             logger: NullLogger<AgentLoop>.Instance,
@@ -284,15 +320,42 @@ public class AgentLoopTests : IDisposable
 
         return new AgentLoop(
             agentName: "test-agent",
-            systemPrompt: null,
             providerRegistry: registry,
             sessionManager: _sessionManager,
-            contextBuilder: new ContextBuilder(NullLogger<ContextBuilder>.Instance),
+            contextBuilder: CreateContextBuilder("test-agent"),
             toolRegistry: toolRegistry ?? new ToolRegistry(),
             settings: new GenerationSettings(),
             hooks: hooks,
             logger: NullLogger<AgentLoop>.Instance,
             maxToolIterations: 5);
+    }
+
+    private static IContextBuilder CreateContextBuilder(string expectedAgentName)
+    {
+        var contextBuilder = new Mock<IContextBuilder>();
+        contextBuilder
+            .Setup(cb => cb.BuildSystemPromptAsync(expectedAgentName, It.IsAny<CancellationToken>()))
+            .ReturnsAsync($"You are {expectedAgentName}");
+        contextBuilder
+            .Setup(cb => cb.BuildMessagesAsync(
+                expectedAgentName,
+                It.IsAny<IReadOnlyList<ChatMessage>>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, IReadOnlyList<ChatMessage> history, string currentMessage, string? channel, string? chatId, CancellationToken _) =>
+            {
+                var messages = new List<ChatMessage>(history.Count + 2)
+                {
+                    new("system", $"You are {expectedAgentName}")
+                };
+                messages.AddRange(history);
+                messages.Add(new("user", currentMessage));
+                return messages;
+            });
+
+        return contextBuilder.Object;
     }
 
     public void Dispose()
