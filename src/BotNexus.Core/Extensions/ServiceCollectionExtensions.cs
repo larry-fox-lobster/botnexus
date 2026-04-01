@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IMessageBus>(sp => new MessageBus(capacity: 1000));
         services.AddSingleton<IActivityStream, ActivityStream>();
         services.AddSingleton<IBotNexusMetrics, BotNexusMetrics>();
+        services.AddSingleton<ISystemActionRegistry, SystemActionRegistry>();
         return services;
     }
 }
