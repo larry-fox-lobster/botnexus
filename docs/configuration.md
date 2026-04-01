@@ -1,13 +1,13 @@
 # BotNexus Configuration Guide
 
-BotNexus uses a hierarchical, dictionary-based configuration model that supports multiple deployment patterns. This guide covers the current approach (appsettings.json) and the planned unified configuration layout (~/.botnexus/).
+BotNexus uses a hierarchical, dictionary-based configuration model with a unified home directory at `~/.botnexus/` (or `BOTNEXUS_HOME`).
 
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
 2. [Configuration Hierarchy](#configuration-hierarchy)
-3. [Current Deployment: appsettings.json](#current-deployment-appsettingsjson)
-4. [Planned Layout: ~/.botnexus/](#planned-layout-botnexus)
+3. [Primary Deployment: ~/.botnexus/](#primary-deployment-botnexus)
+4. [Project Defaults: appsettings.json](#project-defaults-appsettingsjson)
 5. [Configuration Sections](#configuration-sections)
 6. [Extension Configuration](#extension-configuration)
 7. [Environment Variable Overrides](#environment-variable-overrides)
@@ -18,7 +18,7 @@ BotNexus uses a hierarchical, dictionary-based configuration model that supports
 
 ## Quick Start
 
-### Minimal Configuration (appsettings.json)
+### Minimal Configuration (`~/.botnexus/config.json`)
 
 ```json
 {
@@ -48,7 +48,7 @@ BotNexus uses a hierarchical, dictionary-based configuration model that supports
 BotNexus follows a **defaults → overrides** pattern:
 
 1. **Defaults** — Built-in constants in code (e.g., `Model = "gpt-4o"`)
-2. **Configuration file** — appsettings.json (current) or ~/.botnexus/config.json (planned)
+2. **Configuration file** — `~/.botnexus/config.json` (or `${BOTNEXUS_HOME}/config.json` when set)
 3. **Environment variables** — Override any setting (see [Environment Variable Overrides](#environment-variable-overrides))
 4. **Named agent overrides** — Per-agent customization in `Agents.Named` dict
 
@@ -65,19 +65,34 @@ Environment variable (BotNexus__Agents__Named__planner__Model) = "claude-3-5-son
 
 ---
 
-## Current Deployment: appsettings.json
+## Primary Deployment: ~/.botnexus/
 
-BotNexus currently uses ASP.NET Core configuration binding. Place `appsettings.json` in the working directory of your Gateway or API server.
+BotNexus loads user configuration from:
 
-### File Locations
+- `~/.botnexus/config.json`
+- or `${BOTNEXUS_HOME}/config.json` when `BOTNEXUS_HOME` is set.
 
-- **Gateway:** `src/BotNexus.Gateway/appsettings.json`
-- **API:** `src/BotNexus.Api/appsettings.json`
-- **Development overrides:** `appsettings.Development.json` (auto-loaded in dev)
+On startup, BotNexus creates this structure if it does not already exist:
+
+```
+~/.botnexus/
+├── config.json
+├── extensions/
+│   ├── providers/
+│   ├── channels/
+│   └── tools/
+├── tokens/
+├── sessions/
+└── logs/
+```
+
+## Project Defaults: appsettings.json
+
+`src/BotNexus.Gateway/appsettings.json` and `src/BotNexus.Api/appsettings.json` remain default/fallback values. ASP.NET Core default config sources load first, then `~/.botnexus/config.json` is loaded and overrides those defaults.
 
 ### Configuration Binding
 
-The `BotNexus` section in appsettings.json is bound to the `BotNexusConfig` class at startup:
+The `BotNexus` section is bound to the `BotNexusConfig` class at startup:
 
 ```csharp
 // In Gateway/Api startup
@@ -86,50 +101,13 @@ configuration.GetSection(BotNexusConfig.SectionName).Bind(botNexusConfig);
 services.AddSingleton(botNexusConfig);
 ```
 
----
-
-## Planned Layout: ~/.botnexus/
-
-Jon's vision consolidates all user-facing configuration into a single directory. This will be implemented in Phase 4. The structure is:
-
-```
-~/.botnexus/
-├── config.json              # Main configuration (replaces appsettings.json)
-├── extensions/              # User-installed extensions (optional)
-│   ├── providers/
-│   │   ├── azure-openai/
-│   │   └── ...
-│   ├── channels/
-│   │   └── slack/
-│   └── tools/
-│       └── github/
-├── tokens/                  # OAuth token cache
-│   ├── copilot.json
-│   ├── openai.json
-│   └── ...
-└── workspace/               # Default session data
-    ├── agent-sessions.db
-    └── memory/
-```
-
-### Migration Path
-
-When the unified layout launches:
-
-1. **First run:** BotNexus checks for ~/.botnexus/config.json
-2. **If not found:** Falls back to appsettings.json (current approach) with deprecation warning
-3. **Tokens:** Always stored in ~/.botnexus/tokens/ regardless of config source
-4. **Extensions:** Loaded from both system extensions/ (current) and ~/.botnexus/extensions/
-
----
-
 ## Configuration Sections
 
 ### Root: BotNexusConfig
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `ExtensionsPath` | string | `./extensions` | Path to extension discovery folder (dynamic loading) |
+| `ExtensionsPath` | string | `~/.botnexus/extensions` | Path to extension discovery folder (dynamic loading) |
 | `Extensions` | ExtensionLoadingConfig | — | Extension loader behavior (signing, max assemblies) |
 | `Agents` | AgentDefaults | — | Agent defaults and named agent configurations |
 | `Providers` | ProvidersConfig | — | LLM provider registry (Copilot, OpenAI, Anthropic, Azure) |

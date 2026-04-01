@@ -15,7 +15,7 @@ public static class ExtensionLoaderExtensions
     {
         var botSection = configuration.GetSection(BotNexusConfig.SectionName);
         var botConfig = botSection.Get<BotNexusConfig>() ?? new BotNexusConfig();
-        var extensionsPath = Path.GetFullPath(botConfig.ExtensionsPath, Directory.GetCurrentDirectory());
+        var extensionsPath = BotNexusHome.ResolvePath(botConfig.ExtensionsPath);
         var extensionLoadingConfig = NormalizeExtensionLoadingConfig(botConfig.Extensions);
 
         LogInfo($"Extension loader root: {extensionsPath}");

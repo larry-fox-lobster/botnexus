@@ -80,6 +80,7 @@
 - 2026-04-01: `BotNexus.Providers.Copilot` ships as an extension with `CopilotExtensionRegistrar`, OAuth device-code auth via `GitHubDeviceCodeFlow`, and JSON token persistence at `%USERPROFILE%\.botnexus\tokens\copilot.json`.
 - 2026-04-01: Gateway observability now uses ASP.NET Core `IHealthCheck` + `/health` and `/ready`, with readiness tied to enabled channel runtime state and configured provider initialization.
 - 2026-04-01: Baseline platform metrics are emitted via `System.Diagnostics.Metrics` (`botnexus.messages.processed`, `botnexus.tool_calls.executed`, `botnexus.provider.latency`, `botnexus.extensions.loaded`), and message processing logs carry `CorrelationId` scopes end-to-end.
+- 2026-04-01: Startup now resolves BotNexus home from `BOTNEXUS_HOME` or `%USERPROFILE%\.botnexus`, creates home subfolders (`extensions/*`, `tokens`, `sessions`, `logs`) and loads user overrides from `config.json`.
 
 ## Sprint 1 Summary — 2026-04-01T17:33Z
 

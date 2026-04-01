@@ -15,8 +15,7 @@ public static class SessionServiceExtensions
         services.AddSingleton<ISessionManager>(sp =>
         {
             var config = sp.GetRequiredService<IOptions<BotNexusConfig>>().Value;
-            var storePath = Environment.ExpandEnvironmentVariables(
-                config.Agents.Workspace.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+            var storePath = BotNexusHome.ResolvePath(config.Agents.Workspace);
             var sessionsPath = Path.Combine(storePath, "sessions");
             var logger = sp.GetRequiredService<ILogger<SessionManager>>();
             return new SessionManager(sessionsPath, logger);

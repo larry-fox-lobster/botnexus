@@ -2,7 +2,9 @@
   <PropertyGroup Condition="'$(ExtensionType)' != '' and '$(ExtensionName)' != ''">
     <_ExtensionRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\'))</_ExtensionRepositoryRoot>
     <_ExtensionDevelopmentOutput>$([System.IO.Path]::Combine('$(_ExtensionRepositoryRoot)', 'extensions', '$(ExtensionType)', '$(ExtensionName)'))\</_ExtensionDevelopmentOutput>
-    <_ExtensionPublishOutput>$([System.IO.Path]::Combine('$(PublishDir)', 'extensions', '$(ExtensionType)', '$(ExtensionName)'))\</_ExtensionPublishOutput>
+    <_BotNexusHome>$([System.Environment]::GetEnvironmentVariable('BOTNEXUS_HOME'))</_BotNexusHome>
+    <_BotNexusHome Condition="'$(_BotNexusHome)' == ''">$([System.IO.Path]::Combine('$(USERPROFILE)', '.botnexus'))</_BotNexusHome>
+    <_ExtensionPublishOutput>$([System.IO.Path]::Combine('$(_BotNexusHome)', 'extensions', '$(ExtensionType)', '$(ExtensionName)'))\</_ExtensionPublishOutput>
   </PropertyGroup>
 
   <Target Name="CopyExtensionBuildOutput"

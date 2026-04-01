@@ -13,6 +13,12 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
+var botNexusHome = BotNexusHome.Initialize();
+builder.Configuration.AddJsonFile(
+    Path.Combine(botNexusHome, "config.json"),
+    optional: true,
+    reloadOnChange: false);
+builder.Configuration.AddEnvironmentVariables();
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options => options.IncludeScopes = true);
 builder.Services.AddBotNexus(builder.Configuration);
@@ -25,6 +31,7 @@ var gatewayCfg = builder.Configuration
 builder.WebHost.UseUrls($"http://{gatewayCfg.Host}:{gatewayCfg.Port}");
 
 var app = builder.Build();
+app.Logger.LogInformation("BotNexus home: {path}", botNexusHome);
 
 // JSON options for REST API responses
 var jsonOptions = new JsonSerializerOptions

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using BotNexus.Core.Abstractions;
+using BotNexus.Core.Configuration;
 
 namespace BotNexus.Providers.Copilot;
 
@@ -7,8 +8,7 @@ public sealed class FileOAuthTokenStore(string? tokenDirectory = null) : IOAuthT
 {
     private readonly string _tokenDirectory = tokenDirectory
         ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".botnexus",
+            BotNexusHome.ResolveHomePath(),
             "tokens");
 
     public async Task<OAuthToken?> LoadTokenAsync(string providerName, CancellationToken cancellationToken = default)
