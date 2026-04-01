@@ -30,6 +30,8 @@ public static class BotNexusHome
             HomeDirectoryName));
     }
 
+    public static string AgentsPath => Path.Combine(ResolveHomePath(), "agents");
+
     public static string ResolvePath(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -60,12 +62,24 @@ public static class BotNexusHome
         Directory.CreateDirectory(Path.Combine(homePath, "tokens"));
         Directory.CreateDirectory(Path.Combine(homePath, "sessions"));
         Directory.CreateDirectory(Path.Combine(homePath, "logs"));
+        Directory.CreateDirectory(AgentsPath);
 
         var configPath = Path.Combine(homePath, "config.json");
         if (!File.Exists(configPath))
             File.WriteAllText(configPath, DefaultConfigJson);
 
         return homePath;
+    }
+
+    public static string GetAgentWorkspacePath(string agentName)
+        => Path.Combine(AgentsPath, agentName);
+
+    public static void InitializeAgentWorkspace(string agentName)
+    {
+        var agentWorkspacePath = GetAgentWorkspacePath(agentName);
+        Directory.CreateDirectory(agentWorkspacePath);
+        Directory.CreateDirectory(Path.Combine(agentWorkspacePath, "memory"));
+        Directory.CreateDirectory(Path.Combine(agentWorkspacePath, "memory", "daily"));
     }
 
     private static string ResolveAbsolutePath(string path)

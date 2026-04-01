@@ -14,6 +14,10 @@ public class AgentConfig
     public int? MaxToolIterations { get; set; }
     public string? Timezone { get; set; }
     public bool? EnableMemory { get; set; }
+    public int MaxContextFileChars { get; set; } = 8000;
+    public string? ConsolidationModel { get; set; }
+    public int MemoryConsolidationIntervalHours { get; set; } = 24;
+    public bool AutoLoadMemory { get; set; } = true;
     public List<McpServerConfig> McpServers { get; set; } = [];
     public List<string> Skills { get; set; } = [];
     public List<CronJobConfig> CronJobs { get; set; } = [];
