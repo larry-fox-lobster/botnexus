@@ -159,4 +159,58 @@
 ### Team Status
 **ALL 4 SPRINTS COMPLETE:** 24/26 items delivered. Leela: Architecture lead + 6 items across all sprints (review, planning, architecture, extension guide). Production-ready platform ready for external developer community.
 
+### 2026-04-02 — Full Consistency Audit: Docs, Code, Comments
+
+**Trigger:** Jon flagged that `docs/architecture.md` still referenced the pre-`~/.botnexus/config.json` world. Systemic problem — each agent updated their own deliverables but nobody cross-checked other files for stale references.
+
+**Discrepancies Found & Fixed (22 total):**
+
+**architecture.md (8 fixes):**
+1. Line 139: Config box said `appsettings.json → BotNexusConfig` — fixed to `~/.botnexus/config.json`
+2. Lines 326-358: Extension config example had phantom `LoadPath` property, flat `Channels` (missing `Instances` wrapper), wrong property names (`Token`→`BotToken`, `AppId` removed), `Providers`/`Channels`/`Tools` arrays that don't exist in `ExtensionLoadingConfig`
+3. Line 458: Comment said "Bind from appsettings.json" — clarified config.json overrides appsettings.json
+4. Line 794: Session default path was `./sessions` — corrected to `~/.botnexus/workspace/sessions`
+5. Line 902: API key rotation referenced `appsettings.json` — fixed to `config.json`
+6. Lines 984-1015: Installation Layout showed `config/` subfolder with `appsettings.json` and phantom `cache/web_fetch/` — replaced with actual structure from `BotNexusHome.Initialize()` (`config.json` at root, `workspace/sessions/`, no cache)
+7. Lines 1019-1023: Config Resolution omitted `config.json` in loading chain — added it between appsettings.{env}.json and env vars
+8. Lines 1029-1030: First-Run said "Generate default appsettings.json" — corrected to `config.json`
+
+**configuration.md (3 fixes):**
+9. Line 57: Precedence example said `appsettings.json` — fixed to `config.json`
+10. Lines 700-708: Precedence order was wrong (code defaults listed after env vars, config.json missing entirely) — rewritten with correct 5-layer order
+11. Lines 622-633: Extension registration example used `RegisterServices` method (doesn't exist, actual method is `Register`), used `AddScoped` (actual lifetime is Singleton), took `ProviderConfig` parameter (actual is `IConfiguration`)
+
+**extension-development.md (10 fixes):**
+12. Line 35: "enabled in appsettings.json" — added config.json reference
+13. Line 222: "bound from appsettings.json" — generalized to "configuration"
+14. Lines 235-248: Channel config example missing `Instances` wrapper
+15. Line 296: "Enable in appsettings.json" — added config.json reference
+16. Line 981: "receive configuration from appsettings.json" — added config.json reference
+17. Lines 1004: `ExtensionsPath: "./extensions"` — corrected to `~/.botnexus/extensions`
+18. Lines 1010-1030: Config Shape had flat `Channels.discord` (→`Channels.Instances.discord`) and flat `Tools.github` (→`Tools.Extensions.github`)
+19. Lines 1167-1176: `FileOAuthTokenStore` example hardcoded `Environment.GetFolderPath` — corrected to use `BotNexusHome.ResolveHomePath()`
+20. Lines 1432, 1476, 1536: Three troubleshooting references to "appsettings.json" — added config.json references
+21. Lines 1446-1447: Log examples showed `./extensions` — corrected to `~/.botnexus/extensions`
+22. Lines 110-117: Extension.targets Publish description said `{PublishDir}` — corrected to `{BOTNEXUS_HOME}`
+
+**Code (1 fix):**
+- `BotNexusConfig.cs` XML doc: "bound from appsettings.json" → "bound from the BotNexus section (appsettings.json + ~/.botnexus/config.json)"
+
+**README.md (1 fix):**
+- Replaced 1-sentence stub with comprehensive project description (features, quick start, architecture table, config overview, project structure, docs links)
+
+**Items Verified Clean:**
+- All 7 extension .csproj files: correct `ExtensionType`, `ExtensionName`, and `Extension.targets` import ✅
+- `appsettings.json` (Gateway): defaults match code (ExtensionsPath=`~/.botnexus/extensions`, Workspace=`~/.botnexus/workspace`) ✅
+- `appsettings.json` (Api): defaults match code ✅
+- No TODO/FIXME/HACK comments in src/ ✅
+- `Extension.targets`: build/publish paths consistent with BotNexusHome ✅
+
+**Lesson:** Multi-agent doc/code drift is a systemic risk. When any agent changes a config path, data model, or default value, ALL docs and comments referencing the old value must be updated in the same PR. The consistency audit should be a ceremony — not a one-off fix.
+
+## 2026-04-02 — Team Updates
+
+- **Nibbler Onboarded:** New team member added as Consistency Reviewer. Owns post-sprint consistency audits.
+- **New Ceremony:** "Consistency Review" ceremony established, runs after sprint completion or architectural changes. First run (Leela's audit, 2026-04-02) found 22 issues across 5 files.
+- **Decision Merged:** "Cross-Document Consistency Checks as a Team Ceremony" (2026-04-01T18:54Z Jon directive) now in decisions.md. All agents should treat consistency as quality gate.
 

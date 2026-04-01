@@ -77,3 +77,9 @@
 Build is clean (0 errors, 2 warnings). All 124 tests pass. Contract layer is solid — no circular dependencies.
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+
+## 2026-04-02 — Team Updates
+
+- **Nibbler Onboarded:** New Consistency Reviewer added to team. Owns post-sprint audits.
+- **New Ceremony:** Consistency Review ceremony established (trigger: after sprint completion or arch changes). Leela's audit (2026-04-02) found 22 issues across 5 files.
+- **Decision:** Cross-Document Consistency Checks merged into decisions.md. All agents treat consistency as a quality gate.

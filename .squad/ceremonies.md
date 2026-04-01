@@ -22,6 +22,28 @@
 
 ---
 
+## Consistency Review
+
+| Field | Value |
+|-------|-------|
+| **Trigger** | auto |
+| **When** | after |
+| **Condition** | any sprint completion, or any change touching architecture, config, or public APIs |
+| **Facilitator** | nibbler |
+| **Participants** | nibbler (solo — reads everything, fixes everything) |
+| **Time budget** | focused |
+| **Enabled** | ✅ yes |
+
+**Agenda:**
+1. Read all docs end-to-end, cross-reference against code
+2. Check config defaults in code match documented defaults
+3. Grep for stale references (old paths, old names, old behavior)
+4. Verify README and public-facing docs are accurate
+5. Fix all discrepancies directly
+6. Commit fixes with conventional commit format
+
+---
+
 ## Retrospective
 
 | Field | Value |

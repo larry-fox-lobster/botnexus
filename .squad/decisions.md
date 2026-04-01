@@ -589,3 +589,24 @@ The simulated environment needs a config that sets up these multi-agent scenario
 - All meaningful changes require team consensus
 - Document architectural decisions here
 - Keep history focused on work, decisions focused on direction
+
+### 8. Cross-Document Consistency Checks as a Team Ceremony (2026-04-01T18:54Z)
+
+**Author:** Jon Bullen (via Copilot directive)  
+**Status:** Accepted  
+**Related:** Leela's full consistency audit (2026-04-02)
+
+**Context:** Jon flagged that multi-agent development causes documentation drift. When one agent changes a config path, data model, or default value, other agents (and documentation) may reference the old value. No single agent scans the entire codebase for stale references.
+
+**Decision:** Implement consistency checks as a recurring ceremony:
+- **Trigger:** After any significant change (architecture decision, config model change, path/name change)
+- **Scope:** Docs matching code, docs matching each other, code comments matching behavior, README matching current state
+- **Owner:** Designate \Nibbler\ (new Consistency Reviewer) to lead post-sprint audits
+- **Process:** Audit cycle runs after sprint completion or architectural changes
+- **Prevention:** Pull request validation should include a checklist item for consistency (when applicable)
+
+**Why:** Critical for a platform others will learn from. Documentation is the first experience external developers have. Drift undermines trust.
+
+**First Implementation:** Leela's audit (2026-04-02) found and fixed 22 issues across 5 files (8 in architecture.md, 3 in configuration.md, 10 in extension-development.md, 1 README rewrite, 1 code comment fix). Demonstrates scope of the problem and why a ceremony is needed.
+
+**Team Impact:** All agents should treat consistency as a quality gate. Nibbler will formalize the process and run the recurring audits.

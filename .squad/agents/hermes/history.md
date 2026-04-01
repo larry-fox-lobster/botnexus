@@ -206,3 +206,9 @@ All Sprints 1-2 foundation work completed by Farnsworth and Bender. Hermes ready
 ### Team Status
 **ALL 4 SPRINTS COMPLETE:** 24/26 items delivered. Hermes: 3 items across Sprints 2-4 (extension E2E tests, loader unit tests, multi-agent simulation). Platform thoroughly tested, production-ready, and ready for deployment.
 
+
+## 2026-04-02 — Team Updates
+
+- **Nibbler Onboarded:** New Consistency Reviewer added to team. Owns post-sprint audits.
+- **New Ceremony:** Consistency Review ceremony established (trigger: after sprint completion or arch changes). Leela's audit (2026-04-02) found 22 issues across 5 files.
+- **Decision:** Cross-Document Consistency Checks merged into decisions.md. All agents treat consistency as a quality gate.

@@ -84,3 +84,9 @@ See decisions.md "Part 4: Implementation Phases & Work Items" for full roadmap w
 **ALL 4 SPRINTS COMPLETE:** 24/26 items delivered. Fry: 4 items across all sprints (extension build pipeline, tool/channel dynamic loading, WebUI extensions panel). Platform operations now have real-time extension visibility.
 
 
+
+## 2026-04-02 — Team Updates
+
+- **Nibbler Onboarded:** New Consistency Reviewer added to team. Owns post-sprint audits.
+- **New Ceremony:** Consistency Review ceremony established (trigger: after sprint completion or arch changes). Leela's audit (2026-04-02) found 22 issues across 5 files.
+- **Decision:** Cross-Document Consistency Checks merged into decisions.md. All agents treat consistency as a quality gate.

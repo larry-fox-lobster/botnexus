@@ -13,6 +13,7 @@ How to decide who handles what.
 | Visual design & UX | Amy | UI mockups, component styling, design tokens, user experience, accessibility |
 | Code review | Leela | Review PRs, check SOLID compliance, suggest improvements |
 | Testing | Hermes | Write unit tests, integration tests, E2E tests, verify fixes |
+| Consistency review | Nibbler | Cross-check docs ↔ code ↔ comments, stale reference detection, post-sprint audit |
 | Scope & priorities | Leela | What to build next, trade-offs, decisions |
 | Session logging | Scribe | Automatic — never needs routing |
 

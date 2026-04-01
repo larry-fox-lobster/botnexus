@@ -18,6 +18,7 @@
 | Fry | Web Dev | `.squad/agents/fry/charter.md` | ⚛️ Active |
 | Amy | UI Designer | `.squad/agents/amy/charter.md` | 🎨 Active |
 | Hermes | Tester | `.squad/agents/hermes/charter.md` | 🧪 Active |
+| Nibbler | Consistency Reviewer | `.squad/agents/nibbler/charter.md` | 🔍 Active |
 | Scribe | Scribe | `.squad/agents/scribe/charter.md` | 📋 Active |
 | Ralph | Work Monitor | `.squad/agents/ralph/charter.md` | 🔄 Active |
 
