@@ -25,5 +25,6 @@
     <Project Path="tests/BotNexus.Tests.Extensions.Registrar/BotNexus.Tests.Extensions.Registrar.csproj" />
     <Project Path="tests/BotNexus.Tests.Integration/BotNexus.Tests.Integration.csproj" />
     <Project Path="tests/BotNexus.Tests.Unit/BotNexus.Tests.Unit.csproj" />
+    <Project Path="tests/BotNexus.Tests.E2E/BotNexus.Tests.E2E.csproj" />
   </Folder>
 </Solution>
