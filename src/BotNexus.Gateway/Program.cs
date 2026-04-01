@@ -42,6 +42,13 @@ if (Directory.Exists(webUiPath))
     });
 }
 
+var webSocketPath = string.IsNullOrWhiteSpace(gatewayCfg.WebSocketPath) ? "/ws" : gatewayCfg.WebSocketPath;
+app.UseWhen(
+    ctx =>
+        ctx.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase) ||
+        ctx.Request.Path.StartsWithSegments(webSocketPath, StringComparison.OrdinalIgnoreCase),
+    branch => branch.UseMiddleware<ApiKeyAuthenticationMiddleware>());
+
 // --- Health ---
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
@@ -139,7 +146,7 @@ app.MapGet("/api/agents", (IOptions<BotNexusConfig> config) =>
 // --- WebSocket endpoint ---
 if (gatewayCfg.WebSocketEnabled)
 {
-    app.Map(gatewayCfg.WebSocketPath, static wsApp =>
+    app.Map(webSocketPath, static wsApp =>
     {
         wsApp.UseWebSockets();
         wsApp.Run(static async ctx =>
@@ -155,6 +162,19 @@ if (gatewayCfg.WebSocketEnabled)
                 .GetRequiredService<GatewayWebSocketHandler>()
                 .HandleAsync(ctx, ctx.RequestAborted);
         });
+    });
+}
+
+foreach (var webhookHandler in app.Services.GetServices<IWebhookHandler>())
+{
+    var path = webhookHandler.Path.StartsWith("/", StringComparison.Ordinal)
+        ? webhookHandler.Path
+        : $"/{webhookHandler.Path}";
+
+    app.MapPost(path, async (HttpContext context) =>
+    {
+        var result = await webhookHandler.HandleAsync(context).ConfigureAwait(false);
+        await result.ExecuteAsync(context).ConfigureAwait(false);
     });
 }
 

@@ -78,6 +78,14 @@ Build is clean, tests pass. ProviderRegistry exists but is unused — evaluate i
 - Gateway service registration remains hard-coded only for `WebSocketChannel` + `GatewayWebSocketHandler`; external channels are loaded exclusively through `AddBotNexusExtensions()`.
 - Runtime verification: `/api/channels` still reports the built-in `websocket` channel with no external channels enabled, while channel registrars are discovered and executed from `extensions/channels/*`.
 
+### 2026-04-01 — Gateway API Key Authentication for REST + WebSocket
+
+- Added `ApiKeyAuthenticationMiddleware` that protects all `/api/*` routes and the configured WebSocket path (`/ws` by default).
+- API key is accepted via `X-Api-Key` header or `?apiKey=` query parameter for WebSocket upgrade requests.
+- Missing/invalid keys now return HTTP 401 with JSON payload `{ "error": "Unauthorized", "message": "Invalid or missing API key." }`.
+- If `BotNexus:Gateway:ApiKey` is empty, middleware logs a warning and allows unauthenticated requests for dev mode.
+- Added integration tests for success, failure, dev-mode bypass, health bypass, and WebSocket query-key path.
+
 ## Sprint 1 Summary — 2026-04-01T17:33Z
 
 ✅ **COMPLETE** — All 2 Foundation Items Delivered (5 more from Farnsworth)
@@ -130,3 +138,11 @@ All 7 foundation items completed (Farnsworth: 5, Bender: 2). Decisions merged an
 
 ### Team Status
 **Sprint 2 COMPLETE:** All 5 Sprint 2 items delivered (Farnsworth: 2, Bender: 3). Dynamic loading foundation fully integrated and tested. Ready for Phase 3.
+
+### 2026-04-01 — Extension Loader Security Hardening
+
+- Added extension security controls under BotNexus:Extensions: RequireSignedAssemblies (default alse), MaxAssembliesPerExtension (default 50), and DryRun (default alse).
+- Extension folder resolution now rejects escaping reparse points (symlink/junction targets outside extensions root) in addition to traversal segment checks.
+- Loader now validates assembly metadata before load, optionally enforces strong-name signature presence, logs full assembly path/version/discovered types, and supports dry-run validation without runtime loading.
+- Extension AssemblyLoadContext now only shares approved contract assemblies (BotNexus.Core*, Microsoft.Extensions.*) to reduce host-internal exposure.
+- Added unit coverage for invalid assemblies, strong-name enforcement, folder assembly cap, dry-run behavior, reparse-point escape rejection, detailed assembly logging, and host assembly isolation behavior.
