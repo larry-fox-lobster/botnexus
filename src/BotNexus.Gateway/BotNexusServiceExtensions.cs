@@ -68,9 +68,12 @@ public static class BotNexusServiceExtensions
         });
 
         // Cron
+        services.Configure<CronConfig>(configuration.GetSection($"{BotNexusConfig.SectionName}:Cron"));
         services.AddSingleton<ISystemAction, CheckUpdatesAction>();
         services.AddSingleton<ISystemAction, HealthAuditAction>();
         services.AddSingleton<ISystemAction, ExtensionScanAction>();
+        services.AddSingleton<CronJobFactory>();
+        services.AddHostedService<CronJobRegistrationHostedService>();
         services.AddSingleton<ICronService, CronService>();
         services.AddHostedService(sp => (CronService)sp.GetRequiredService<ICronService>());
 
