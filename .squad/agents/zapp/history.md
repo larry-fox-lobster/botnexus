@@ -69,3 +69,32 @@
 - 2 P2 items deferred to next sprint: Anthropic tool-calling feature parity, plugin architecture deep-dive
 - Hearbeat service still needs HealthCheck.AggregateAsync() implementation (minor gap)
 - Plugin discovery (AssemblyLoadContext per extension) not yet fully tested with real extension deployments
+
+### 2026-04-03 — 100% Scenario Coverage: All Gaps Closed
+
+**Task:** Close ALL scenario coverage gaps → 100% executable. Requested by Jon.
+
+**Achievement:** 8 scenarios implemented (6 🔲 Planned + 2 ⚠️ Partial → all ✅ Covered). SCENARIOS.md now shows 64/64 (100%).
+
+**New tests created (all in `tests/BotNexus.Tests.Integration/Tests/`):**
+
+| Scenario | File | Tests |
+|---|---|---|
+| SC-AWM-006: Memory consolidation | MemoryConsolidationE2eTests.cs | 2 tests — full consolidation pipeline with real MemoryStore, fake LLM, daily file archival; today's file preservation |
+| SC-AWM-009: Home directory init | HomeDirectoryInitE2eTests.cs | 3 tests — Gateway startup creates full dir structure, default config.json, per-agent workspace setup |
+| SC-AWM-010: Memory isolation | MemoryStoreIsolationE2eTests.cs | 5 tests — cross-agent read isolation, daily memory isolation, key listing isolation, delete isolation, MEMORY.md isolation |
+| SC-PRV-007: Multi-provider | MultiProviderE2eTests.cs | 3 tests — case-insensitive registry, WebApplicationFactory with 2 providers, response differentiation |
+| SC-CHN-002: Slack webhook E2E | SlackWebhookE2eTests.cs | 4 tests — URL verification via Gateway, valid event callback, invalid signature rejection, message bus publishing |
+| SC-CHN-004: Channel config | ChannelConfigE2eTests.cs | 5 tests — open allow-list, restricted allow-list, message blocking, start/stop lifecycle, disabled channel |
+| SC-OBS-003: Correlation IDs | CorrelationIdE2eTests.cs | 8 tests — auto-generation, preservation, idempotency, null handling, non-string coercion, record cloning, uniqueness, metadata flow |
+| SC-OBS-004: Metrics | MetricsE2eTests.cs | 8 tests — all 8 metric instruments (counters, histograms, gauge) validated via MeterListener with tag assertions |
+
+**Key design decisions:**
+- All new tests placed in `BotNexus.Tests.Integration` to avoid heavy E2E fixtures where not needed
+- BOTNEXUS_HOME env var override used for all filesystem tests (never touches `%USERPROFILE%\.botnexus\`)
+- Slack E2E registers `SlackWebhookHandler` directly in DI (simulates extension loading)
+- Metrics tests use `System.Diagnostics.Metrics.MeterListener` for in-process metric capture
+- Added project references to Integration csproj: Channels.Base, Channels.Slack, Providers.Base
+
+**Test results:** 395 total tests, 0 failures (Deployment:10, E2E:23, Integration:77, Unit:285)
+
