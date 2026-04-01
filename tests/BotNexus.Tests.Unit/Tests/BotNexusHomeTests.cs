@@ -43,6 +43,18 @@ public sealed class BotNexusHomeTests : IDisposable
         BotNexusHome.AgentsPath.Should().Be(Path.Combine(_testHomePath, "agents"));
     }
 
+    [Fact]
+    public void Initialize_CreatesMinimalDefaultConfigWithoutProviders()
+    {
+        BotNexusHome.Initialize();
+
+        var configPath = Path.Combine(_testHomePath, "config.json");
+        var configContent = File.ReadAllText(configPath);
+
+        configContent.Should().Contain("\"Providers\": {}", "first-run config should not force provider setup");
+        configContent.Should().NotContain("\"copilot\"", "providers should be user configured");
+    }
+
     public void Dispose()
     {
         Environment.SetEnvironmentVariable(HomeOverrideEnvVar, _originalHomeOverride);

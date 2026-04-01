@@ -15,7 +15,7 @@ public sealed class CleanStartTests
         var port = GatewayProcessFixture.FindFreePort();
         await using var gw = new GatewayProcessFixture(port);
 
-        // Pre-create config.json to prevent default (which adds copilot provider)
+        // Pre-create config.json to ensure deterministic test config
         gw.WriteAppSettings(GatewayProcessFixture.DefaultAppSettings(port));
         gw.WriteConfigJson(GatewayProcessFixture.MinimalConfigJson());
 

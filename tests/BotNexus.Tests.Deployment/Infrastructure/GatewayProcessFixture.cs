@@ -226,7 +226,7 @@ public sealed class GatewayProcessFixture : IAsyncDisposable
         }
         """;
 
-    /// <summary>Minimal config.json that prevents Initialize() from writing the default (which adds copilot).</summary>
+    /// <summary>Minimal config.json that prevents Initialize() from writing defaults.</summary>
     public static string MinimalConfigJson() => """
         {
           "BotNexus": {}

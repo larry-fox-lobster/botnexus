@@ -9,11 +9,13 @@ public static class BotNexusHome
 {
   "BotNexus": {
     "ExtensionsPath": "~/.botnexus/extensions",
-    "Providers": {
-      "copilot": {
-        "Auth": "oauth",
-        "ApiBase": "https://api.githubcopilot.com"
-      }
+    "Providers": {},
+    "Channels": {
+      "Instances": {}
+    },
+    "Tools": {
+      "Extensions": {},
+      "McpServers": {}
     }
   }
 }
