@@ -21,14 +21,29 @@ public sealed class MessageBusHealthCheck(IMessageBus messageBus) : IHealthCheck
     }
 }
 
-public sealed class ProviderRegistrationHealthCheck(ProviderRegistry providerRegistry) : IHealthCheck
+public sealed class ProviderRegistrationHealthCheck(
+    ProviderRegistry providerRegistry,
+    IOptions<BotNexusConfig> options) : IHealthCheck
 {
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
+        var configuredProviders = options.Value.Providers.Keys.ToList();
+        if (configuredProviders.Count == 0)
+            return Task.FromResult(HealthCheckResult.Healthy("No providers configured"));
+
         var providers = providerRegistry.GetProviderNames();
         return Task.FromResult(providers.Count > 0
-            ? HealthCheckResult.Healthy("At least one provider is registered", data: new Dictionary<string, object> { ["providers"] = providers })
-            : HealthCheckResult.Unhealthy("No providers are registered"));
+            ? HealthCheckResult.Healthy("At least one configured provider is registered",
+                data: new Dictionary<string, object>
+                {
+                    ["providers"] = providers,
+                    ["configuredProviders"] = configuredProviders
+                })
+            : HealthCheckResult.Unhealthy("Providers are configured but none are registered",
+                data: new Dictionary<string, object>
+                {
+                    ["configuredProviders"] = configuredProviders
+                }));
     }
 }
 
@@ -42,7 +57,8 @@ public sealed class ExtensionLoaderHealthCheck(ExtensionLoadReport loadReport) :
                 data: new Dictionary<string, object>
                 {
                     ["loaded"] = loadReport.LoadedCount,
-                    ["failed"] = loadReport.FailedCount
+                    ["failed"] = loadReport.FailedCount,
+                    ["warnings"] = loadReport.WarningCount
                 }));
         }
 
@@ -50,7 +66,8 @@ public sealed class ExtensionLoaderHealthCheck(ExtensionLoadReport loadReport) :
             data: new Dictionary<string, object>
             {
                 ["loaded"] = loadReport.LoadedCount,
-                ["failed"] = loadReport.FailedCount
+                ["failed"] = loadReport.FailedCount,
+                ["warnings"] = loadReport.WarningCount
             }));
     }
 }
@@ -85,6 +102,9 @@ public sealed class ProviderReadinessHealthCheck(ProviderRegistry providerRegist
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         var configuredProviders = options.Value.Providers.Keys.ToList();
+        if (configuredProviders.Count == 0)
+            return Task.FromResult(HealthCheckResult.Healthy("No providers configured"));
+
         var registeredProviders = providerRegistry.GetProviderNames();
         var missingProviders = configuredProviders
             .Where(name => !registeredProviders.Contains(name, StringComparer.OrdinalIgnoreCase))
