@@ -13,6 +13,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <ExtensionType>channels</ExtensionType>
+    <ExtensionName>slack</ExtensionName>
   </PropertyGroup>
+
+  <Import Project="..\Extension.targets" />
 
 </Project>

@@ -1,0 +1,35 @@
+<Project>
+  <PropertyGroup Condition="'$(ExtensionType)' != '' and '$(ExtensionName)' != ''">
+    <_ExtensionRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\'))</_ExtensionRepositoryRoot>
+    <_ExtensionDevelopmentOutput>$([System.IO.Path]::Combine('$(_ExtensionRepositoryRoot)', 'extensions', '$(ExtensionType)', '$(ExtensionName)'))\</_ExtensionDevelopmentOutput>
+    <_ExtensionPublishOutput>$([System.IO.Path]::Combine('$(PublishDir)', 'extensions', '$(ExtensionType)', '$(ExtensionName)'))\</_ExtensionPublishOutput>
+  </PropertyGroup>
+
+  <Target Name="CopyExtensionBuildOutput"
+          AfterTargets="Build"
+          Condition="'$(ExtensionType)' != '' and '$(ExtensionName)' != ''">
+    <ItemGroup>
+      <_ExtensionBuildFiles Include="$(TargetDir)**\*"
+                            Exclude="$(TargetDir)ref\**\*;$(TargetDir)refint\**\*" />
+    </ItemGroup>
+
+    <MakeDir Directories="$(_ExtensionDevelopmentOutput)" />
+    <Copy SourceFiles="@(_ExtensionBuildFiles)"
+          DestinationFiles="@(_ExtensionBuildFiles->'$(_ExtensionDevelopmentOutput)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyExtensionPublishOutput"
+          AfterTargets="Publish"
+          Condition="'$(ExtensionType)' != '' and '$(ExtensionName)' != '' and '$(PublishDir)' != ''">
+    <ItemGroup>
+      <_ExtensionPublishFiles Include="$(PublishDir)**\*"
+                              Exclude="$(PublishDir)extensions\**\*" />
+    </ItemGroup>
+
+    <MakeDir Directories="$(_ExtensionPublishOutput)" />
+    <Copy SourceFiles="@(_ExtensionPublishFiles)"
+          DestinationFiles="@(_ExtensionPublishFiles->'$(_ExtensionPublishOutput)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

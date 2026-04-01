@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>BotNexus extension library providing GitHub tools for agents.</Description>
+    <ExtensionType>tools</ExtensionType>
+    <ExtensionName>github</ExtensionName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,5 +19,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
   </ItemGroup>
+
+  <Import Project="..\Extension.targets" />
 
 </Project>

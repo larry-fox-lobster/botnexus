@@ -60,6 +60,12 @@ Build is clean, tests pass. ProviderRegistry exists but is unused — evaluate i
 - Security gates are in place for extension keys (reject rooted paths, invalid chars, `.`/`..` traversal), and failures are warning/error logged without crashing startup.
 - Gateway DI now invokes extension loading during service registration so configured extensions are wired automatically at startup.
 
+### 2026-04-01 — Extension Build/Publish Pipeline via MSBuild Metadata
+
+- Added shared `src/Extension.targets` that extension projects can import and activate with `<ExtensionType>` + `<ExtensionName>` metadata.
+- `Build` now copies extension outputs into solution-root `extensions/{type}/{name}/`, and `Publish` mirrors outputs into `{PublishDir}/extensions/{type}/{name}/`.
+- Applied metadata/imports to Discord, Slack, Telegram, OpenAI, Anthropic, and GitHub extension projects; gateway development config now points `BotNexus:ExtensionsPath` at `../../extensions`.
+
 ## Sprint 1 Summary — 2026-04-01T17:33Z
 
 ✅ **COMPLETE** — All 2 Foundation Items Delivered (5 more from Farnsworth)
