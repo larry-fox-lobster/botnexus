@@ -41,7 +41,7 @@ public sealed class AgentCronJob : ICronJob
         _channelResolver = channelResolver;
         _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<AgentCronJob>.Instance;
 
-        Name = config.Agent;
+        Name = string.IsNullOrWhiteSpace(config.Name) ? config.Agent : config.Name;
         Schedule = config.Schedule;
         Enabled = config.Enabled;
         TimeZone = ResolveTimeZone(config.Timezone);

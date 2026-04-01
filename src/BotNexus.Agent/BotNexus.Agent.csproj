@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BotNexus.Core\BotNexus.Core.csproj" />
+    <ProjectReference Include="..\BotNexus.Cron\BotNexus.Cron.csproj" />
     <ProjectReference Include="..\BotNexus.Providers.Base\BotNexus.Providers.Base.csproj" />
     <ProjectReference Include="..\BotNexus.Session\BotNexus.Session.csproj" />
   </ItemGroup>

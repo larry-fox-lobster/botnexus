@@ -3,6 +3,9 @@ namespace BotNexus.Core.Configuration;
 /// <summary>Per-job configuration within the centralized Cron section.</summary>
 public class CronJobConfig
 {
+    /// <summary>Optional explicit job name override.</summary>
+    public string? Name { get; set; }
+
     /// <summary>Cron expression (standard 5-field or 6-field with seconds).</summary>
     public string Schedule { get; set; } = string.Empty;
 
