@@ -24,6 +24,7 @@ public sealed class CronService : BackgroundService, ICronService
     private readonly TimeSpan _tickInterval;
     private readonly int _executionHistorySize;
     private readonly bool _enabled;
+    private volatile bool _isRunning;
 
     public CronService(
         ILogger<CronService> logger,
@@ -40,6 +41,9 @@ public sealed class CronService : BackgroundService, ICronService
         _tickInterval = TimeSpan.FromSeconds(cron.TickIntervalSeconds > 0 ? cron.TickIntervalSeconds : 10);
         _executionHistorySize = cron.ExecutionHistorySize > 0 ? cron.ExecutionHistorySize : 100;
     }
+
+    /// <inheritdoc />
+    public bool IsRunning => _isRunning;
 
     /// <inheritdoc />
     public void Register(ICronJob job)
@@ -164,23 +168,31 @@ public sealed class CronService : BackgroundService, ICronService
             return;
         }
 
+        _isRunning = true;
         _logger.LogInformation("Cron service started with tick interval {TickIntervalSeconds}s", _tickInterval.TotalSeconds);
 
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                await Task.Delay(_tickInterval, stoppingToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
+                try
+                {
+                    await Task.Delay(_tickInterval, stoppingToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
+                await TickAsync(stoppingToken).ConfigureAwait(false);
             }
 
-            await TickAsync(stoppingToken).ConfigureAwait(false);
+            await AwaitRunningTasksAsync().ConfigureAwait(false);
         }
-
-        await AwaitRunningTasksAsync().ConfigureAwait(false);
+        finally
+        {
+            _isRunning = false;
+        }
     }
 
     private Task TickAsync(CancellationToken cancellationToken)

@@ -1,10 +1,6 @@
-using System.Reflection;
 using BotNexus.Core.Abstractions;
-using BotNexus.Core.Configuration;
 using BotNexus.Heartbeat;
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Moq;
 
 namespace BotNexus.Tests.Unit.Tests;
@@ -12,126 +8,44 @@ namespace BotNexus.Tests.Unit.Tests;
 public sealed class HeartbeatServiceTests
 {
     [Fact]
-    public async Task RunConsolidationTriggersAsync_EnabledAgent_IsThrottledByInterval()
+    public void Beat_IsNoOp()
     {
-        var config = BuildConfig(new Dictionary<string, AgentConfig>
-        {
-            ["farnsworth"] = new() { EnableMemory = true, MemoryConsolidationIntervalHours = 24 }
-        });
+        var cron = new Mock<ICronService>();
+        var sut = new HeartbeatService(cron.Object);
 
-        var consolidator = new Mock<IMemoryConsolidator>();
-        consolidator.Setup(c => c.ConsolidateAsync("farnsworth", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new MemoryConsolidationResult(true, 2, 8));
+        var act = () => sut.Beat();
 
-        var workspace = new Mock<IAgentWorkspace>();
-        workspace.Setup(w => w.InitializeAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        workspace.Setup(w => w.FileExists("HEARTBEAT.md")).Returns(true);
-        workspace.Setup(w => w.ReadFileAsync("HEARTBEAT.md", It.IsAny<CancellationToken>()))
-            .ReturnsAsync("[daily] consolidate memory");
+        act.Should().NotThrow();
+    }
 
-        var workspaceFactory = new Mock<IAgentWorkspaceFactory>();
-        workspaceFactory.Setup(f => f.Create("farnsworth")).Returns(workspace.Object);
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void IsHealthy_DelegatesToCronServiceState(bool isRunning)
+    {
+        var cron = new Mock<ICronService>();
+        cron.SetupGet(c => c.IsRunning).Returns(isRunning);
 
-        var sut = new HeartbeatService(
-            NullLogger<HeartbeatService>.Instance,
-            Options.Create(config),
-            consolidator.Object,
-            workspaceFactory.Object);
+        var sut = new HeartbeatService(cron.Object);
 
-        await InvokeRunConsolidationTriggersAsync(sut);
-        await InvokeRunConsolidationTriggersAsync(sut);
-
-        consolidator.Verify(c => c.ConsolidateAsync("farnsworth", It.IsAny<CancellationToken>()), Times.Once);
-        workspace.Verify(w => w.ReadFileAsync("HEARTBEAT.md", It.IsAny<CancellationToken>()), Times.Once);
+        sut.IsHealthy.Should().Be(isRunning);
     }
 
     [Fact]
-    public async Task RunConsolidationTriggersAsync_AgentFailure_DoesNotBlockOtherAgents()
+    public void LastBeat_ReturnsMostRecentCronJobRun()
     {
-        var config = BuildConfig(new Dictionary<string, AgentConfig>
-        {
-            ["amy"] = new() { EnableMemory = true, MemoryConsolidationIntervalHours = 24 },
-            ["bender"] = new() { EnableMemory = true, MemoryConsolidationIntervalHours = 24 }
-        });
+        var oldest = new DateTimeOffset(2026, 4, 3, 9, 0, 0, TimeSpan.Zero);
+        var newest = new DateTimeOffset(2026, 4, 3, 11, 0, 0, TimeSpan.Zero);
+        var cron = new Mock<ICronService>();
+        cron.Setup(c => c.GetJobs()).Returns(
+        [
+            new CronJobStatus("job-a", CronJobType.Agent, "0 * * * *", true, oldest, null, true, TimeSpan.FromSeconds(2)),
+            new CronJobStatus("job-b", CronJobType.System, "*/5 * * * *", true, null, null, null, null),
+            new CronJobStatus("job-c", CronJobType.Maintenance, "0 2 * * *", true, newest, null, true, TimeSpan.FromSeconds(1))
+        ]);
 
-        var consolidator = new Mock<IMemoryConsolidator>();
-        consolidator.Setup(c => c.ConsolidateAsync("amy", It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("boom"));
-        consolidator.Setup(c => c.ConsolidateAsync("bender", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new MemoryConsolidationResult(true, 1, 3));
+        var sut = new HeartbeatService(cron.Object);
 
-        var amyWorkspace = new Mock<IAgentWorkspace>();
-        amyWorkspace.Setup(w => w.InitializeAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        amyWorkspace.Setup(w => w.FileExists("HEARTBEAT.md")).Returns(false);
-
-        var benderWorkspace = new Mock<IAgentWorkspace>();
-        benderWorkspace.Setup(w => w.InitializeAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        benderWorkspace.Setup(w => w.FileExists("HEARTBEAT.md")).Returns(false);
-
-        var workspaceFactory = new Mock<IAgentWorkspaceFactory>();
-        workspaceFactory.Setup(f => f.Create("amy")).Returns(amyWorkspace.Object);
-        workspaceFactory.Setup(f => f.Create("bender")).Returns(benderWorkspace.Object);
-
-        var sut = new HeartbeatService(
-            NullLogger<HeartbeatService>.Instance,
-            Options.Create(config),
-            consolidator.Object,
-            workspaceFactory.Object);
-
-        await InvokeRunConsolidationTriggersAsync(sut);
-
-        consolidator.Verify(c => c.ConsolidateAsync("amy", It.IsAny<CancellationToken>()), Times.Once);
-        consolidator.Verify(c => c.ConsolidateAsync("bender", It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task RunConsolidationTriggersAsync_DisabledAgents_AreSkipped()
-    {
-        var config = BuildConfig(new Dictionary<string, AgentConfig>
-        {
-            ["fry"] = new() { EnableMemory = false, MemoryConsolidationIntervalHours = 24 },
-            ["leela"] = new() { EnableMemory = true, MemoryConsolidationIntervalHours = 24 }
-        });
-
-        var consolidator = new Mock<IMemoryConsolidator>();
-        consolidator.Setup(c => c.ConsolidateAsync("leela", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new MemoryConsolidationResult(true, 0, 0));
-
-        var workspace = new Mock<IAgentWorkspace>();
-        workspace.Setup(w => w.InitializeAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        workspace.Setup(w => w.FileExists("HEARTBEAT.md")).Returns(false);
-
-        var workspaceFactory = new Mock<IAgentWorkspaceFactory>();
-        workspaceFactory.Setup(f => f.Create("leela")).Returns(workspace.Object);
-
-        var sut = new HeartbeatService(
-            NullLogger<HeartbeatService>.Instance,
-            Options.Create(config),
-            consolidator.Object,
-            workspaceFactory.Object);
-
-        await InvokeRunConsolidationTriggersAsync(sut);
-
-        consolidator.Verify(c => c.ConsolidateAsync("leela", It.IsAny<CancellationToken>()), Times.Once);
-        consolidator.Verify(c => c.ConsolidateAsync("fry", It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    private static BotNexusConfig BuildConfig(Dictionary<string, AgentConfig> agents)
-        => new()
-        {
-            Agents = new AgentDefaults
-            {
-                Named = agents
-            }
-        };
-
-    private static async Task InvokeRunConsolidationTriggersAsync(HeartbeatService service)
-    {
-        var method = typeof(HeartbeatService).GetMethod("RunConsolidationTriggersAsync", BindingFlags.Instance | BindingFlags.NonPublic);
-        method.Should().NotBeNull("HeartbeatService should expose consolidation cycle logic");
-
-        var task = method!.Invoke(service, [CancellationToken.None]) as Task;
-        task.Should().NotBeNull();
-        await task!;
+        sut.LastBeat.Should().Be(newest);
     }
 }

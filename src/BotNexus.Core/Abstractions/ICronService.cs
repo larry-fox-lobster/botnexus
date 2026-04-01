@@ -3,6 +3,9 @@ namespace BotNexus.Core.Abstractions;
 /// <summary>Central scheduler for all recurring work in BotNexus.</summary>
 public interface ICronService
 {
+    /// <summary>Whether the cron scheduler loop is currently running.</summary>
+    bool IsRunning { get; }
+
     /// <summary>Register a job from configuration or at runtime.</summary>
     void Register(ICronJob job);
 
