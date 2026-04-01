@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using BotNexus.Core.Abstractions;
 using BotNexus.Core.Configuration;
 using BotNexus.Core.Models;
+using BotNexus.Core.Observability;
 using Cronos;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -21,6 +22,7 @@ public sealed class CronService : BackgroundService, ICronService
     private readonly ILogger<CronService> _logger;
     private readonly IServiceProvider _services;
     private readonly IActivityStream _activityStream;
+    private readonly IBotNexusMetrics _metrics;
     private readonly TimeSpan _tickInterval;
     private readonly int _executionHistorySize;
     private readonly bool _enabled;
@@ -30,11 +32,13 @@ public sealed class CronService : BackgroundService, ICronService
         ILogger<CronService> logger,
         IServiceProvider services,
         IActivityStream activityStream,
+        IBotNexusMetrics metrics,
         IOptions<BotNexusConfig> options)
     {
         _logger = logger;
         _services = services;
         _activityStream = activityStream;
+        _metrics = metrics;
 
         var cron = options.Value.Cron ?? new CronConfig();
         _enabled = cron.Enabled;
@@ -97,7 +101,8 @@ public sealed class CronService : BackgroundService, ICronService
                     entry.LastRunStartedAt,
                     entry.NextOccurrence,
                     entry.LastResult?.Success,
-                    entry.LastResult?.Duration))
+                    entry.LastResult?.Duration,
+                    entry.ConsecutiveFailures))
                 .ToList();
         }
     }
@@ -204,10 +209,21 @@ public sealed class CronService : BackgroundService, ICronService
         {
             foreach (var entry in _jobs.Values)
             {
-                if (!entry.Job.Enabled || entry.IsRunning || !entry.NextOccurrence.HasValue)
+                if (!entry.Job.Enabled)
+                {
+                    if (entry.NextOccurrence.HasValue && entry.NextOccurrence.Value <= now)
+                        _metrics.IncrementCronJobsSkipped(entry.Job.Name, "disabled");
                     continue;
+                }
 
-                if (entry.NextOccurrence.Value > now)
+                if (entry.IsRunning)
+                {
+                    if (entry.NextOccurrence.HasValue && entry.NextOccurrence.Value <= now)
+                        _metrics.IncrementCronJobsSkipped(entry.Job.Name, "overlapping");
+                    continue;
+                }
+
+                if (!entry.NextOccurrence.HasValue || entry.NextOccurrence.Value > now)
                     continue;
 
                 var scheduledTime = entry.NextOccurrence.Value;
@@ -242,6 +258,8 @@ public sealed class CronService : BackgroundService, ICronService
             Services = _services
         };
 
+        _metrics.IncrementCronJobsExecuted(entry.Job.Name);
+
         CronJobResult result = new(
             Success: false,
             Error: "Job did not complete.",
@@ -252,7 +270,7 @@ public sealed class CronService : BackgroundService, ICronService
         {
             await PublishActivitySafeAsync(
                 ActivityEventType.AgentProcessing,
-                "cron.started",
+                "cron.job.started",
                 entry.Job,
                 context,
                 cancellationToken).ConfigureAwait(false);
@@ -274,6 +292,8 @@ public sealed class CronService : BackgroundService, ICronService
             var duration = result.Duration == default ? completedAt - startedAt : result.Duration;
             result = result with { Duration = duration };
 
+            _metrics.RecordCronJobDuration(entry.Job.Name, duration.TotalMilliseconds);
+
             if (result.Success)
             {
                 _logger.LogInformation(
@@ -283,14 +303,21 @@ public sealed class CronService : BackgroundService, ICronService
 
                 await PublishActivitySafeAsync(
                     ActivityEventType.AgentCompleted,
-                    "cron.completed",
+                    "cron.job.completed",
                     entry.Job,
                     context,
                     cancellationToken,
-                    result.Output).ConfigureAwait(false);
+                    result.Output,
+                    new Dictionary<string, object>
+                    {
+                        ["duration_ms"] = duration.TotalMilliseconds,
+                        ["success"] = true
+                    }).ConfigureAwait(false);
             }
             else
             {
+                _metrics.IncrementCronJobsFailed(entry.Job.Name);
+
                 _logger.LogWarning(
                     "Cron job '{JobName}' failed in {DurationMs}ms: {Error}",
                     entry.Job.Name,
@@ -299,17 +326,24 @@ public sealed class CronService : BackgroundService, ICronService
 
                 await PublishActivitySafeAsync(
                     ActivityEventType.Error,
-                    "cron.failed",
+                    "cron.job.failed",
                     entry.Job,
                     context,
                     cancellationToken,
-                    result.Error).ConfigureAwait(false);
+                    result.Error,
+                    new Dictionary<string, object>
+                    {
+                        ["duration_ms"] = duration.TotalMilliseconds,
+                        ["success"] = false,
+                        ["error"] = result.Error ?? string.Empty
+                    }).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
         {
             completedAt = DateTimeOffset.UtcNow;
             result = result with { Success = false, Error = ex.Message, Duration = completedAt - startedAt };
+            _metrics.IncrementCronJobsFailed(entry.Job.Name);
             _logger.LogError(ex, "Cron job '{JobName}' execution pipeline failed", entry.Job.Name);
         }
         finally
@@ -327,6 +361,7 @@ public sealed class CronService : BackgroundService, ICronService
             {
                 entry.LastRunStartedAt = startedAt;
                 entry.LastResult = result;
+                entry.ConsecutiveFailures = result.Success ? 0 : entry.ConsecutiveFailures + 1;
                 entry.IsRunning = false;
 
                 if (!_history.TryGetValue(entry.Job.Name, out var history))
@@ -350,7 +385,8 @@ public sealed class CronService : BackgroundService, ICronService
         ICronJob job,
         CronJobContext context,
         CancellationToken cancellationToken,
-        string? details = null)
+        string? details = null,
+        Dictionary<string, object>? extraMetadata = null)
     {
         var metadata = new Dictionary<string, object>
         {
@@ -362,6 +398,12 @@ public sealed class CronService : BackgroundService, ICronService
             ["scheduled_time"] = context.ScheduledTime.ToString("O"),
             ["actual_time"] = context.ActualTime.ToString("O")
         };
+
+        if (extraMetadata is not null)
+        {
+            foreach (var kvp in extraMetadata)
+                metadata[kvp.Key] = kvp.Value;
+        }
 
         await _activityStream.PublishAsync(new ActivityEvent(
             eventType,
@@ -380,11 +422,12 @@ public sealed class CronService : BackgroundService, ICronService
         ICronJob job,
         CronJobContext context,
         CancellationToken cancellationToken,
-        string? details = null)
+        string? details = null,
+        Dictionary<string, object>? extraMetadata = null)
     {
         try
         {
-            await PublishActivityAsync(eventType, eventName, job, context, cancellationToken, details).ConfigureAwait(false);
+            await PublishActivityAsync(eventType, eventName, job, context, cancellationToken, details, extraMetadata).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -430,6 +473,7 @@ public sealed class CronService : BackgroundService, ICronService
         public DateTimeOffset? NextOccurrence { get; set; }
         public DateTimeOffset? LastRunStartedAt { get; set; }
         public CronJobResult? LastResult { get; set; }
+        public int ConsecutiveFailures { get; set; }
         public bool IsRunning { get; set; }
     }
 }

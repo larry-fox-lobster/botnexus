@@ -17,7 +17,7 @@ public sealed class CronHeartbeatAdapter(ICronService cronService, IOptions<Cron
         get
         {
             var latestCronBeat = _cronService.GetJobs()
-                .Select(static job => job.LastRun)
+                .Select(static job => job.LastRunStartedAt)
                 .Where(static timestamp => timestamp.HasValue)
                 .Select(static timestamp => timestamp!.Value)
                 .OrderByDescending(static timestamp => timestamp)

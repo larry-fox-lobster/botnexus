@@ -39,6 +39,93 @@ public sealed class SystemCronJobTests
         result.Metadata!["routedChannels"].Should().Be(1);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_MissingAction_ReturnsFailure()
+    {
+        var registry = new SystemActionRegistry();
+        var config = new CronJobConfig
+        {
+            Schedule = "* * * * *",
+            Action = null
+        };
+
+        var context = BuildContext(new ServiceCollection().BuildServiceProvider(), "system-check");
+        var job = new SystemCronJob(config, registry);
+
+        var result = await job.ExecuteAsync(context, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Be("System job action is required.");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnknownAction_ReturnsFailure()
+    {
+        var registry = new SystemActionRegistry();
+        var config = new CronJobConfig
+        {
+            Schedule = "* * * * *",
+            Action = "does-not-exist"
+        };
+
+        var context = BuildContext(new ServiceCollection().BuildServiceProvider(), "system-check");
+        var job = new SystemCronJob(config, registry);
+
+        var result = await job.ExecuteAsync(context, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Be("Unknown system action 'does-not-exist'.");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ActionThrows_ReturnsFailureWithActionMetadata()
+    {
+        var action = new ThrowingSystemAction("health-audit");
+        var registry = new SystemActionRegistry([action]);
+        var config = new CronJobConfig
+        {
+            Schedule = "* * * * *",
+            Action = "health-audit"
+        };
+
+        var context = BuildContext(new ServiceCollection().BuildServiceProvider(), "system-check");
+        var job = new SystemCronJob(config, registry);
+
+        var result = await job.ExecuteAsync(context, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Be("action failed");
+        result.Metadata.Should().NotBeNull();
+        result.Metadata!["action"].Should().Be("health-audit");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_EmptyOutput_DoesNotRoute()
+    {
+        var action = new TestSystemAction("check-updates", string.Empty);
+        var registry = new SystemActionRegistry([action]);
+        var config = new CronJobConfig
+        {
+            Schedule = "* * * * *",
+            Action = "check-updates",
+            OutputChannels = ["websocket"]
+        };
+
+        var channel = new TestChannel("websocket");
+        var services = new ServiceCollection()
+            .AddSingleton<IChannel>(channel)
+            .BuildServiceProvider();
+        var context = BuildContext(services, "system-check");
+        var job = new SystemCronJob(config, registry);
+
+        var result = await job.ExecuteAsync(context, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        channel.Messages.Should().BeEmpty();
+        result.Metadata.Should().NotBeNull();
+        result.Metadata!["routedChannels"].Should().Be(0);
+    }
+
     private static CronJobContext BuildContext(IServiceProvider services, string name)
     {
         var now = DateTimeOffset.UtcNow;
@@ -63,6 +150,15 @@ public sealed class SystemCronJobTests
             ExecuteCount++;
             return Task.FromResult(result);
         }
+    }
+
+    private sealed class ThrowingSystemAction(string name) : ISystemAction
+    {
+        public string Name { get; } = name;
+        public string Description => "throws";
+
+        public Task<string> ExecuteAsync(CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("action failed");
     }
 
     private sealed class TestChannel : IChannel

@@ -142,6 +142,128 @@ public sealed class CronJobFactoryTests
         registeredJob!.Name.Should().Be("farnsworth");
     }
 
+    [Fact]
+    public void CreateAndRegisterAll_HandlesCaseInsensitiveTypeAndNameOverride()
+    {
+        var cronConfig = new CronConfig
+        {
+            Jobs = new Dictionary<string, CronJobConfig>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["agent-digest"] = new()
+                {
+                    Name = "digest-job",
+                    Type = "AGENT",
+                    Schedule = "0 9 * * *",
+                    Agent = "bender",
+                    Prompt = "Summarize activity."
+                }
+            }
+        };
+
+        var serviceProvider = BuildServiceProvider();
+        var factory = new CronJobFactory(
+            Options.Create(cronConfig),
+            Options.Create(new BotNexusConfig()),
+            serviceProvider,
+            NullLogger<CronJobFactory>.Instance);
+        var cronService = new Mock<ICronService>();
+        ICronJob? registeredJob = null;
+        cronService
+            .Setup(x => x.Register(It.IsAny<ICronJob>()))
+            .Callback<ICronJob>(job => registeredJob = job);
+
+        factory.CreateAndRegisterAll(cronService.Object);
+
+        cronService.Verify(x => x.Register(It.IsAny<ICronJob>()), Times.Once);
+        registeredJob.Should().NotBeNull();
+        registeredJob!.Name.Should().Be("digest-job");
+    }
+
+    [Fact]
+    public void CreateAndRegisterAll_InvalidCronSchedule_StillRegistersJob()
+    {
+        var cronConfig = new CronConfig
+        {
+            Jobs = new Dictionary<string, CronJobConfig>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["broken"] = new()
+                {
+                    Type = "agent",
+                    Schedule = "not-a-cron",
+                    Agent = "bender",
+                    Prompt = "Run"
+                }
+            }
+        };
+
+        var serviceProvider = BuildServiceProvider();
+        var factory = new CronJobFactory(
+            Options.Create(cronConfig),
+            Options.Create(new BotNexusConfig()),
+            serviceProvider,
+            NullLogger<CronJobFactory>.Instance);
+        var cronService = new Mock<ICronService>();
+
+        factory.CreateAndRegisterAll(cronService.Object);
+        cronService.Verify(x => x.Register(It.IsAny<ICronJob>()), Times.Once);
+    }
+
+    [Fact]
+    public void CreateAndRegisterAll_MigratesLegacyJobsWithUniqueSuffixWhenKeyAlreadyExists()
+    {
+        var cronConfig = new CronConfig
+        {
+            Jobs = new Dictionary<string, CronJobConfig>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["farnsworth-legacy-1"] = new()
+                {
+                    Type = "system",
+                    Schedule = "* * * * *",
+                    Action = "check-updates"
+                }
+            }
+        };
+
+        var botNexusConfig = new BotNexusConfig
+        {
+            Agents = new AgentDefaults
+            {
+                Named = new Dictionary<string, AgentConfig>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["farnsworth"] = new()
+                    {
+#pragma warning disable CS0618
+                        CronJobs = [new CronJobConfig
+                        {
+                            Type = "agent",
+                            Schedule = "0 7 * * *",
+                            Prompt = "Daily platform check."
+                        }]
+#pragma warning restore CS0618
+                    }
+                }
+            }
+        };
+
+        var serviceProvider = BuildServiceProvider();
+        var factory = new CronJobFactory(
+            Options.Create(cronConfig),
+            Options.Create(botNexusConfig),
+            serviceProvider,
+            NullLogger<CronJobFactory>.Instance);
+        var cronService = new Mock<ICronService>();
+        var registered = new List<ICronJob>();
+        cronService
+            .Setup(x => x.Register(It.IsAny<ICronJob>()))
+            .Callback<ICronJob>(registered.Add);
+
+        factory.CreateAndRegisterAll(cronService.Object);
+
+        registered.Should().HaveCount(2);
+        registered.Should().Contain(job => job.Name == "farnsworth");
+        registered.Should().Contain(job => job.Name.StartsWith("system:", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static IServiceProvider BuildServiceProvider()
     {
         var services = new ServiceCollection();
