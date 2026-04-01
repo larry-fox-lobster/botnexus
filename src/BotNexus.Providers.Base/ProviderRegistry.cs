@@ -11,7 +11,7 @@ public sealed class ProviderRegistry
     {
         if (providers is null) return;
         foreach (var p in providers)
-            Register(p.DefaultModel, p);
+            Register(GetProviderKey(p), p);
     }
 
     /// <summary>Registers a provider under the given name.</summary>
@@ -27,6 +27,29 @@ public sealed class ProviderRegistry
         => _providers.TryGetValue(name, out var p) ? p
             : throw new InvalidOperationException($"Provider '{name}' is not registered.");
 
+    /// <summary>Gets the first registered provider, or null if none are registered.</summary>
+    public ILlmProvider? GetDefault()
+        => _providers.Values.FirstOrDefault();
+
     /// <summary>Returns all registered provider names.</summary>
     public IReadOnlyList<string> GetProviderNames() => [.. _providers.Keys];
+
+    private static string GetProviderKey(ILlmProvider provider)
+    {
+        var ns = provider.GetType().Namespace;
+        if (!string.IsNullOrWhiteSpace(ns))
+        {
+            var marker = ".Providers.";
+            var start = ns.IndexOf(marker, StringComparison.Ordinal);
+            if (start >= 0)
+            {
+                var segment = ns[(start + marker.Length)..].Split('.')[0];
+                if (!string.IsNullOrWhiteSpace(segment))
+                    return segment.ToLowerInvariant();
+            }
+        }
+
+        return provider.GetType().Name.Replace("Provider", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .ToLowerInvariant();
+    }
 }

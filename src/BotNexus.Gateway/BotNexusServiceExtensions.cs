@@ -5,6 +5,7 @@ using BotNexus.Channels.Base;
 using BotNexus.Cron;
 using BotNexus.Heartbeat;
 using BotNexus.Session;
+using BotNexus.Providers.Base;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 
@@ -18,6 +19,7 @@ public static class BotNexusServiceExtensions
     {
         // Core
         services.AddBotNexusCore(configuration);
+        services.AddSingleton<ProviderRegistry>();
 
         // Session
         services.AddBotNexusSession();

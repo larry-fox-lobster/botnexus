@@ -1,6 +1,8 @@
 using BotNexus.Core.Abstractions;
 using BotNexus.Core.Configuration;
+using BotNexus.Providers.Base;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -12,6 +14,7 @@ public static class OpenAiServiceExtensions
     /// <summary>Registers the OpenAI provider.</summary>
     public static IServiceCollection AddOpenAiProvider(this IServiceCollection services)
     {
+        services.TryAddSingleton<ProviderRegistry>();
         services.AddSingleton<ILlmProvider>(sp =>
         {
             var config = sp.GetRequiredService<IOptions<BotNexusConfig>>().Value;

@@ -1,5 +1,6 @@
 using BotNexus.Core.Abstractions;
 using BotNexus.Core.Models;
+using BotNexus.Providers.Base;
 using BotNexus.Agent.Tools;
 using Microsoft.Extensions.Logging;
 
@@ -17,7 +18,9 @@ public sealed class AgentLoop
 {
     private readonly string _agentName;
     private readonly string? _systemPrompt;
-    private readonly ILlmProvider _provider;
+    private readonly string? _model;
+    private readonly string? _providerName;
+    private readonly ProviderRegistry _providerRegistry;
     private readonly ISessionManager _sessionManager;
     private readonly ContextBuilder _contextBuilder;
     private readonly ToolRegistry _toolRegistry;
@@ -29,22 +32,26 @@ public sealed class AgentLoop
     public AgentLoop(
         string agentName,
         string? systemPrompt,
-        ILlmProvider provider,
+        ProviderRegistry providerRegistry,
         ISessionManager sessionManager,
         ContextBuilder contextBuilder,
         ToolRegistry toolRegistry,
         GenerationSettings settings,
+        string? model = null,
+        string? providerName = null,
         IReadOnlyList<IAgentHook>? hooks = null,
         ILogger<AgentLoop>? logger = null,
         int maxToolIterations = 40)
     {
         _agentName = agentName;
         _systemPrompt = systemPrompt;
-        _provider = provider;
+        _providerRegistry = providerRegistry;
         _sessionManager = sessionManager;
         _contextBuilder = contextBuilder;
         _toolRegistry = toolRegistry;
         _settings = settings;
+        _model = model;
+        _providerName = providerName;
         _hooks = hooks ?? [];
         _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<AgentLoop>.Instance;
         _maxToolIterations = maxToolIterations;
@@ -80,7 +87,8 @@ public sealed class AgentLoop
                     .ToList();
 
                 var request = new ChatRequest(userMessages, _settings, tools, _systemPrompt);
-                var llmResponse = await _provider.ChatAsync(request, cancellationToken).ConfigureAwait(false);
+                var provider = ResolveProvider();
+                var llmResponse = await provider.ChatAsync(request, cancellationToken).ConfigureAwait(false);
 
                 if (!string.IsNullOrEmpty(llmResponse.Content))
                 {
@@ -123,5 +131,46 @@ public sealed class AgentLoop
                 await hook.OnErrorAsync(errorContext, cancellationToken).ConfigureAwait(false);
             throw;
         }
+    }
+
+    private ILlmProvider ResolveProvider()
+    {
+        if (!string.IsNullOrWhiteSpace(_providerName))
+        {
+            var configured = _providerRegistry.Get(_providerName);
+            if (configured is not null) return configured;
+        }
+
+        var configuredModel = string.IsNullOrWhiteSpace(_model) ? _settings.Model : _model;
+        if (!string.IsNullOrWhiteSpace(configuredModel))
+        {
+            var fromModelPrefix = ResolveProviderFromModelPrefix(configuredModel);
+            if (fromModelPrefix is not null) return fromModelPrefix;
+
+            foreach (var name in _providerRegistry.GetProviderNames())
+            {
+                var provider = _providerRegistry.Get(name);
+                if (provider is not null &&
+                    string.Equals(provider.DefaultModel, configuredModel, StringComparison.OrdinalIgnoreCase))
+                {
+                    return provider;
+                }
+            }
+        }
+
+        var byDefault = _providerRegistry.GetDefault();
+        if (byDefault is not null) return byDefault;
+
+        throw new InvalidOperationException(
+            $"No LLM providers are registered for agent '{_agentName}'.");
+    }
+
+    private ILlmProvider? ResolveProviderFromModelPrefix(string model)
+    {
+        var separatorIndex = model.IndexOfAny([':', '/']);
+        if (separatorIndex <= 0) return null;
+
+        var providerName = model[..separatorIndex];
+        return _providerRegistry.Get(providerName);
     }
 }

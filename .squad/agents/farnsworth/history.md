@@ -75,3 +75,4 @@
 - **OAuth contracts live in Core Abstractions** (2026-04-01): OAuth integration points are defined under `src/BotNexus.Core/Abstractions` via `IOAuthProvider`, `IOAuthTokenStore`, and `OAuthToken`.
 - **ProviderConfig auth discriminator** (2026-04-01): `ProviderConfig` includes an `Auth` property defaulting to `"apikey"` for selecting API key vs OAuth provider auth behavior.
 - **Config binding is now extension-keyed and case-insensitive** (2026-04-01): `ProvidersConfig` and `ChannelsConfig.Instances` are dictionary-based with `StringComparer.OrdinalIgnoreCase`, enabling folder-name keys (e.g., `openai`, `telegram`) without casing fragility.
+- 2026-04-01: `ProviderRegistry` now infers provider keys from provider namespaces/types (e.g., OpenAI -> `openai`) and is DI-registered so agent loops can resolve provider per agent model/provider config with default fallback.

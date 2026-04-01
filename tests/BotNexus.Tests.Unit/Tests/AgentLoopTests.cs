@@ -2,6 +2,7 @@ using BotNexus.Agent;
 using BotNexus.Agent.Tools;
 using BotNexus.Core.Abstractions;
 using BotNexus.Core.Models;
+using BotNexus.Providers.Base;
 using BotNexus.Session;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -126,15 +127,55 @@ public class AgentLoopTests : IDisposable
         mockHook.Verify(h => h.OnAfterAsync(It.IsAny<AgentHookContext>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task ProcessAsync_UsesProviderFromModelPrefix_WhenConfigured()
+    {
+        var openAiProvider = new Mock<ILlmProvider>();
+        openAiProvider.Setup(p => p.DefaultModel).Returns("gpt-4o");
+        openAiProvider.Setup(p => p.Generation).Returns(new GenerationSettings());
+        openAiProvider.Setup(p => p.ChatAsync(It.IsAny<ChatRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LlmResponse("openai", FinishReason.Stop));
+
+        var otherProvider = new Mock<ILlmProvider>();
+        otherProvider.Setup(p => p.DefaultModel).Returns("claude-3-5-sonnet");
+        otherProvider.Setup(p => p.Generation).Returns(new GenerationSettings());
+        otherProvider.Setup(p => p.ChatAsync(It.IsAny<ChatRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LlmResponse("other", FinishReason.Stop));
+
+        var registry = new ProviderRegistry();
+        registry.Register("other", otherProvider.Object);
+        registry.Register("openai", openAiProvider.Object);
+
+        var loop = new AgentLoop(
+            agentName: "test-agent",
+            systemPrompt: null,
+            providerRegistry: registry,
+            sessionManager: _sessionManager,
+            contextBuilder: new ContextBuilder(NullLogger<ContextBuilder>.Instance),
+            toolRegistry: new ToolRegistry(),
+            settings: new GenerationSettings { Model = "openai:gpt-4o" },
+            logger: NullLogger<AgentLoop>.Instance,
+            maxToolIterations: 5);
+
+        var result = await loop.ProcessAsync(MakeMessage("hello"));
+
+        result.Should().Be("openai");
+        openAiProvider.Verify(p => p.ChatAsync(It.IsAny<ChatRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+        otherProvider.Verify(p => p.ChatAsync(It.IsAny<ChatRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private AgentLoop CreateLoop(
         ILlmProvider provider,
         ToolRegistry? toolRegistry = null,
         IReadOnlyList<IAgentHook>? hooks = null)
     {
+        var registry = new ProviderRegistry();
+        registry.Register("test", provider);
+
         return new AgentLoop(
             agentName: "test-agent",
             systemPrompt: null,
-            provider: provider,
+            providerRegistry: registry,
             sessionManager: _sessionManager,
             contextBuilder: new ContextBuilder(NullLogger<ContextBuilder>.Instance),
             toolRegistry: toolRegistry ?? new ToolRegistry(),
