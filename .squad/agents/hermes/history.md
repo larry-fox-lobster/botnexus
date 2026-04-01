@@ -83,6 +83,11 @@
 Baseline: build is clean, all 124 tests pass. Ready for implementation.
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+### 2026-04-01 — Extension Loading E2E Test Harness
+
+- Added `BotNexus.Tests.Extensions.E2E` fixture assembly with lightweight dynamic extensions (`FixtureChannel`, `FixtureLlmProvider`, `FixtureEchoTool`) so extension-loading flows can be validated without external services.
+- Gateway E2E extension tests (`ExtensionLoadingE2eTests`) run in-process via `WebApplicationFactory<Program>` and inject config via `BotNexus__...` environment variables; this reliably drives `AddBotNexusExtensions` at startup.
+- Full suite baseline now includes dynamic extension flow coverage (config → discovery → DI → runtime, `/api/channels`, provider model selection, and WebSocket end-to-end tool-call path).
 
 ### 2026-04-01 — ExtensionLoader test strategy and quality gate
 

@@ -21,6 +21,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/BotNexus.Tests.Extensions.Convention/BotNexus.Tests.Extensions.Convention.csproj" />
+    <Project Path="tests/BotNexus.Tests.Extensions.E2E/BotNexus.Tests.Extensions.E2E.csproj" />
     <Project Path="tests/BotNexus.Tests.Extensions.Registrar/BotNexus.Tests.Extensions.Registrar.csproj" />
     <Project Path="tests/BotNexus.Tests.Integration/BotNexus.Tests.Integration.csproj" />
     <Project Path="tests/BotNexus.Tests.Unit/BotNexus.Tests.Unit.csproj" />
