@@ -3,6 +3,7 @@ namespace BotNexus.Core.Configuration;
 /// <summary>Configuration for a single LLM provider.</summary>
 public class ProviderConfig
 {
+    public string Auth { get; set; } = "apikey";
     public string ApiKey { get; set; } = string.Empty;
     public string? ApiBase { get; set; }
     public string? DefaultModel { get; set; }
