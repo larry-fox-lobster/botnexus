@@ -203,6 +203,119 @@ app.MapGet("/api/tools", (IEnumerable<ITool> tools) =>
     return Results.Json(toolList, jsonOptions);
 });
 
+// --- REST API: Cron ---
+app.MapGet("/api/cron", (ICronService cronService) =>
+{
+    var jobs = cronService.GetJobs().Select(j => new
+    {
+        name = j.Name,
+        type = j.Type,
+        schedule = j.Schedule,
+        enabled = j.Enabled,
+        lastRun = j.LastRun,
+        nextRun = j.NextRun,
+        lastResult = j.LastRunSuccess switch
+        {
+            true => "success",
+            false => "failure",
+            null => (string?)null
+        }
+    });
+    return Results.Json(jobs, jsonOptions);
+});
+
+app.MapGet("/api/cron/history", (ICronService cronService, int? limit) =>
+{
+    var cap = Math.Clamp(limit ?? 50, 1, 500);
+    var allHistory = cronService.GetJobs()
+        .SelectMany(j => cronService.GetHistory(j.Name, cap))
+        .OrderByDescending(e => e.StartedAt)
+        .Take(cap)
+        .Select(e => new
+        {
+            jobName = e.JobName,
+            correlationId = e.CorrelationId,
+            startedAt = e.StartedAt,
+            completedAt = e.CompletedAt,
+            success = e.Success,
+            output = e.Output,
+            error = e.Error
+        });
+    return Results.Json(allHistory, jsonOptions);
+});
+
+app.MapGet("/api/cron/{name}", (string name, ICronService cronService) =>
+{
+    var job = cronService.GetJobs().FirstOrDefault(j =>
+        string.Equals(j.Name, name, StringComparison.OrdinalIgnoreCase));
+    if (job is null)
+        return Results.Json(new { error = $"Cron job '{name}' not found." }, jsonOptions, statusCode: 404);
+
+    var history = cronService.GetHistory(job.Name).Select(e => new
+    {
+        correlationId = e.CorrelationId,
+        startedAt = e.StartedAt,
+        completedAt = e.CompletedAt,
+        success = e.Success,
+        output = e.Output,
+        error = e.Error
+    });
+
+    return Results.Json(new
+    {
+        name = job.Name,
+        type = job.Type,
+        schedule = job.Schedule,
+        enabled = job.Enabled,
+        lastRun = job.LastRun,
+        nextRun = job.NextRun,
+        lastResult = job.LastRunSuccess switch
+        {
+            true => "success",
+            false => "failure",
+            null => (string?)null
+        },
+        history
+    }, jsonOptions);
+});
+
+app.MapPost("/api/cron/{name}/trigger", async (string name, ICronService cronService) =>
+{
+    var job = cronService.GetJobs().FirstOrDefault(j =>
+        string.Equals(j.Name, name, StringComparison.OrdinalIgnoreCase));
+    if (job is null)
+        return Results.Json(new { error = $"Cron job '{name}' not found." }, jsonOptions, statusCode: 404);
+
+    await cronService.TriggerAsync(job.Name);
+    return Results.Json(new { triggered = true, jobName = job.Name }, jsonOptions);
+});
+
+app.MapPut("/api/cron/{name}/enable", async (string name, HttpContext httpContext, ICronService cronService) =>
+{
+    var job = cronService.GetJobs().FirstOrDefault(j =>
+        string.Equals(j.Name, name, StringComparison.OrdinalIgnoreCase));
+    if (job is null)
+        return Results.Json(new { error = $"Cron job '{name}' not found." }, jsonOptions, statusCode: 404);
+
+    EnableRequest? body;
+    try
+    {
+        body = await httpContext.Request.ReadFromJsonAsync<EnableRequest>(jsonOptions);
+    }
+    catch
+    {
+        return Results.Json(new { error = "Invalid JSON body. Expected { \"enabled\": true/false }." },
+            jsonOptions, statusCode: 400);
+    }
+
+    if (body is null)
+        return Results.Json(new { error = "Request body is required. Expected { \"enabled\": true/false }." },
+            jsonOptions, statusCode: 400);
+
+    cronService.SetEnabled(job.Name, body.Enabled);
+    return Results.Json(new { jobName = job.Name, enabled = body.Enabled }, jsonOptions);
+});
+
 // --- REST API: Extensions summary ---
 app.MapGet("/api/extensions", (
     ExtensionLoadReport report,
@@ -268,3 +381,5 @@ await app.RunAsync();
 
 // Expose Program for WebApplicationFactory<Program> in integration tests
 public partial class Program { }
+
+internal sealed record EnableRequest(bool Enabled);
