@@ -285,11 +285,11 @@
 
 
 
-### 2026-04-02 — Sprint 5 Complete: Agent Workspace, Memory, Deployment Lifecycle
+### 2026-04-02 — Sprint 5 Complete: Agent Workspace, Memory, Deployment Lifecycle + Kif Onboarding
 
-**Overview:** Sprint 5 delivered the core agent infrastructure (workspace + identity), memory management system (long-term + daily with consolidation), and comprehensive deployment lifecycle validation (10 real-process E2E scenarios).
+**Overview:** Sprint 5 delivered the core agent infrastructure (workspace + identity), memory management system (long-term + daily with consolidation), and comprehensive deployment lifecycle validation (10 real-process E2E scenarios). Team expanded with Kif as Documentation Engineer.
 
-**Achievement:** 48/50 items done. 2 P2 items deferred (Anthropic tool-calling, plugin architecture deep-dive). Team grew from 6 to 8 agents (Nibbler + Zapp added).
+**Achievement:** 48/50 items done. 2 P2 items deferred (Anthropic tool-calling, plugin architecture deep-dive). Team grew from 6 to 8 agents (Nibbler + Zapp added). Kif added as 9th agent for documentation and getting-started guide.
 
 **Workspace & Identity (Leela ws-01/02, Farnsworth ws-03/04/05):**
 - Agent workspace structure: ~/.botnexus/agents/{agent-name}/ with SOUL/IDENTITY/USER/AGENTS/TOOLS/MEMORY files
@@ -321,8 +321,17 @@
 **Scenario Registry & Team Expansion (Leela ws-22, Zapp scenario-registry + deployment-lifecycle-tests):**
 - Zapp added to team: owns E2E deployment validation, deployment lifecycle tests
 - Nibbler added to team: owns consistency reviews, post-sprint audits
+- Kif added to team: owns user-facing documentation, getting-started guide, style guide, GitHub Pages
 - Scenario registry process formalized: Hermes maintains as living document after sprint completion
 - Consistency review ceremony established: triggered after sprint or architecture changes
+
+**Kif — Documentation Engineer Onboarding (Kif getting-started guide):**
+- Created `docs/getting-started.md` — 706-line comprehensive guide covering prerequisites through OpenClaw migration
+- 13 sections: Prerequisites, Installation, First Run, Initial Configuration, Adding Channels, Adding Providers, Creating Custom Tool, Running Agents, Building Custom Agents, Deployment Scenarios, Troubleshooting, OpenClaw Integration, Reference Links
+- Every code example, config snippet, and API endpoint verified against live source code
+- Updated README.md with prominent Getting Started link and full documentation listing
+- All steps tested end-to-end for accuracy and usability
+- Supports 100% scenario coverage and first-time user onboarding
 
 **Process Updates:**
 - All decisions from inbox merged into decisions.md (decisions #9, #10, #11)
@@ -334,6 +343,8 @@
 - 2 P2 items deferred to next sprint: Anthropic tool-calling feature parity, plugin architecture deep-dive
 - Hearbeat service still needs HealthCheck.AggregateAsync() implementation (minor gap)
 - Plugin discovery (AssemblyLoadContext per extension) not yet fully tested with real extension deployments
+- GitHub Pages setup pending (Kif P1 item for next sprint)
+- Documentation style guide needed (Kif P1 item for next sprint)
 
 ## Session Completion: 2026-04-02
 

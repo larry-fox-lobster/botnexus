@@ -92,6 +92,7 @@ Initial setup complete.
 **Scenario Registry & Team Expansion (Leela ws-22, Zapp scenario-registry + deployment-lifecycle-tests):**
 - Zapp added to team: owns E2E deployment validation, deployment lifecycle tests
 - Nibbler added to team: owns consistency reviews, post-sprint audits
+- Kif added to team: owns user-facing documentation, getting-started guide, style guide, GitHub Pages
 - Scenario registry process formalized: Hermes maintains as living document after sprint completion
 - Consistency review ceremony established: triggered after sprint or architecture changes
 
@@ -100,6 +101,9 @@ Initial setup complete.
 - Inbox files deleted (merged, not orphaned)
 - Cross-agent consistency checks now a formal ceremony with Nibbler as owner
 - Documentation updated and consistency audit completed (Leela: 22 issues fixed across 5 files)
+- Scribe logged getting-started guide session (2026-04-01T23-27-getting-started.md)
+- Scribe updated Kif's history with getting-started guide delivery (706 lines, 13 sections, all examples verified)
+- Scribe updated Leela's history with Kif onboarding
 
 **Outstanding:**
 - 2 P2 items deferred to next sprint: Anthropic tool-calling feature parity, plugin architecture deep-dive
