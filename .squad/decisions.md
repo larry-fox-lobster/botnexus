@@ -610,3 +610,782 @@ The simulated environment needs a config that sets up these multi-agent scenario
 **First Implementation:** Leela's audit (2026-04-02) found and fixed 22 issues across 5 files (8 in architecture.md, 3 in configuration.md, 10 in extension-development.md, 1 README rewrite, 1 code comment fix). Demonstrates scope of the problem and why a ceremony is needed.
 
 **Team Impact:** All agents should treat consistency as a quality gate. Nibbler will formalize the process and run the recurring audits.
+
+---
+
+### 9. User Directive — Agent Workspace with SOUL/IDENTITY/MEMORY + Context Builder (2026-04-01T19:31Z)
+
+**By:** Jon Bullen (via Copilot)  
+**Status:** Accepted
+
+### 2026-04-01T19:31Z: User directive — Agent workspace with SOUL/IDENTITY/MEMORY files + context builder
+**By:** Jon Bullen (via Copilot)
+**What:** Each agent should have a workspace folder containing personality and context files (SOUL, IDENTITY, USER, MEMORY, etc.) like OpenClaw. A context builder object should assemble the full agent context at session start from these files. Memory model should follow OpenClaw's approach: a distilled long-term memory.md file plus separate daily memory files that are searchable. Reference Nanobot's context.py for the context-building process and OpenClaw's memory tools for search and memory management.
+**Why:** User request — captured for team memory. This is a fundamental agent architecture decision that defines how agents maintain identity, personality, and memory across sessions.
+
+
+---
+
+### 10. User Directive — E2E Deployment Lifecycle + Scenario Registry (2026-04-01T20:03Z)
+
+**By:** Jon Bullen (via Copilot)  
+**Status:** Accepted
+
+### 2026-04-01T20:03Z: User directive — E2E must cover deployment lifecycle + scenario tracking process
+**By:** Jon Bullen (via Copilot)
+**What:** Two requirements:
+
+1. **Scenario tracking process:** The E2E simulation scenario list must be maintained as a living document. Every time a feature is added or architecture changes, Hermes must update the scenario registry. This should be a formal process, not ad-hoc.
+
+2. **Deployment lifecycle testing:** E2E tests must go beyond in-process testing to cover the FULL customer experience:
+   - Deploying the platform (first install, config creation at ~/.botnexus/)
+   - Starting the Gateway (clean start, verify health/ready)
+   - Configuring agents (create workspace, set up SOUL/IDENTITY/USER files)
+   - Sending messages through configured channels (Copilot provider at minimum)
+   - Stopping the Gateway gracefully (verify no message loss, session persistence)
+   - Restarting the Gateway (verify sessions restored, memory intact)
+   - Updating the platform (add/remove extensions, config changes, restart)
+   - Managing the environment (health checks, extension status, logs)
+   - Integration verification (Copilot provider OAuth flow, channel routing, tool execution)
+   
+   Customers need to have confidence that deploying, configuring, updating, and managing BotNexus is robust and well-tested.
+
+**Why:** User request — the platform must be tested as customers will use it, not just as code units. Deployment lifecycle is a first-class testing concern.
+
+
+---
+
+### 11. Agent Workspace, Context Builder & Memory Architecture — Implementation Plan (2026-04-02)
+
+**Author:** Leela (Lead/Architect)  
+**Status:** Accepted  
+**References:** Replaces and supersedes decision #9; implementation guide for agent workspace capabilities
+
+# Agent Workspace, Context Builder & Memory Architecture
+
+**Author:** Leela (Lead/Architect)  
+**Status:** Proposed  
+**Date:** 2026-04-02  
+**Requested by:** Jon Bullen  
+**References:** OpenClaw workspace model, Nanobot context.py & memory.py
+
+---
+
+## Executive Summary
+
+This plan adds three interconnected capabilities to BotNexus:
+
+1. **Agent Workspaces** — per-agent folders with identity, personality, and context files
+2. **Context Builder** — a new `IContextBuilder` service that assembles the full system prompt from workspace files, memory, tools, and runtime state
+3. **Memory Model** — two-layer persistent memory (long-term MEMORY.md + daily files) with search, save, and consolidation
+
+These replace the current flat `string? systemPrompt` parameter in `AgentLoop` with a rich, file-driven context system. The existing `IMemoryStore` interface is extended (not replaced) to support the new memory model. The current `ContextBuilder` class (token-budget trimmer) is refactored into the new `IContextBuilder`.
+
+---
+
+## Part 1: Current State Analysis
+
+### What exists today
+
+| Component | Location | What it does | Limitations |
+|---|---|---|---|
+| `AgentLoop` | `Agent/AgentLoop.cs` | Takes a flat `string? systemPrompt` in constructor; passes it to `ChatRequest` on each LLM call | No file-based context, no workspace loading, no memory injection |
+| `ContextBuilder` | `Agent/ContextBuilder.cs` | Trims session history to fit context window budget (chars ≈ tokens × 4) | Only handles history trimming; no system prompt assembly, no workspace files, no memory |
+| `IMemoryStore` | `Core/Abstractions/IMemoryStore.cs` | Key-value read/write/append/delete/list with `{basePath}/{agentName}/memory/{key}.txt` | No structured memory model (no MEMORY.md vs daily), no search, no consolidation |
+| `MemoryStore` | `Agent/MemoryStore.cs` | File-based implementation of `IMemoryStore` | Flat key-value store; doesn't know about long-term vs daily memory |
+| `AgentConfig` | `Core/Configuration/AgentConfig.cs` | Per-agent config with `SystemPrompt`, `SystemPromptFile`, `EnableMemory`, `Workspace` | No workspace file references, no identity file paths |
+| `BotNexusHome` | `Core/Configuration/BotNexusHome.cs` | Manages `~/.botnexus/` structure; creates extensions/, tokens/, sessions/, logs/ | No `agents/` directory; no workspace initialization |
+
+### Key integration points
+
+- `AgentLoop` constructor receives `string? systemPrompt` and `ContextBuilder` — these are the insertion points
+- `ChatRequest` already supports `string? SystemPrompt` — the provider layer is ready
+- `IMemoryStore` is already in Core abstractions — we extend it, we don't replace it
+- `BotNexusHome.Initialize()` creates the home directory structure — we add `agents/` here
+- `AgentConfig.EnableMemory` already exists — we use it to gate memory features
+- `ToolRegistry` accepts `ITool` implementations — memory tools register here
+
+---
+
+## Part 2: Agent Workspace Structure
+
+### 2.1 Workspace Location
+
+```
+~/.botnexus/agents/{agent-name}/
+```
+
+Each named agent gets a workspace folder under `~/.botnexus/agents/`. This is separate from the existing `~/.botnexus/workspace/` (which holds sessions). The `agents/` folder is agent-specific persistent state; `workspace/` is transient session data.
+
+**Why not `~/.botnexus/workspace/{agent-name}/`?** The existing workspace path is session-oriented. Agent identity and memory are conceptually different from session history — they persist across all sessions and channels. Clean separation avoids confusion.
+
+### 2.2 Workspace Files
+
+```
+~/.botnexus/agents/{agent-name}/
+├── SOUL.md              # Core personality, values, boundaries, communication style
+├── IDENTITY.md          # Name, role, expertise descriptors, emoji/avatar
+├── USER.md              # About the human: name, pronouns, timezone, preferences
+├── AGENTS.md            # Multi-agent awareness: who else exists, collaboration rules
+├── TOOLS.md             # Available tools and their descriptions (auto-generated)
+├── HEARTBEAT.md         # Periodic task instructions (loaded by cron/heartbeat)
+├── MEMORY.md            # Long-term distilled memory (loaded every session)
+└── memory/              # Daily memory files
+    ├── 2026-04-01.md
+    ├── 2026-04-02.md
+    └── ...
+```
+
+#### File Descriptions
+
+| File | Loaded When | Authored By | Purpose |
+|---|---|---|---|
+| `SOUL.md` | Every session (system prompt) | Human | Core personality. "Who you are." Values, boundaries, communication style, behavioral rules. The agent's constitution. |
+| `IDENTITY.md` | Every session (system prompt) | Human | Structured identity metadata: name, role title, expertise tags, emoji, avatar URL. Kept separate from SOUL for machine-parseable identity. |
+| `USER.md` | Every session (system prompt) | Human + Agent | About the human operator. Name, pronouns, timezone, preferences, working style. Agent can update this as it learns about the user. |
+| `AGENTS.md` | Every session (system prompt) | System (auto-generated) | Multi-agent awareness. Lists all configured agents, their roles, and collaboration protocols. Auto-generated from config + agent IDENTITY files. |
+| `TOOLS.md` | Every session (system prompt) | System (auto-generated) | Describes available tools. Auto-generated from `ToolRegistry.GetDefinitions()`. Gives the agent awareness of its capabilities in natural language. |
+| `HEARTBEAT.md` | On heartbeat/cron triggers | Human | Instructions for periodic tasks (health checks, memory consolidation, cleanup). Not loaded in normal sessions — only when the heartbeat service triggers. |
+| `MEMORY.md` | Every session (system prompt) | Agent (via consolidation) | Distilled long-term memory. Durable facts, preferences, learned behaviors. Updated via LLM-based consolidation from daily files. |
+| `memory/*.md` | Today + yesterday auto-loaded | Agent (via memory_save) | Daily running notes. Timestamped observations, conversation highlights, temporary context. Auto-loaded for today and yesterday only. |
+
+### 2.3 Workspace Initialization
+
+**First-run behavior:** When an agent workspace is accessed for the first time:
+
+1. `BotNexusHome.Initialize()` gains an `InitializeAgentWorkspace(string agentName)` method
+2. Creates the directory structure: `agents/{name}/`, `agents/{name}/memory/`
+3. Creates stub files for human-authored files (SOUL.md, IDENTITY.md, USER.md) with placeholder content and comments explaining what to put there
+4. Does NOT create AGENTS.md or TOOLS.md (these are auto-generated at context build time)
+5. Creates empty MEMORY.md
+6. Optionally creates HEARTBEAT.md stub if the agent has cron jobs configured
+
+**Stub template example (SOUL.md):**
+```markdown
+# Soul
+
+<!-- Define this agent's core personality, values, and boundaries.
+     This file is loaded into every session as part of the system prompt.
+     
+     Example:
+     You are a helpful, precise assistant. You value clarity and correctness.
+     You communicate in a professional but warm tone. -->
+
+(Not yet configured)
+```
+
+### 2.4 Multi-Agent Awareness (AGENTS.md)
+
+Auto-generated at context build time from:
+1. `AgentDefaults.Named` dictionary in config (gives us agent names)
+2. Each agent's `IDENTITY.md` file (gives us their role/expertise)
+
+**Generated format:**
+```markdown
+# Other Agents
+
+You are part of a multi-agent system. Here are the other agents you can collaborate with:
+
+## bender — Backend Engineer
+- **Expertise:** C#, .NET, security, extension architecture
+- **Ask them about:** Backend implementation, security patterns, DI wiring
+
+## fry — Web Developer  
+- **Expertise:** HTML, CSS, JavaScript, WebUI
+- **Ask them about:** Frontend implementation, WebSocket client, UI
+
+(Auto-generated from agent configurations. Do not edit manually.)
+```
+
+### 2.5 HEARTBEAT.md
+
+**Include it.** BotNexus already has a `BotNexus.Heartbeat` project and `IHeartbeatService` in Core. The heartbeat system can load `HEARTBEAT.md` when triggering periodic agent tasks (memory consolidation, health checks, etc.). This is a natural fit.
+
+---
+
+## Part 3: Context Builder (`IContextBuilder`)
+
+### 3.1 Interface Design
+
+```csharp
+namespace BotNexus.Core.Abstractions;
+
+/// <summary>
+/// Assembles the full agent context (system prompt + message history)
+/// for an LLM request. Loads workspace files, memory, tools, and
+/// runtime state into a structured prompt.
+/// </summary>
+public interface IContextBuilder
+{
+    /// <summary>
+    /// Builds the complete system prompt from workspace files, memory,
+    /// and runtime context for the given agent.
+    /// </summary>
+    Task<string> BuildSystemPromptAsync(
+        string agentName,
+        ToolRegistry toolRegistry,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Builds the trimmed message history for the LLM request,
+    /// staying within the context window budget.
+    /// </summary>
+    IReadOnlyList<ChatMessage> BuildMessages(
+        Session session,
+        InboundMessage inboundMessage,
+        GenerationSettings settings);
+}
+```
+
+**Design rationale:**
+- `BuildSystemPromptAsync` is async because it reads files from disk
+- `BuildMessages` remains synchronous (operates on in-memory session data) — this is the existing `ContextBuilder.Build()` logic, relocated
+- The interface is in Core so the Gateway and other modules can depend on it
+- `ToolRegistry` is passed in (not injected) because it's per-agent, not a singleton
+
+### 3.2 Implementation
+
+New class: `AgentContextBuilder` in `BotNexus.Agent`
+
+```csharp
+namespace BotNexus.Agent;
+
+public sealed class AgentContextBuilder : IContextBuilder
+{
+    // Workspace files loaded into every system prompt, in order
+    private static readonly string[] BootstrapFiles = 
+        ["IDENTITY.md", "SOUL.md", "USER.md", "AGENTS.md", "TOOLS.md"];
+    
+    private readonly string _agentsBasePath;     // ~/.botnexus/agents/
+    private readonly IMemoryStore _memoryStore;
+    private readonly ILogger<AgentContextBuilder> _logger;
+    private readonly int _maxFileChars;          // Truncation limit per file (default 8000)
+    
+    public async Task<string> BuildSystemPromptAsync(
+        string agentName, ToolRegistry toolRegistry, CancellationToken ct)
+    {
+        var parts = new List<string>();
+        
+        // 1. Load bootstrap workspace files
+        foreach (var fileName in BootstrapFiles)
+        {
+            var content = await LoadWorkspaceFileAsync(agentName, fileName, ct);
+            if (content is not null)
+                parts.Add($"## {Path.GetFileNameWithoutExtension(fileName)}\n\n{Truncate(content)}");
+        }
+        
+        // 2. Auto-generate TOOLS.md from ToolRegistry if no file exists
+        if (!await WorkspaceFileExistsAsync(agentName, "TOOLS.md", ct))
+            parts.Add(GenerateToolsSummary(toolRegistry));
+        
+        // 3. Load memory context
+        var memoryContext = await LoadMemoryContextAsync(agentName, ct);
+        if (!string.IsNullOrWhiteSpace(memoryContext))
+            parts.Add($"## Memory\n\n{memoryContext}");
+        
+        // 4. Runtime context (date, timezone, agent name)
+        parts.Add(BuildRuntimeContext(agentName));
+        
+        return string.Join("\n\n---\n\n", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
+    }
+    
+    private async Task<string> LoadMemoryContextAsync(string agentName, CancellationToken ct)
+    {
+        var parts = new List<string>();
+        
+        // Long-term memory (always loaded)
+        var longTerm = await _memoryStore.ReadAsync(agentName, "MEMORY", ct);
+        if (!string.IsNullOrWhiteSpace(longTerm))
+            parts.Add($"### Long-term Memory\n\n{Truncate(longTerm)}");
+        
+        // Today's daily notes
+        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var todayNotes = await _memoryStore.ReadAsync(agentName, $"daily/{today}", ct);
+        if (!string.IsNullOrWhiteSpace(todayNotes))
+            parts.Add($"### Today ({today})\n\n{Truncate(todayNotes)}");
+        
+        // Yesterday's daily notes
+        var yesterday = DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd");
+        var yesterdayNotes = await _memoryStore.ReadAsync(agentName, $"daily/{yesterday}", ct);
+        if (!string.IsNullOrWhiteSpace(yesterdayNotes))
+            parts.Add($"### Yesterday ({yesterday})\n\n{Truncate(yesterdayNotes)}");
+        
+        return string.Join("\n\n", parts);
+    }
+}
+```
+
+### 3.3 Context Assembly Order
+
+The system prompt is assembled in this order (matching Nanobot's ContextBuilder pattern):
+
+```
+┌─────────────────────────────────────────┐
+│ 1. IDENTITY — Who am I?                 │
+│ 2. SOUL — How do I behave?              │
+│ 3. USER — Who am I talking to?          │
+│ 4. AGENTS — Who else is on the team?    │
+│ 5. TOOLS — What can I do?               │
+│ 6. MEMORY (long-term) — What do I know? │
+│ 7. MEMORY (today) — What happened today?│
+│ 8. MEMORY (yesterday) — Recent context  │
+│ 9. Runtime — Date, time, agent name     │
+└─────────────────────────────────────────┘
+```
+
+### 3.4 Truncation Strategy
+
+- **Per-file limit:** 8,000 characters by default (configurable via `AgentConfig.MaxContextFileChars`)
+- **Total system prompt budget:** 25% of context window (e.g., 16K chars for a 64K-token context window)
+- **Truncation order when over budget:** Oldest daily memory → yesterday's notes → AGENTS.md → TOOLS.md → USER.md → (SOUL and IDENTITY are never truncated)
+- **Truncation indicator:** When a file is truncated, append `\n\n[... truncated, {N} chars omitted]`
+
+### 3.5 Integration with AgentLoop
+
+**Before (current):**
+```csharp
+public AgentLoop(string agentName, string? systemPrompt, ..., ContextBuilder contextBuilder, ...)
+```
+
+**After (new):**
+```csharp
+public AgentLoop(string agentName, IContextBuilder contextBuilder, ...) 
+{
+    // No more string? systemPrompt parameter
+    // ContextBuilder handles everything
+}
+
+public async Task<string> ProcessAsync(InboundMessage message, CancellationToken ct)
+{
+    // Build system prompt once per ProcessAsync call (not per iteration)
+    var systemPrompt = await _contextBuilder.BuildSystemPromptAsync(
+        _agentName, _toolRegistry, ct);
+    
+    for (int iteration = 0; iteration < _maxToolIterations; iteration++)
+    {
+        var messages = _contextBuilder.BuildMessages(session, message, _settings);
+        var request = new ChatRequest(messages, _settings, tools, systemPrompt);
+        // ... rest unchanged
+    }
+}
+```
+
+**Breaking change:** The `AgentLoop` constructor signature changes. All callers (Gateway, tests) must update. The `string? systemPrompt` parameter is removed; `ContextBuilder` is replaced by `IContextBuilder`.
+
+---
+
+## Part 4: Memory Model
+
+### 4.1 Two-Layer Memory
+
+| Layer | File | Loaded | Written By | Purpose |
+|---|---|---|---|---|
+| Long-term | `MEMORY.md` | Every session | Consolidation (LLM) | Distilled facts, preferences, decisions. Updated by LLM summarization. The agent's "permanent record." |
+| Daily | `memory/YYYY-MM-DD.md` | Today + yesterday | `memory_save` tool | Running notes and observations. Timestamped entries. Ephemeral — consolidated into MEMORY.md periodically. |
+
+### 4.2 Memory File Format
+
+**MEMORY.md (long-term):**
+```markdown
+# Memory
+
+## User Preferences
+- Jon prefers concise responses
+- Always use conventional commits
+- Copilot is the only LLM provider in use
+
+## Architecture Decisions
+- Extensions are dynamically loaded from ~/.botnexus/extensions/
+- Config.json overrides appsettings.json
+- OAuth for Copilot, API keys for other providers
+
+## Learned Patterns
+- Build: `dotnet build BotNexus.slnx`
+- Test: `dotnet test BotNexus.slnx`
+- 192 tests across unit, integration, E2E
+
+(Last consolidated: 2026-04-02T14:30Z)
+```
+
+**memory/2026-04-02.md (daily):**
+```markdown
+# 2026-04-02
+
+- [09:15] User asked about workspace architecture. Discussed OpenClaw reference.
+- [10:30] Completed consistency audit — 22 fixes across 5 files.
+- [14:00] Started workspace/memory design task. Reading codebase.
+- [15:45] User confirmed HEARTBEAT.md should be included.
+```
+
+### 4.3 Memory Storage — Extending IMemoryStore
+
+The existing `IMemoryStore` interface already supports the new model with a key convention:
+
+| Memory Type | Key Used | Path Resolved To |
+|---|---|---|
+| Long-term | `"MEMORY"` | `~/.botnexus/agents/{name}/memory/MEMORY.txt` |
+| Daily note | `"daily/2026-04-02"` | `~/.botnexus/agents/{name}/memory/daily/2026-04-02.txt` |
+| Workspace file | (not via IMemoryStore) | `~/.botnexus/agents/{name}/SOUL.md` |
+
+**Change needed:** The `MemoryStore` path resolution needs to move from `{basePath}/{agentName}/memory/{key}.txt` to `{agentsBasePath}/{agentName}/memory/{key}.md` (use `.md` for markdown files, and the agents base path).
+
+We add a new `IAgentWorkspace` interface for workspace file access (SOUL.md, IDENTITY.md, etc.) separate from `IMemoryStore`:
+
+```csharp
+namespace BotNexus.Core.Abstractions;
+
+/// <summary>
+/// Provides read/write access to agent workspace files
+/// (SOUL.md, IDENTITY.md, USER.md, AGENTS.md, etc.)
+/// </summary>
+public interface IAgentWorkspace
+{
+    /// <summary>Reads a workspace file for the given agent.</summary>
+    Task<string?> ReadFileAsync(string agentName, string fileName, CancellationToken ct = default);
+    
+    /// <summary>Writes a workspace file for the given agent.</summary>
+    Task WriteFileAsync(string agentName, string fileName, string content, CancellationToken ct = default);
+    
+    /// <summary>Checks if a workspace file exists.</summary>
+    Task<bool> FileExistsAsync(string agentName, string fileName, CancellationToken ct = default);
+    
+    /// <summary>Lists all workspace files for the given agent.</summary>
+    Task<IReadOnlyList<string>> ListFilesAsync(string agentName, CancellationToken ct = default);
+    
+    /// <summary>Ensures the workspace directory exists with stub files.</summary>
+    Task InitializeAsync(string agentName, CancellationToken ct = default);
+}
+```
+
+### 4.4 Memory Consolidation
+
+**Trigger:** Consolidation runs when:
+1. The heartbeat service fires (configurable interval, default: every 6 hours)
+2. Context pressure is detected (daily notes exceed a size threshold, e.g., 10KB)
+3. Manually triggered via a `memory_consolidate` tool call
+
+**Process:**
+1. Load current `MEMORY.md`
+2. Load all daily files older than 2 days
+3. Send to LLM with consolidation prompt:
+   > "Review these daily notes and the current long-term memory. Extract durable facts, preferences, and decisions. Update the long-term memory. Discard ephemeral details."
+4. LLM returns updated `MEMORY.md` content
+5. Write updated `MEMORY.md`
+6. Archive processed daily files (move to `memory/archive/` or delete — configurable)
+
+**Important:** Consolidation requires an LLM call. This means the agent must have a provider configured. Consolidation should use a cheap/fast model (configurable via `AgentConfig.ConsolidationModel`).
+
+### 4.5 Memory Search
+
+**Phase 1 (keyword-based):** Simple grep-style search across all memory files:
+```csharp
+public async Task<IReadOnlyList<MemorySearchResult>> SearchAsync(
+    string agentName, string query, int maxResults = 10, CancellationToken ct = default)
+{
+    // 1. List all memory files (MEMORY.md + daily/*.md)
+    // 2. Read each file, search for query terms (case-insensitive)
+    // 3. Return matching lines with file name and line number
+    // 4. Rank by recency (newer files first) and match density
+}
+```
+
+**Phase 2 (hybrid, future):** Add vector embeddings stored alongside memory files. Use cosine similarity + keyword overlap for ranking. This is out of scope for the initial implementation.
+
+---
+
+## Part 5: Memory Tools
+
+### 5.1 Tool: `memory_search`
+
+```csharp
+public sealed class MemorySearchTool : ToolBase
+{
+    public override ToolDefinition Definition => new(
+        "memory_search",
+        "Search across all memory files (long-term and daily notes) for relevant information.",
+        new Dictionary<string, ToolParameterSchema>
+        {
+            ["query"] = new("string", "Search terms to find in memory", Required: true),
+            ["max_results"] = new("integer", "Maximum results to return (default: 10)")
+        });
+}
+```
+
+### 5.2 Tool: `memory_save`
+
+```csharp
+public sealed class MemorySaveTool : ToolBase
+{
+    public override ToolDefinition Definition => new(
+        "memory_save",
+        "Save information to memory. Use 'long_term' for durable facts or 'daily' for session notes.",
+        new Dictionary<string, ToolParameterSchema>
+        {
+            ["content"] = new("string", "The content to save", Required: true),
+            ["type"] = new("string", "Memory type: 'long_term' or 'daily' (default: 'daily')"),
+            ["section"] = new("string", "Section header for long-term memory (e.g., 'User Preferences')")
+        });
+}
+```
+
+### 5.3 Tool: `memory_get`
+
+```csharp
+public sealed class MemoryGetTool : ToolBase
+{
+    public override ToolDefinition Definition => new(
+        "memory_get",
+        "Read a specific memory file or a line range from it.",
+        new Dictionary<string, ToolParameterSchema>
+        {
+            ["file"] = new("string", "File to read: 'MEMORY' for long-term, or a date 'YYYY-MM-DD' for daily", Required: true),
+            ["start_line"] = new("integer", "Start line (1-indexed, optional)"),
+            ["end_line"] = new("integer", "End line (inclusive, optional)")
+        });
+}
+```
+
+### 5.4 Tool Registration
+
+Memory tools are registered per-agent when `AgentConfig.EnableMemory` is `true`:
+
+```csharp
+// In AgentLoop factory or Gateway wiring
+if (agentConfig.EnableMemory == true)
+{
+    toolRegistry.Register(new MemorySearchTool(memoryStore, agentName, logger));
+    toolRegistry.Register(new MemorySaveTool(memoryStore, agentName, logger));
+    toolRegistry.Register(new MemoryGetTool(memoryStore, agentName, logger));
+}
+```
+
+---
+
+## Part 6: Configuration Changes
+
+### 6.1 AgentConfig Additions
+
+```csharp
+public class AgentConfig
+{
+    // ... existing properties ...
+    
+    // NEW: Workspace configuration
+    public string? WorkspacePath { get; set; }           // Override agent workspace path
+    public int MaxContextFileChars { get; set; } = 8000; // Per-file truncation limit
+    public string? ConsolidationModel { get; set; }      // Model for memory consolidation
+    public int MemoryConsolidationIntervalHours { get; set; } = 6;
+    public bool AutoLoadMemory { get; set; } = true;     // Auto-load MEMORY.md + daily
+}
+```
+
+### 6.2 BotNexusHome Changes
+
+```csharp
+public static class BotNexusHome
+{
+    public static string Initialize()
+    {
+        // ... existing directory creation ...
+        
+        // NEW: Create agents directory
+        Directory.CreateDirectory(Path.Combine(homePath, "agents"));
+        
+        return homePath;
+    }
+    
+    /// <summary>Creates workspace structure for a specific agent.</summary>
+    public static void InitializeAgentWorkspace(string agentName)
+    {
+        var agentPath = Path.Combine(ResolveHomePath(), "agents", agentName);
+        Directory.CreateDirectory(agentPath);
+        Directory.CreateDirectory(Path.Combine(agentPath, "memory"));
+        Directory.CreateDirectory(Path.Combine(agentPath, "memory", "daily"));
+        
+        // Create stub files if they don't exist
+        CreateStubIfMissing(Path.Combine(agentPath, "SOUL.md"), SoulStub);
+        CreateStubIfMissing(Path.Combine(agentPath, "IDENTITY.md"), IdentityStub);
+        CreateStubIfMissing(Path.Combine(agentPath, "USER.md"), UserStub);
+        CreateStubIfMissing(Path.Combine(agentPath, "MEMORY.md"), "# Memory\n");
+    }
+}
+```
+
+### 6.3 Example Configuration
+
+```json
+{
+  "BotNexus": {
+    "Agents": {
+      "Named": {
+        "assistant": {
+          "Name": "assistant",
+          "EnableMemory": true,
+          "Model": "copilot:gpt-4o",
+          "MaxContextFileChars": 8000,
+          "ConsolidationModel": "copilot:gpt-4o-mini",
+          "MemoryConsolidationIntervalHours": 6
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+## Part 7: Updated Home Directory Structure
+
+```
+~/.botnexus/
+├── config.json
+├── extensions/
+│   ├── providers/
+│   ├── channels/
+│   └── tools/
+├── tokens/
+├── sessions/              # Existing session JSONL files
+├── logs/
+└── agents/                # NEW: Per-agent workspaces
+    ├── assistant/
+    │   ├── SOUL.md
+    │   ├── IDENTITY.md
+    │   ├── USER.md
+    │   ├── AGENTS.md       (auto-generated)
+    │   ├── TOOLS.md        (auto-generated)
+    │   ├── HEARTBEAT.md
+    │   ├── MEMORY.md
+    │   └── memory/
+    │       ├── daily/
+    │       │   ├── 2026-04-01.md
+    │       │   └── 2026-04-02.md
+    │       └── archive/    (consolidated daily files)
+    └── reviewer/
+        ├── SOUL.md
+        ├── ...
+        └── memory/
+            └── daily/
+```
+
+---
+
+## Part 8: Work Items
+
+### Phase 1: Foundation (Core Interfaces & Config)
+
+| ID | Title | Size | Owner | Dependencies | Description |
+|---|---|---|---|---|---|
+| `ws-01` | `IContextBuilder` interface in Core | S | Leela | — | Add `IContextBuilder` to `Core/Abstractions/`. Async `BuildSystemPromptAsync` + sync `BuildMessages`. |
+| `ws-02` | `IAgentWorkspace` interface in Core | S | Leela | — | Add `IAgentWorkspace` to `Core/Abstractions/`. Read/write/list workspace files, initialize stubs. |
+| `ws-03` | `AgentConfig` workspace properties | S | Farnsworth | — | Add `MaxContextFileChars`, `ConsolidationModel`, `MemoryConsolidationIntervalHours`, `AutoLoadMemory` to `AgentConfig`. |
+| `ws-04` | `BotNexusHome` agents directory | S | Farnsworth | — | Add `agents/` to `Initialize()`. Add `InitializeAgentWorkspace(agentName)` method. |
+| `ws-05` | `MemoryStore` path migration | S | Farnsworth | `ws-04` | Update `MemoryStore` to use `~/.botnexus/agents/{name}/memory/` path. Support `.md` extensions. Support `daily/` subdirectory for dated keys. |
+
+### Phase 2: Implementation
+
+| ID | Title | Size | Owner | Dependencies | Description |
+|---|---|---|---|---|---|
+| `ws-06` | `AgentWorkspace` implementation | M | Bender | `ws-02`, `ws-04` | Implement `IAgentWorkspace`. File I/O for workspace files under `~/.botnexus/agents/{name}/`. Stub file creation on init. |
+| `ws-07` | `AgentContextBuilder` implementation | L | Bender | `ws-01`, `ws-02`, `ws-05`, `ws-06` | Implement `IContextBuilder`. Load bootstrap files, auto-generate AGENTS.md/TOOLS.md, load memory, build runtime context. Truncation logic. Relocate existing history-trimming from `ContextBuilder`. |
+| `ws-08` | `AgentLoop` refactor | M | Bender | `ws-07` | Replace `string? systemPrompt` + `ContextBuilder` with `IContextBuilder`. Build system prompt via `BuildSystemPromptAsync`. Update all callers. |
+| `ws-09` | `MemorySearchTool` | M | Bender | `ws-05` | `ITool` implementation. Grep-based search across MEMORY.md + daily files. Case-insensitive. Results ranked by recency. |
+| `ws-10` | `MemorySaveTool` | S | Bender | `ws-05` | `ITool` implementation. Writes to MEMORY.md (append to section) or daily file (append timestamped entry). |
+| `ws-11` | `MemoryGetTool` | S | Bender | `ws-05` | `ITool` implementation. Reads MEMORY.md or a daily file by date. Optional line range. |
+| `ws-12` | Memory tool registration | S | Bender | `ws-09`, `ws-10`, `ws-11` | Register memory tools in `ToolRegistry` when `EnableMemory` is true. Wire in Gateway/AgentLoop factory. |
+| `ws-13` | DI registration | M | Farnsworth | `ws-06`, `ws-07` | Add `AddAgentWorkspace()` and `AddAgentContextBuilder()` DI extension methods. Wire `IAgentWorkspace`, `IContextBuilder` into `ServiceCollection`. |
+
+### Phase 3: Memory Consolidation
+
+| ID | Title | Size | Owner | Dependencies | Description |
+|---|---|---|---|---|---|
+| `ws-14` | `IMemoryConsolidator` interface | S | Leela | `ws-05` | Interface for LLM-based memory consolidation. `ConsolidateAsync(agentName)` method. |
+| `ws-15` | `MemoryConsolidator` implementation | L | Bender | `ws-14`, `ws-07` | Loads MEMORY.md + old daily files, calls LLM with consolidation prompt, writes updated MEMORY.md, archives processed dailies. |
+| `ws-16` | Heartbeat consolidation trigger | M | Farnsworth | `ws-15` | Integrate consolidation with `IHeartbeatService`. Trigger based on `MemoryConsolidationIntervalHours`. Load HEARTBEAT.md for additional instructions. |
+
+### Phase 4: Testing
+
+| ID | Title | Size | Owner | Dependencies | Description |
+|---|---|---|---|---|---|
+| `ws-17` | `AgentContextBuilder` unit tests | M | Hermes | `ws-07` | Test prompt assembly, truncation, file loading, auto-generation. Mock `IAgentWorkspace` and `IMemoryStore`. |
+| `ws-18` | `AgentWorkspace` unit tests | M | Hermes | `ws-06` | Test file CRUD, initialization stubs, directory creation. Use temp directories. |
+| `ws-19` | Memory tools unit tests | M | Hermes | `ws-09`, `ws-10`, `ws-11` | Test search, save, get tools. Mock `IMemoryStore`. Verify tool definitions match expected schema. |
+| `ws-20` | `MemoryConsolidator` unit tests | M | Hermes | `ws-15` | Test consolidation flow. Mock LLM provider. Verify MEMORY.md updates and daily file archival. |
+| `ws-21` | Integration tests | L | Hermes | `ws-08`, `ws-12`, `ws-13` | End-to-end: configure agent → initialize workspace → process message → verify context includes workspace files and memory → verify memory tools work. |
+
+### Phase 5: Documentation
+
+| ID | Title | Size | Owner | Dependencies | Description |
+|---|---|---|---|---|---|
+| `ws-22` | Workspace & memory docs | M | Leela | `ws-21` | Document workspace file format, memory model, configuration options, and tool usage in `docs/`. Update architecture.md. |
+
+### Dependency Graph
+
+```
+Phase 1 (Foundation):
+  ws-01 ─┐
+  ws-02 ─┼──→ Phase 2
+  ws-03 ─┤
+  ws-04 ─┤
+  ws-05 ─┘
+
+Phase 2 (Implementation):
+  ws-06 ──→ ws-07 ──→ ws-08
+  ws-09 ─┐
+  ws-10 ─┼──→ ws-12 ──→ ws-13
+  ws-11 ─┘
+
+Phase 3 (Consolidation):
+  ws-14 ──→ ws-15 ──→ ws-16
+
+Phase 4 (Testing):
+  ws-17, ws-18, ws-19, ws-20, ws-21 (parallel after their deps)
+
+Phase 5 (Docs):
+  ws-22 (after Phase 4)
+```
+
+### Summary
+
+| Phase | Items | Total Size | Key Deliverables |
+|---|---|---|---|
+| 1. Foundation | 5 | 5×S = ~2-3 days | Interfaces, config, home directory |
+| 2. Implementation | 8 | 2S+4M+1L+1S = ~5-7 days | Working context builder, memory tools, AgentLoop refactor |
+| 3. Consolidation | 3 | 1S+1L+1M = ~3-4 days | LLM-based memory consolidation via heartbeat |
+| 4. Testing | 5 | 4M+1L = ~4-5 days | Full test coverage |
+| 5. Docs | 1 | 1M = ~1-2 days | User-facing documentation |
+| **Total** | **22** | | **~15-21 days** |
+
+---
+
+## Part 9: Open Questions
+
+1. **Workspace file format:** Should IDENTITY.md use structured YAML frontmatter (for machine-parseability) or freeform markdown?
+   - **Recommendation:** Freeform markdown. Keep it simple. Machine-parseable metadata belongs in `config.json`, not workspace files.
+
+2. **Memory consolidation model:** Should consolidation use the agent's configured provider, or a dedicated cheap model?
+   - **Recommendation:** Configurable via `ConsolidationModel`. Default to agent's provider if not set.
+
+3. **Daily file retention:** How long do we keep daily files after consolidation?
+   - **Recommendation:** Move to `memory/archive/` for 30 days, then delete. Configurable.
+
+4. **AGENTS.md generation frequency:** Generate at every session start, or cache and regenerate on config change?
+   - **Recommendation:** Generate at session start. It's cheap (small file) and ensures freshness.
+
+5. **Backward compatibility:** The `AgentConfig.SystemPrompt` and `SystemPromptFile` properties exist today. Do we keep them?
+   - **Recommendation:** Yes. If `SystemPrompt` or `SystemPromptFile` is set, prepend it to the assembled context. This preserves backward compatibility and allows simple agents that don't need workspace files.
+
+---
+
+## Decision Log
+
+| Date | Decision | Rationale |
+|---|---|---|
+| 2026-04-02 | Agent workspaces at `~/.botnexus/agents/{name}/`, not `~/.botnexus/workspace/{name}/` | Clean separation: agents (identity/memory) vs workspace (sessions). Different lifecycles. |
+| 2026-04-02 | Extend `IMemoryStore`, don't replace it | Existing interface supports key-value model. Daily files are just keys like `daily/2026-04-02`. No breaking change. |
+| 2026-04-02 | New `IAgentWorkspace` interface for workspace files | Workspace files (SOUL.md, IDENTITY.md) are conceptually different from memory. Different access patterns. |
+| 2026-04-02 | New `IContextBuilder` replaces flat `string? systemPrompt` | Central place for context assembly. Enables file-driven personality, memory injection, tool awareness. |
+| 2026-04-02 | Include HEARTBEAT.md | BotNexus already has heartbeat infrastructure. Natural fit for periodic memory consolidation. |
+| 2026-04-02 | AGENTS.md auto-generated from config | Prevents staleness. Multi-agent awareness stays in sync with actual agent configuration. |
+| 2026-04-02 | Keyword search first, hybrid later | YAGNI. Grep-based search is sufficient for initial deployment. Vector search is a future enhancement. |
+| 2026-04-02 | Preserve `SystemPrompt`/`SystemPromptFile` backward compat | Simple agents shouldn't need workspace files. Inline prompts are a valid configuration path. |
+
