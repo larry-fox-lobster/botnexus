@@ -1,6 +1,8 @@
 using BotNexus.Core.Abstractions;
 using BotNexus.Core.Configuration;
+using BotNexus.Core.Extensions;
 using BotNexus.Core.Models;
+using BotNexus.Core.Observability;
 using BotNexus.Channels.Base;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -21,6 +23,8 @@ public sealed class Gateway : BackgroundService
     private readonly IAgentRouter _agentRouter;
     private readonly ILogger<Gateway> _logger;
     private readonly BotNexusConfig _config;
+    private readonly IBotNexusMetrics _metrics;
+    private readonly ExtensionLoadReport _extensionLoadReport;
 
     public Gateway(
         IMessageBus messageBus,
@@ -28,6 +32,8 @@ public sealed class Gateway : BackgroundService
         ChannelManager channelManager,
         IAgentRouter agentRouter,
         ILogger<Gateway> logger,
+        IBotNexusMetrics metrics,
+        ExtensionLoadReport extensionLoadReport,
         IOptions<BotNexusConfig> config)
     {
         _messageBus = messageBus;
@@ -35,6 +41,8 @@ public sealed class Gateway : BackgroundService
         _channelManager = channelManager;
         _agentRouter = agentRouter;
         _logger = logger;
+        _metrics = metrics;
+        _extensionLoadReport = extensionLoadReport;
         _config = config.Value;
     }
 
@@ -42,13 +50,23 @@ public sealed class Gateway : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("BotNexus Gateway starting...");
+        _metrics.UpdateExtensionsLoaded(_extensionLoadReport.LoadedCount);
 
         await _channelManager.StartAllAsync(stoppingToken).ConfigureAwait(false);
 
         _logger.LogInformation("BotNexus Gateway ready. Listening for messages...");
 
-        await foreach (var message in _messageBus.ReadAllAsync(stoppingToken).ConfigureAwait(false))
+        await foreach (var inbound in _messageBus.ReadAllAsync(stoppingToken).ConfigureAwait(false))
         {
+            var message = inbound.EnsureCorrelationId(out var correlationId);
+            using var scope = _logger.BeginScope(new Dictionary<string, object>
+            {
+                ["CorrelationId"] = correlationId,
+                ["SessionKey"] = message.SessionKey
+            });
+
+            _metrics.IncrementMessagesProcessed(message.Channel);
+
             // Broadcast inbound message to activity stream
             await _activityStream.PublishAsync(new ActivityEvent(
                 ActivityEventType.MessageReceived,
@@ -71,6 +89,12 @@ public sealed class Gateway : BackgroundService
 
             _ = Task.Run(async () =>
             {
+                using var taskScope = _logger.BeginScope(new Dictionary<string, object>
+                {
+                    ["CorrelationId"] = correlationId,
+                    ["SessionKey"] = message.SessionKey
+                });
+
                 try
                 {
                     var runTasks = targetRunners.Select(async runner =>

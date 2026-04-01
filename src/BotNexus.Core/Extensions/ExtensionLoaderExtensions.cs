@@ -138,14 +138,14 @@ public static class ExtensionLoaderExtensions
             RegisterByConvention(services, extensionConfigSection, spec.InterfaceType, loadedAssemblies, spec.TypeFolder, spec.Key);
             RegisterServiceKeyMappings(services, spec, registrationCountBefore);
 
-            var registrationCountAfter = CountServiceRegistrations(services, spec.InterfaceType);
-            var addedRegistrations = registrationCountAfter - registrationCountBefore;
-            var succeeded = addedRegistrations > 0;
+            var finalRegistrationCount = CountServiceRegistrations(services, spec.InterfaceType);
+            var finalAddedRegistrations = finalRegistrationCount - registrationCountBefore;
+            var finalSucceeded = finalAddedRegistrations > 0;
             results.Add(new ExtensionLoadResult(
                 spec.TypeFolder,
                 spec.Key,
-                succeeded,
-                succeeded ? $"Registered {addedRegistrations} service(s)" : "No matching services registered"));
+                finalSucceeded,
+                finalSucceeded ? $"Registered {finalAddedRegistrations} service(s)" : "No matching services registered"));
         }
 
         var loadedCount = results.Count(r => r.Success);

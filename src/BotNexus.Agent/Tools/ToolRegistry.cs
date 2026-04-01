@@ -1,5 +1,6 @@
 using BotNexus.Core.Abstractions;
 using BotNexus.Core.Models;
+using BotNexus.Core.Observability;
 
 namespace BotNexus.Agent.Tools;
 
@@ -7,6 +8,12 @@ namespace BotNexus.Agent.Tools;
 public sealed class ToolRegistry
 {
     private readonly Dictionary<string, ITool> _tools = new(StringComparer.OrdinalIgnoreCase);
+    private readonly IBotNexusMetrics? _metrics;
+
+    public ToolRegistry(IBotNexusMetrics? metrics = null)
+    {
+        _metrics = metrics;
+    }
 
     /// <summary>Registers a tool, replacing any existing tool with the same name.</summary>
     public void Register(ITool tool) => _tools[tool.Definition.Name] = tool;
@@ -37,6 +44,8 @@ public sealed class ToolRegistry
     /// <summary>Executes a tool call and returns the result string.</summary>
     public async Task<string> ExecuteAsync(ToolCallRequest toolCall, CancellationToken cancellationToken = default)
     {
+        _metrics?.IncrementToolCallsExecuted(toolCall.ToolName);
+
         if (!_tools.TryGetValue(toolCall.ToolName, out var tool))
             return $"Error: Tool '{toolCall.ToolName}' not found.";
 

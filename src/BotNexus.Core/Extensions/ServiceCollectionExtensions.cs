@@ -1,6 +1,7 @@
 using BotNexus.Core.Abstractions;
 using BotNexus.Core.Bus;
 using BotNexus.Core.Configuration;
+using BotNexus.Core.Observability;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,6 +16,7 @@ public static class ServiceCollectionExtensions
         services.Configure<BotNexusConfig>(configuration.GetSection(BotNexusConfig.SectionName));
         services.AddSingleton<IMessageBus>(sp => new MessageBus(capacity: 1000));
         services.AddSingleton<IActivityStream, ActivityStream>();
+        services.AddSingleton<IBotNexusMetrics, BotNexusMetrics>();
         return services;
     }
 }

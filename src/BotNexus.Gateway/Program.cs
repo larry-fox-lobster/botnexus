@@ -5,10 +5,14 @@ using BotNexus.Core.Abstractions;
 using BotNexus.Core.Configuration;
 using BotNexus.Core.Models;
 using BotNexus.Gateway;
+using BotNexus.Gateway.HealthChecks;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.ClearProviders();
+builder.Logging.AddSimpleConsole(options => options.IncludeScopes = true);
 builder.Services.AddBotNexus(builder.Configuration);
 
 // Bind Kestrel to the configured gateway address
@@ -50,7 +54,23 @@ app.UseWhen(
     branch => branch.UseMiddleware<ApiKeyAuthenticationMiddleware>());
 
 // --- Health ---
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = _ => true,
+    ResponseWriter = HealthCheckJsonResponseWriter.WriteResponse,
+    ResultStatusCodes =
+    {
+        [Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Healthy] = StatusCodes.Status200OK,
+        [Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded] = StatusCodes.Status200OK,
+        [Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy] = StatusCodes.Status200OK
+    }
+});
+
+app.MapHealthChecks("/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = HealthCheckJsonResponseWriter.WriteResponse
+});
 
 // --- REST API: Sessions ---
 app.MapGet("/api/sessions", async (ISessionManager sessionManager) =>

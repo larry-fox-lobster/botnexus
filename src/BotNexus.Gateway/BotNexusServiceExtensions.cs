@@ -3,6 +3,7 @@ using BotNexus.Core.Extensions;
 using BotNexus.Channels.Base;
 using BotNexus.Cron;
 using BotNexus.Heartbeat;
+using BotNexus.Gateway.HealthChecks;
 using BotNexus.Session;
 using BotNexus.Providers.Base;
 using Microsoft.Extensions.DependencyInjection;
@@ -63,6 +64,12 @@ public static class BotNexusServiceExtensions
         // Gateway
         services.AddSingleton<IAgentRouter, AgentRouter>();
         services.AddHostedService<Gateway>();
+        services.AddHealthChecks()
+            .AddCheck<MessageBusHealthCheck>("message_bus")
+            .AddCheck<ProviderRegistrationHealthCheck>("provider_registration")
+            .AddCheck<ExtensionLoaderHealthCheck>("extension_loader")
+            .AddCheck<ChannelReadinessHealthCheck>("channel_readiness", tags: ["ready"])
+            .AddCheck<ProviderReadinessHealthCheck>("provider_readiness", tags: ["ready"]);
 
         return services;
     }

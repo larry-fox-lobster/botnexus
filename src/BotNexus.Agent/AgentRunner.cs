@@ -33,6 +33,14 @@ public sealed class AgentRunner : IAgentRunner
     /// <inheritdoc/>
     public async Task RunAsync(InboundMessage message, CancellationToken cancellationToken = default)
     {
+        var correlationId = message.GetCorrelationId() ?? "n/a";
+        using var scope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["CorrelationId"] = correlationId,
+            ["SessionKey"] = message.SessionKey,
+            ["AgentName"] = AgentName
+        });
+
         // Try command routing first
         if (_commandRouter is not null)
         {
@@ -48,6 +56,7 @@ public sealed class AgentRunner : IAgentRunner
 
             if (!string.IsNullOrEmpty(response) && _responseChannel is not null)
             {
+                _logger.LogInformation("Sending response to channel {Channel}", message.Channel);
                 await _responseChannel.SendAsync(
                     new OutboundMessage(message.Channel, message.ChatId, response),
                     cancellationToken).ConfigureAwait(false);

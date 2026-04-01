@@ -1,8 +1,10 @@
 using BotNexus.Core.Abstractions;
 using BotNexus.Core.Models;
+using BotNexus.Core.Observability;
 using BotNexus.Providers.Base;
 using BotNexus.Agent.Tools;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace BotNexus.Agent;
 
@@ -29,6 +31,7 @@ public sealed class AgentLoop
     private readonly ILogger<AgentLoop> _logger;
     private readonly GenerationSettings _settings;
     private readonly int _maxToolIterations;
+    private readonly IBotNexusMetrics? _metrics;
 
     public AgentLoop(
         string agentName,
@@ -43,6 +46,7 @@ public sealed class AgentLoop
         IEnumerable<ITool>? additionalTools = null,
         IReadOnlyList<IAgentHook>? hooks = null,
         ILogger<AgentLoop>? logger = null,
+        IBotNexusMetrics? metrics = null,
         int maxToolIterations = 40)
     {
         _agentName = agentName;
@@ -57,12 +61,21 @@ public sealed class AgentLoop
         _additionalTools = [.. (additionalTools ?? [])];
         _hooks = hooks ?? [];
         _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<AgentLoop>.Instance;
+        _metrics = metrics;
         _maxToolIterations = maxToolIterations;
     }
 
     /// <summary>Processes an inbound message through the full agent pipeline.</summary>
     public async Task<string> ProcessAsync(InboundMessage message, CancellationToken cancellationToken = default)
     {
+        var correlationId = message.GetCorrelationId() ?? "n/a";
+        using var scope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["CorrelationId"] = correlationId,
+            ["SessionKey"] = message.SessionKey,
+            ["AgentName"] = _agentName
+        });
+
         var session = await _sessionManager.GetOrCreateAsync(message.SessionKey, _agentName, cancellationToken).ConfigureAwait(false);
         var hookContext = new AgentHookContext(_agentName, message.SessionKey, message);
 
@@ -94,7 +107,12 @@ public sealed class AgentLoop
 
                 var request = new ChatRequest(userMessages, _settings, tools, _systemPrompt);
                 var provider = ResolveProvider();
+                _logger.LogInformation("Calling provider {ProviderName} for agent {AgentName}", provider.GetType().Name, _agentName);
+                var providerTimer = Stopwatch.StartNew();
                 var llmResponse = await provider.ChatAsync(request, cancellationToken).ConfigureAwait(false);
+                providerTimer.Stop();
+                _metrics?.RecordProviderLatency(provider.GetType().Name, providerTimer.Elapsed.TotalMilliseconds);
+                _logger.LogInformation("Provider {ProviderName} responded in {ElapsedMs}ms", provider.GetType().Name, providerTimer.Elapsed.TotalMilliseconds);
 
                 if (!string.IsNullOrEmpty(llmResponse.Content))
                 {

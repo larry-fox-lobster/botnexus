@@ -41,4 +41,7 @@ public sealed class MessageBus : IMessageBus
 
     /// <summary>Completes the writer, signalling no more messages will be published.</summary>
     public void Complete() => _channel.Writer.Complete();
+
+    /// <summary>Returns <c>true</c> when the bus can still accept messages.</summary>
+    public bool IsAlive => !_channel.Reader.Completion.IsCompleted;
 }

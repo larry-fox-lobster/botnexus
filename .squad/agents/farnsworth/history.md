@@ -78,6 +78,8 @@
 - 2026-04-01: `ProviderRegistry` now infers provider keys from provider namespaces/types (e.g., OpenAI -> `openai`) and is DI-registered so agent loops can resolve provider per agent model/provider config with default fallback.
 - 2026-04-01: Extension assemblies may carry their own copies of `BotNexus.Core`/`BotNexus.Providers.Base`; the loader must reuse host-loaded shared assemblies to avoid type-identity mismatches that break `IExtensionRegistrar`/`ILlmProvider` discovery.
 - 2026-04-01: `BotNexus.Providers.Copilot` ships as an extension with `CopilotExtensionRegistrar`, OAuth device-code auth via `GitHubDeviceCodeFlow`, and JSON token persistence at `%USERPROFILE%\.botnexus\tokens\copilot.json`.
+- 2026-04-01: Gateway observability now uses ASP.NET Core `IHealthCheck` + `/health` and `/ready`, with readiness tied to enabled channel runtime state and configured provider initialization.
+- 2026-04-01: Baseline platform metrics are emitted via `System.Diagnostics.Metrics` (`botnexus.messages.processed`, `botnexus.tool_calls.executed`, `botnexus.provider.latency`, `botnexus.extensions.loaded`), and message processing logs carry `CorrelationId` scopes end-to-end.
 
 ## Sprint 1 Summary — 2026-04-01T17:33Z
 

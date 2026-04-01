@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Hosting;
@@ -59,6 +60,19 @@ public class GatewayApiKeyAuthTests
         var response = await client.GetAsync("/health");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        payload.RootElement.TryGetProperty("checks", out _).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ReadyEndpoint_BypassesAuthentication()
+    {
+        using var factory = new GatewayApiKeyAuthFactory("test-api-key");
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/ready");
+
+        response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
