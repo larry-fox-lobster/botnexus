@@ -433,6 +433,76 @@ All Phase 1 P0 foundation work delivered:
 
 ---
 
+## Part 4: GitHub Copilot Provider Implementation (Sprint 2, 2026-04-01T17:45Z)
+
+**Decision:** Implement GitHub Copilot as a first-class LLM provider extension using OAuth device code flow with OpenAI-compatible chat completion API.
+
+**Rationale:**
+- Copilot is the only provider Jon uses (P0 priority per directive 2c)
+- OAuth device code flow aligns with Nanobot reference pattern
+- OpenAI-compatible HTTP layer reduces duplication vs. dedicated protocol
+- Extension-based delivery leverages dynamic loading infrastructure
+
+**Implementation Delivered:**
+
+1. ✅ **BotNexus.Providers.Copilot** extension project
+   - Target: `net10.0`
+   - Extension metadata: `providers/copilot`
+   - Imports `Extension.targets` for automatic build/publish pipeline
+
+2. ✅ **CopilotProvider : LlmProviderBase, IOAuthProvider**
+   - Base URL: `https://api.githubcopilot.com` (configurable)
+   - OpenAI-compatible request/response DTOs
+   - Non-streaming chat completions
+   - SSE streaming with delta parsing
+   - Tool call parsing (`tool_calls`)
+
+3. ✅ **OAuth Device Code Flow (GitHubDeviceCodeFlow)**
+   - `POST /login/device/code` with `scope=copilot`
+   - Displays `verification_uri` + `user_code` to user
+   - Polls `POST /login/oauth/access_token` until success/error/timeout
+   - Token cached via IOAuthTokenStore
+
+4. ✅ **FileOAuthTokenStore**
+   - Encrypted JSON persistence
+   - Default location: `%USERPROFILE%\.botnexus\tokens\{provider}.json`
+   - Supports token refresh and expiry re-authentication
+
+5. ✅ **CopilotExtensionRegistrar**
+   - Binds `CopilotConfig` from `BotNexus:Providers:copilot`
+   - Registers `CopilotProvider` as `ILlmProvider`
+   - Registers `FileOAuthTokenStore` as default `IOAuthTokenStore` (TryAddSingleton)
+   - Enables automatic DI wiring via ExtensionLoader
+
+6. ✅ **Unit Test Coverage**
+   - Chat completion scenarios
+   - Streaming deltas
+   - Tool calling parsing
+   - Device code flow polling
+   - Token caching and reuse
+   - Expired token re-authentication flow
+
+7. ✅ **Gateway Configuration Example**
+   ```
+   BotNexus:Providers:
+     copilot:
+       Enabled: true
+       Auth: oauth
+       DefaultModel: gpt-4o
+       ApiBase: https://api.githubcopilot.com
+       # Optional override:
+       OAuthClientId: Iv1.b507a08c87ecfe98
+   ```
+
+**Unblocks:**
+- Phase 3 work (tool extensibility, observability)
+- Production deployment with Copilot as default provider
+- Future OAuth pattern re-use for other providers
+
+**Build Status:** ✅ Green, all tests passing, zero warnings
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus

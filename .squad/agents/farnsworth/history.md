@@ -101,3 +101,34 @@
 
 ### Team Status
 All 7 foundation items completed (Farnsworth: 5, Bender: 2). Decisions merged and deduplicated. Ready for Phase 2.
+
+## Sprint 2 Summary — 2026-04-01T17:45Z
+
+✅ **COMPLETE** — Dynamic Loading Fully Wired (2 items from Bender, plus Copilot provider)
+
+### Your Deliverables (Farnsworth) — Sprint 2
+
+1. ✅ **provider-dynamic-loading** — ExtensionLoader with AssemblyLoadContext, folder discovery, DI registration
+2. ✅ **copilot-provider** (52ad353) — OAuth device code flow, OpenAI-compatible HTTP, FileOAuthTokenStore
+
+### Key Achievements
+
+- **BotNexus.Providers.Copilot** extension project fully implemented
+- **CopilotProvider : LlmProviderBase, IOAuthProvider** with streaming and tool calling
+- **OAuth Device Code Flow** via GitHubDeviceCodeFlow with token persistence
+- **CopilotExtensionRegistrar** for automatic DI registration
+- Full unit test coverage (chat, streaming, tools, device flow, token caching, re-auth)
+- **Decision merged to decisions.md** — Part 4: GitHub Copilot Provider Implementation
+
+### Build Status
+- ✅ Solution green, 0 errors, 0 warnings
+- ✅ All 124+ tests passing
+- ✅ No regressions
+
+### Unblocks
+- Phase 3 work (tool calling, observability)
+- Production deployment with Copilot as default provider
+- Future OAuth pattern re-use
+
+### Team Status
+**Sprint 2 COMPLETE:** Dynamic assembly loading foundation fully wired. Farnsworth and Bender delivered all items. Ready for Phase 3.
