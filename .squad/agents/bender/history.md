@@ -52,3 +52,10 @@ Build is clean, tests pass. ProviderRegistry exists but is unused — evaluate i
 - Agent targeting is metadata-driven (`agent`, `agent_name`, `agentName`), supports explicit broadcast (`all`/`*`), and logs per-agent dispatch.
 - `IAgentRunner` now carries `AgentName`, enabling deterministic name-to-runner resolution for multi-agent environments.
 - Gateway config now includes routing controls: `DefaultAgent` and `BroadcastWhenAgentUnspecified`.
+
+### 2026-04-01 — Dynamic Extension Loader Foundation Landed
+
+- Added `AddBotNexusExtensions(IConfiguration)` in Core to discover configured provider/channel/tool keys and load extension assemblies from `ExtensionsPath/{type}/{key}`.
+- Loader creates one collectible `AssemblyLoadContext` per extension folder, supports `IExtensionRegistrar` first, and falls back to convention registration for `ILlmProvider`, `IChannel`, and `ITool`.
+- Security gates are in place for extension keys (reject rooted paths, invalid chars, `.`/`..` traversal), and failures are warning/error logged without crashing startup.
+- Gateway DI now invokes extension loading during service registration so configured extensions are wired automatically at startup.

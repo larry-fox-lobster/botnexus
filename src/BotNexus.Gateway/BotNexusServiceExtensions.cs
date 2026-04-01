@@ -19,6 +19,7 @@ public static class BotNexusServiceExtensions
     {
         // Core
         services.AddBotNexusCore(configuration);
+        services.AddBotNexusExtensions(configuration);
         services.AddSingleton<ProviderRegistry>();
 
         // Session
