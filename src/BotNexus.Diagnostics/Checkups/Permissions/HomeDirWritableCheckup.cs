@@ -9,6 +9,7 @@ public sealed class HomeDirWritableCheckup(DiagnosticsPaths paths) : IHealthChec
     public string Name => "HomeDirWritable";
     public string Category => "Permissions";
     public string Description => "Checks ~/.botnexus is writable.";
+    public bool CanAutoFix => true;
 
     public Task<CheckupResult> RunAsync(CancellationToken ct = default)
     {
@@ -28,6 +29,12 @@ public sealed class HomeDirWritableCheckup(DiagnosticsPaths paths) : IHealthChec
                 $"BotNexus home directory is not writable: {ex.Message}",
                 "Grant write permissions to ~/.botnexus or set BOTNEXUS_HOME to a writable directory."));
         }
+    }
+
+    public Task<CheckupResult> FixAsync(CancellationToken ct = default)
+    {
+        Directory.CreateDirectory(_paths.HomePath);
+        return RunAsync(ct);
     }
 
     private static void VerifyWritable(string path)

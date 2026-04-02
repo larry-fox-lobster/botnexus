@@ -9,6 +9,7 @@ public sealed class LogDirWritableCheckup(DiagnosticsPaths paths) : IHealthCheck
     public string Name => "LogDirWritable";
     public string Category => "Permissions";
     public string Description => "Checks ~/.botnexus/logs is writable.";
+    public bool CanAutoFix => true;
 
     public Task<CheckupResult> RunAsync(CancellationToken ct = default)
     {
@@ -28,6 +29,12 @@ public sealed class LogDirWritableCheckup(DiagnosticsPaths paths) : IHealthCheck
                 $"BotNexus logs directory is not writable: {ex.Message}",
                 "Grant write permissions to ~/.botnexus/logs or set BOTNEXUS_HOME to a writable location."));
         }
+    }
+
+    public Task<CheckupResult> FixAsync(CancellationToken ct = default)
+    {
+        Directory.CreateDirectory(_paths.LogsPath);
+        return RunAsync(ct);
     }
 
     private static void VerifyWritable(string path)

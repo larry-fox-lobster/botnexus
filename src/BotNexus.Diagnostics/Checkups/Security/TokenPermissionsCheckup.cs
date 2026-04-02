@@ -11,6 +11,7 @@ public sealed class TokenPermissionsCheckup(DiagnosticsPaths paths) : IHealthChe
     public string Name => "TokenPermissions";
     public string Category => "Security";
     public string Description => "Checks token directory permissions are not world-readable.";
+    public bool CanAutoFix => true;
 
     public Task<CheckupResult> RunAsync(CancellationToken ct = default)
     {
@@ -35,6 +36,29 @@ public sealed class TokenPermissionsCheckup(DiagnosticsPaths paths) : IHealthChe
                 CheckupStatus.Fail,
                 $"Failed to validate token directory permissions: {ex.Message}",
                 "Verify ~/.botnexus/tokens permissions so only trusted users can read tokens."));
+        }
+    }
+
+    public Task<CheckupResult> FixAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var tokensPath = _paths.TokensPath;
+            Directory.CreateDirectory(tokensPath);
+
+            if (OperatingSystem.IsWindows())
+                FixWindowsAcl(tokensPath);
+            else
+                FixUnixPermissions(tokensPath);
+
+            return RunAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(new CheckupResult(
+                CheckupStatus.Fail,
+                $"Failed to fix token directory permissions: {ex.Message}",
+                "Manually restrict ~/.botnexus/tokens to the current user."));
         }
     }
 
@@ -82,5 +106,39 @@ public sealed class TokenPermissionsCheckup(DiagnosticsPaths paths) : IHealthChe
         }
 
         return new CheckupResult(CheckupStatus.Pass, $"Token directory permissions are acceptable ({mode}).");
+    }
+
+    private static void FixWindowsAcl(string tokensPath)
+    {
+        var security = new DirectorySecurity();
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+
+        var currentUser = WindowsIdentity.GetCurrent().User;
+        if (currentUser is not null)
+        {
+            security.AddAccessRule(new FileSystemAccessRule(
+                currentUser,
+                FileSystemRights.FullControl,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None,
+                AccessControlType.Allow));
+        }
+
+        var adminSid = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
+        security.AddAccessRule(new FileSystemAccessRule(
+            adminSid,
+            FileSystemRights.FullControl,
+            InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+            PropagationFlags.None,
+            AccessControlType.Allow));
+
+        new DirectoryInfo(tokensPath).SetAccessControl(security);
+    }
+
+    private static void FixUnixPermissions(string tokensPath)
+    {
+        File.SetUnixFileMode(
+            tokensPath,
+            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
     }
 }

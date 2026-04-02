@@ -10,12 +10,18 @@ public sealed class ConfigValidCheckup(DiagnosticsPaths paths) : IHealthCheckup
     {
         PropertyNameCaseInsensitive = true
     };
+    private static readonly JsonSerializerOptions WriteJsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     private readonly DiagnosticsPaths _paths = paths ?? throw new ArgumentNullException(nameof(paths));
 
     public string Name => "ConfigValid";
     public string Category => "Configuration";
     public string Description => "Validates that config.json is valid JSON and binds to BotNexusConfig.";
+    public bool CanAutoFix => true;
 
     public Task<CheckupResult> RunAsync(CancellationToken ct = default)
     {
@@ -67,5 +73,21 @@ public sealed class ConfigValidCheckup(DiagnosticsPaths paths) : IHealthCheckup
                 $"Failed to validate config.json: {ex.Message}",
                 "Fix JSON syntax and verify config fields match BotNexusConfig."));
         }
+    }
+
+    public Task<CheckupResult> FixAsync(CancellationToken ct = default)
+    {
+        if (!File.Exists(_paths.ConfigPath))
+        {
+            Directory.CreateDirectory(_paths.HomePath);
+            var defaultPayload = new Dictionary<string, BotNexusConfig>
+            {
+                [BotNexusConfig.SectionName] = new BotNexusConfig()
+            };
+            var json = JsonSerializer.Serialize(defaultPayload, WriteJsonOptions);
+            File.WriteAllText(_paths.ConfigPath, json);
+        }
+
+        return RunAsync(ct);
     }
 }

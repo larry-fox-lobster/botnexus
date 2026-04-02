@@ -11,6 +11,7 @@ public sealed class ExtensionsFolderExistsCheckup(IOptions<BotNexusConfig> optio
     public string Name => "ExtensionsFolderExists";
     public string Category => "Extensions";
     public string Description => "Checks configured extension folders exist under the extensions root.";
+    public bool CanAutoFix => true;
 
     public Task<CheckupResult> RunAsync(CancellationToken ct = default)
     {
@@ -46,6 +47,15 @@ public sealed class ExtensionsFolderExistsCheckup(IOptions<BotNexusConfig> optio
                 $"Failed to validate extension folders: {ex.Message}",
                 "Verify BotNexus:ExtensionsPath and configured extension keys."));
         }
+    }
+
+    public Task<CheckupResult> FixAsync(CancellationToken ct = default)
+    {
+        var extensionRoot = BotNexusHome.ResolvePath(_config.ExtensionsPath);
+        foreach (var folder in GetConfiguredExtensionFolders(extensionRoot).Distinct(StringComparer.OrdinalIgnoreCase))
+            Directory.CreateDirectory(folder);
+
+        return RunAsync(ct);
     }
 
     private IEnumerable<string> GetConfiguredExtensionFolders(string extensionRoot)
