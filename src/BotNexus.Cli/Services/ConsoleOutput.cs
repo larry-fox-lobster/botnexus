@@ -1,3 +1,4 @@
+using Spectre.Console;
 using System.Text.Json;
 
 namespace BotNexus.Cli.Services;
@@ -11,79 +12,87 @@ public enum ConsoleStatus
 
 public static class ConsoleOutput
 {
-    private const string Reset = "\u001b[0m";
-    private const string BoldUnderline = "\u001b[1;4m";
-    private const string Green = "\u001b[32m";
-    private const string Yellow = "\u001b[33m";
-    private const string Red = "\u001b[31m";
-
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true
     };
 
-    public static void WriteTable(IEnumerable<string> headers, IEnumerable<IEnumerable<string?>> rows)
+    public static void WriteBanner(string version)
     {
-        var headerList = headers.ToList();
-        var rowList = rows.Select(r => r.Select(c => c ?? string.Empty).ToList()).ToList();
-        var widths = Enumerable.Range(0, headerList.Count)
-            .Select(index => Math.Max(
-                headerList[index].Length,
-                rowList.Select(r => index < r.Count ? r[index].Length : 0).DefaultIfEmpty(0).Max()))
-            .ToList();
-
-        Console.WriteLine(BuildRow(headerList, widths));
-        Console.WriteLine(BuildSeparator(widths));
-        foreach (var row in rowList)
-            Console.WriteLine(BuildRow(row, widths));
+        if (Console.IsOutputRedirected) return;
+        
+        AnsiConsole.Write(
+            new FigletText("BotNexus")
+                .Color(Color.CornflowerBlue));
+        AnsiConsole.MarkupLine($"[dim]v{Markup.Escape(version)}[/]");
+        AnsiConsole.WriteLine();
     }
 
     public static void WriteStatus(ConsoleStatus status, string message)
     {
-        var (icon, color) = status switch
+        var (icon, style) = status switch
         {
-            ConsoleStatus.Success => ("✅", Green),
-            ConsoleStatus.Warning => ("⚠️", Yellow),
-            ConsoleStatus.Error => ("❌", Red),
-            _ => ("•", string.Empty)
+            ConsoleStatus.Success => ("✅", "green"),
+            ConsoleStatus.Warning => ("⚠️", "yellow"),
+            ConsoleStatus.Error => ("❌", "red"),
+            _ => ("•", "default")
         };
 
-        WriteWithColor($"{icon} {message}", color);
+        AnsiConsole.MarkupLine($"[{style}]{icon} {Markup.Escape(message)}[/]");
     }
 
     public static void WriteHeader(string text)
     {
-        if (!Console.IsOutputRedirected)
-            Console.WriteLine($"{BoldUnderline}{text}{Reset}");
-        else
-            Console.WriteLine(text);
+        AnsiConsole.Write(new Rule($"[bold]{Markup.Escape(text)}[/]").LeftJustified());
+    }
+
+    public static void WriteTable(IEnumerable<string> headers, IEnumerable<IEnumerable<string?>> rows)
+    {
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Grey);
+
+        foreach (var header in headers)
+            table.AddColumn(new TableColumn(Markup.Escape(header)).Header(new Markup($"[bold]{Markup.Escape(header)}[/]")));
+
+        foreach (var row in rows)
+            table.AddRow(row.Select(cell => Markup.Escape(cell ?? string.Empty)).ToArray());
+
+        AnsiConsole.Write(table);
     }
 
     public static void WriteJson(object? value)
-        => Console.WriteLine(JsonSerializer.Serialize(value, JsonOptions));
-
-    private static string BuildRow(IReadOnlyList<string> values, IReadOnlyList<int> widths)
     {
-        var columns = widths.Select((width, index) =>
-        {
-            var value = index < values.Count ? values[index] : string.Empty;
-            return value.PadRight(width);
-        });
-
-        return $"| {string.Join(" | ", columns)} |";
+        var json = JsonSerializer.Serialize(value, JsonOptions);
+        AnsiConsole.Write(
+            new Panel(Markup.Escape(json))
+                .Header("[bold]Configuration[/]")
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Grey));
     }
 
-    private static string BuildSeparator(IReadOnlyList<int> widths)
-        => $"+-{string.Join("-+-", widths.Select(w => new string('-', w)))}-+";
-
-    private static void WriteWithColor(string text, string color)
+    public static string Prompt(string label, string defaultValue)
     {
-        if (Console.IsOutputRedirected || string.IsNullOrEmpty(color))
-        {
-            Console.WriteLine(text);
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(defaultValue))
+            return AnsiConsole.Prompt(
+                new TextPrompt<string>($"[bold]{Markup.Escape(label)}[/]:"));
 
-        Console.WriteLine($"{color}{text}{Reset}");
+        return AnsiConsole.Prompt(
+            new TextPrompt<string>($"[bold]{Markup.Escape(label)}[/]:")
+                .DefaultValue(defaultValue)
+                .ShowDefaultValue());
+    }
+
+    public static bool Confirm(string message, bool defaultValue = false)
+    {
+        return AnsiConsole.Confirm(message, defaultValue);
+    }
+
+    public static string Select(string prompt, IEnumerable<string> choices)
+    {
+        return AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title($"[bold]{Markup.Escape(prompt)}[/]")
+                .AddChoices(choices));
     }
 }

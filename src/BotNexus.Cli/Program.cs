@@ -10,6 +10,7 @@ using BotNexus.Core.Abstractions;
 using BotNexus.Core.Configuration;
 using BotNexus.Diagnostics;
 using BotNexus.Diagnostics.Checkups.Configuration;
+using Spectre.Console;
 
 var homeOption = new Option<string?>("--home")
 {
@@ -24,6 +25,8 @@ if (args.Length == 1 && string.Equals(args[0], "--version", StringComparison.Ord
     Console.WriteLine($"botnexus {cliVersion}");
     return 0;
 }
+
+ConsoleOutput.WriteBanner(cliVersion);
 
 var rootCommand = new RootCommand("BotNexus CLI — manage agents, providers, and the Gateway.");
 rootCommand.Add(homeOption);
@@ -82,8 +85,7 @@ static Command BuildConfigCommand(Option<string?> homeOption, ConfigFileManager 
         var configPath = configManager.GetConfigPath(homePath);
         if (File.Exists(configPath))
         {
-            var overwrite = Prompt("config.json already exists. Overwrite? (y/N)", "N");
-            if (!overwrite.Equals("y", StringComparison.OrdinalIgnoreCase))
+            if (!ConsoleOutput.Confirm("config.json already exists. Overwrite?"))
             {
                 ConsoleOutput.WriteStatus(ConsoleStatus.Warning, "Canceled.");
                 return 1;
@@ -91,9 +93,9 @@ static Command BuildConfigCommand(Option<string?> homeOption, ConfigFileManager 
         }
 
         var config = new BotNexusConfig();
-        var providerName = Prompt("Provider", "copilot");
-        var model = Prompt("Model", config.Agents.Model);
-        var portText = Prompt("Gateway port", config.Gateway.Port.ToString());
+        var providerName = ConsoleOutput.Prompt("Provider", "copilot");
+        var model = ConsoleOutput.Prompt("Model", config.Agents.Model);
+        var portText = ConsoleOutput.Prompt("Gateway port", config.Gateway.Port.ToString());
         if (!int.TryParse(portText, out var port))
         {
             ConsoleOutput.WriteStatus(ConsoleStatus.Error, $"Invalid port: {portText}");
@@ -128,15 +130,15 @@ static Command BuildAgentCommand(Option<string?> homeOption, ConfigFileManager c
     {
         var homePath = ResolveHome(parseResult, homeOption);
         var config = configManager.LoadConfig(homePath);
-        var name = Prompt("Agent name", string.Empty);
+        var name = ConsoleOutput.Prompt("Agent name", string.Empty);
         if (string.IsNullOrWhiteSpace(name))
         {
             ConsoleOutput.WriteStatus(ConsoleStatus.Error, "Agent name is required.");
             return 1;
         }
 
-        var provider = Prompt("Provider", config.Providers.Keys.FirstOrDefault() ?? "copilot");
-        var model = Prompt("Model", config.Agents.Model);
+        var provider = ConsoleOutput.Prompt("Provider", config.Providers.Keys.FirstOrDefault() ?? "copilot");
+        var model = ConsoleOutput.Prompt("Model", config.Agents.Model);
         configManager.AddAgent(homePath, name, new AgentConfig
         {
             Name = name,
@@ -221,16 +223,16 @@ static Command BuildProviderCommand(Option<string?> homeOption, ConfigFileManage
     addCommand.SetAction(parseResult =>
     {
         var homePath = ResolveHome(parseResult, homeOption);
-        var name = Prompt("Provider name", string.Empty);
+        var name = ConsoleOutput.Prompt("Provider name", string.Empty);
         if (string.IsNullOrWhiteSpace(name))
         {
             ConsoleOutput.WriteStatus(ConsoleStatus.Error, "Provider name is required.");
             return 1;
         }
 
-        var auth = Prompt("Auth type", "apikey");
-        var apiBase = Prompt("API base", string.Empty);
-        var defaultModel = Prompt("Default model", string.Empty);
+        var auth = ConsoleOutput.Prompt("Auth type", "apikey");
+        var apiBase = ConsoleOutput.Prompt("API base", string.Empty);
+        var defaultModel = ConsoleOutput.Prompt("Default model", string.Empty);
 
         configManager.AddProvider(homePath, name, new ProviderConfig
         {
@@ -278,14 +280,14 @@ static Command BuildChannelCommand(Option<string?> homeOption, ConfigFileManager
     addCommand.SetAction(parseResult =>
     {
         var homePath = ResolveHome(parseResult, homeOption);
-        var type = Prompt("Channel type (discord/slack/telegram)", string.Empty);
+        var type = ConsoleOutput.Select("Channel type", new[] { "discord", "slack", "telegram" });
         if (!new[] { "discord", "slack", "telegram" }.Contains(type, StringComparer.OrdinalIgnoreCase))
         {
             ConsoleOutput.WriteStatus(ConsoleStatus.Error, "Channel type must be discord, slack, or telegram.");
             return 1;
         }
 
-        var token = Prompt("Bot token", string.Empty);
+        var token = ConsoleOutput.Prompt("Bot token", string.Empty);
         if (string.IsNullOrWhiteSpace(token))
         {
             ConsoleOutput.WriteStatus(ConsoleStatus.Error, "Token is required.");
@@ -388,37 +390,42 @@ static Command BuildDoctorCommand(Option<string?> homeOption)
         var passCount = 0;
         var warnCount = 0;
         var failCount = 0;
+        
+        var doctorTable = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Grey);
+        doctorTable.AddColumn(new TableColumn("[bold]Status[/]"));
+        doctorTable.AddColumn(new TableColumn("[bold]Category[/]"));
+        doctorTable.AddColumn(new TableColumn("[bold]Name[/]"));
+        doctorTable.AddColumn(new TableColumn("[bold]Message[/]"));
+
         for (var index = 0; index < selectedCheckups.Count && index < results.Count; index++)
         {
             var checkup = selectedCheckups[index];
             var result = results[index];
-            var statusText = result.Status switch
+            var statusMarkup = result.Status switch
             {
-                CheckupStatus.Pass => "PASS",
-                CheckupStatus.Warn => "WARN",
-                _ => "FAIL"
+                CheckupStatus.Pass => "[green]PASS[/]",
+                CheckupStatus.Warn => "[yellow]WARN[/]",
+                _ => "[red]FAIL[/]"
             };
 
             switch (result.Status)
             {
-                case CheckupStatus.Pass:
-                    passCount++;
-                    break;
-                case CheckupStatus.Warn:
-                    warnCount++;
-                    break;
-                default:
-                    failCount++;
-                    break;
+                case CheckupStatus.Pass: passCount++; break;
+                case CheckupStatus.Warn: warnCount++; break;
+                default: failCount++; break;
             }
 
-            Console.WriteLine($"[{statusText}] {checkup.Category}/{checkup.Name}: {result.Message}");
+            var message = Markup.Escape(result.Message);
             if (!string.IsNullOrWhiteSpace(result.Advice))
-                Console.WriteLine($"  -> {result.Advice}");
+                message += $"\n[dim]→ {Markup.Escape(result.Advice)}[/]";
+
+            doctorTable.AddRow(statusMarkup, Markup.Escape(checkup.Category), Markup.Escape(checkup.Name), message);
         }
 
-        Console.WriteLine();
-        Console.WriteLine($"Summary: {passCount} passed, {warnCount} warnings, {failCount} failures");
+        AnsiConsole.Write(doctorTable);
+        AnsiConsole.MarkupLine($"\n[bold]Summary:[/] [green]{passCount} passed[/], [yellow]{warnCount} warnings[/], [red]{failCount} failures[/]");
         return failCount > 0 ? 1 : 0;
     });
 
@@ -469,22 +476,35 @@ static Command BuildStatusCommand(Option<string?> homeOption, ConfigFileManager 
                 ? "✅"
                 : "⚠️ CLI and installed versions differ";
 
-        var sourceText = !installedVersion.HasValue
+        var sourceDisplay = !installedVersion.HasValue
             ? ""
             : installedVersionValue.Source switch
             {
-                "dev" => $"  Source:            dev ({installedVersionValue.PackagesPath})",
-                "release" => "  Source:            release (GitHub)",
-                _ => $"  Source:            {installedVersionValue.Source ?? "unknown"}"
+                "dev" => $"dev ({installedVersionValue.PackagesPath})",
+                "release" => "release (GitHub)",
+                _ => installedVersionValue.Source ?? "unknown"
             };
 
-        Console.WriteLine("BotNexus Status");
-        Console.WriteLine($"  CLI version:       {cliVersion}");
-        Console.WriteLine($"  Installed version: {installedVersionText}");
-        if (!string.IsNullOrEmpty(sourceText))
-            Console.WriteLine(sourceText);
-        Console.WriteLine($"  Gateway:           {gatewayStatus}");
-        Console.WriteLine($"  Version match:     {versionMatch}");
+        var statusTable = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Grey)
+            .HideHeaders();
+        statusTable.AddColumn("Key");
+        statusTable.AddColumn("Value");
+        statusTable.AddRow("[bold]CLI version[/]", Markup.Escape(cliVersion));
+        statusTable.AddRow("[bold]Installed version[/]", Markup.Escape(installedVersionText));
+        if (!string.IsNullOrEmpty(sourceDisplay))
+        {
+            statusTable.AddRow("[bold]Source[/]", Markup.Escape(sourceDisplay));
+        }
+        var gatewayColor = hasRunningPid || isOnline ? "green" : "red";
+        statusTable.AddRow("[bold]Gateway[/]", $"[{gatewayColor}]{Markup.Escape(gatewayStatus)}[/]");
+        statusTable.AddRow("[bold]Version match[/]", Markup.Escape(versionMatch));
+
+        AnsiConsole.Write(new Panel(statusTable)
+            .Header("[bold]BotNexus Status[/]")
+            .Border(BoxBorder.Rounded)
+            .BorderColor(Color.CornflowerBlue));
         return 0;
     });
 
@@ -596,11 +616,11 @@ static Command BuildBackupCommand(Option<string?> homeOption)
         {
             var result = CreateBackupArchive(homePath, outputPath);
             ConsoleOutput.WriteStatus(ConsoleStatus.Success, $"Backup created: {result.ArchivePath}");
-            Console.WriteLine($"   Config: {result.Summary.ConfigFiles} {Pluralize("file", result.Summary.ConfigFiles)} | " +
-                              $"Agents: {result.Summary.AgentDirectories} {Pluralize("dir", result.Summary.AgentDirectories)} | " +
-                              $"Sessions: {result.Summary.SessionFiles} {Pluralize("file", result.Summary.SessionFiles)} | " +
-                              $"Tokens: {result.Summary.TokenFiles} {Pluralize("file", result.Summary.TokenFiles)}");
-            Console.WriteLine($"   Size: {FormatSize(result.ArchiveSizeBytes)}");
+            AnsiConsole.MarkupLine($"   [dim]Config:[/] {result.Summary.ConfigFiles} {Pluralize("file", result.Summary.ConfigFiles)} [dim]|[/] " +
+                                  $"[dim]Agents:[/] {result.Summary.AgentDirectories} {Pluralize("dir", result.Summary.AgentDirectories)} [dim]|[/] " +
+                                  $"[dim]Sessions:[/] {result.Summary.SessionFiles} {Pluralize("file", result.Summary.SessionFiles)} [dim]|[/] " +
+                                  $"[dim]Tokens:[/] {result.Summary.TokenFiles} {Pluralize("file", result.Summary.TokenFiles)}");
+            AnsiConsole.MarkupLine($"   [dim]Size:[/] {FormatSize(result.ArchiveSizeBytes)}");
             return 0;
         }
         catch (Exception ex)
@@ -640,16 +660,14 @@ static Command BuildBackupCommand(Option<string?> homeOption)
             if (!force)
             {
                 ConsoleOutput.WriteHeader("Restore Preview");
-                Console.WriteLine($"Archive: {resolvedBackupPath}");
-                Console.WriteLine($"Size: {FormatSize(backupSummary.ArchiveSizeBytes)}");
-                Console.WriteLine($"Files: {backupSummary.TotalFiles}");
-                Console.WriteLine($"Config: {backupSummary.ConfigFiles} {Pluralize("file", backupSummary.ConfigFiles)} | " +
-                                  $"Agents: {backupSummary.AgentDirectories} {Pluralize("dir", backupSummary.AgentDirectories)} | " +
-                                  $"Sessions: {backupSummary.SessionFiles} {Pluralize("file", backupSummary.SessionFiles)} | " +
-                                  $"Tokens: {backupSummary.TokenFiles} {Pluralize("file", backupSummary.TokenFiles)}");
-                Console.Write("This will overwrite your current BotNexus data. Continue? [y/N] ");
-                var confirmation = Console.ReadLine();
-                if (!string.Equals(confirmation, "y", StringComparison.OrdinalIgnoreCase))
+                AnsiConsole.MarkupLine($"[dim]Archive:[/] {Markup.Escape(resolvedBackupPath)}");
+                AnsiConsole.MarkupLine($"[dim]Size:[/] {FormatSize(backupSummary.ArchiveSizeBytes)}");
+                AnsiConsole.MarkupLine($"[dim]Files:[/] {backupSummary.TotalFiles}");
+                AnsiConsole.MarkupLine($"[dim]Config:[/] {backupSummary.ConfigFiles} {Pluralize("file", backupSummary.ConfigFiles)} [dim]|[/] " +
+                                      $"[dim]Agents:[/] {backupSummary.AgentDirectories} {Pluralize("dir", backupSummary.AgentDirectories)} [dim]|[/] " +
+                                      $"[dim]Sessions:[/] {backupSummary.SessionFiles} {Pluralize("file", backupSummary.SessionFiles)} [dim]|[/] " +
+                                      $"[dim]Tokens:[/] {backupSummary.TokenFiles} {Pluralize("file", backupSummary.TokenFiles)}");
+                if (!ConsoleOutput.Confirm("This will overwrite your current BotNexus data. Continue?"))
                 {
                     ConsoleOutput.WriteStatus(ConsoleStatus.Warning, "Restore canceled.");
                     return 1;
@@ -662,11 +680,11 @@ static Command BuildBackupCommand(Option<string?> homeOption)
             RestoreBackupArchive(resolvedBackupPath, homePath);
             ConsoleOutput.WriteStatus(ConsoleStatus.Success, $"Backup restored: {resolvedBackupPath}");
             var totalFiles = backupSummary.TotalFiles ?? 0;
-            Console.WriteLine($"   Restored: {totalFiles} {Pluralize("file", totalFiles)}");
-            Console.WriteLine($"   Config: {backupSummary.ConfigFiles} {Pluralize("file", backupSummary.ConfigFiles)} | " +
-                              $"Agents: {backupSummary.AgentDirectories} {Pluralize("dir", backupSummary.AgentDirectories)} | " +
-                              $"Sessions: {backupSummary.SessionFiles} {Pluralize("file", backupSummary.SessionFiles)} | " +
-                              $"Tokens: {backupSummary.TokenFiles} {Pluralize("file", backupSummary.TokenFiles)}");
+            AnsiConsole.MarkupLine($"   [dim]Restored:[/] {totalFiles} {Pluralize("file", totalFiles)}");
+            AnsiConsole.MarkupLine($"   [dim]Config:[/] {backupSummary.ConfigFiles} {Pluralize("file", backupSummary.ConfigFiles)} [dim]|[/] " +
+                                  $"[dim]Agents:[/] {backupSummary.AgentDirectories} {Pluralize("dir", backupSummary.AgentDirectories)} [dim]|[/] " +
+                                  $"[dim]Sessions:[/] {backupSummary.SessionFiles} {Pluralize("file", backupSummary.SessionFiles)} [dim]|[/] " +
+                                  $"[dim]Tokens:[/] {backupSummary.TokenFiles} {Pluralize("file", backupSummary.TokenFiles)}");
             return 0;
         }
         catch (Exception ex)
@@ -683,7 +701,7 @@ static Command BuildBackupCommand(Option<string?> homeOption)
         var backupsPath = ResolveBackupsDirectory(homePath);
         if (!Directory.Exists(backupsPath))
         {
-            Console.WriteLine("No backups found.");
+            ConsoleOutput.WriteStatus(ConsoleStatus.Warning, "No backups found.");
             return 0;
         }
 
@@ -693,7 +711,7 @@ static Command BuildBackupCommand(Option<string?> homeOption)
             .ToList();
         if (backups.Count == 0)
         {
-            Console.WriteLine("No backups found.");
+            ConsoleOutput.WriteStatus(ConsoleStatus.Warning, "No backups found.");
             return 0;
         }
 
@@ -964,13 +982,6 @@ static string ResolveHome(ParseResult parseResult, Option<string?> homeOption)
     return BotNexusHome.ResolveHomePath();
 }
 
-static string Prompt(string label, string defaultValue)
-{
-    Console.Write($"{label}{(string.IsNullOrWhiteSpace(defaultValue) ? string.Empty : $" [{defaultValue}]")}: ");
-    var value = Console.ReadLine();
-    return string.IsNullOrWhiteSpace(value) ? defaultValue : value.Trim();
-}
-
 static int? ReadPid(string pidPath)
 {
     return int.TryParse(File.ReadAllText(pidPath).Trim(), out var pid) ? pid : null;
@@ -1084,7 +1095,7 @@ static int RunInstall(string homePath, string installPath, string packagesPath)
     ConsoleOutput.WriteTable(
         ["package", "kind", "status", "target"],
         installed.Select(item => new[] { item.Package, item.Kind, item.Status, item.Target }));
-    Console.WriteLine($"version.json written to {versionPath}");
+    AnsiConsole.MarkupLine($"[dim]version.json written to {Markup.Escape(versionPath)}[/]");
     return 0;
 }
 
