@@ -469,9 +469,20 @@ static Command BuildStatusCommand(Option<string?> homeOption, ConfigFileManager 
                 ? "✅"
                 : "⚠️ CLI and installed versions differ";
 
+        var sourceText = !installedVersion.HasValue
+            ? ""
+            : installedVersionValue.Source switch
+            {
+                "dev" => $"  Source:            dev ({installedVersionValue.PackagesPath})",
+                "release" => "  Source:            release (GitHub)",
+                _ => $"  Source:            {installedVersionValue.Source ?? "unknown"}"
+            };
+
         Console.WriteLine("BotNexus Status");
         Console.WriteLine($"  CLI version:       {cliVersion}");
         Console.WriteLine($"  Installed version: {installedVersionText}");
+        if (!string.IsNullOrEmpty(sourceText))
+            Console.WriteLine(sourceText);
         Console.WriteLine($"  Gateway:           {gatewayStatus}");
         Console.WriteLine($"  Version match:     {versionMatch}");
         return 0;
@@ -1066,7 +1077,7 @@ static int RunInstall(string homePath, string installPath, string packagesPath)
         return 1;
     }
 
-    var versionPath = WriteVersionManifest(installPath, installed.Select(item => item.Package).ToList());
+    var versionPath = WriteVersionManifest(installPath, packagesPath, installed.Select(item => item.Package).ToList());
     UpdateExtensionsPathInConfig(homePath, Path.Combine(installPath, "extensions"));
 
     ConsoleOutput.WriteStatus(ConsoleStatus.Success, $"Installed {installed.Count(item => item.Status == "installed")} package(s).");
@@ -1112,14 +1123,17 @@ static bool IsNuGetMetadataEntry(string entryPath)
     return false;
 }
 
-static string WriteVersionManifest(string installPath, IReadOnlyCollection<string> packages)
+static string WriteVersionManifest(string installPath, string packagesPath, IReadOnlyCollection<string> packages)
 {
     var version = ResolveCliVersion();
+    var isRelease = version.Contains("-dev") is false;
     var payload = new
     {
         Version = version,
         InstalledAtUtc = DateTime.UtcNow.ToString("o"),
         Commit = ResolveGitCommitHash(),
+        Source = isRelease ? "release" : "dev",
+        PackagesPath = packagesPath,
         InstallPath = installPath,
         Packages = packages
     };
@@ -1241,7 +1255,9 @@ static InstalledVersionInfo? ReadInstalledVersionInfo(string installPath)
         var version = root["Version"]?.GetValue<string>() ?? "unknown";
         var installedAtUtc = root["InstalledAtUtc"]?.GetValue<string>();
         var commit = root["Commit"]?.GetValue<string>();
-        return new InstalledVersionInfo(version, installedAtUtc, commit);
+        var source = root["Source"]?.GetValue<string>();
+        var packagesPath = root["PackagesPath"]?.GetValue<string>();
+        return new InstalledVersionInfo(version, installedAtUtc, commit, source, packagesPath);
     }
     catch
     {
@@ -1564,7 +1580,7 @@ static string BuildGatewayUrl(GatewayConfig gateway)
 readonly record struct BackupResult(string ArchivePath, long ArchiveSizeBytes, BackupSummary Summary);
 readonly record struct InstallTarget(string Kind, string TargetPath);
 readonly record struct PackageInstallResult(string Package, string Kind, string Target, string Status);
-readonly record struct InstalledVersionInfo(string Version, string? InstalledAtUtc, string? Commit);
+readonly record struct InstalledVersionInfo(string Version, string? InstalledAtUtc, string? Commit, string? Source, string? PackagesPath);
 
 readonly record struct BackupSummary(
     int ConfigFiles,
