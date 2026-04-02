@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Text.Json;
 using BotNexus.Cli.Services;
 using BotNexus.Core.Abstractions;
@@ -25,6 +26,7 @@ rootCommand.Add(BuildExtensionCommand(homeOption, configManager));
 rootCommand.Add(BuildDoctorCommand(homeOption));
 rootCommand.Add(BuildStatusCommand(homeOption, configManager));
 rootCommand.Add(BuildLogsCommand(homeOption));
+rootCommand.Add(BuildBackupCommand(homeOption));
 rootCommand.Add(BuildStartCommand(homeOption, configManager));
 rootCommand.Add(BuildStopCommand(homeOption));
 rootCommand.Add(BuildRestartCommand(homeOption, configManager));
@@ -528,6 +530,152 @@ static Command BuildLogsCommand(Option<string?> homeOption)
     return logsCommand;
 }
 
+static Command BuildBackupCommand(Option<string?> homeOption)
+{
+    var backupCommand = new Command("backup", "Backup and restore the BotNexus home directory.");
+
+    var outputOption = new Option<string?>("--output")
+    {
+        Description = "Output path for the backup zip file."
+    };
+    var forceOption = new Option<bool>("--force")
+    {
+        Description = "Restore without confirmation prompt."
+    };
+    var backupPathArgument = new Argument<string>("path")
+    {
+        Description = "Path to the backup zip file."
+    };
+
+    var createCommand = new Command("create", "Create a backup archive of the BotNexus home directory.");
+    createCommand.Add(outputOption);
+    createCommand.SetAction(parseResult =>
+    {
+        var homePath = ResolveHome(parseResult, homeOption);
+        var outputPath = parseResult.GetValue(outputOption);
+
+        try
+        {
+            var result = CreateBackupArchive(homePath, outputPath);
+            ConsoleOutput.WriteStatus(ConsoleStatus.Success, $"Backup created: {result.ArchivePath}");
+            Console.WriteLine($"   Config: {result.Summary.ConfigFiles} {Pluralize("file", result.Summary.ConfigFiles)} | " +
+                              $"Agents: {result.Summary.AgentDirectories} {Pluralize("dir", result.Summary.AgentDirectories)} | " +
+                              $"Sessions: {result.Summary.SessionFiles} {Pluralize("file", result.Summary.SessionFiles)} | " +
+                              $"Tokens: {result.Summary.TokenFiles} {Pluralize("file", result.Summary.TokenFiles)}");
+            Console.WriteLine($"   Size: {FormatSize(result.ArchiveSizeBytes)}");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            ConsoleOutput.WriteStatus(ConsoleStatus.Error, $"Backup failed: {ex.Message}");
+            return 1;
+        }
+    });
+
+    var restoreCommand = new Command("restore", "Restore BotNexus home data from a backup archive.")
+    {
+        backupPathArgument
+    };
+    restoreCommand.Add(forceOption);
+    restoreCommand.SetAction(parseResult =>
+    {
+        var homePath = ResolveHome(parseResult, homeOption);
+        var backupPath = parseResult.GetValue(backupPathArgument);
+        var force = parseResult.GetValue(forceOption);
+
+        if (string.IsNullOrWhiteSpace(backupPath))
+        {
+            ConsoleOutput.WriteStatus(ConsoleStatus.Error, "Backup path is required.");
+            return 1;
+        }
+
+        try
+        {
+            var resolvedBackupPath = Path.GetFullPath(backupPath);
+            if (!File.Exists(resolvedBackupPath))
+            {
+                ConsoleOutput.WriteStatus(ConsoleStatus.Error, $"Backup file not found: {resolvedBackupPath}");
+                return 1;
+            }
+
+            var backupSummary = InspectBackupArchive(resolvedBackupPath);
+            if (!force)
+            {
+                ConsoleOutput.WriteHeader("Restore Preview");
+                Console.WriteLine($"Archive: {resolvedBackupPath}");
+                Console.WriteLine($"Size: {FormatSize(backupSummary.ArchiveSizeBytes)}");
+                Console.WriteLine($"Files: {backupSummary.TotalFiles}");
+                Console.WriteLine($"Config: {backupSummary.ConfigFiles} {Pluralize("file", backupSummary.ConfigFiles)} | " +
+                                  $"Agents: {backupSummary.AgentDirectories} {Pluralize("dir", backupSummary.AgentDirectories)} | " +
+                                  $"Sessions: {backupSummary.SessionFiles} {Pluralize("file", backupSummary.SessionFiles)} | " +
+                                  $"Tokens: {backupSummary.TokenFiles} {Pluralize("file", backupSummary.TokenFiles)}");
+                Console.Write("This will overwrite your current BotNexus data. Continue? [y/N] ");
+                var confirmation = Console.ReadLine();
+                if (!string.Equals(confirmation, "y", StringComparison.OrdinalIgnoreCase))
+                {
+                    ConsoleOutput.WriteStatus(ConsoleStatus.Warning, "Restore canceled.");
+                    return 1;
+                }
+            }
+
+            var preRestoreBackup = CreateBackupArchive(homePath, null, "botnexus-pre-restore");
+            ConsoleOutput.WriteStatus(ConsoleStatus.Success, $"Pre-restore backup created: {preRestoreBackup.ArchivePath}");
+
+            RestoreBackupArchive(resolvedBackupPath, homePath);
+            ConsoleOutput.WriteStatus(ConsoleStatus.Success, $"Backup restored: {resolvedBackupPath}");
+            var totalFiles = backupSummary.TotalFiles ?? 0;
+            Console.WriteLine($"   Restored: {totalFiles} {Pluralize("file", totalFiles)}");
+            Console.WriteLine($"   Config: {backupSummary.ConfigFiles} {Pluralize("file", backupSummary.ConfigFiles)} | " +
+                              $"Agents: {backupSummary.AgentDirectories} {Pluralize("dir", backupSummary.AgentDirectories)} | " +
+                              $"Sessions: {backupSummary.SessionFiles} {Pluralize("file", backupSummary.SessionFiles)} | " +
+                              $"Tokens: {backupSummary.TokenFiles} {Pluralize("file", backupSummary.TokenFiles)}");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            ConsoleOutput.WriteStatus(ConsoleStatus.Error, $"Restore failed: {ex.Message}");
+            return 1;
+        }
+    });
+
+    var listCommand = new Command("list", "List available backup archives.");
+    listCommand.SetAction(parseResult =>
+    {
+        var homePath = ResolveHome(parseResult, homeOption);
+        var backupsPath = Path.Combine(homePath, "backups");
+        if (!Directory.Exists(backupsPath))
+        {
+            Console.WriteLine("No backups found.");
+            return 0;
+        }
+
+        var backups = Directory.EnumerateFiles(backupsPath, "*.zip", SearchOption.TopDirectoryOnly)
+            .Select(path => new FileInfo(path))
+            .OrderByDescending(file => file.LastWriteTimeUtc)
+            .ToList();
+        if (backups.Count == 0)
+        {
+            Console.WriteLine("No backups found.");
+            return 0;
+        }
+
+        ConsoleOutput.WriteTable(
+            ["Name", "Date", "Size"],
+            backups.Select(file => new[]
+            {
+                file.Name,
+                file.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                FormatSize(file.Length)
+            }));
+        return 0;
+    });
+
+    backupCommand.Add(createCommand);
+    backupCommand.Add(restoreCommand);
+    backupCommand.Add(listCommand);
+    return backupCommand;
+}
+
 static Command BuildStartCommand(Option<string?> homeOption, ConfigFileManager configManager)
 {
     var foregroundOption = new Option<bool>("--foreground")
@@ -741,6 +889,180 @@ static bool TryResolveGatewayLaunch(out string workingDirectory, out string args
     return false;
 }
 
+static BackupResult CreateBackupArchive(string homePath, string? outputPath, string namePrefix = "botnexus-backup")
+{
+    if (!Directory.Exists(homePath))
+        throw new DirectoryNotFoundException($"Home directory not found: {homePath}");
+
+    var archivePath = string.IsNullOrWhiteSpace(outputPath)
+        ? Path.Combine(homePath, "backups", $"{namePrefix}-{DateTime.Now:yyyy-MM-ddTHH-mm-ss}.zip")
+        : Path.GetFullPath(outputPath);
+    var destinationDirectory = Path.GetDirectoryName(archivePath);
+    if (string.IsNullOrWhiteSpace(destinationDirectory))
+        throw new InvalidOperationException($"Unable to resolve output directory for: {archivePath}");
+
+    Directory.CreateDirectory(destinationDirectory);
+
+    var summary = BuildBackupSummaryFromHome(homePath);
+    if (File.Exists(archivePath))
+        File.Delete(archivePath);
+
+    using (var archive = ZipFile.Open(archivePath, ZipArchiveMode.Create))
+    {
+        foreach (var filePath in Directory.EnumerateFiles(homePath, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(homePath, filePath);
+            if (ShouldExcludeFromBackup(relativePath))
+                continue;
+
+            archive.CreateEntryFromFile(filePath, NormalizeArchivePath(relativePath), CompressionLevel.Optimal);
+        }
+    }
+
+    var size = new FileInfo(archivePath).Length;
+    return new BackupResult(archivePath, size, summary);
+}
+
+static BackupSummary BuildBackupSummaryFromHome(string homePath)
+{
+    var configFiles = File.Exists(Path.Combine(homePath, "config.json")) ? 1 : 0;
+    var agentDirectories = CountDirectories(Path.Combine(homePath, "agents"));
+    var sessionFiles = CountFiles(Path.Combine(homePath, "sessions"));
+    var tokenFiles = CountFiles(Path.Combine(homePath, "tokens"));
+    var extensionFiles = CountFiles(Path.Combine(homePath, "extensions"));
+
+    return new BackupSummary(configFiles, agentDirectories, sessionFiles, tokenFiles, extensionFiles, null);
+}
+
+static BackupSummary InspectBackupArchive(string backupPath)
+{
+    var configFiles = 0;
+    var agentDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var sessionFiles = 0;
+    var tokenFiles = 0;
+    var extensionFiles = 0;
+    var totalFiles = 0;
+
+    using var archive = ZipFile.OpenRead(backupPath);
+    foreach (var entry in archive.Entries)
+    {
+        if (string.IsNullOrEmpty(entry.Name))
+            continue;
+
+        totalFiles++;
+        var relativePath = entry.FullName.Replace('/', Path.DirectorySeparatorChar);
+        var topSegment = GetTopLevelSegment(relativePath);
+        if (relativePath.Equals("config.json", StringComparison.OrdinalIgnoreCase))
+            configFiles++;
+
+        if (topSegment.Equals("agents", StringComparison.OrdinalIgnoreCase))
+        {
+            var remaining = relativePath["agents".Length..].TrimStart(Path.DirectorySeparatorChar);
+            var agentName = remaining.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(agentName))
+                agentDirectories.Add(agentName);
+        }
+        else if (topSegment.Equals("sessions", StringComparison.OrdinalIgnoreCase))
+        {
+            sessionFiles++;
+        }
+        else if (topSegment.Equals("tokens", StringComparison.OrdinalIgnoreCase))
+        {
+            tokenFiles++;
+        }
+        else if (topSegment.Equals("extensions", StringComparison.OrdinalIgnoreCase))
+        {
+            extensionFiles++;
+        }
+    }
+
+    var archiveSizeBytes = new FileInfo(backupPath).Length;
+    return new BackupSummary(configFiles, agentDirectories.Count, sessionFiles, tokenFiles, extensionFiles, totalFiles)
+    {
+        ArchiveSizeBytes = archiveSizeBytes
+    };
+}
+
+static void RestoreBackupArchive(string backupPath, string homePath)
+{
+    Directory.CreateDirectory(homePath);
+    using var archive = ZipFile.OpenRead(backupPath);
+    var fullHomePath = Path.GetFullPath(homePath)
+        .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+    foreach (var entry in archive.Entries)
+    {
+        var destinationPath = GetSafeDestinationPath(fullHomePath, entry.FullName);
+        if (string.IsNullOrEmpty(entry.Name))
+        {
+            Directory.CreateDirectory(destinationPath);
+            continue;
+        }
+
+        var destinationDirectory = Path.GetDirectoryName(destinationPath);
+        if (!string.IsNullOrWhiteSpace(destinationDirectory))
+            Directory.CreateDirectory(destinationDirectory);
+
+        entry.ExtractToFile(destinationPath, overwrite: true);
+    }
+}
+
+static string GetSafeDestinationPath(string fullHomePath, string entryPath)
+{
+    var normalizedEntryPath = entryPath.Replace('/', Path.DirectorySeparatorChar);
+    var destinationPath = Path.GetFullPath(Path.Combine(fullHomePath, normalizedEntryPath));
+    if (!destinationPath.StartsWith(fullHomePath, StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException($"Backup archive contains an invalid path: {entryPath}");
+
+    return destinationPath;
+}
+
+static int CountFiles(string directoryPath)
+    => Directory.Exists(directoryPath) ? Directory.EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories).Count() : 0;
+
+static int CountDirectories(string directoryPath)
+    => Directory.Exists(directoryPath) ? Directory.EnumerateDirectories(directoryPath, "*", SearchOption.TopDirectoryOnly).Count() : 0;
+
+static bool ShouldExcludeFromBackup(string relativePath)
+{
+    if (string.IsNullOrWhiteSpace(relativePath))
+        return false;
+
+    var topSegment = GetTopLevelSegment(relativePath);
+    return topSegment.Equals("backups", StringComparison.OrdinalIgnoreCase) ||
+           topSegment.Equals("logs", StringComparison.OrdinalIgnoreCase);
+}
+
+static string GetTopLevelSegment(string relativePath)
+{
+    var segments = relativePath.Split(
+        [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+        StringSplitOptions.RemoveEmptyEntries);
+    return segments.Length > 0 ? segments[0] : string.Empty;
+}
+
+static string NormalizeArchivePath(string path)
+    => path.Replace(Path.DirectorySeparatorChar, '/');
+
+static string Pluralize(string noun, int count)
+    => count == 1 ? noun : $"{noun}s";
+
+static string FormatSize(long bytes)
+{
+    const double kiloByte = 1024d;
+    const double megaByte = kiloByte * 1024d;
+    const double gigaByte = megaByte * 1024d;
+
+    if (bytes < kiloByte)
+        return $"{bytes} B";
+    if (bytes < megaByte)
+        return $"{Math.Round(bytes / kiloByte)} KB";
+    if (bytes < gigaByte)
+        return $"{Math.Round(bytes / megaByte, 1)} MB";
+
+    return $"{Math.Round(bytes / gigaByte, 1)} GB";
+}
+
 static IEnumerable<string> EnumerateSearchRoots()
 {
     var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -768,4 +1090,17 @@ static string BuildGatewayUrl(GatewayConfig gateway)
         host = "localhost";
 
     return $"http://{host}:{gateway.Port}";
+}
+
+readonly record struct BackupResult(string ArchivePath, long ArchiveSizeBytes, BackupSummary Summary);
+
+readonly record struct BackupSummary(
+    int ConfigFiles,
+    int AgentDirectories,
+    int SessionFiles,
+    int TokenFiles,
+    int ExtensionFiles,
+    int? TotalFiles)
+{
+    public long ArchiveSizeBytes { get; init; }
 }

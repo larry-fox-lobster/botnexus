@@ -71,6 +71,7 @@
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 - Message bus publishing is now async-only; the sync `MessageBusExtensions.Publish()` wrapper was removed to eliminate sync-over-async deadlock risk.
+- 2026-04-01: BotNexus CLI now includes `backup create|restore|list` in `src/BotNexus.Cli/Program.cs`, with zip backup of home data excluding `backups/` and `logs/`, plus pre-restore safety backups.
 - 2026-04-01: `BotNexus.Core` already references `Microsoft.Extensions.Configuration.Abstractions` and `Microsoft.Extensions.DependencyInjection.Abstractions` (v10.0.5), so extension registration contracts can use these abstractions directly without package changes.
 - **OAuth contracts live in Core Abstractions** (2026-04-01): OAuth integration points are defined under `src/BotNexus.Core/Abstractions` via `IOAuthProvider`, `IOAuthTokenStore`, and `OAuthToken`.
 - **ProviderConfig auth discriminator** (2026-04-01): `ProviderConfig` includes an `Auth` property defaulting to `"apikey"` for selecting API key vs OAuth provider auth behavior.
