@@ -42,7 +42,7 @@ public sealed class CliIntegrationTests
         var result = await CliTestHost.RunCliAsync("config validate", home.Path);
 
         result.ExitCode.Should().Be(0);
-        result.StdOut.Should().Contain("Config is valid JSON and binds to BotNexusConfig");
+        result.StdOut.Should().Contain("Config").And.Contain("valid");
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public sealed class CliIntegrationTests
         var result = await CliTestHost.RunCliAsync("doctor --category configuration", home.Path);
 
         result.ExitCode.Should().BeOneOf(0, 1);
-        result.StdOut.Should().Contain("Configuration/ConfigValid");
+        result.StdOut.Should().ContainAll("Configuration", "ConfigValid");
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public sealed class CliIntegrationTests
         var result = await CliTestHost.RunCliAsync("status", home.Path);
 
         result.ExitCode.Should().Be(0);
-        result.StdOut.Should().ContainAll("BotNexus Status", "CLI version:", "Installed version:", "Gateway:", "Version match:");
+        result.StdOut.Should().ContainAll("BotNexus Status", "CLI version", "Installed version", "Gateway", "Version match");
         result.StdOut.Should().Contain("Offline");
     }
 

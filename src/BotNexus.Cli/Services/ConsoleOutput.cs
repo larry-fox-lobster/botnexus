@@ -73,6 +73,13 @@ public static class ConsoleOutput
 
     public static string Prompt(string label, string defaultValue)
     {
+        if (Console.IsInputRedirected)
+        {
+            Console.Write($"{label}{(string.IsNullOrWhiteSpace(defaultValue) ? string.Empty : $" [{defaultValue}]")}: ");
+            var value = Console.ReadLine();
+            return string.IsNullOrWhiteSpace(value) ? defaultValue : value.Trim();
+        }
+
         if (string.IsNullOrWhiteSpace(defaultValue))
             return AnsiConsole.Prompt(
                 new TextPrompt<string>($"[bold]{Markup.Escape(label)}[/]:"));
@@ -85,14 +92,32 @@ public static class ConsoleOutput
 
     public static bool Confirm(string message, bool defaultValue = false)
     {
+        if (Console.IsInputRedirected)
+        {
+            Console.Write($"{message} [y/N] ");
+            var value = Console.ReadLine();
+            return !string.IsNullOrWhiteSpace(value) &&
+                   value.Trim().Equals("y", StringComparison.OrdinalIgnoreCase);
+        }
+
         return AnsiConsole.Confirm(message, defaultValue);
     }
 
     public static string Select(string prompt, IEnumerable<string> choices)
     {
+        var choiceList = choices.ToList();
+        if (Console.IsInputRedirected)
+        {
+            Console.Write($"{prompt} ({string.Join("/", choiceList)}): ");
+            var value = Console.ReadLine();
+            if (!string.IsNullOrWhiteSpace(value) && choiceList.Contains(value.Trim(), StringComparer.OrdinalIgnoreCase))
+                return value.Trim();
+            return choiceList.First();
+        }
+
         return AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title($"[bold]{Markup.Escape(prompt)}[/]")
-                .AddChoices(choices));
+                .AddChoices(choiceList));
     }
 }
