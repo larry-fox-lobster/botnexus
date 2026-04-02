@@ -77,3 +77,19 @@
 
 **Next Steps:** Production deployment readiness, Sprint 7 planning for P2 items.
 
+### 2026-04-02 — Squad Lifecycle Skill Created
+
+**Deliverable:** `.squad/skills/squad-lifecycle/SKILL.md` — self-contained skill file covering all first-time setup and team lifecycle operations. Extracted from `squad.agent.md` v0.9.1 to reduce coordinator context load (~40% of content that was loading every session but only needed occasionally).
+
+**Sections extracted:**
+- Configuration Check (new — lightweight "am I configured?" gate)
+- Init Mode Phase 1 & Phase 2 (team proposal and creation)
+- Casting & Persistent Naming (universe allowlist, name allocation, overflow, state files, migration)
+- Team Member Management (adding, removing, plugin marketplace)
+- Integration Flows (GitHub Issues, PRD Mode, Human Team Members, Copilot Coding Agent)
+- Worktree Lifecycle Management (creation, reuse, cleanup, pre-spawn setup)
+- Format References (multi-agent artifact format, constraint budget tracking)
+- Anti-patterns section
+
+**Key design choice:** Used the template version of squad.agent.md (v0.9.1, 946 lines) as the stable source for extraction. The live agent file had already been restructured to reference this skill via a pointer at line 25. All on-demand reference pointers to `.squad/templates/` preserved as-is.
+
