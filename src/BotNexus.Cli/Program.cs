@@ -47,6 +47,7 @@ rootCommand.Add(BuildUpdateCommand(homeOption, configManager));
 rootCommand.Add(BuildStartCommand(homeOption, configManager));
 rootCommand.Add(BuildStopCommand(homeOption));
 rootCommand.Add(BuildRestartCommand(homeOption, configManager));
+rootCommand.Add(BuildWebUiCommand(homeOption));
 
 return rootCommand.Parse(args).Invoke();
 
@@ -876,6 +877,84 @@ static Command BuildRestartCommand(Option<string?> homeOption, ConfigFileManager
         return StartGateway(homePath, configManager, foreground: false);
     });
     return restartCommand;
+}
+
+static Command BuildWebUiCommand(Option<string?> homeOption)
+{
+    var webUiCommand = new Command("webui", "Manage the WebUI static files.");
+
+    var devCommand = new Command("dev", "Copy WebUI source files to the installed gateway for live development.");
+    devCommand.SetAction(parseResult =>
+    {
+        var sourcePath = FindWebUiSourcePath();
+        if (sourcePath is null)
+        {
+            ConsoleOutput.WriteStatus(ConsoleStatus.Error,
+                "Could not find WebUI source. Run from the repo root or a directory containing src/BotNexus.WebUI/wwwroot/.");
+            return 1;
+        }
+
+        var installPath = ResolveInstallPath(null);
+        var targetPath = Path.Combine(installPath, "gateway", "wwwroot");
+        if (!Directory.Exists(Path.Combine(installPath, "gateway")))
+        {
+            ConsoleOutput.WriteStatus(ConsoleStatus.Error,
+                $"Gateway not installed at {installPath}. Run 'botnexus install' first.");
+            return 1;
+        }
+
+        Directory.CreateDirectory(targetPath);
+        var count = 0;
+        foreach (var file in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(sourcePath, file);
+            var destFile = Path.Combine(targetPath, relativePath);
+            var destDir = Path.GetDirectoryName(destFile);
+            if (!string.IsNullOrWhiteSpace(destDir))
+                Directory.CreateDirectory(destDir);
+            File.Copy(file, destFile, overwrite: true);
+            count++;
+        }
+
+        ConsoleOutput.WriteStatus(ConsoleStatus.Success,
+            $"Copied {count} file(s) from {sourcePath} to {targetPath}");
+        AnsiConsole.MarkupLine("[dim]Refresh your browser to see the changes — no gateway restart needed.[/]");
+        return 0;
+    });
+
+    var openCommand = new Command("open", "Open the WebUI in the default browser.");
+    openCommand.SetAction(parseResult =>
+    {
+        var homePath = ResolveHome(parseResult, homeOption);
+        var config = new ConfigFileManager().LoadConfig(homePath);
+        var url = BuildGatewayUrl(config.Gateway);
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            ConsoleOutput.WriteStatus(ConsoleStatus.Success, $"Opened {url}");
+        }
+        catch (Exception ex)
+        {
+            ConsoleOutput.WriteStatus(ConsoleStatus.Error, $"Failed to open browser: {ex.Message}");
+            return 1;
+        }
+        return 0;
+    });
+
+    webUiCommand.Add(devCommand);
+    webUiCommand.Add(openCommand);
+    return webUiCommand;
+}
+
+static string? FindWebUiSourcePath()
+{
+    foreach (var root in EnumerateSearchRoots())
+    {
+        var candidate = Path.Combine(root, "src", "BotNexus.WebUI", "wwwroot");
+        if (Directory.Exists(candidate))
+            return candidate;
+    }
+    return null;
 }
 
 static int StartGateway(string homePath, ConfigFileManager configManager, bool foreground)
