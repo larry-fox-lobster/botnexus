@@ -9,10 +9,11 @@ BotNexus uses a hierarchical, dictionary-based configuration model with a unifie
 3. [Primary Deployment: ~/.botnexus/](#primary-deployment-botnexus)
 4. [Project Defaults: appsettings.json](#project-defaults-appsettingsjson)
 5. [Configuration Sections](#configuration-sections)
-6. [Extension Configuration](#extension-configuration)
-7. [Environment Variable Overrides](#environment-variable-overrides)
-8. [Security Best Practices](#security-best-practices)
-9. [Examples](#examples)
+6. [Hot Reload](#hot-reload)
+7. [Extension Configuration](#extension-configuration)
+8. [Environment Variable Overrides](#environment-variable-overrides)
+9. [Security Best Practices](#security-best-practices)
+10. [Examples](#examples)
 
 ---
 
@@ -607,6 +608,43 @@ Optional OpenAI-compatible REST API (for external clients).
 | `Enabled` | bool | false | Enable the API server |
 
 **Note:** The API provides OpenAI-compatible `/v1/chat/completions` endpoint. Keep `Host` as `127.0.0.1` unless behind a proxy or firewall.
+
+---
+
+## Hot Reload
+
+BotNexus monitors `~/.botnexus/config.json` for changes and applies most configuration updates **live** — no Gateway restart required. The `ConfigReloadOrchestrator` (a background service) uses `IOptionsMonitor` to detect changes, debounces rapid edits (500 ms), and applies updates to the appropriate subsystems.
+
+### What reloads automatically
+
+| Setting | Effect |
+|---------|--------|
+| `Agents.Named.*` | Agent runners are rebuilt with new model, temperature, prompt, etc. |
+| `Agents` defaults (Model, MaxTokens, etc.) | All agents inherit updated defaults |
+| `Providers.*` | Provider registry is refreshed; new/changed provider configs take effect |
+| `Cron.*` | Cron jobs are reloaded (schedules, new jobs, removed jobs) |
+| `Gateway.ApiKey` | API key middleware uses the new key immediately |
+
+### What requires a restart
+
+| Setting | Reason |
+|---------|--------|
+| `Gateway.Host` / `Gateway.Port` | Kestrel bind address is set at startup |
+| `ExtensionsPath` | Extension assemblies are loaded once at startup |
+
+### Activity Stream Notification
+
+On reload, the Gateway publishes a `gateway.config.reloaded` activity event listing which subsystems were updated. WebUI and WebSocket clients receive this event in real time.
+
+### CLI Config Commands
+
+The CLI tool provides commands for managing configuration:
+
+```bash
+botnexus config validate   # Validate config.json syntax and binding
+botnexus config show       # Show resolved config (defaults merged with overrides)
+botnexus config init       # Create default config.json interactively
+```
 
 ---
 

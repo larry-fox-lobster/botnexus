@@ -17,6 +17,9 @@ New to BotNexus? The **Getting Started** guide walks you from clone → build �
 - **MCP Support** — Model Context Protocol servers (stdio and SSE transports)
 - **Session Persistence** — Conversation history persisted to disk (JSONL format)
 - **Observable** — Correlation IDs, health checks, real-time activity stream via WebUI
+- **CLI Tool** — `botnexus` command-line interface for config, agents, providers, doctor, and Gateway lifecycle
+- **Diagnostics** — 13 health checkups across 6 categories with auto-fix support (`botnexus doctor`)
+- **Hot Reload** — Edit `config.json` and changes apply live (agents, providers, cron) — no restart needed
 
 ## Quick Start
 
@@ -27,6 +30,20 @@ dotnet build BotNexus.slnx
 # Run the Gateway
 dotnet run --project src/BotNexus.Gateway
 ```
+
+### CLI Tool
+
+BotNexus includes a command-line tool for managing configuration, agents, providers, diagnostics, and the Gateway lifecycle:
+
+```bash
+# Install as a .NET tool
+dotnet tool install --global --add-source ./src/BotNexus.Cli/bin/Release/net10.0 botnexus
+
+# Or run directly from source
+dotnet run --project src/BotNexus.Cli -- doctor
+```
+
+Key commands: `botnexus config validate`, `botnexus doctor`, `botnexus status`, `botnexus start`, `botnexus stop`. Run `botnexus --help` for the full list.
 
 On first run, BotNexus creates `~/.botnexus/` with a default `config.json`. Edit this file to configure providers, channels, and agents:
 
@@ -66,9 +83,11 @@ On first run, BotNexus creates `~/.botnexus/` with a default `config.json`. Edit
 
 | Component | Description |
 |-----------|-------------|
-| **Gateway** | Main orchestrator — message bus, agent routing, channel management |
+| **Gateway** | Main orchestrator — message bus, agent routing, channel management, hot reload |
 | **Agent** | Per-agent processing loop with context building and tool execution |
-| **Core** | 13 interface contracts, configuration, extension loading |
+| **Core** | 14 interface contracts, configuration, extension loading |
+| **Cli** | `botnexus` command-line tool — config, agents, providers, doctor, Gateway lifecycle |
+| **Diagnostics** | 13 health checkups with auto-fix, used by CLI doctor and `/api/doctor` endpoint |
 | **Channels** | Discord, Slack, Telegram, WebSocket implementations |
 | **Providers** | Copilot (OAuth), OpenAI, Anthropic LLM backends |
 | **Session** | JSONL-based conversation persistence |
@@ -88,7 +107,9 @@ On first run, BotNexus creates `~/.botnexus/` with a default `config.json`. Edit
 ```
 src/
 ├── BotNexus.Core          # Abstractions, config, extension loader
-├── BotNexus.Gateway       # Main host, agent router, WebSocket
+├── BotNexus.Gateway       # Main host, agent router, WebSocket, hot reload
+├── BotNexus.Cli           # CLI tool (botnexus command)
+├── BotNexus.Diagnostics   # Health checkups (doctor) with auto-fix
 ├── BotNexus.Api           # OpenAI-compatible REST API
 ├── BotNexus.Agent         # Agent loop, tool registry, MCP
 ├── BotNexus.Session       # JSONL session persistence

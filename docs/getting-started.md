@@ -18,8 +18,9 @@
 10. [Configure Cron Jobs (optional)](#10-configure-cron-jobs-optional)
 11. [Migrating from OpenClaw](#11-migrating-from-openclaw)
 12. [Managing the Environment](#12-managing-the-environment)
-13. [Security](#13-security)
-14. [Next Steps](#14-next-steps)
+13. [CLI Tool](#13-cli-tool)
+14. [Security](#14-security)
+15. [Next Steps](#15-next-steps)
 
 ---
 
@@ -297,6 +298,8 @@ The Copilot provider is not pre-configured by default. Add it to `~/.botnexus/co
 ```
 
 Restart the Gateway to pick up the configuration change (Ctrl+C, then `dotnet run --project src/BotNexus.Gateway`).
+
+> **Hot Reload:** Most configuration changes (agents, providers, cron jobs, API key) are applied automatically when you save `config.json` — no restart required. Only host/port and extension path changes require a restart. See [Configuration Guide — Hot Reload](configuration.md#hot-reload) for details.
 
 > **Note:** The Copilot provider uses GitHub's built-in OAuth client ID and API endpoint automatically. No additional setup is needed beyond adding it to the config.
 
@@ -789,6 +792,16 @@ curl -X POST http://localhost:18790/api/cron/morning-briefing/trigger
 
 # List active sessions
 curl http://localhost:18790/api/sessions
+
+# System status (gateway version, health, agents, cron, memory)
+curl http://localhost:18790/api/status
+
+# Run diagnostics (all checkups or filtered by category)
+curl http://localhost:18790/api/doctor
+curl http://localhost:18790/api/doctor?category=Configuration
+
+# Graceful shutdown
+curl -X POST http://localhost:18790/api/shutdown
 ```
 
 ### Logs
@@ -829,7 +842,70 @@ tail -50 ~/.botnexus/logs/botnexus-*.log
 
 ---
 
-## 13. Security
+## 13. CLI Tool
+
+BotNexus includes a command-line tool (`botnexus`) for managing configuration, agents, providers, diagnostics, and the Gateway lifecycle without editing JSON or using curl.
+
+### Install
+
+```bash
+# Install as a global .NET tool (from local build)
+dotnet tool install --global --add-source ./src/BotNexus.Cli/bin/Release/net10.0 botnexus
+
+# Or run directly from the repo
+dotnet run --project src/BotNexus.Cli -- --help
+```
+
+### Commands
+
+| Command | Description |
+|---|---|
+| `botnexus config validate` | Validate config.json syntax and binding |
+| `botnexus config show` | Show resolved config (defaults merged with overrides) |
+| `botnexus config init` | Create default config.json interactively |
+| `botnexus agent list` | List configured agents |
+| `botnexus agent add` | Add an agent to config |
+| `botnexus agent workspace <name>` | Show agent workspace path and files |
+| `botnexus provider list` | List configured providers |
+| `botnexus provider add` | Add a provider to config |
+| `botnexus channel add` | Add a channel instance to config |
+| `botnexus extension list` | List installed extensions |
+| `botnexus doctor` | Run health checkups |
+| `botnexus status` | Show Gateway and configuration status |
+| `botnexus logs [-f] [--lines N]` | Tail Gateway logs |
+| `botnexus start [--foreground]` | Start Gateway |
+| `botnexus stop` | Stop Gateway |
+| `botnexus restart` | Restart Gateway |
+
+All commands support the `--home` option to override `BOTNEXUS_HOME`.
+
+### Doctor
+
+The `doctor` command runs health checkups across 6 categories:
+
+```bash
+# Run all checkups
+botnexus doctor
+
+# Filter by category
+botnexus doctor --category Configuration
+```
+
+**Categories:** Configuration, Security, Connectivity, Extensions, Permissions, Resources.
+
+13 checkups are included. Five of them support **auto-fix** (creating missing directories, fixing permissions, generating default config). Auto-fix runs automatically via the Gateway's `/api/doctor` endpoint and the `CheckupRunner.RunAndFixAsync` API.
+
+| Auto-Fix Checkup | What It Fixes |
+|---|---|
+| ConfigValidCheckup | Creates default config.json if missing |
+| TokenPermissionsCheckup | Fixes token directory permissions |
+| ExtensionsFolderExistsCheckup | Creates missing extension folders |
+| HomeDirWritableCheckup | Creates home directory if missing |
+| LogDirWritableCheckup | Creates logs directory if missing |
+
+---
+
+## 14. Security
 
 ### Gateway API key
 
@@ -887,7 +963,7 @@ Each channel supports an `AllowFrom` list that restricts which users or chat IDs
 
 ---
 
-## 14. Next Steps
+## 15. Next Steps
 
 You're up and running! Here's where to go from here:
 

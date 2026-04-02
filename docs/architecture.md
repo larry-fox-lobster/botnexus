@@ -1,7 +1,7 @@
 # BotNexus Architecture Overview
 
-**Version:** 1.0  
-**Last Updated:** 2026-04-01  
+**Version:** 1.1  
+**Last Updated:** 2026-05-01  
 **Lead Architect:** Leela
 
 ---
@@ -19,9 +19,12 @@
 9. [Agent Workspace and Memory](#agent-workspace-and-memory)
 10. [Session Management](#session-management)
 11. [Cron and Scheduling](#cron-and-scheduling)
-12. [Security Model](#security-model)
-13. [Observability](#observability)
-14. [Installation Layout](#installation-layout)
+12. [Diagnostics (Doctor)](#diagnostics-doctor)
+13. [Configuration Hot Reload](#configuration-hot-reload)
+14. [Security Model](#security-model)
+15. [Observability](#observability)
+16. [Installation Layout](#installation-layout)
+17. [Component Reference](#component-reference)
 
 ---
 
@@ -40,7 +43,7 @@
 ### Key Characteristics
 
 - **Lean Core**: 17 class libraries, minimal dependencies
-- **Contract-First**: Core module defines 13 interfaces; implementations in outer modules
+- **Contract-First**: Core module defines 14 interfaces; implementations in outer modules
 - **Async-First**: All operations async (I/O, message processing, tool execution)
 - **Configuration-Driven**: Extensions loaded only when configured; no automatic discovery
 - **Session-Persistent**: Conversation history persisted to disk (JSONL format)
@@ -135,6 +138,8 @@
 │ - ISessionManager, ICommandRouter                            │
 │ - IAgentRouter, ChannelManager, ToolRegistry                │
 │ - ProviderRegistry, ExtensionLoadReport                      │
+│ - ConfigReloadOrchestrator (live config reload)              │
+│ - CheckupRunner, IHealthCheckup (diagnostics)               │
 └──────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -443,6 +448,7 @@ BotNexus uses Microsoft.Extensions.DependencyInjection (standard .NET DI contain
 | `ILlmProvider` implementations | Singleton | Connection pooling |
 | `ITool` implementations | Singleton | Stateless tools |
 | `Gateway` | Singleton, BackgroundService | Main orchestrator |
+| `ConfigReloadOrchestrator` | Singleton, BackgroundService | Live config reload on file change |
 | `CronService` | Singleton, BackgroundService | Scheduled jobs |
 | `IHeartbeatService` (`CronHeartbeatAdapter`) | Singleton | Thin adapter over CronService |
 | `IAgentHook` implementations | Transient | Fresh per request |
@@ -500,6 +506,12 @@ public static IServiceCollection AddBotNexus(
     // Add Gateway as BackgroundService
     services.AddHostedService<Gateway>();
     
+    // Diagnostics (13 health checkups, CheckupRunner)
+    services.AddBotNexusDiagnostics();
+    
+    // Config hot reload (watches config.json, reloads agents/providers/cron)
+    services.AddHostedService<ConfigReloadOrchestrator>();
+    
     // Add health checks
     services.AddHealthChecks()
         .AddCheck<MessageBusHealthCheck>("message_bus")
@@ -536,7 +548,7 @@ private static void AddBotNexusExtensions(
 
 ## 6. Core Abstractions
 
-The Core module defines 13 interfaces that form the contract between the engine and all extensions:
+The Core module defines 14 interfaces that form the contract between the engine and all extensions:
 
 | Interface | Location | Purpose |
 |-----------|----------|---------|
@@ -553,6 +565,7 @@ The Core module defines 13 interfaces that form the contract between the engine 
 | `IActivityStream` | `Abstractions/IActivityStream.cs` | System-wide event publication |
 | `IAgentHook` | `Abstractions/IAgentHook.cs` | Pipeline middleware (before/after/error) |
 | `IMemoryStore` | `Abstractions/IMemoryStore.cs` | Persistent agent memory/notes |
+| `IHealthCheckup` | `Abstractions/IHealthCheckup.cs` | Diagnostic health check with optional auto-fix |
 
 ### Key Design Principles
 
@@ -1102,7 +1115,101 @@ For detailed configuration, examples, and troubleshooting, see [Cron and Schedul
 
 ---
 
-## 12. Security Model
+## 12. Diagnostics (Doctor)
+
+BotNexus includes a diagnostics system with 13 health checkups organized across 6 categories. These are used by the CLI `doctor` command and the `/api/doctor` Gateway endpoint.
+
+### IHealthCheckup Interface
+
+**File:** `BotNexus.Core/Abstractions/IHealthCheckup.cs`
+
+```csharp
+public interface IHealthCheckup
+{
+    string Name { get; }
+    string Category { get; }
+    string Description { get; }
+    bool CanAutoFix => false;
+    Task<CheckupResult> RunAsync(CancellationToken ct = default);
+    Task<CheckupResult> FixAsync(CancellationToken ct = default) => RunAsync(ct);
+}
+```
+
+- **CanAutoFix**: Indicates if the checkup can fix the issue automatically
+- **FixAsync**: Attempts auto-repair (defaults to re-running the check)
+- **CheckupResult**: Record of `(CheckupStatus Status, string Message, string? Advice)`
+- **CheckupStatus**: `Pass`, `Warn`, `Fail`
+
+### Checkup Categories
+
+| Category | Checkups | Description |
+|----------|----------|-------------|
+| **Configuration** | ConfigValidCheckup, AgentConfigCheckup, ProviderConfigCheckup | Config file validity and required fields |
+| **Security** | ApiKeyStrengthCheckup, TokenPermissionsCheckup, ExtensionSignedCheckup | Credential strength, file permissions, assembly signing |
+| **Connectivity** | ProviderReachableCheckup, PortAvailableCheckup | API reachability and port availability |
+| **Extensions** | ExtensionsFolderExistsCheckup, ExtensionAssembliesValidCheckup | Extension directory and DLL validity |
+| **Permissions** | HomeDirWritableCheckup, LogDirWritableCheckup | Directory write access |
+| **Resources** | DiskSpaceCheckup | Available disk space (warn at 500 MB, fail at 100 MB) |
+
+### Auto-Fix Checkups
+
+Five checkups support automatic repair (`CanAutoFix = true`):
+
+| Checkup | What It Fixes |
+|---------|---------------|
+| `ConfigValidCheckup` | Creates default `config.json` if missing |
+| `TokenPermissionsCheckup` | Fixes token directory permissions (platform-specific ACL/chmod) |
+| `ExtensionsFolderExistsCheckup` | Creates missing extension folders (providers, channels, tools) |
+| `HomeDirWritableCheckup` | Creates `~/.botnexus/` directory if missing |
+| `LogDirWritableCheckup` | Creates `~/.botnexus/logs/` directory if missing |
+
+### CheckupRunner
+
+**File:** `BotNexus.Diagnostics/CheckupRunner.cs`
+
+Orchestrates checkup execution:
+- `RunAllAsync(category?)` — Run all (or filtered) checkups, return results
+- `RunAndFixAsync(category?, force, promptUser?)` — Run checkups and auto-fix failures
+- `GetCategories()` — List available categories
+
+### Access Points
+
+| Surface | Usage |
+|---------|-------|
+| CLI | `botnexus doctor [--category <name>]` |
+| Gateway API | `GET /api/doctor[?category=<name>]` |
+| Cron | Built-in `health-audit` system action |
+
+---
+
+## 13. Configuration Hot Reload
+
+BotNexus applies most configuration changes live when `config.json` is saved — no Gateway restart required.
+
+### ConfigReloadOrchestrator
+
+**File:** `BotNexus.Gateway/ConfigReloadOrchestrator.cs`
+
+A `BackgroundService` that monitors config changes via `IOptionsMonitor<BotNexusConfig>`:
+
+1. **Detect** — `IOptionsMonitor.OnChange` fires when `config.json` is modified
+2. **Debounce** — Waits 500 ms for rapid successive edits to settle
+3. **Diff** — Compares previous and current config via JSON serialization
+4. **Apply** — Reloads only affected subsystems:
+   - **Agents**: Rebuilds agent runners for changed agent configurations
+   - **Providers**: Refreshes the provider registry with updated keys
+   - **Cron**: Reloads all cron job schedules
+   - **API Key**: Middleware picks up the new key immediately
+5. **Notify** — Publishes a `gateway.config.reloaded` activity event
+
+### What Requires a Restart
+
+- `Gateway.Host` / `Gateway.Port` — Kestrel bind address is set at startup
+- `ExtensionsPath` — Extension assemblies are loaded once at startup
+
+---
+
+## 14. Security Model
 
 ### Authentication
 
@@ -1154,7 +1261,7 @@ Currently not implemented. Future consideration:
 
 ---
 
-## 13. Observability
+## 15. Observability
 
 BotNexus provides multiple observability mechanisms to monitor health and behavior.
 
@@ -1167,8 +1274,31 @@ BotNexus provides multiple observability mechanisms to monitor health and behavi
 | `message_bus` | Liveness | IMessageBus alive |
 | `provider_registration` | Liveness | At least one provider registered |
 | `extension_loader` | Liveness | Extension load report available |
+| `cron_service` | Liveness | Cron service running |
 | `channel_readiness` | Readiness | All configured channels running |
 | `provider_readiness` | Readiness | At least one provider ready |
+
+### Gateway REST API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/health` | GET | Liveness probe |
+| `/ready` | GET | Readiness probe |
+| `/api/sessions` | GET | List all sessions |
+| `/api/sessions/{*key}` | GET | Get specific session details |
+| `/api/channels` | GET | List configured channels |
+| `/api/agents` | GET | List configured agents |
+| `/api/providers` | GET | List LLM providers |
+| `/api/tools` | GET | List available tools |
+| `/api/extensions` | GET | Extension load summary |
+| `/api/cron` | GET | List cron jobs |
+| `/api/cron/history` | GET | Cron execution history |
+| `/api/cron/{name}` | GET | Cron job details |
+| `/api/cron/{name}/trigger` | POST | Manually trigger a cron job |
+| `/api/cron/{name}/enable` | PUT | Enable/disable a cron job |
+| `/api/status` | GET | Complete system status (version, health, agents, cron, sessions) |
+| `/api/doctor` | GET | Run diagnostic checkups (optional `?category=` filter) |
+| `/api/shutdown` | POST | Graceful Gateway shutdown (optional `{"reason": "..."}` body, returns 202) |
 
 ### Metrics
 
@@ -1225,7 +1355,7 @@ public enum ActivityEventType
 
 ---
 
-## 14. Installation Layout
+## 16. Installation Layout
 
 ### Runtime Directory Structure
 
@@ -1278,7 +1408,7 @@ On first run:
 
 ---
 
-## 15. Component Reference
+## 17. Component Reference
 
 ### Class Hierarchy
 
@@ -1311,11 +1441,31 @@ BotNexus.Gateway/
 ├── Gateway.cs             (Main orchestrator)
 ├── AgentRouter.cs
 ├── ChannelManager.cs
+├── ConfigReloadOrchestrator.cs  (Live config reload)
 ├── WebSocketChannel.cs
 ├── GatewayWebSocketHandler.cs
 └── Health/
     ├── MessageBusHealthCheck.cs
     └── ...
+
+BotNexus.Cli/
+├── Program.cs             (CLI entry point, 16 commands)
+└── Services/
+    ├── ConfigFileManager.cs
+    ├── ConsoleOutput.cs
+    └── GatewayClient.cs
+
+BotNexus.Diagnostics/
+├── CheckupRunner.cs       (Orchestrates checkups + auto-fix)
+├── DiagnosticsPaths.cs
+├── ServiceCollectionExtensions.cs
+└── Checkups/
+    ├── Configuration/     (ConfigValid, AgentConfig, ProviderConfig)
+    ├── Security/          (ApiKeyStrength, TokenPermissions, ExtensionSigned)
+    ├── Connectivity/      (ProviderReachable, PortAvailable)
+    ├── Extensions/        (ExtensionsFolderExists, ExtensionAssembliesValid)
+    ├── Permissions/       (HomeDirWritable, LogDirWritable)
+    └── Resources/         (DiskSpace)
 
 BotNexus.Agent/
 ├── AgentLoop.cs           (Core processing)
@@ -1363,9 +1513,13 @@ BotNexus.Session/
 | Core contracts | `src/BotNexus.Core/Abstractions/` |
 | DI setup | `src/BotNexus.Gateway/BotNexusServiceExtensions.cs` |
 | Message processing | `src/BotNexus.Gateway/Gateway.cs` |
+| Config hot reload | `src/BotNexus.Gateway/ConfigReloadOrchestrator.cs` |
 | Agent execution | `src/BotNexus.Agent/AgentLoop.cs` |
 | Session storage | `src/BotNexus.Session/SessionManager.cs` |
 | Extension loading | `src/BotNexus.Core/Extensions/ExtensionLoaderExtensions.cs` |
+| CLI entry point | `src/BotNexus.Cli/Program.cs` |
+| Diagnostics runner | `src/BotNexus.Diagnostics/CheckupRunner.cs` |
+| Health checkup contract | `src/BotNexus.Core/Abstractions/IHealthCheckup.cs` |
 | WebUI | `src/BotNexus.WebUI/wwwroot/` |
 | Tests | `tests/` |
 
