@@ -395,8 +395,12 @@ When developing BotNexus, you'll iterate through this cycle:
 
 1. **Edit your code** (in `src/BotNexus.Gateway/` or `src/BotNexus.Providers.*/`)
 2. **Rebuild**: `dotnet build` (or `dotnet build -c Release` for Release builds)
-3. **Restart the gateway**: Ctrl+C, then `botnexus start` or `dotnet run --project src/BotNexus.Gateway`
-4. **Test**: Reload the WebUI or send a test message
+3. **Pack**: `./scripts/pack.ps1` — rebuilds all nupkg packages in `artifacts/`
+4. **Install**: `botnexus install` — deploys fresh packages to the install location
+5. **Restart the gateway**: `botnexus stop && botnexus start`
+6. **Test**: Reload the WebUI or send a test message
+
+> **Why pack?** `botnexus install` reads pre-built `.nupkg` files from `artifacts/`. If you skip `pack.ps1`, the install deploys stale binaries and your changes won't take effect.
 
 ### B. Changing Agent Personality
 
@@ -406,14 +410,10 @@ When developing BotNexus, you'll iterate through this cycle:
 
 ### C. Changing Extensions (Channels, Tools)
 
-1. **Edit extension code** (in `extensions/`)
-2. **Build the extension**: `dotnet build extensions/channels/YourChannel/`
-3. **Copy to extensions folder**:
-   ```bash
-   # Assuming you're in the repo root
-   Copy-Item extensions/channels/YourChannel/bin/Debug/net10.0/*.dll ~/.botnexus/extensions/channels/
-   ```
-4. **Restart the gateway** to reload extensions
+1. **Edit extension code** (in `src/BotNexus.Channels.*/` or `src/BotNexus.Tools.*/`)
+2. **Pack**: `./scripts/pack.ps1` — rebuilds all packages including extensions
+3. **Install**: `botnexus install` — deploys fresh extension DLLs
+4. **Restart the gateway**: `botnexus stop && botnexus start` to reload extensions
 
 ---
 
