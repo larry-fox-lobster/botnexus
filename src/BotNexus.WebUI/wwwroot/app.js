@@ -185,13 +185,7 @@
         const time = entry.timestamp ? formatTime(entry.timestamp) : '';
         let roleLabel = entry.role;
         if (entry.role === 'tool' && entry.toolName) roleLabel = `tool: ${entry.toolName}`;
-        div.innerHTML = `
-            <div class="msg-header">
-                <span class="msg-role">${escapeHtml(roleLabel)}</span>
-                <span>${time}</span>
-            </div>
-            ${escapeHtml(entry.content)}
-        `;
+        div.innerHTML = `<div class="msg-header"><span class="msg-role">${escapeHtml(roleLabel)}</span><span>${time}</span></div>${escapeHtml(entry.content)}`;
         elChatMessages.appendChild(div);
     }
 
@@ -215,13 +209,7 @@
         const div = document.createElement('div');
         div.className = `message ${role}`;
         const now = formatTime(new Date().toISOString());
-        div.innerHTML = `
-            <div class="msg-header">
-                <span class="msg-role">${escapeHtml(role)}</span>
-                <span>${now}</span>
-            </div>
-            ${escapeHtml(content)}
-        `;
+        div.innerHTML = `<div class="msg-header"><span class="msg-role">${escapeHtml(role)}</span><span>${now}</span></div>${escapeHtml(content)}`;
         // Remove any pending delta element
         const pending = elChatMessages.querySelector('.message.assistant.streaming');
         if (pending && role === 'assistant') {
@@ -236,13 +224,7 @@
         if (!streaming) {
             streaming = document.createElement('div');
             streaming.className = 'message assistant streaming';
-            streaming.innerHTML = `
-                <div class="msg-header">
-                    <span class="msg-role">ASSISTANT</span>
-                    <span>streaming...</span>
-                </div>
-                <span class="delta-content"></span>
-            `;
+            streaming.innerHTML = `<div class="msg-header"><span class="msg-role">ASSISTANT</span><span>streaming...</span></div><span class="delta-content"></span>`;
             elChatMessages.appendChild(streaming);
         }
         const deltaEl = streaming.querySelector('.delta-content');
