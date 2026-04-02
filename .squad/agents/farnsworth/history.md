@@ -296,3 +296,17 @@ All 7 foundation items completed (Farnsworth: 5, Bender: 2). Decisions merged an
 
 ### Team Status
 **Backup infrastructure COMPLETE:** CLI command fully implemented, comprehensive test coverage, foolproof test isolation established. Ready for production backup/restore workflows.
+
+## 2026-04-02 — Packaging Workflow Scripts
+
+### Your Deliverables (Farnsworth)
+
+- Added `scripts/pack.ps1` to publish gateway/cli/extensions in Release and package each as `.nupkg` into `artifacts/`.
+- Added `scripts/install.ps1` to install packages into configurable app path (`~/.botnexus/app` default), map extension packages into `extensions/{type}/{name}`, emit `version.json`, and update `~/.botnexus/config.json` `ExtensionsPath`.
+- Added `scripts/update.ps1` to stop running gateway process (if any), run install, then restart gateway from installed binaries.
+
+### Validation
+
+- Baseline build succeeded.
+- Baseline tests show a pre-existing failure in `BotNexus.Tests.Unit.Tests.CopilotProviderTests.ChatAsync_ReturnsCompletionPayload` (expected `/v1/chat/completions`, actual `/chat/completions`).
+- Ran `scripts/pack.ps1` and confirmed packages were generated in `artifacts/`.
