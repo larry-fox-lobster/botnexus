@@ -2,6 +2,8 @@ using System.CommandLine;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using BotNexus.Cli.Services;
 using BotNexus.Core.Abstractions;
 using BotNexus.Core.Configuration;
@@ -27,6 +29,8 @@ rootCommand.Add(BuildDoctorCommand(homeOption));
 rootCommand.Add(BuildStatusCommand(homeOption, configManager));
 rootCommand.Add(BuildLogsCommand(homeOption));
 rootCommand.Add(BuildBackupCommand(homeOption));
+rootCommand.Add(BuildInstallCommand(homeOption));
+rootCommand.Add(BuildUpdateCommand(homeOption, configManager));
 rootCommand.Add(BuildStartCommand(homeOption, configManager));
 rootCommand.Add(BuildStopCommand(homeOption));
 rootCommand.Add(BuildRestartCommand(homeOption, configManager));
@@ -676,6 +680,93 @@ static Command BuildBackupCommand(Option<string?> homeOption)
     return backupCommand;
 }
 
+static Command BuildInstallCommand(Option<string?> homeOption)
+{
+    var installPathOption = new Option<string?>("--install-path")
+    {
+        Description = "Install path for app deployment. Defaults to ~/.botnexus/app."
+    };
+    var packagesPathOption = new Option<string?>("--packages")
+    {
+        Description = "Packages folder. Defaults to ./artifacts if present, else ~/.botnexus/packages."
+    };
+
+    var installCommand = new Command("install", "Install BotNexus packages into the app directory.");
+    installCommand.Add(installPathOption);
+    installCommand.Add(packagesPathOption);
+    installCommand.SetAction(parseResult =>
+    {
+        var homePath = ResolveHome(parseResult, homeOption);
+        var installPath = ResolveInstallPath(parseResult.GetValue(installPathOption));
+        var packagesPath = ResolvePackagesPath(parseResult.GetValue(packagesPathOption), homePath);
+
+        return RunInstall(homePath, installPath, packagesPath);
+    });
+
+    return installCommand;
+}
+
+static Command BuildUpdateCommand(Option<string?> homeOption, ConfigFileManager configManager)
+{
+    var installPathOption = new Option<string?>("--install-path")
+    {
+        Description = "Install path for app deployment. Defaults to ~/.botnexus/app."
+    };
+    var packagesPathOption = new Option<string?>("--packages")
+    {
+        Description = "Packages folder. Defaults to ./artifacts if present, else ~/.botnexus/packages."
+    };
+
+    var updateCommand = new Command("update", "Update BotNexus deployment and restart gateway if needed.");
+    updateCommand.Add(installPathOption);
+    updateCommand.Add(packagesPathOption);
+    updateCommand.SetAction(parseResult =>
+    {
+        var homePath = ResolveHome(parseResult, homeOption);
+        var installPath = ResolveInstallPath(parseResult.GetValue(installPathOption));
+        var packagesPath = ResolvePackagesPath(parseResult.GetValue(packagesPathOption), homePath);
+
+        var pidPath = Path.Combine(homePath, "gateway.pid");
+        var existingPid = File.Exists(pidPath) ? ReadPid(pidPath) : null;
+        var wasRunning = existingPid is not null && IsRunning(existingPid.Value);
+
+        if (wasRunning)
+        {
+            var stopResult = StopGateway(homePath);
+            if (stopResult != 0)
+            {
+                ConsoleOutput.WriteStatus(ConsoleStatus.Error, "Failed to stop gateway before update.");
+                return 1;
+            }
+        }
+
+        var installResult = RunInstall(homePath, installPath, packagesPath);
+        if (installResult != 0)
+            return installResult;
+
+        if (wasRunning)
+        {
+            var gatewayDllPath = Path.Combine(installPath, "gateway", "BotNexus.Gateway.dll");
+            if (!File.Exists(gatewayDllPath))
+            {
+                ConsoleOutput.WriteStatus(ConsoleStatus.Error, $"Gateway DLL not found for restart: {gatewayDllPath}");
+                return 1;
+            }
+
+            var startResult = StartInstalledGateway(homePath, configManager, gatewayDllPath);
+            if (startResult != 0)
+                return startResult;
+        }
+
+        ConsoleOutput.WriteStatus(ConsoleStatus.Success, wasRunning
+            ? "Update complete. Gateway restarted."
+            : "Update complete.");
+        return 0;
+    });
+
+    return updateCommand;
+}
+
 static Command BuildStartCommand(Option<string?> homeOption, ConfigFileManager configManager)
 {
     var foregroundOption = new Option<bool>("--foreground")
@@ -733,10 +824,10 @@ static int StartGateway(string homePath, ConfigFileManager configManager, bool f
         File.Delete(pidPath);
     }
 
-    if (!TryResolveGatewayLaunch(out var workingDirectory, out var launchArgs))
+    if (!TryResolveGatewayLaunch(homePath, out var workingDirectory, out var launchArgs))
     {
         ConsoleOutput.WriteStatus(ConsoleStatus.Error,
-            "Could not locate BotNexus.Gateway. Ensure src\\BotNexus.Gateway\\BotNexus.Gateway.csproj is available.");
+            "Could not locate BotNexus.Gateway. Install the app or run from a repo with src\\BotNexus.Gateway\\BotNexus.Gateway.csproj.");
         return 1;
     }
 
@@ -863,9 +954,265 @@ static bool IsRunning(int pid)
     }
 }
 
-static bool TryResolveGatewayLaunch(out string workingDirectory, out string args)
+static string ResolveInstallPath(string? installPath)
 {
-    var gatewayDll = Path.Combine(AppContext.BaseDirectory, "BotNexus.Gateway.dll");
+    if (!string.IsNullOrWhiteSpace(installPath))
+        return Path.GetFullPath(BotNexusHome.ResolvePath(installPath));
+
+    return Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".botnexus",
+        "app");
+}
+
+static string ResolvePackagesPath(string? packagesPath, string homePath)
+{
+    if (!string.IsNullOrWhiteSpace(packagesPath))
+        return Path.GetFullPath(BotNexusHome.ResolvePath(packagesPath));
+
+    var cwdArtifacts = Path.Combine(Directory.GetCurrentDirectory(), "artifacts");
+    if (Directory.Exists(cwdArtifacts))
+        return cwdArtifacts;
+
+    return Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".botnexus",
+        "packages");
+}
+
+static int RunInstall(string homePath, string installPath, string packagesPath)
+{
+    if (!Directory.Exists(packagesPath))
+    {
+        ConsoleOutput.WriteStatus(ConsoleStatus.Error, $"Packages directory not found: {packagesPath}");
+        return 1;
+    }
+
+    Directory.CreateDirectory(installPath);
+    var packageFiles = Directory.EnumerateFiles(packagesPath, "*.nupkg", SearchOption.TopDirectoryOnly)
+        .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+    if (packageFiles.Count == 0)
+    {
+        ConsoleOutput.WriteStatus(ConsoleStatus.Error, $"No .nupkg files found in {packagesPath}");
+        return 1;
+    }
+
+    var installed = new List<PackageInstallResult>();
+    try
+    {
+        foreach (var packageFile in packageFiles)
+        {
+            var packageId = Path.GetFileNameWithoutExtension(packageFile);
+            var target = GetInstallTarget(packageId, installPath);
+            if (target.Kind == "cli")
+            {
+                installed.Add(new PackageInstallResult(Path.GetFileName(packageFile), "cli", "(skipped)", "skipped"));
+                continue;
+            }
+
+            if (Directory.Exists(target.TargetPath))
+                Directory.Delete(target.TargetPath, recursive: true);
+            Directory.CreateDirectory(target.TargetPath);
+
+            using var archive = ZipFile.OpenRead(packageFile);
+            foreach (var entry in archive.Entries)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Name))
+                    continue;
+                if (IsNuGetMetadataEntry(entry.FullName))
+                    continue;
+
+                var entryPath = entry.FullName.Replace('/', Path.DirectorySeparatorChar);
+                var destinationPath = Path.Combine(target.TargetPath, entryPath);
+                var destinationDirectory = Path.GetDirectoryName(destinationPath);
+                if (!string.IsNullOrWhiteSpace(destinationDirectory))
+                    Directory.CreateDirectory(destinationDirectory);
+
+                entry.ExtractToFile(destinationPath, overwrite: true);
+            }
+
+            installed.Add(new PackageInstallResult(Path.GetFileName(packageFile), target.Kind, target.TargetPath, "installed"));
+        }
+    }
+    catch (Exception ex)
+    {
+        ConsoleOutput.WriteStatus(ConsoleStatus.Error, $"Install failed: {ex.Message}");
+        return 1;
+    }
+
+    var versionPath = WriteVersionManifest(installPath, installed.Select(item => item.Package).ToList());
+    UpdateExtensionsPathInConfig(homePath, Path.Combine(installPath, "extensions"));
+
+    ConsoleOutput.WriteStatus(ConsoleStatus.Success, $"Installed {installed.Count(item => item.Status == "installed")} package(s).");
+    ConsoleOutput.WriteTable(
+        ["package", "kind", "status", "target"],
+        installed.Select(item => new[] { item.Package, item.Kind, item.Status, item.Target }));
+    Console.WriteLine($"version.json written to {versionPath}");
+    return 0;
+}
+
+static InstallTarget GetInstallTarget(string packageId, string installRoot)
+{
+    if (string.Equals(packageId, "BotNexus.Gateway", StringComparison.OrdinalIgnoreCase))
+        return new InstallTarget("gateway", Path.Combine(installRoot, "gateway"));
+    if (string.Equals(packageId, "BotNexus.Cli", StringComparison.OrdinalIgnoreCase))
+        return new InstallTarget("cli", Path.Combine(installRoot, "cli"));
+
+    var extensionMatch = Regex.Match(
+        packageId,
+        @"^BotNexus\.(?<type>Providers|Channels|Tools)\.(?<name>.+)$",
+        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+    if (extensionMatch.Success)
+    {
+        var extensionType = extensionMatch.Groups["type"].Value.ToLowerInvariant();
+        var extensionName = extensionMatch.Groups["name"].Value.ToLowerInvariant();
+        return new InstallTarget("extension", Path.Combine(installRoot, "extensions", extensionType, extensionName));
+    }
+
+    throw new InvalidOperationException($"Unknown package naming pattern: {packageId}");
+}
+
+static bool IsNuGetMetadataEntry(string entryPath)
+{
+    var normalized = entryPath.Replace('\\', '/');
+    if (string.Equals(normalized, "[Content_Types].xml", StringComparison.OrdinalIgnoreCase))
+        return true;
+    if (normalized.StartsWith("_rels/", StringComparison.OrdinalIgnoreCase))
+        return true;
+    if (normalized.StartsWith("package/", StringComparison.OrdinalIgnoreCase))
+        return true;
+    if (normalized.EndsWith(".nuspec", StringComparison.OrdinalIgnoreCase))
+        return true;
+    return false;
+}
+
+static string WriteVersionManifest(string installPath, IReadOnlyCollection<string> packages)
+{
+    var payload = new
+    {
+        InstalledAtUtc = DateTime.UtcNow.ToString("o"),
+        Commit = ResolveGitCommitHash(),
+        InstallPath = installPath,
+        Packages = packages
+    };
+
+    var versionPath = Path.Combine(installPath, "version.json");
+    var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+    File.WriteAllText(versionPath, json);
+    return versionPath;
+}
+
+static string ResolveGitCommitHash()
+{
+    try
+    {
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = "rev-parse HEAD",
+                WorkingDirectory = Directory.GetCurrentDirectory(),
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+
+        if (!process.Start())
+            return "unknown";
+
+        var output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit(5000);
+        if (process.ExitCode != 0)
+            return "unknown";
+
+        return string.IsNullOrWhiteSpace(output) ? "unknown" : output.Trim();
+    }
+    catch
+    {
+        return "unknown";
+    }
+}
+
+static void UpdateExtensionsPathInConfig(string homePath, string extensionsPath)
+{
+    Directory.CreateDirectory(homePath);
+    var configPath = Path.Combine(homePath, "config.json");
+    JsonObject rootObject;
+    if (File.Exists(configPath))
+    {
+        var content = File.ReadAllText(configPath);
+        rootObject = JsonNode.Parse(content) as JsonObject ?? new JsonObject();
+    }
+    else
+    {
+        rootObject = new JsonObject();
+    }
+
+    if (rootObject["BotNexus"] is not JsonObject botNexusSection)
+    {
+        botNexusSection = new JsonObject();
+        rootObject["BotNexus"] = botNexusSection;
+    }
+
+    botNexusSection["ExtensionsPath"] = extensionsPath;
+    File.WriteAllText(
+        configPath,
+        rootObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+}
+
+static int StartInstalledGateway(string homePath, ConfigFileManager configManager, string gatewayDllPath)
+{
+    var workingDirectory = Path.GetDirectoryName(gatewayDllPath) ?? Directory.GetCurrentDirectory();
+    var startInfo = new ProcessStartInfo("dotnet", $"\"{gatewayDllPath}\"")
+    {
+        UseShellExecute = false,
+        WorkingDirectory = workingDirectory
+    };
+    startInfo.Environment["BOTNEXUS_HOME"] = homePath;
+
+    var process = Process.Start(startInfo);
+    if (process is null)
+    {
+        ConsoleOutput.WriteStatus(ConsoleStatus.Error, "Failed to restart gateway process.");
+        return 1;
+    }
+
+    Directory.CreateDirectory(homePath);
+    var pidPath = Path.Combine(homePath, "gateway.pid");
+    File.WriteAllText(pidPath, process.Id.ToString());
+
+    var config = configManager.LoadConfig(homePath);
+    var gatewayUrl = BuildGatewayUrl(config.Gateway);
+    using var client = new GatewayClient(gatewayUrl);
+    var timeoutAt = DateTime.UtcNow.AddSeconds(20);
+    while (DateTime.UtcNow < timeoutAt)
+    {
+        if (process.HasExited)
+        {
+            ConsoleOutput.WriteStatus(ConsoleStatus.Error, "Gateway exited before becoming healthy after update.");
+            return 1;
+        }
+
+        if (client.IsRunningAsync().GetAwaiter().GetResult())
+        {
+            ConsoleOutput.WriteStatus(ConsoleStatus.Success, $"Gateway restarted (PID {process.Id}).");
+            return 0;
+        }
+
+        Thread.Sleep(500);
+    }
+
+    ConsoleOutput.WriteStatus(ConsoleStatus.Warning, $"Gateway restarted (PID {process.Id}) but health check timed out.");
+    return 1;
+}
+
+static bool TryResolveGatewayLaunch(string homePath, out string workingDirectory, out string args)
+{
+    var gatewayDll = Path.Combine(homePath, "app", "gateway", "BotNexus.Gateway.dll");
     if (File.Exists(gatewayDll))
     {
         workingDirectory = Path.GetDirectoryName(gatewayDll) ?? Directory.GetCurrentDirectory();
@@ -1101,6 +1448,8 @@ static string BuildGatewayUrl(GatewayConfig gateway)
 }
 
 readonly record struct BackupResult(string ArchivePath, long ArchiveSizeBytes, BackupSummary Summary);
+readonly record struct InstallTarget(string Kind, string TargetPath);
+readonly record struct PackageInstallResult(string Package, string Kind, string Target, string Status);
 
 readonly record struct BackupSummary(
     int ConfigFiles,

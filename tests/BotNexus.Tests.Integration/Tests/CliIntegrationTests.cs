@@ -1,4 +1,5 @@
 using FluentAssertions;
+using System.IO.Compression;
 
 namespace BotNexus.Tests.Integration.Tests;
 
@@ -16,7 +17,7 @@ public sealed class CliIntegrationTests
         var result = await CliTestHost.RunCliAsync("--help", home.Path);
 
         result.ExitCode.Should().Be(0);
-        result.StdOut.Should().ContainAll("config", "agent", "provider", "extension", "doctor", "status", "logs");
+        result.StdOut.Should().ContainAll("config", "agent", "provider", "extension", "doctor", "status", "logs", "install", "update");
     }
 
     [Fact]
@@ -163,4 +164,37 @@ public sealed class CliIntegrationTests
         result.StdOut.Should().ContainAll("line 2", "line 3");
     }
 
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task Install_DeploysPackages_AndSkipsCliPackage()
+    {
+        await using var home = await CliHomeScope.CreateAsync();
+        var packagesPath = Path.Combine(home.Path, "packages");
+        var installPath = Path.Combine(home.Path, "app-install");
+        Directory.CreateDirectory(packagesPath);
+
+        CreateNupkg(Path.Combine(packagesPath, "BotNexus.Gateway.nupkg"), ("lib/net10.0/BotNexus.Gateway.dll", "gateway"));
+        CreateNupkg(Path.Combine(packagesPath, "BotNexus.Cli.nupkg"), ("lib/net10.0/BotNexus.Cli.dll", "cli"));
+        CreateNupkg(Path.Combine(packagesPath, "BotNexus.Providers.Copilot.nupkg"), ("lib/net10.0/BotNexus.Providers.Copilot.dll", "provider"));
+
+        var result = await CliTestHost.RunCliAsync($"install --install-path \"{installPath}\" --packages \"{packagesPath}\"", home.Path);
+
+        result.ExitCode.Should().Be(0);
+        File.Exists(Path.Combine(installPath, "gateway", "lib", "net10.0", "BotNexus.Gateway.dll")).Should().BeTrue();
+        File.Exists(Path.Combine(installPath, "extensions", "providers", "copilot", "lib", "net10.0", "BotNexus.Providers.Copilot.dll")).Should().BeTrue();
+        Directory.Exists(Path.Combine(installPath, "cli")).Should().BeFalse();
+        File.Exists(Path.Combine(installPath, "version.json")).Should().BeTrue();
+        File.ReadAllText(Path.Combine(home.Path, "config.json")).Should().Contain("ExtensionsPath");
+    }
+
+    private static void CreateNupkg(string packagePath, params (string EntryName, string Content)[] entries)
+    {
+        using var archive = ZipFile.Open(packagePath, ZipArchiveMode.Create);
+        foreach (var (entryName, content) in entries)
+        {
+            var entry = archive.CreateEntry(entryName);
+            using var writer = new StreamWriter(entry.Open());
+            writer.Write(content);
+        }
+    }
 }

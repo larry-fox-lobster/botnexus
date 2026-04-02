@@ -310,3 +310,37 @@ All 7 foundation items completed (Farnsworth: 5, Bender: 2). Decisions merged an
 - Baseline build succeeded.
 - Baseline tests show a pre-existing failure in `BotNexus.Tests.Unit.Tests.CopilotProviderTests.ChatAsync_ReturnsCompletionPayload` (expected `/v1/chat/completions`, actual `/chat/completions`).
 - Ran `scripts/pack.ps1` and confirmed packages were generated in `artifacts/`.
+
+## 2026-04-02 — CLI Tool Installability & Native Install/Update Commands
+
+### Your Deliverables (Farnsworth)
+
+- Added bootstrap install scripts:
+  - `scripts/install-cli.ps1` (Windows PowerShell)
+  - `scripts/install-cli.sh` (Linux/macOS bash)
+- Extended `src/BotNexus.Cli/Program.cs` with native commands:
+  - `botnexus install [--install-path <path>] [--packages <path>]`
+  - `botnexus update [--install-path <path>] [--packages <path>]`
+- Ported package extraction logic from `scripts/install.ps1` into CLI:
+  - Gateway installs to `{install-path}/gateway`
+  - Extensions install to `{install-path}/extensions/{type}/{name}`
+  - `BotNexus.Cli.nupkg` is explicitly skipped
+  - `version.json` written with install metadata
+  - `~/.botnexus/config.json` `BotNexus.ExtensionsPath` updated
+- Updated gateway launch resolution for `start`:
+  1. Prefer installed gateway at `~/.botnexus/app/gateway/BotNexus.Gateway.dll`
+  2. Fall back to repo project `src/BotNexus.Gateway/BotNexus.Gateway.csproj`
+- Added CLI integration coverage updates:
+  - Help now validated for `install` and `update`
+  - New install integration scenario validates package deployment and CLI package skip behavior
+
+### Validation
+
+- Ran bootstrap script: `powershell -ExecutionPolicy Bypass -File scripts/install-cli.ps1`
+- Verified global tool help includes new commands: `botnexus --help`
+- Verified deployment command: `botnexus install --packages Q:\repos\botnexus\artifacts`
+- Verified update command: `botnexus update --packages Q:\repos\botnexus\artifacts`
+- Verified `start` works in both modes:
+  - Installed binary launch path (content root under `~/.botnexus/app/gateway`)
+  - Repo fallback (`dotnet run --project ...`) when install path not present for selected home
+- Ran full suite: `dotnet test --no-restore -v minimal --tl:off` (all passing)
