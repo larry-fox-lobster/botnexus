@@ -86,6 +86,14 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
         var payload = BuildRequestPayload(request, stream: false);
         using var httpRequest = await CreateChatRequestAsync(payload, cancellationToken).ConfigureAwait(false);
         using var response = await _httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
+        
+        if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            await InvalidateTokenAsync(cancellationToken).ConfigureAwait(false);
+            Logger.LogWarning("Copilot token rejected (HTTP {StatusCode}), clearing cached token for re-authentication",
+                (int)response.StatusCode);
+        }
+        
         response.EnsureSuccessStatusCode();
 
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -127,6 +135,14 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
         using var response = await _httpClient
             .SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
+        
+        if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            await InvalidateTokenAsync(cancellationToken).ConfigureAwait(false);
+            Logger.LogWarning("Copilot token rejected (HTTP {StatusCode}), clearing cached token for re-authentication",
+                (int)response.StatusCode);
+        }
+        
         response.EnsureSuccessStatusCode();
 
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -176,6 +192,12 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
                 }
             }
         }
+    }
+
+    private async Task InvalidateTokenAsync(CancellationToken cancellationToken)
+    {
+        _cachedToken = null;
+        await _tokenStore.ClearTokenAsync("copilot", cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<HttpRequestMessage> CreateChatRequestAsync(
