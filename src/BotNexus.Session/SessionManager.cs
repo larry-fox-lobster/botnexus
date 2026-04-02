@@ -99,6 +99,9 @@ public sealed class SessionManager : ISessionManager
             var filePath = GetFilePath(sessionKey);
             if (File.Exists(filePath))
                 File.Delete(filePath);
+            var metaPath = Path.ChangeExtension(filePath, ".meta.json");
+            if (File.Exists(metaPath))
+                File.Delete(metaPath);
         }
         finally
         {
@@ -130,6 +133,20 @@ public sealed class SessionManager : ISessionManager
         var session = new Core.Models.Session { Key = sessionKey, AgentName = agentName };
         var filePath = GetFilePath(sessionKey);
 
+        // Load agent name from metadata sidecar if available
+        var metaPath = Path.ChangeExtension(filePath, ".meta.json");
+        if (File.Exists(metaPath))
+        {
+            try
+            {
+                var metaJson = await File.ReadAllTextAsync(metaPath, cancellationToken).ConfigureAwait(false);
+                var meta = JsonSerializer.Deserialize<SessionMeta>(metaJson, _jsonOptions);
+                if (meta is not null && !string.IsNullOrWhiteSpace(meta.AgentName))
+                    session.AgentName = meta.AgentName;
+            }
+            catch { /* best-effort */ }
+        }
+
         if (!File.Exists(filePath))
             return session;
 
@@ -142,10 +159,28 @@ public sealed class SessionManager : ISessionManager
                 if (entry is not null)
                     session.History.Add(entry);
             }
+
+            // Derive timestamps from history
+            if (session.History.Count > 0)
+            {
+                session.CreatedAt = session.History[0].Timestamp;
+                session.UpdatedAt = session.History[^1].Timestamp;
+            }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to load session {SessionKey} from {FilePath}", sessionKey, filePath);
+        }
+
+        // Auto-migrate: write meta file if it doesn't exist yet
+        if (!File.Exists(metaPath) && File.Exists(filePath))
+        {
+            try
+            {
+                var metaJson = JsonSerializer.Serialize(new SessionMeta(session.AgentName), _jsonOptions);
+                await File.WriteAllTextAsync(metaPath, metaJson, cancellationToken).ConfigureAwait(false);
+            }
+            catch { /* best-effort migration */ }
         }
 
         return session;
@@ -156,6 +191,12 @@ public sealed class SessionManager : ISessionManager
         var filePath = GetFilePath(session.Key);
         var lines = session.History.Select(e => JsonSerializer.Serialize(e, _jsonOptions));
         await File.WriteAllLinesAsync(filePath, lines, cancellationToken).ConfigureAwait(false);
+
+        // Write metadata sidecar
+        var metaPath = Path.ChangeExtension(filePath, ".meta.json");
+        var meta = new SessionMeta(session.AgentName);
+        var metaJson = JsonSerializer.Serialize(meta, _jsonOptions);
+        await File.WriteAllTextAsync(metaPath, metaJson, cancellationToken).ConfigureAwait(false);
     }
 
     private string GetFilePath(string sessionKey)
@@ -167,3 +208,5 @@ public sealed class SessionManager : ISessionManager
     private static string DecodeSessionKey(string encoded)
         => Uri.UnescapeDataString(encoded.Replace("_", "%"));
 }
+
+internal sealed record SessionMeta(string AgentName);

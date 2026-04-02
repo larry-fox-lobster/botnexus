@@ -99,13 +99,14 @@ app.MapHealthChecks("/ready", new HealthCheckOptions
 });
 
 // --- REST API: Sessions ---
-app.MapGet("/api/sessions", async (ISessionManager sessionManager) =>
+app.MapGet("/api/sessions", async (ISessionManager sessionManager, IOptions<BotNexusConfig> config) =>
 {
+    var defaultAgent = config.Value.Agents.Named.Keys.FirstOrDefault() ?? "default";
     var keys = await sessionManager.ListKeysAsync();
     var sessions = new List<object>();
     foreach (var key in keys)
     {
-        var session = await sessionManager.GetOrCreateAsync(key, "unknown");
+        var session = await sessionManager.GetOrCreateAsync(key, defaultAgent);
         sessions.Add(new
         {
             key = session.Key,
@@ -119,10 +120,11 @@ app.MapGet("/api/sessions", async (ISessionManager sessionManager) =>
     return Results.Json(sessions, jsonOptions);
 });
 
-app.MapGet("/api/sessions/{*key}", async (string key, ISessionManager sessionManager) =>
+app.MapGet("/api/sessions/{*key}", async (string key, ISessionManager sessionManager, IOptions<BotNexusConfig> config) =>
 {
     var decoded = Uri.UnescapeDataString(key);
-    var session = await sessionManager.GetOrCreateAsync(decoded, "unknown");
+    var defaultAgent = config.Value.Agents.Named.Keys.FirstOrDefault() ?? "default";
+    var session = await sessionManager.GetOrCreateAsync(decoded, defaultAgent);
     if (session.History.Count == 0 && session.CreatedAt == session.UpdatedAt)
         return Results.NotFound(new { error = "Session not found" });
 

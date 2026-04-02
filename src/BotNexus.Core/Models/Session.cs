@@ -16,8 +16,8 @@ public record SessionEntry(
 public class Session
 {
     public string Key { get; init; } = string.Empty;
-    public string AgentName { get; init; } = string.Empty;
-    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+    public string AgentName { get; set; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public List<SessionEntry> History { get; init; } = [];
 
