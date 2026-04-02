@@ -8,6 +8,7 @@
     <Project Path="src/BotNexus.Channels.Telegram/BotNexus.Channels.Telegram.csproj" />
     <Project Path="src/BotNexus.Command/BotNexus.Command.csproj" />
     <Project Path="src/BotNexus.Core/BotNexus.Core.csproj" />
+    <Project Path="src/BotNexus.Diagnostics/BotNexus.Diagnostics.csproj" />
     <Project Path="src/BotNexus.Cron/BotNexus.Cron.csproj" />
     <Project Path="src/BotNexus.Gateway/BotNexus.Gateway.csproj" />
     <Project Path="src/BotNexus.Heartbeat/BotNexus.Heartbeat.csproj" />
