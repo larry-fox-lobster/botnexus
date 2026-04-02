@@ -160,9 +160,11 @@ app.MapGet("/api/channels", (ChannelManager channelManager) =>
 app.MapGet("/api/agents", (IOptions<BotNexusConfig> config) =>
 {
     var agentDefaults = config.Value.Agents;
-    var agents = new List<object>
+    var agents = new List<object>();
+
+    if (agentDefaults.Named.Count == 0)
     {
-        new
+        agents.Add(new
         {
             name = "default",
             model = agentDefaults.Model,
@@ -170,8 +172,8 @@ app.MapGet("/api/agents", (IOptions<BotNexusConfig> config) =>
             temperature = agentDefaults.Temperature,
             maxToolIterations = agentDefaults.MaxToolIterations,
             timezone = agentDefaults.Timezone
-        }
-    };
+        });
+    }
 
     foreach (var (agentName, agentCfg) in agentDefaults.Named)
     {
