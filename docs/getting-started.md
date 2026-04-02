@@ -9,16 +9,17 @@
 1. [Prerequisites](#1-prerequisites)
 2. [Build from Source](#2-build-from-source)
 3. [First Run](#3-first-run)
-4. [Configure the Copilot Provider](#4-configure-the-copilot-provider)
-5. [Create Your First Agent](#5-create-your-first-agent)
-6. [Talk to Your Agent](#6-talk-to-your-agent)
-7. [Set Up Multiple Agents](#7-set-up-multiple-agents)
-8. [Configure Channels (optional)](#8-configure-channels-optional)
-9. [Configure Cron Jobs (optional)](#9-configure-cron-jobs-optional)
-10. [Migrating from OpenClaw](#10-migrating-from-openclaw)
-11. [Managing the Environment](#11-managing-the-environment)
-12. [Security](#12-security)
-13. [Next Steps](#13-next-steps)
+4. [Using the Web Interface](#4-using-the-web-interface)
+5. [Configure the Copilot Provider](#5-configure-the-copilot-provider)
+6. [Create Your First Agent](#6-create-your-first-agent)
+7. [Talk to Your Agent](#7-talk-to-your-agent)
+8. [Set Up Multiple Agents](#8-set-up-multiple-agents)
+9. [Configure Channels (optional)](#9-configure-channels-optional)
+10. [Configure Cron Jobs (optional)](#10-configure-cron-jobs-optional)
+11. [Migrating from OpenClaw](#11-migrating-from-openclaw)
+12. [Managing the Environment](#12-managing-the-environment)
+13. [Security](#13-security)
+14. [Next Steps](#14-next-steps)
 
 ---
 
@@ -162,11 +163,121 @@ info: Microsoft.Hosting.Lifetime[14] Now listening on: http://0.0.0.0:18790
 
 > **Note:** On first run, you'll see "No providers configured" and "No enabled channels configured" — these are healthy states. You'll configure providers and channels as needed in the next steps.
 
-> **Troubleshooting:** If port 18790 is in use, edit `~/.botnexus/config.json` and change `Gateway.Port` (see [Section 12](#12-security) for full Gateway config).
+> **Troubleshooting:** If port 18790 is in use, edit `~/.botnexus/config.json` and change `Gateway.Port` (see [Section 13](#13-security) for full Gateway config).
 
 ---
 
-## 4. Configure Your First Provider (Copilot)
+## 4. Using the Web Interface
+
+The **WebUI** is the easiest way to interact with BotNexus. It provides a real-time chat interface, session management, and a live view of all loaded extensions. No command-line knowledge required!
+
+### Accessing the WebUI
+
+After starting the Gateway, open your browser to:
+
+```
+http://localhost:18790/
+```
+
+You should see the BotNexus web interface load immediately. The UI connects to the Gateway via WebSocket automatically.
+
+> **Note:** Modern browsers (Chrome, Firefox, Safari, Edge) with WebSocket support work best. The UI detects the correct protocol automatically (ws for HTTP, wss for HTTPS).
+
+### The Web Interface Layout
+
+The WebUI has a clean two-panel design:
+
+#### **Left Sidebar** — Navigation & Extensions
+- **💬 New Chat** — Create a new chat session instantly
+- **📋 Sessions** — Browse past conversations; click to reload and continue chatting
+- **📡 Channels** — View all connected messaging channels and their status
+- **🧠 Agents** — See available agents with their models and settings
+- **🧩 Extensions** — Panel showing loaded providers, tools, and health status
+- **📊 Activity Monitor** — Optional real-time feed of all messages across channels
+- **🌐 Connection Status** — Shows WebSocket connection state (connected/disconnected)
+
+#### **Main Chat Area** — Your Conversation
+- **Welcome Screen** — Displays when no session is selected; instructs you to start a new chat
+- **Chat Messages** — Shows conversation history with timestamps and message roles (User/Assistant/Tool)
+- **Input Area** — Type your message and press `Enter` or click **Send**
+
+### Quick Start: Send Your First Message
+
+1. **Click "Start New Chat"** in the sidebar
+2. **Type your message** in the text area (e.g., "Hello! What can you do?")
+3. **Press `Enter` or click Send**
+4. **Watch the agent respond** — the UI streams responses in real-time
+
+The session is created automatically on your first message and saved to disk.
+
+### Understanding Sessions
+
+**Sessions** are persistent conversations tied to a specific agent. Each session:
+- Has a unique key (format: `channel:connection-id:agent-name`)
+- Stores full message history
+- Can be paused and resumed anytime
+- Persists across Gateway restarts
+
+In the **Sessions** panel:
+- **📋 Sessions list** shows all past sessions sorted by recency
+- **Agent name** — which agent handled the conversation
+- **Message count** — total messages in that session
+- **Timestamp** — when the session was last updated
+- Click any session to reload it and continue the conversation
+
+### Viewing Extensions
+
+The **Extensions** panel shows a health summary and all loaded components:
+
+```
+✅ 4 loaded        ← Green if no failures
+❌ 0 failed
+📡 1 channel       ← Copilot, Discord, Slack, etc.
+🧠 1 provider      ← LLM backend (e.g., Copilot, OpenAI)
+🔧 15 tools        ← Available AI tools
+```
+
+Expand **Providers** and **Tools** to see what's available. This is useful for debugging configuration or seeing what capabilities your agent has access to.
+
+### Real-Time Activity Monitor
+
+The **Activity Monitor** (📊) shows real-time events from across all channels:
+
+- **Toggle the switch** to enable or disable the live feed
+- Events are color-coded:
+  - 🟢 **Message Received** — user input captured
+  - 🟠 **Response Sent** — agent's reply
+  - 🔴 **Errors** — any failures or issues
+
+This is helpful for monitoring multi-channel setups or debugging unexpected behavior.
+
+### WebSocket Connection
+
+The UI automatically connects to the Gateway's WebSocket endpoint (`/ws`). You should see:
+
+```
+🌐 Connected
+```
+
+in the connection status.
+
+**If you see "Disconnected":**
+- Check that the Gateway is running (`dotnet run --project src/BotNexus.Gateway`)
+- Verify the Gateway is on `http://localhost:18790` (or your custom host/port)
+- Try refreshing the page (Ctrl+R or Cmd+R)
+- The UI will auto-reconnect every 3 seconds
+
+### Tips & Tricks
+
+- **Shift+Enter** to add line breaks without sending
+- **Click a session** to load it and continue conversing
+- **Refresh buttons** (↻) in each section reload that panel's data
+- **Sessions are persistent** — close the browser anytime; your chat will be there when you return
+- **Multiple tabs supported** — open multiple WebUI tabs to run parallel conversations
+
+---
+
+## 5. Configure Your First Provider (Copilot)
 
 The Copilot provider is not pre-configured by default. Add it to `~/.botnexus/config.json`:
 
@@ -211,7 +322,7 @@ The token is cached and refreshed automatically. You only need to do this once (
 
 ---
 
-## 5. Create Your First Agent
+## 6. Create Your First Agent
 
 Agents are named configurations with their own workspace, personality, and settings. Edit `~/.botnexus/config.json` to add one:
 
@@ -317,15 +428,41 @@ Changes to workspace files take effect on the **next conversation** — no resta
 
 ---
 
-## 6. Talk to Your Agent
+## 7. Talk to Your Agent
 
-### Option A: WebUI (browser)
+Now that you have an agent configured, it's time to start chatting! BotNexus gives you three ways to interact with your agents, but **the WebUI is the easiest and recommended for most users**.
 
-Open **http://localhost:18790** in your browser. The built-in WebUI provides a real-time chat interface with activity monitoring.
+### Option A: WebUI (browser) — **Recommended** ⭐
 
-### Option B: WebSocket
+This is the primary way most users interact with BotNexus. Open your browser to:
 
-Connect to the WebSocket endpoint at `ws://localhost:18790/ws`. Send JSON messages:
+```
+http://localhost:18790/
+```
+
+You'll see:
+- A **welcome screen** with instructions
+- A **sidebar** showing all sessions, channels, agents, and extensions
+- A **chat panel** ready for input
+
+**To send your first message:**
+
+1. Click **"💬 Start New Chat"** in the sidebar
+2. Type your message in the text area (e.g., `"Hello! What can you help me with?"`)
+3. Press `Enter` or click **Send**
+4. Watch the agent respond in real-time
+
+The session is automatically created and saved. You can continue chatting or start new sessions anytime. For full details, see [Section 4: Using the Web Interface](#4-using-the-web-interface).
+
+### Option B: WebSocket (direct connection)
+
+For programmatic access or custom integrations, connect directly to:
+
+```
+ws://localhost:18790/ws
+```
+
+Send JSON messages:
 
 ```json
 {"type": "message", "content": "Hello! What can you do?", "agent": "assistant"}
@@ -367,11 +504,11 @@ curl http://localhost:18790/api/sessions/ws:abc-123-def:assistant
 
 ### First conversation
 
-When you send your first message, you'll see the OAuth flow kick in (see [Section 4](#4-configure-the-copilot-provider)). After authenticating, the agent responds using the Copilot API with your workspace files as context.
+When you send your first message, you'll see the OAuth flow kick in (see [Section 5](#5-configure-the-copilot-provider)). After authenticating, the agent responds using the Copilot API with your workspace files as context.
 
 ---
 
-## 7. Set Up Multiple Agents
+## 8. Set Up Multiple Agents
 
 Add more agents to the `Named` section in `config.json`:
 
@@ -440,7 +577,7 @@ BotNexus auto-generates an `AGENTS.md` file in each agent's workspace that lists
 
 ---
 
-## 8. Configure Channels (optional)
+## 9. Configure Channels (optional)
 
 BotNexus supports multiple messaging channels as extensions. Channels are configured under `BotNexus.Channels.Instances` in your config:
 
@@ -496,7 +633,7 @@ Channel, provider, and tool implementations are loaded from `~/.botnexus/extensi
 
 ---
 
-## 9. Configure Cron Jobs (optional)
+## 10. Configure Cron Jobs (optional)
 
 BotNexus includes a built-in cron service for scheduling recurring tasks. Jobs are defined centrally under `BotNexus.Cron.Jobs`:
 
@@ -550,7 +687,7 @@ Standard 5-field cron expressions: `minute hour day-of-month month day-of-week`
 
 ---
 
-## 10. Migrating from OpenClaw
+## 11. Migrating from OpenClaw
 
 If you're coming from OpenClaw, the good news is that BotNexus uses the same workspace file format. Migration is mostly moving files to new locations.
 
@@ -566,7 +703,7 @@ If you're coming from OpenClaw, the good news is that BotNexus uses the same wor
 
 ### Copy workspace files
 
-After creating your agent (see [Section 5](#5-create-your-first-agent)), copy your OpenClaw workspace:
+After creating your agent (see [Section 6](#6-create-your-first-agent)), copy your OpenClaw workspace:
 
 **Windows (PowerShell):**
 
@@ -612,7 +749,7 @@ cp ~/.openclaw/workspace/memory/*.md ~/.botnexus/agents/$AGENT/memory/daily/
 
 ---
 
-## 11. Managing the Environment
+## 12. Managing the Environment
 
 ### Health and status endpoints
 
@@ -692,7 +829,7 @@ tail -50 ~/.botnexus/logs/botnexus-*.log
 
 ---
 
-## 12. Security
+## 13. Security
 
 ### Gateway API key
 
@@ -750,7 +887,7 @@ Each channel supports an `AllowFrom` list that restricts which users or chat IDs
 
 ---
 
-## 13. Next Steps
+## 14. Next Steps
 
 You're up and running! Here's where to go from here:
 
