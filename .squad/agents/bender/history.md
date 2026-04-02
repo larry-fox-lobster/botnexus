@@ -304,3 +304,15 @@ All 7 foundation items completed (Farnsworth: 5, Bender: 2). Decisions merged an
 **Cross-Agent Update:** Sprint 7 was a major infrastructure sprint combining three interconnected capabilities: the otnexus CLI tool, pluggable doctor diagnostics system, and config hot reload. The CLI tool added 16 commands via System.CommandLine framework for managing BotNexus. The doctor system provides 13 diagnostic checkups across 6 categories (config, security, connectivity, extensions, providers, permissions, resources) with optional auto-fix capability and two fix modes (interactive --fix, force --fix --force). Config hot reload lets the Gateway watch ~/.botnexus/config.json and automatically reload without restart using IOptionsMonitor + FileSystemWatcher. Also deployed three Gateway REST endpoints (/api/status, /api/doctor, /api/shutdown) and fixed a P0 first-run bug where extensions failed to load. Test coverage grew to 443 tests (322 unit + 98 integration + 23 E2E). Kif (Documentation Engineer) joined the team. See .squad/log/2026-04-02T00-34-sprint7-complete.md and .squad/decisions.md Sprint 7 section for full details.
 
 ---
+
+### 2026-04-02 — Fixed Parallel Publish Race Condition in Pack Script
+
+**Issue:** The pack.ps1 script was running `dotnet build` once on the solution, then `dotnet publish --no-build` in parallel for all 9 components. This caused a race condition where multiple publish operations trampled on shared `obj/` ref assemblies in the Gateway project, resulting in "PE image doesn't contain managed metadata" errors.
+
+**Root Cause:** Even with `--no-build`, `dotnet publish` still touches intermediate files in `obj/` (ref assemblies, publish markers). When multiple publish commands run concurrently and share transitive dependencies on Gateway, they race on the same `obj/` artifacts.
+
+**Solution:** Changed to `dotnet restore` once + parallel `dotnet publish --no-restore` with `/p:UseSharedCompilation=false`. Each publish now builds its own project tree independently, eliminating the race while maintaining parallelism (4 concurrent publishes via -ThrottleLimit 4).
+
+**Additional Fix:** Improved error handling in ForEach-Object -Parallel block to capture $LASTEXITCODE into a local variable before it gets overwritten by subsequent commands.
+
+**Outcome:** Pack script now completes successfully, creating all 9 .nupkg packages without corruption. Parallelism maintained for speed.
