@@ -424,3 +424,16 @@
 **User Preference (Jon):** Wants the agent file lean — load-on-demand for infrequent operations, always-loaded for critical operational rules.
 
 ---
+
+### Internal Tools Auto-Registration — Review & Commit
+
+**What:** Reviewed and committed feat that auto-registers 5 built-in tools (FilesystemTool, ShellTool, WebTool, MessageTool, CronTool) for every agent session via `AgentRunnerFactory.CreateInternalTools()`. Added `AgentConfig.DisallowedTools` opt-out property.
+
+**Architecture Notes:**
+- Filtering happens at two levels: factory filters internal+external tools before injection, AgentLoop filters memory tools via `RegisterIfAllowed()`. No double-filtering — each level handles its own tool set.
+- `_channels` refactored from single `IChannel?` to `IReadOnlyList<IChannel>` to support CronTool multi-channel needs. `FirstOrDefault()` still used where single channel needed.
+- ShellTool conditionally added based on `ToolsConfig.Exec.Enable` — security gate preserved.
+- `DisallowedTools` uses case-insensitive `HashSet<string>` for lookup — consistent with tool name matching.
+- All 466 tests pass (322 unit + 110 integration + 23 E2E + 11 deployment).
+
+---
