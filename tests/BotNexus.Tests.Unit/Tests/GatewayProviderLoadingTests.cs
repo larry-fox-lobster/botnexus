@@ -7,8 +7,25 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace BotNexus.Tests.Unit.Tests;
 
-public class GatewayProviderLoadingTests
+[Collection("BotNexusHomeEnvVar")]
+public class GatewayProviderLoadingTests : IDisposable
 {
+    private readonly string? _previousHome;
+    private readonly string _tempHome;
+
+    public GatewayProviderLoadingTests()
+    {
+        _tempHome = Path.Combine(Path.GetTempPath(), $"botnexus-gw-prov-{Guid.NewGuid():N}");
+        _previousHome = Environment.GetEnvironmentVariable("BOTNEXUS_HOME");
+        Environment.SetEnvironmentVariable("BOTNEXUS_HOME", _tempHome);
+    }
+
+    public void Dispose()
+    {
+        Environment.SetEnvironmentVariable("BOTNEXUS_HOME", _previousHome);
+        try { if (Directory.Exists(_tempHome)) Directory.Delete(_tempHome, recursive: true); } catch { }
+    }
+
     [Fact]
     public void AddBotNexus_LoadsOpenAiProviderFromExtensions_AndRegistersConfigKey()
     {

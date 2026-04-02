@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <!-- Apply test.runsettings to all test projects automatically.
+         This sets BOTNEXUS_HOME to a temp path so tests never touch ~/.botnexus -->
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory)test.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
+</Project>

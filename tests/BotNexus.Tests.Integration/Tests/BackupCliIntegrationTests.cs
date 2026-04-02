@@ -7,6 +7,9 @@ namespace BotNexus.Tests.Integration.Tests;
 [Collection("cli-integration")]
 public sealed class BackupCliIntegrationTests
 {
+    private static string BackupsDir(string homePath) =>
+        homePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + "-backups";
+
     [Fact]
     [Trait("Category", "CLI")]
     public async Task BackupCreate_CreatesZipFile_AndReturnsZero()
@@ -16,8 +19,8 @@ public sealed class BackupCliIntegrationTests
         var result = await CliTestHost.RunCliAsync("backup create", home.Path);
 
         result.ExitCode.Should().Be(0);
-        Directory.Exists(Path.Combine(home.Path, "backups")).Should().BeTrue();
-        Directory.GetFiles(Path.Combine(home.Path, "backups"), "*.zip").Should().ContainSingle();
+        Directory.Exists(BackupsDir(home.Path)).Should().BeTrue();
+        Directory.GetFiles(BackupsDir(home.Path), "*.zip").Should().ContainSingle();
     }
 
     [Fact]
@@ -42,13 +45,11 @@ public sealed class BackupCliIntegrationTests
 
     [Fact]
     [Trait("Category", "CLI")]
-    public async Task BackupCreate_ExcludesLogsAndBackups_FromZip()
+    public async Task BackupCreate_ExcludesLogs_FromZip()
     {
         await using var home = await CliHomeScope.CreateAsync();
         Directory.CreateDirectory(Path.Combine(home.Path, "logs"));
         await File.WriteAllTextAsync(Path.Combine(home.Path, "logs", "gateway.log"), "test");
-        Directory.CreateDirectory(Path.Combine(home.Path, "backups"));
-        await File.WriteAllTextAsync(Path.Combine(home.Path, "backups", "old.zip"), "placeholder");
         await File.WriteAllTextAsync(Path.Combine(home.Path, "keep.txt"), "keep");
 
         var result = await CliTestHost.RunCliAsync("backup create", home.Path);
@@ -58,7 +59,6 @@ public sealed class BackupCliIntegrationTests
         using var archive = ZipFile.OpenRead(backupPath);
         var names = archive.Entries.Select(e => NormalizeZipEntry(e.FullName)).ToArray();
         names.Should().NotContain(n => n.StartsWith("logs/", StringComparison.OrdinalIgnoreCase));
-        names.Should().NotContain(n => n.StartsWith("backups/", StringComparison.OrdinalIgnoreCase));
         names.Should().Contain("keep.txt");
     }
 
@@ -67,14 +67,21 @@ public sealed class BackupCliIntegrationTests
     public async Task BackupCreate_WithOutputOption_WritesToSpecifiedPath()
     {
         await using var home = await CliHomeScope.CreateAsync();
-        var outputDir = Path.Combine(home.Path, "custom-output");
+        var outputDir = Path.Combine(Path.GetTempPath(), $"botnexus-backup-output-{Guid.NewGuid():N}");
         Directory.CreateDirectory(outputDir);
         var outputPath = Path.Combine(outputDir, "my-backup.zip");
 
-        var result = await CliTestHost.RunCliAsync($"backup create --output \"{outputPath}\"", home.Path);
+        try
+        {
+            var result = await CliTestHost.RunCliAsync($"backup create --output \"{outputPath}\"", home.Path);
 
-        result.ExitCode.Should().Be(0);
-        File.Exists(outputPath).Should().BeTrue();
+            result.ExitCode.Should().Be(0);
+            File.Exists(outputPath).Should().BeTrue();
+        }
+        finally
+        {
+            try { Directory.Delete(outputDir, recursive: true); } catch { }
+        }
     }
 
     [Fact]
@@ -96,10 +103,10 @@ public sealed class BackupCliIntegrationTests
     public async Task BackupList_ShowsAvailableBackups_InTable()
     {
         await using var home = await CliHomeScope.CreateAsync();
-        var backupsDir = Path.Combine(home.Path, "backups");
-        Directory.CreateDirectory(backupsDir);
-        CreateZipWithEntry(Path.Combine(backupsDir, "backup-a.zip"), "a.txt", "a");
-        CreateZipWithEntry(Path.Combine(backupsDir, "backup-b.zip"), "b.txt", "b");
+        var backupsPath = BackupsDir(home.Path);
+        Directory.CreateDirectory(backupsPath);
+        CreateZipWithEntry(Path.Combine(backupsPath, "backup-a.zip"), "a.txt", "a");
+        CreateZipWithEntry(Path.Combine(backupsPath, "backup-b.zip"), "b.txt", "b");
 
         var result = await CliTestHost.RunCliAsync("backup list", home.Path);
 
@@ -148,14 +155,21 @@ public sealed class BackupCliIntegrationTests
     public async Task BackupRestore_WithForce_SkipsConfirmation()
     {
         await using var home = await CliHomeScope.CreateAsync();
-        var sourceBackupPath = Path.Combine(home.Path, "restore-source.zip");
+        var sourceBackupPath = Path.Combine(Path.GetTempPath(), $"botnexus-restore-src-{Guid.NewGuid():N}.zip");
         CreateZipWithEntry(sourceBackupPath, "config.json", """{"restored":true}""");
 
-        var result = await CliTestHost.RunCliAsync($"backup restore \"{sourceBackupPath}\" --force", home.Path);
+        try
+        {
+            var result = await CliTestHost.RunCliAsync($"backup restore \"{sourceBackupPath}\" --force", home.Path);
 
-        result.ExitCode.Should().Be(0);
-        File.Exists(Path.Combine(home.Path, "config.json")).Should().BeTrue();
-        (await File.ReadAllTextAsync(Path.Combine(home.Path, "config.json"))).Should().Contain("restored");
+            result.ExitCode.Should().Be(0);
+            File.Exists(Path.Combine(home.Path, "config.json")).Should().BeTrue();
+            (await File.ReadAllTextAsync(Path.Combine(home.Path, "config.json"))).Should().Contain("restored");
+        }
+        finally
+        {
+            try { File.Delete(sourceBackupPath); } catch { }
+        }
     }
 
     [Fact]
@@ -164,15 +178,22 @@ public sealed class BackupCliIntegrationTests
     {
         await using var home = await CliHomeScope.CreateAsync();
         await File.WriteAllTextAsync(Path.Combine(home.Path, "marker.txt"), "before-restore");
-        var sourceBackupPath = Path.Combine(home.Path, "restore-source.zip");
+        var sourceBackupPath = Path.Combine(Path.GetTempPath(), $"botnexus-restore-src-{Guid.NewGuid():N}.zip");
         CreateZipWithEntry(sourceBackupPath, "marker.txt", "after-restore");
 
-        var result = await CliTestHost.RunCliAsync($"backup restore \"{sourceBackupPath}\" --force", home.Path);
+        try
+        {
+            var result = await CliTestHost.RunCliAsync($"backup restore \"{sourceBackupPath}\" --force", home.Path);
 
-        result.ExitCode.Should().Be(0);
-        var preRestoreBackup = Directory.GetFiles(Path.Combine(home.Path, "backups"), "*.zip")
-            .FirstOrDefault(path => ContainsEntryWithContent(path, "marker.txt", "before-restore"));
-        preRestoreBackup.Should().NotBeNull();
+            result.ExitCode.Should().Be(0);
+            var preRestoreBackup = Directory.GetFiles(BackupsDir(home.Path), "*.zip")
+                .FirstOrDefault(path => ContainsEntryWithContent(path, "marker.txt", "before-restore"));
+            preRestoreBackup.Should().NotBeNull();
+        }
+        finally
+        {
+            try { File.Delete(sourceBackupPath); } catch { }
+        }
     }
 
     [Fact]
@@ -180,7 +201,7 @@ public sealed class BackupCliIntegrationTests
     public async Task BackupRestore_MissingFile_ReturnsError()
     {
         await using var home = await CliHomeScope.CreateAsync();
-        var missingPath = Path.Combine(home.Path, "missing-backup.zip");
+        var missingPath = Path.Combine(Path.GetTempPath(), "botnexus-missing-backup.zip");
 
         var result = await CliTestHost.RunCliAsync($"backup restore \"{missingPath}\" --force", home.Path);
 
@@ -189,8 +210,7 @@ public sealed class BackupCliIntegrationTests
 
     private static string GetMostRecentBackup(string homePath)
     {
-        var backupsDir = Path.Combine(homePath, "backups");
-        return Directory.GetFiles(backupsDir, "*.zip")
+        return Directory.GetFiles(BackupsDir(homePath), "*.zip")
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .First();
     }

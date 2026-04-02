@@ -14,12 +14,16 @@ namespace BotNexus.Tests.Integration.Tests;
 public class AgentSessionIntegrationTests : IDisposable
 {
     private readonly string _tempPath;
+    private readonly string? _previousHome;
     private readonly IServiceProvider _serviceProvider;
 
     public AgentSessionIntegrationTests()
     {
         _tempPath = Path.Combine(Path.GetTempPath(), $"botnexus-int-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempPath);
+
+        _previousHome = Environment.GetEnvironmentVariable("BOTNEXUS_HOME");
+        Environment.SetEnvironmentVariable("BOTNEXUS_HOME", _tempPath);
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -110,6 +114,7 @@ public class AgentSessionIntegrationTests : IDisposable
 
     public void Dispose()
     {
+        Environment.SetEnvironmentVariable("BOTNEXUS_HOME", _previousHome);
         if (_serviceProvider is IDisposable d) d.Dispose();
         if (Directory.Exists(_tempPath))
             Directory.Delete(_tempPath, recursive: true);

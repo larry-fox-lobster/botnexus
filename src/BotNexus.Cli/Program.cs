@@ -642,7 +642,7 @@ static Command BuildBackupCommand(Option<string?> homeOption)
     listCommand.SetAction(parseResult =>
     {
         var homePath = ResolveHome(parseResult, homeOption);
-        var backupsPath = Path.Combine(homePath, "backups");
+        var backupsPath = ResolveBackupsDirectory(homePath);
         if (!Directory.Exists(backupsPath))
         {
             Console.WriteLine("No backups found.");
@@ -895,7 +895,7 @@ static BackupResult CreateBackupArchive(string homePath, string? outputPath, str
         throw new DirectoryNotFoundException($"Home directory not found: {homePath}");
 
     var archivePath = string.IsNullOrWhiteSpace(outputPath)
-        ? Path.Combine(homePath, "backups", $"{namePrefix}-{DateTime.Now:yyyy-MM-ddTHH-mm-ss}.zip")
+        ? Path.Combine(ResolveBackupsDirectory(homePath), $"{namePrefix}-{DateTime.Now:yyyy-MM-ddTHH-mm-ss}.zip")
         : Path.GetFullPath(outputPath);
     var destinationDirectory = Path.GetDirectoryName(archivePath);
     if (string.IsNullOrWhiteSpace(destinationDirectory))
@@ -907,10 +907,14 @@ static BackupResult CreateBackupArchive(string homePath, string? outputPath, str
     if (File.Exists(archivePath))
         File.Delete(archivePath);
 
+    var archiveFullPath = Path.GetFullPath(archivePath);
     using (var archive = ZipFile.Open(archivePath, ZipArchiveMode.Create))
     {
         foreach (var filePath in Directory.EnumerateFiles(homePath, "*", SearchOption.AllDirectories))
         {
+            if (string.Equals(Path.GetFullPath(filePath), archiveFullPath, StringComparison.OrdinalIgnoreCase))
+                continue;
+
             var relativePath = Path.GetRelativePath(homePath, filePath);
             if (ShouldExcludeFromBackup(relativePath))
                 continue;
@@ -1023,14 +1027,18 @@ static int CountFiles(string directoryPath)
 static int CountDirectories(string directoryPath)
     => Directory.Exists(directoryPath) ? Directory.EnumerateDirectories(directoryPath, "*", SearchOption.TopDirectoryOnly).Count() : 0;
 
+static string ResolveBackupsDirectory(string homePath)
+{
+    return homePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + "-backups";
+}
+
 static bool ShouldExcludeFromBackup(string relativePath)
 {
     if (string.IsNullOrWhiteSpace(relativePath))
         return false;
 
     var topSegment = GetTopLevelSegment(relativePath);
-    return topSegment.Equals("backups", StringComparison.OrdinalIgnoreCase) ||
-           topSegment.Equals("logs", StringComparison.OrdinalIgnoreCase);
+    return topSegment.Equals("logs", StringComparison.OrdinalIgnoreCase);
 }
 
 static string GetTopLevelSegment(string relativePath)

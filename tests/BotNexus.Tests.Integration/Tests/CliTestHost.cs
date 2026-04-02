@@ -67,18 +67,23 @@ internal sealed class CliHomeScope : IAsyncDisposable
 
     public ValueTask DisposeAsync()
     {
-        if (Directory.Exists(Path))
+        CleanupDirectory(Path);
+        CleanupDirectory(Path.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar) + "-backups");
+        return ValueTask.CompletedTask;
+    }
+
+    private static void CleanupDirectory(string path)
+    {
+        if (Directory.Exists(path))
         {
             try
             {
-                Directory.Delete(Path, recursive: true);
+                Directory.Delete(path, recursive: true);
             }
             catch
             {
                 // best-effort cleanup
             }
         }
-
-        return ValueTask.CompletedTask;
     }
 }

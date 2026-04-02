@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ensures all test processes run with BOTNEXUS_HOME pointed away from the real user directory.
+     Individual tests may override this with their own temp paths. -->
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <BOTNEXUS_HOME>%TEMP%\botnexus-test-isolated</BOTNEXUS_HOME>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>

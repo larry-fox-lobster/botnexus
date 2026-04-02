@@ -311,7 +311,10 @@ public sealed class ExtensionLoadingE2eTests : IAsyncLifetime
         Dictionary<string, string?>? overrides = null,
         bool addDefaultSettings = true)
     {
-        var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["BOTNEXUS_HOME"] = WorkspaceRoot
+        };
 
         if (addDefaultSettings)
         {

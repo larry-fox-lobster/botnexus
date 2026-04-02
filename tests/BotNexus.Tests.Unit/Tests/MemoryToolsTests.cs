@@ -10,6 +10,8 @@ namespace BotNexus.Tests.Unit.Tests;
 [Collection("BotNexusHomeEnvVar")]
 public sealed class MemoryToolsTests : IDisposable
 {
+    private readonly string? _previousHome;
+    private readonly string _testHome;
     private readonly string _legacyBasePath;
     private readonly MemoryStore _store;
     private readonly string _agentName = $"bender-memory-tools-{Guid.NewGuid():N}";
@@ -17,6 +19,10 @@ public sealed class MemoryToolsTests : IDisposable
 
     public MemoryToolsTests()
     {
+        _testHome = Path.Combine(Path.GetTempPath(), $"botnexus-memtools-{Guid.NewGuid():N}");
+        _previousHome = Environment.GetEnvironmentVariable("BOTNEXUS_HOME");
+        Environment.SetEnvironmentVariable("BOTNEXUS_HOME", _testHome);
+
         _legacyBasePath = Path.Combine(Path.GetTempPath(), $"botnexus-legacy-memory-tools-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_legacyBasePath);
         _store = new MemoryStore(_legacyBasePath, NullLogger<MemoryStore>.Instance);
@@ -327,10 +333,15 @@ public sealed class MemoryToolsTests : IDisposable
 
     public void Dispose()
     {
+        Environment.SetEnvironmentVariable("BOTNEXUS_HOME", _previousHome);
+
         if (Directory.Exists(_legacyBasePath))
             Directory.Delete(_legacyBasePath, recursive: true);
 
         if (Directory.Exists(_agentWorkspacePath))
             Directory.Delete(_agentWorkspacePath, recursive: true);
+
+        if (Directory.Exists(_testHome))
+            Directory.Delete(_testHome, recursive: true);
     }
 }
