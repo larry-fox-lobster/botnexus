@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$InstallPath = (Join-Path $HOME ".botnexus\app"),
+    [string]$InstallPath = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) "BotNexus"),
     [string]$PackagesPath = (Join-Path (Split-Path -Path $PSScriptRoot -Parent) "artifacts")
 )
 

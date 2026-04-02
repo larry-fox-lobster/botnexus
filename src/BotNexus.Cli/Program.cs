@@ -684,7 +684,7 @@ static Command BuildInstallCommand(Option<string?> homeOption)
 {
     var installPathOption = new Option<string?>("--install-path")
     {
-        Description = "Install path for app deployment. Defaults to ~/.botnexus/app."
+        Description = "Install path. Defaults to %LOCALAPPDATA%\\BotNexus (override with BOTNEXUS_INSTALL env var)."
     };
     var packagesPathOption = new Option<string?>("--packages")
     {
@@ -710,7 +710,7 @@ static Command BuildUpdateCommand(Option<string?> homeOption, ConfigFileManager 
 {
     var installPathOption = new Option<string?>("--install-path")
     {
-        Description = "Install path for app deployment. Defaults to ~/.botnexus/app."
+        Description = "Install path. Defaults to %LOCALAPPDATA%\\BotNexus (override with BOTNEXUS_INSTALL env var)."
     };
     var packagesPathOption = new Option<string?>("--packages")
     {
@@ -959,10 +959,12 @@ static string ResolveInstallPath(string? installPath)
     if (!string.IsNullOrWhiteSpace(installPath))
         return Path.GetFullPath(BotNexusHome.ResolvePath(installPath));
 
-    return Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".botnexus",
-        "app");
+    var envOverride = Environment.GetEnvironmentVariable("BOTNEXUS_INSTALL");
+    if (!string.IsNullOrWhiteSpace(envOverride))
+        return Path.GetFullPath(envOverride);
+
+    var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+    return Path.Combine(appData, "BotNexus");
 }
 
 static string ResolvePackagesPath(string? packagesPath, string homePath)
@@ -1212,7 +1214,9 @@ static int StartInstalledGateway(string homePath, ConfigFileManager configManage
 
 static bool TryResolveGatewayLaunch(string homePath, out string workingDirectory, out string args)
 {
-    var gatewayDll = Path.Combine(homePath, "app", "gateway", "BotNexus.Gateway.dll");
+    var installBase = Environment.GetEnvironmentVariable("BOTNEXUS_INSTALL")
+        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BotNexus");
+    var gatewayDll = Path.Combine(installBase, "gateway", "BotNexus.Gateway.dll");
     if (File.Exists(gatewayDll))
     {
         workingDirectory = Path.GetDirectoryName(gatewayDll) ?? Directory.GetCurrentDirectory();
