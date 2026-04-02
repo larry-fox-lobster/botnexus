@@ -5,10 +5,12 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Path $PSScriptRoot -Parent
+$commonScript = Join-Path $PSScriptRoot "common.ps1"
+. $commonScript
 $artifactsRoot = Join-Path $repoRoot "artifacts"
 $stagingRoot = Join-Path $artifactsRoot "_staging"
 $packageWorkRoot = Join-Path $artifactsRoot "_package"
-$packageVersion = (Get-Date).ToUniversalTime().ToString("yyyy.MM.dd.HHmmss")
+$packageVersion = Resolve-Version
 
 $components = @(
     @{ Id = "BotNexus.Gateway"; Project = "src\BotNexus.Gateway\BotNexus.Gateway.csproj" },
@@ -44,7 +46,7 @@ foreach ($component in $components) {
     $zipPath = Join-Path $artifactsRoot "$componentId.zip"
 
     Write-Host "Publishing $componentId..."
-    dotnet publish $projectPath --configuration Release --output $publishPath --nologo --verbosity minimal --tl:off
+    dotnet publish $projectPath --configuration Release --output $publishPath --nologo --verbosity minimal --tl:off /p:Version=$packageVersion /p:InformationalVersion=$packageVersion
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet publish failed for $componentId"
     }

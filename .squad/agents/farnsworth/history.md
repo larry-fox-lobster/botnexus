@@ -344,3 +344,30 @@ All 7 foundation items completed (Farnsworth: 5, Bender: 2). Decisions merged an
   - Installed binary launch path (content root under `~/.botnexus/app/gateway`)
   - Repo fallback (`dotnet run --project ...`) when install path not present for selected home
 - Ran full suite: `dotnet test --no-restore -v minimal --tl:off` (all passing)
+
+## 2026-04-02 — Repository + CLI Versioning System
+
+### Your Deliverables (Farnsworth)
+
+- Added repo-root `Directory.Build.props` with default `<Version>` and `<InformationalVersion>` set to `0.0.0-dev` for all projects.
+- Added shared `scripts/common.ps1` with `Resolve-Version` (env override, git tag `v*`, or `0.0.0-dev.{short-hash}[.dirty]`).
+- Updated `scripts/pack.ps1` and `scripts/install-cli.ps1` to consume `Resolve-Version` and pass `/p:Version` + `/p:InformationalVersion` into `dotnet publish` / `dotnet pack`.
+- Updated CLI startup/versioning in `src/BotNexus.Cli/Program.cs`:
+  - `--version` prints one-line `botnexus <resolved-version>`
+  - version resolution now prefers release/dev git semantics when default dev assembly metadata is present
+- Enhanced `botnexus status` to print:
+  - CLI version
+  - installed version (from `{installPath}/version.json`)
+  - gateway status + PID info
+  - version match indicator
+- Updated `WriteVersionManifest()` to include `"Version"` in `version.json`.
+- Kept install manifest `"Commit"` as short hash for alignment with dev-version format.
+- Updated CLI integration assertion to validate `version.json` now includes `"Version"`.
+
+### Validation
+
+- `dotnet build --nologo --verbosity minimal --tl:off` ✅
+- `dotnet run --project src\BotNexus.Cli -- --version` ✅ (`botnexus 0.0.0-dev.<hash>.dirty`)
+- `powershell -ExecutionPolicy Bypass -File scripts\pack.ps1` ✅ (artifacts use resolved dev version)
+- Manual install verification via CLI `install` confirmed `version.json` now includes `"Version"`.
+- `dotnet test --no-restore -v minimal --tl:off` ✅ (all test projects passing)

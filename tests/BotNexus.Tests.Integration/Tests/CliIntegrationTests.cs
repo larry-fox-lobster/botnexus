@@ -146,7 +146,8 @@ public sealed class CliIntegrationTests
         var result = await CliTestHost.RunCliAsync("status", home.Path);
 
         result.ExitCode.Should().Be(0);
-        result.StdOut.Should().Contain("Gateway offline");
+        result.StdOut.Should().ContainAll("BotNexus Status", "CLI version:", "Installed version:", "Gateway:", "Version match:");
+        result.StdOut.Should().Contain("Offline");
     }
 
     [Fact]
@@ -184,6 +185,7 @@ public sealed class CliIntegrationTests
         File.Exists(Path.Combine(installPath, "extensions", "providers", "copilot", "lib", "net10.0", "BotNexus.Providers.Copilot.dll")).Should().BeTrue();
         Directory.Exists(Path.Combine(installPath, "cli")).Should().BeFalse();
         File.Exists(Path.Combine(installPath, "version.json")).Should().BeTrue();
+        File.ReadAllText(Path.Combine(installPath, "version.json")).Should().Contain("\"Version\"");
         File.ReadAllText(Path.Combine(home.Path, "config.json")).Should().Contain("ExtensionsPath");
     }
 

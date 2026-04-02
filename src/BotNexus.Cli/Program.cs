@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -17,7 +18,14 @@ var homeOption = new Option<string?>("--home")
 homeOption.Recursive = true;
 
 var configManager = new ConfigFileManager();
-var rootCommand = new RootCommand("BotNexus CLI");
+var cliVersion = ResolveCliVersion();
+if (args.Length == 1 && string.Equals(args[0], "--version", StringComparison.OrdinalIgnoreCase))
+{
+    Console.WriteLine($"botnexus {cliVersion}");
+    return 0;
+}
+
+var rootCommand = new RootCommand("BotNexus CLI — manage agents, providers, and the Gateway.");
 rootCommand.Add(homeOption);
 
 rootCommand.Add(BuildConfigCommand(homeOption, configManager));
@@ -422,36 +430,51 @@ static Command BuildStatusCommand(Option<string?> homeOption, ConfigFileManager 
     var statusCommand = new Command("status", "Show Gateway and configuration status.");
     statusCommand.SetAction(parseResult =>
     {
+        var cliVersion = ResolveCliVersion();
         var homePath = ResolveHome(parseResult, homeOption);
         var config = configManager.LoadConfig(homePath);
         var gatewayUrl = BuildGatewayUrl(config.Gateway);
+        var installPath = ResolveInstallPath(null);
+        var installedVersion = ReadInstalledVersionInfo(installPath);
+        var installedVersionValue = installedVersion.GetValueOrDefault();
+        var installedVersionText = !installedVersion.HasValue
+            ? "unknown (not installed)"
+            : string.IsNullOrWhiteSpace(installedVersionValue.InstalledAtUtc)
+                ? installedVersionValue.Version
+                : $"{installedVersionValue.Version} (installed {installedVersionValue.InstalledAtUtc})";
 
+        var pidPath = Path.Combine(homePath, "gateway.pid");
+        var pid = File.Exists(pidPath) ? ReadPid(pidPath) : null;
+        var hasRunningPid = pid is not null && IsRunning(pid.Value);
+
+        var isOnline = false;
         using var client = new GatewayClient(gatewayUrl);
         try
         {
-            var health = client.GetHealthAsync().GetAwaiter().GetResult();
-            var extensions = client.GetExtensionsAsync().GetAwaiter().GetResult();
-            ConsoleOutput.WriteStatus(ConsoleStatus.Success, $"Gateway online ({gatewayUrl})");
-            ConsoleOutput.WriteHeader("Health");
-            ConsoleOutput.WriteJson(health);
-            ConsoleOutput.WriteHeader("Extensions");
-            ConsoleOutput.WriteJson(extensions);
-            return 0;
+            isOnline = client.IsRunningAsync().GetAwaiter().GetResult();
         }
         catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or HttpRequestException)
         {
-            ConsoleOutput.WriteStatus(ConsoleStatus.Warning, $"Gateway offline ({gatewayUrl})");
-            ConsoleOutput.WriteTable(
-                ["setting", "value"],
-                [
-                    ["gateway host", config.Gateway.Host],
-                    ["gateway port", config.Gateway.Port.ToString()],
-                    ["named agents", config.Agents.Named.Count.ToString()],
-                    ["providers", config.Providers.Count.ToString()],
-                ["channels", config.Channels.Instances.Count.ToString()]
-                ]);
-            return 0;
+            isOnline = false;
         }
+
+        var gatewayStatus = hasRunningPid
+            ? $"Running (PID {pid!.Value}) on {gatewayUrl}"
+            : isOnline
+                ? $"Running (PID unknown) on {gatewayUrl}"
+                : $"Offline on {gatewayUrl}";
+        var versionMatch = !installedVersion.HasValue
+            ? "⚠️ Installed version unavailable"
+            : string.Equals(cliVersion, installedVersionValue.Version, StringComparison.OrdinalIgnoreCase)
+                ? "✅"
+                : "⚠️ CLI and installed versions differ";
+
+        Console.WriteLine("BotNexus Status");
+        Console.WriteLine($"  CLI version:       {cliVersion}");
+        Console.WriteLine($"  Installed version: {installedVersionText}");
+        Console.WriteLine($"  Gateway:           {gatewayStatus}");
+        Console.WriteLine($"  Version match:     {versionMatch}");
+        return 0;
     });
 
     return statusCommand;
@@ -1091,8 +1114,10 @@ static bool IsNuGetMetadataEntry(string entryPath)
 
 static string WriteVersionManifest(string installPath, IReadOnlyCollection<string> packages)
 {
+    var version = ResolveCliVersion();
     var payload = new
     {
+        Version = version,
         InstalledAtUtc = DateTime.UtcNow.ToString("o"),
         Commit = ResolveGitCommitHash(),
         InstallPath = installPath,
@@ -1107,6 +1132,66 @@ static string WriteVersionManifest(string installPath, IReadOnlyCollection<strin
 
 static string ResolveGitCommitHash()
 {
+    return TryRunGitCommand("rev-parse --short HEAD", out var output)
+        ? output
+        : "unknown";
+}
+
+static string ResolveCliVersion()
+{
+    var embeddedVersion = ResolveEmbeddedAssemblyVersion();
+    var isDefaultDevVersion = string.Equals(embeddedVersion, "0.0.0-dev", StringComparison.OrdinalIgnoreCase)
+        || embeddedVersion.StartsWith("0.0.0-dev+", StringComparison.OrdinalIgnoreCase);
+    if (!isDefaultDevVersion)
+        return embeddedVersion;
+
+    if (TryResolveGitVersion(out var gitVersion))
+        return gitVersion;
+
+    return embeddedVersion;
+}
+
+static string ResolveEmbeddedAssemblyVersion()
+{
+    var assembly = Assembly.GetExecutingAssembly();
+    return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+        ?? assembly.GetName().Version?.ToString()
+        ?? "unknown";
+}
+
+static bool TryResolveGitVersion(out string version)
+{
+    var envVersion = Environment.GetEnvironmentVariable("BOTNEXUS_VERSION");
+    if (!string.IsNullOrWhiteSpace(envVersion))
+    {
+        version = envVersion.Trim();
+        return true;
+    }
+
+    if (TryRunGitCommand("describe --tags --exact-match HEAD", out var tag) &&
+        tag.StartsWith("v", StringComparison.OrdinalIgnoreCase) &&
+        tag.Length > 1)
+    {
+        version = tag[1..];
+        return true;
+    }
+
+    if (!TryRunGitCommand("rev-parse --short HEAD", out var hash))
+    {
+        version = string.Empty;
+        return false;
+    }
+
+    var dirty = TryRunGitCommand("status --porcelain", out var status) && !string.IsNullOrWhiteSpace(status)
+        ? ".dirty"
+        : string.Empty;
+    version = $"0.0.0-dev.{hash}{dirty}";
+    return true;
+}
+
+static bool TryRunGitCommand(string arguments, out string output)
+{
+    output = string.Empty;
     try
     {
         using var process = new Process
@@ -1114,7 +1199,7 @@ static string ResolveGitCommitHash()
             StartInfo = new ProcessStartInfo
             {
                 FileName = "git",
-                Arguments = "rev-parse HEAD",
+                Arguments = arguments,
                 WorkingDirectory = Directory.GetCurrentDirectory(),
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -1124,18 +1209,43 @@ static string ResolveGitCommitHash()
         };
 
         if (!process.Start())
-            return "unknown";
+            return false;
 
-        var output = process.StandardOutput.ReadToEnd();
+        var stdout = process.StandardOutput.ReadToEnd();
         process.WaitForExit(5000);
         if (process.ExitCode != 0)
-            return "unknown";
+            return false;
 
-        return string.IsNullOrWhiteSpace(output) ? "unknown" : output.Trim();
+        output = stdout.Trim();
+        return !string.IsNullOrWhiteSpace(output);
     }
     catch
     {
-        return "unknown";
+        return false;
+    }
+}
+
+static InstalledVersionInfo? ReadInstalledVersionInfo(string installPath)
+{
+    var versionPath = Path.Combine(installPath, "version.json");
+    if (!File.Exists(versionPath))
+        return null;
+
+    try
+    {
+        var content = File.ReadAllText(versionPath);
+        var root = JsonNode.Parse(content) as JsonObject;
+        if (root is null)
+            return null;
+
+        var version = root["Version"]?.GetValue<string>() ?? "unknown";
+        var installedAtUtc = root["InstalledAtUtc"]?.GetValue<string>();
+        var commit = root["Commit"]?.GetValue<string>();
+        return new InstalledVersionInfo(version, installedAtUtc, commit);
+    }
+    catch
+    {
+        return null;
     }
 }
 
@@ -1454,6 +1564,7 @@ static string BuildGatewayUrl(GatewayConfig gateway)
 readonly record struct BackupResult(string ArchivePath, long ArchiveSizeBytes, BackupSummary Summary);
 readonly record struct InstallTarget(string Kind, string TargetPath);
 readonly record struct PackageInstallResult(string Package, string Kind, string Target, string Status);
+readonly record struct InstalledVersionInfo(string Version, string? InstalledAtUtc, string? Commit);
 
 readonly record struct BackupSummary(
     int ConfigFiles,
