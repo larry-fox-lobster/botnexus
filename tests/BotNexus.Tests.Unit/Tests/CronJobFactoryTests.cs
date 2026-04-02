@@ -278,7 +278,7 @@ public sealed class CronJobFactoryTests
     private sealed class TestChannel(string name) : IChannel
     {
         public string Name { get; } = name;
-        public string DisplayName => name;
+        public string DisplayName => Name;
         public bool IsRunning => true;
         public bool SupportsStreaming => false;
 

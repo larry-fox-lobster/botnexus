@@ -34,7 +34,7 @@ public class ProviderRetryTests
             return new LlmResponse("response", FinishReason.Stop);
         }
 
-        public override async IAsyncEnumerable<string> ChatStreamAsync(ChatRequest request, CancellationToken cancellationToken = default)
+        public override async IAsyncEnumerable<string> ChatStreamAsync(ChatRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             await Task.CompletedTask;
             yield return "stream";

@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using BotNexus.Core.Abstractions;
@@ -62,6 +63,7 @@ public sealed class TokenPermissionsCheckup(DiagnosticsPaths paths) : IHealthChe
         }
     }
 
+    [SupportedOSPlatform("windows")]
     private static CheckupResult CheckWindowsAcl(string tokensPath)
     {
         var security = new DirectoryInfo(tokensPath).GetAccessControl();
@@ -93,6 +95,7 @@ public sealed class TokenPermissionsCheckup(DiagnosticsPaths paths) : IHealthChe
         return new CheckupResult(CheckupStatus.Pass, "Token directory ACL does not expose tokens to Everyone.");
     }
 
+    [UnsupportedOSPlatform("windows")]
     private static CheckupResult CheckUnixPermissions(string tokensPath)
     {
         var mode = File.GetUnixFileMode(tokensPath);
@@ -108,6 +111,7 @@ public sealed class TokenPermissionsCheckup(DiagnosticsPaths paths) : IHealthChe
         return new CheckupResult(CheckupStatus.Pass, $"Token directory permissions are acceptable ({mode}).");
     }
 
+    [SupportedOSPlatform("windows")]
     private static void FixWindowsAcl(string tokensPath)
     {
         var security = new DirectorySecurity();
@@ -135,6 +139,7 @@ public sealed class TokenPermissionsCheckup(DiagnosticsPaths paths) : IHealthChe
         new DirectoryInfo(tokensPath).SetAccessControl(security);
     }
 
+    [UnsupportedOSPlatform("windows")]
     private static void FixUnixPermissions(string tokensPath)
     {
         File.SetUnixFileMode(
