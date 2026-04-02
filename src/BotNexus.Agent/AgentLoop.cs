@@ -104,13 +104,18 @@ public sealed class AgentLoop
                         !(entry.Role == MessageRole.User &&
                           entry.Timestamp == message.Timestamp &&
                           string.Equals(entry.Content, message.Content, StringComparison.Ordinal)))
-                    .Select(static entry => new ChatMessage(entry.Role switch
-                    {
-                        MessageRole.User => "user",
-                        MessageRole.Assistant => "assistant",
-                        MessageRole.Tool => "tool",
-                        _ => "user"
-                    }, entry.Content))
+                    .Select(static entry => new ChatMessage(
+                        entry.Role switch
+                        {
+                            MessageRole.User => "user",
+                            MessageRole.Assistant => "assistant",
+                            MessageRole.Tool => "tool",
+                            _ => "user"
+                        },
+                        entry.Content,
+                        ToolCallId: entry.ToolCallId,
+                        ToolName: entry.ToolName,
+                        ToolCalls: entry.ToolCalls))
                     .ToList();
 
                 var messages = await _contextBuilder.BuildMessagesAsync(
@@ -134,10 +139,15 @@ public sealed class AgentLoop
                 _metrics?.RecordProviderLatency(provider.GetType().Name, providerTimer.Elapsed.TotalMilliseconds);
                 _logger.LogInformation("Provider {ProviderName} responded in {ElapsedMs}ms", provider.GetType().Name, providerTimer.Elapsed.TotalMilliseconds);
 
-                if (!string.IsNullOrEmpty(llmResponse.Content))
+                if (!string.IsNullOrEmpty(llmResponse.Content) || llmResponse.ToolCalls is { Count: > 0 })
                 {
-                    session.AddEntry(new SessionEntry(MessageRole.Assistant, llmResponse.Content, DateTimeOffset.UtcNow));
-                    response = llmResponse.Content;
+                    session.AddEntry(new SessionEntry(
+                        MessageRole.Assistant,
+                        llmResponse.Content ?? string.Empty,
+                        DateTimeOffset.UtcNow,
+                        ToolCalls: llmResponse.ToolCalls));
+                    if (!string.IsNullOrEmpty(llmResponse.Content))
+                        response = llmResponse.Content;
                 }
 
                 // Handle tool calls

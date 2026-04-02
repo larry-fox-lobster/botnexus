@@ -124,7 +124,49 @@ public sealed class AnthropicProvider : LlmProviderBase
         var settings = request.Settings;
         var messages = request.Messages
             .Where(m => m.Role != "system")
-            .Select(m => new { role = m.Role, content = m.Content })
+            .Select(m =>
+            {
+                var msg = new Dictionary<string, object?>
+                {
+                    ["role"] = m.Role,
+                    ["content"] = m.Content
+                };
+
+                // Anthropic uses content blocks for tool use/result
+                if (m.ToolCalls is { Count: > 0 })
+                {
+                    var contentBlocks = new List<object>();
+                    if (!string.IsNullOrEmpty(m.Content))
+                        contentBlocks.Add(new { type = "text", text = m.Content });
+
+                    foreach (var tc in m.ToolCalls)
+                    {
+                        contentBlocks.Add(new
+                        {
+                            type = "tool_use",
+                            id = tc.Id,
+                            name = tc.ToolName,
+                            input = tc.Arguments
+                        });
+                    }
+                    msg["content"] = contentBlocks;
+                }
+
+                if (string.Equals(m.Role, "tool", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(m.ToolCallId))
+                {
+                    msg["content"] = new[]
+                    {
+                        new
+                        {
+                            type = "tool_result",
+                            tool_use_id = m.ToolCallId,
+                            content = m.Content
+                        }
+                    };
+                }
+
+                return msg;
+            })
             .ToList<object>();
 
         var body = new Dictionary<string, object?>

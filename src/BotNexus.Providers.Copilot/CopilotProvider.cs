@@ -298,11 +298,37 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
 
         foreach (var message in request.Messages)
         {
-            messages.Add(new Dictionary<string, object?>
+            var msg = new Dictionary<string, object?>
             {
                 ["role"] = message.Role,
                 ["content"] = message.Content
-            });
+            };
+
+            // Assistant messages with tool_calls
+            if (message.ToolCalls is { Count: > 0 })
+            {
+                msg["tool_calls"] = message.ToolCalls.Select(tc => new Dictionary<string, object?>
+                {
+                    ["id"] = tc.Id,
+                    ["type"] = "function",
+                    ["function"] = new Dictionary<string, object?>
+                    {
+                        ["name"] = tc.ToolName,
+                        ["arguments"] = JsonSerializer.Serialize(tc.Arguments)
+                    }
+                }).ToList();
+            }
+
+            // Tool result messages
+            if (string.Equals(message.Role, "tool", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrEmpty(message.ToolCallId))
+                    msg["tool_call_id"] = message.ToolCallId;
+                if (!string.IsNullOrEmpty(message.ToolName))
+                    msg["name"] = message.ToolName;
+            }
+
+            messages.Add(msg);
         }
 
         var payload = new Dictionary<string, object?>
