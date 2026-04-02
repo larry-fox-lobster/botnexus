@@ -331,4 +331,10 @@ All Sprints 1-2 foundation work completed by Farnsworth and Bender. Hermes ready
 - 23 E2E tests: ✅ All isolated
 - GitHub Actions CI: ✅ Linux + Windows both green
 
+### 2026-04-02 — Backup CLI integration test pattern
+
+- Extracted CLI runner helpers into shared integration test utilities (`CliTestHost`, `CliHomeScope`, `CliRunResult`) so new CLI test classes can reuse the exact process-launch pattern without duplicating code.
+- Added dedicated `BackupCliIntegrationTests` for `backup create`, `backup list`, and `backup restore`, including ZIP-content validation with `System.IO.Compression.ZipFile`.
+- Preserved strict home isolation by using `CliHomeScope.CreateAsync()` in every test to avoid touching `%USERPROFILE%\.botnexus`.
+
 ---
