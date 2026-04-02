@@ -55,20 +55,16 @@ The BotNexus CLI can be installed as a global .NET tool for convenient command-l
 
 ### Option A: Install from Local Build (Recommended)
 
-First, build the CLI in Release mode:
+Run the bootstrap script — it packs the CLI and installs it as a global dotnet tool:
 
-```bash
-dotnet build src/BotNexus.Cli -c Release
+```powershell
+# Windows (PowerShell)
+./scripts/install-cli.ps1
 ```
 
-Then install it globally from the build output:
-
 ```bash
-# Windows (PowerShell)
-dotnet tool install --global --add-source .\src\BotNexus.Cli\bin\Release\net10.0 botnexus
-
 # macOS/Linux
-dotnet tool install --global --add-source ./src/BotNexus.Cli/bin/Release/net10.0 botnexus
+./scripts/install-cli.sh
 ```
 
 Verify installation:
@@ -78,6 +74,8 @@ botnexus --version
 ```
 
 You should see `0.0.0-dev.{short-hash}` (e.g., `0.0.0-dev.d2b8527`).
+
+> **Updating the CLI:** After code changes, run the same script again — it detects an existing install and uses `dotnet tool update` automatically.
 
 ### Option B: Run Directly from Repo
 

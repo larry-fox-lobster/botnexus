@@ -13,13 +13,14 @@ $version = Resolve-Version
 dotnet pack (Join-Path $repoRoot "src\BotNexus.Cli") -c Release -o $toolsPath /p:Version=$version /p:InformationalVersion=$version
 
 $resolvedToolsPath = [System.IO.Path]::GetFullPath($toolsPath)
-$isInstalled = dotnet tool list --global | Select-String -Pattern '^\s*botnexus\.cli\s+'
+$isInstalled = dotnet tool list --global | Select-String -Pattern 'botnexus\.cli'
 
 if ($null -ne $isInstalled) {
-    dotnet tool update --global --add-source $resolvedToolsPath BotNexus.Cli
+    Write-Host "Removing existing botnexus CLI..."
+    dotnet tool uninstall --global BotNexus.Cli
 }
-else {
-    dotnet tool install --global --add-source $resolvedToolsPath BotNexus.Cli
-}
+
+Write-Host "Installing botnexus CLI ($version)..."
+dotnet tool install --global --add-source $resolvedToolsPath BotNexus.Cli --version $version
 
 Write-Host "✅ botnexus CLI installed. Run 'botnexus --help' to get started."
