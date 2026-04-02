@@ -81,6 +81,18 @@ public static class BotNexusServiceExtensions
 
         // Gateway
         services.AddSingleton<IAgentRunnerFactory, AgentRunnerFactory>();
+
+        // Register agent runners for each configured named agent so the AgentRouter
+        // can dispatch messages. Only agents explicitly listed in config are registered;
+        // tests that create runners manually (E2E fixtures) are not affected.
+        var namedSection = configuration.GetSection($"{BotNexusConfig.SectionName}:Agents:Named");
+        foreach (var child in namedSection.GetChildren())
+        {
+            var agentName = child.Key;
+            services.AddSingleton<IAgentRunner>(sp =>
+                sp.GetRequiredService<IAgentRunnerFactory>().Create(agentName));
+        }
+
         services.AddSingleton<IAgentRouter, AgentRouter>();
         services.AddHostedService<Gateway>();
         services.AddHealthChecks()

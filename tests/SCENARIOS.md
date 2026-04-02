@@ -20,7 +20,8 @@
 | Security & Auth | 5 | 5 | 0 | 0 |
 | Observability | 4 | 4 | 0 | 0 |
 | Cron & Scheduling | 8 | 8 | 0 | 0 |
-| **TOTAL** | **64** | **64** | **0** | **0** |
+| Getting Started Guide | 1 | 1 | 0 | 0 |
+| **TOTAL** | **65** | **65** | **0** | **0** |
 
 **Coverage: 100% covered. Zero planned. Zero partial.**
 
@@ -962,6 +963,31 @@ E2E tests for the cron system covering the full lifecycle: config → startup �
 
 ---
 
+## 10. Getting Started Guide
+
+End-to-end validation of `docs/getting-started.md` — simulates a real user's first experience via real process starts with isolated `BOTNEXUS_HOME`.
+
+---
+
+### SC-GSG-001: Getting-Started Full Journey
+
+- **Category:** Getting Started Guide
+- **Status:** ✅ Covered
+- **Test location:** `tests/BotNexus.Tests.Deployment/Tests/GettingStartedGuideTests.cs`
+- **Description:** Walks through the complete getting-started guide from clean install to chatting with an agent. Uses real Gateway process, temp BOTNEXUS_HOME, fixture mock provider (in place of Copilot).
+- **Steps:**
+  1. **§2 Build:** Verify Gateway DLL exists (requires prior `dotnet build BotNexus.slnx`).
+  2. **§3 First Run:** Start Gateway with empty home → verify full directory structure created (extensions/, agents/, tokens/, sessions/, logs/, config.json).
+  3. **§3 Health check:** `GET /health` → status must be Healthy or Degraded (NOT Unhealthy).
+  4. **§3 Ready check:** `GET /ready` → must return 200 with status field.
+  5. **§4 Configure provider:** Deploy fixture-provider extension DLL → write config.json with provider → restart → verify provider loads via `GET /api/extensions`.
+  6. **§5 Create agent:** Add "assistant" agent to config.json → restart → verify agent listed via `GET /api/agents`.
+  7. **§6 Send message:** Connect WebSocket → receive "connected" → send message to "assistant" → verify fixture provider echoes response.
+  8. **§5 Workspace:** After first message, verify lazy-created workspace: SOUL.md and IDENTITY.md exist.
+  9. **Final:** `GET /api/extensions` healthy; `GET /api/agents` still lists assistant.
+
+---
+
 ## Appendix: Test File Index
 
 Quick reference mapping test files to the scenarios they cover.
@@ -1007,3 +1033,4 @@ Quick reference mapping test files to the scenarios they cover.
 | `tests/BotNexus.Tests.Deployment/Tests/HealthDuringStartupTests.cs` | SC-DPL-009 |
 | `tests/BotNexus.Tests.Deployment/Tests/ConcurrentHandlingTests.cs` | SC-DPL-010 |
 | `tests/BotNexus.Tests.E2E/Tests/CronTests.cs` | SC-CRN-001, SC-CRN-002, SC-CRN-003, SC-CRN-004, SC-CRN-005, SC-CRN-006, SC-CRN-007, SC-CRN-008 |
+| `tests/BotNexus.Tests.Deployment/Tests/GettingStartedGuideTests.cs` | SC-GSG-001 |
