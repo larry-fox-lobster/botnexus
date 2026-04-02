@@ -40,7 +40,7 @@ public sealed class TokenPermissionsCheckup(DiagnosticsPaths paths) : IHealthChe
 
     private static CheckupResult CheckWindowsAcl(string tokensPath)
     {
-        var security = Directory.GetAccessControl(tokensPath);
+        var security = new DirectoryInfo(tokensPath).GetAccessControl();
         var rules = security.GetAccessRules(includeExplicit: true, includeInherited: true, targetType: typeof(SecurityIdentifier))
             .Cast<FileSystemAccessRule>()
             .Where(rule => rule.AccessControlType == AccessControlType.Allow);
