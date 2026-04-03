@@ -602,6 +602,32 @@ static string NormalizeAgentId(string agentName)
     return normalized;
 }
 
+// Local helper function for fallback model lists when dynamic fetch fails
+static IReadOnlyList<string> GetFallbackModels(string providerName, string defaultModel)
+{
+    // Known Copilot models as of April 2026
+    if (providerName.Equals("copilot", StringComparison.OrdinalIgnoreCase))
+    {
+        return new[]
+        {
+            "gpt-4o",
+            "gpt-4o-mini",
+            "o1",
+            "o1-mini",
+            "o3-mini",
+            "claude-opus-4.6",
+            "claude-sonnet-4.6",
+            "claude-sonnet-4.5",
+            "claude-haiku-4.5",
+            "gemini-2.0-flash-exp",
+            "gemini-2.0-flash-thinking-exp"
+        };
+    }
+    
+    // For other providers, just return the default model
+    return new[] { defaultModel };
+}
+
 // --- REST API: Providers ---
 app.MapGet("/api/providers", async (ProviderRegistry providerRegistry) =>
 {
@@ -617,11 +643,13 @@ app.MapGet("/api/providers", async (ProviderRegistry providerRegistry) =>
         IReadOnlyList<string> availableModels;
         try
         {
-            availableModels = await provider.GetAvailableModelsAsync();
+            var fetchTask = provider.GetAvailableModelsAsync(CancellationToken.None);
+            availableModels = await fetchTask.WaitAsync(TimeSpan.FromSeconds(5));
         }
         catch (Exception)
         {
-            availableModels = new[] { provider.DefaultModel };
+            // Fallback to known models if dynamic fetch fails or times out
+            availableModels = GetFallbackModels(name, provider.DefaultModel);
         }
         
         providers.Add(new
@@ -653,11 +681,13 @@ app.MapGet("/api/models", async (ProviderRegistry providerRegistry) =>
         IReadOnlyList<string> models;
         try
         {
-            models = await provider.GetAvailableModelsAsync();
+            var fetchTask = provider.GetAvailableModelsAsync(CancellationToken.None);
+            models = await fetchTask.WaitAsync(TimeSpan.FromSeconds(5));
         }
         catch (Exception)
         {
-            models = new[] { provider.DefaultModel };
+            // Fallback to known models if dynamic fetch fails or times out
+            models = GetFallbackModels(name, provider.DefaultModel);
         }
         
         result.Add(new
