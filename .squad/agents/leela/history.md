@@ -1050,3 +1050,61 @@ ASP.NET Core routing does not allow catch-all parameters (`{*key}`) to have addi
 
 ---
 
+
+## 2026-04-03T21:50:01Z — Multi-Turn Tool Calling Debug Session
+
+**Status:** 🔍 Partial Fix — WebSocket routing fixed, multi-turn behavior analyzed  
+**Requested by:** Jon Bullen  
+**Scope:** Investigate and fix broken multi-turn tool calling for Nova agent
+
+**Problem Reported:**
+Jon reported that Nova agent says "Let me check if there's anything in the config or gateway..." and then STOPS — no tool call, no continuation. Multi-turn tool calling is the #1 priority.
+
+**Investigation Findings:**
+
+**Issue #1: WebSocket Agent Routing Bug** ✅ **FIXED**
+- WebSocket connections with ?agent=nova were being routed to "assistant" agent
+- Root cause: GatewayWebSocketHandler didn't read query parameters
+- Fix: Extract gent query param and pass through routing chain
+- Priority: message.agent_name > message.agent > query ?agent=
+- Commit: `2c8bc05`
+
+**Issue #2: Multi-Turn Status** 🔍 **NEEDS INVESTIGATION**
+- Multi-turn IS working (agent iterates: 0, 1, 2, 3, 4...)
+- BUT: Agent calls SAME tool repeatedly in infinite loop
+- Tool results ARE being added to session history ✅
+- Tool results ARE converted to ChatMessage with correct role/IDs ✅  
+- Copilot provider serializes correctly with tool_call_id and name ✅
+- **Hypothesis:** Either LLM not seeing results, or format issue with Copilot API proxy
+
+**Enhanced Logging Added:**
+- CopilotProvider logs tool counts and names at INFO level
+- Request/response payloads at DEBUG level
+- BotNexus.Providers.Copilot set to Debug in appsettings.Development.json
+
+**Research Completed:**
+- Analyzed Pi agent (badlogic/pi-mono) multi-turn implementation
+- Documented their approach: streaming with tools, tool result serialization, cross-model message replay
+- Key insight: Empty 	ools: [] required if messages reference past tool calls (Anthropic quirk)
+
+**Next Steps:**
+1. Capture actual HTTP request payload to Copilot API (DEBUG logs)
+2. Verify tool results are in messages array with correct tool_call_id
+3. Compare Nova (claude-opus-4.6) vs assistant (gpt-4o) behavior
+4. Test if model-specific issue or general serialization problem
+5. Check if empty tools array needed for Anthropic via Copilot proxy
+
+**Files Changed:**
+- src/BotNexus.Gateway/GatewayWebSocketHandler.cs — Query param routing
+- src/BotNexus.Providers.Copilot/CopilotProvider.cs — Enhanced logging
+- src/BotNexus.Gateway/appsettings.Development.json — Debug logging
+- .squad/agents/leela/multi-turn-investigation.md — Detailed analysis
+
+**Testing:**
+- Created test scripts: 	est-nova.ps1, 	est-nova-simple.ps1
+- Verified Nova agent now routes correctly via WebSocket
+- Confirmed multi-turn loop behavior (infinite tool calls)
+
+**Recommendation:**
+HIGH PRIORITY — Capture HTTP payload to definitively confirm whether tool results are making it into subsequent requests or if there's a serialization/format issue specific to Copilot API or Claude models.
+
