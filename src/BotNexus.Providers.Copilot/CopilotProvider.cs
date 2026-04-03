@@ -67,6 +67,7 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
 
             if (_cachedToken is { IsExpired: true })
             {
+                Logger.LogWarning("OAuth token for Copilot has expired (expired at {ExpiresAt:u}). Clearing and prompting for re-authentication.", _cachedToken.ExpiresAt);
                 await _tokenStore.ClearTokenAsync("copilot", cancellationToken).ConfigureAwait(false);
                 _cachedToken = null;
             }
@@ -104,7 +105,7 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
         if (exchangeResponse.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
         {
             var body = await exchangeResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            Logger.LogWarning("Copilot token exchange failed (HTTP {StatusCode}): {Body}",
+            Logger.LogWarning("Copilot token exchange failed (HTTP {StatusCode}): {Body}. Clearing cached GitHub OAuth token and prompting re-authentication.",
                 (int)exchangeResponse.StatusCode, body);
             _cachedToken = null;
             await _tokenStore.ClearTokenAsync("copilot", cancellationToken).ConfigureAwait(false);
@@ -142,13 +143,16 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
     protected override async Task<LlmResponse> ChatCoreAsync(ChatRequest request, CancellationToken cancellationToken)
     {
         var payload = BuildRequestPayload(request, stream: false);
+        var modelUsed = payload["model"]?.ToString() ?? _defaultModel;
+        Logger.LogDebug("CopilotProvider: Sending chat request with model={Model}", modelUsed);
         using var httpRequest = await CreateChatRequestAsync(payload, cancellationToken).ConfigureAwait(false);
         using var response = await _httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            Logger.LogWarning("Copilot API returned HTTP {StatusCode}: {Body}", (int)response.StatusCode, body);
+            Logger.LogWarning("Copilot API returned HTTP {StatusCode} for model {Model}: {Body}", 
+                (int)response.StatusCode, modelUsed, body);
 
             if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
             {
@@ -177,8 +181,8 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
         if (message.TryGetProperty("tool_calls", out var toolCallsElement) && toolCallsElement.ValueKind == JsonValueKind.Array)
             toolCalls = ParseToolCalls(toolCallsElement);
 
-        Logger.LogDebug("Copilot response: content_length={ContentLength}, finish_reason={FinishReasonRaw}/{FinishReasonMapped}, tool_calls={ToolCallCount}",
-            content?.Length ?? 0, finishReasonStr ?? "null", finishReason, toolCalls?.Count ?? 0);
+        Logger.LogDebug("Copilot response: model={Model}, content_length={ContentLength}, finish_reason={FinishReasonRaw}/{FinishReasonMapped}, tool_calls={ToolCallCount}",
+            modelUsed, content?.Length ?? 0, finishReasonStr ?? "null", finishReason, toolCalls?.Count ?? 0);
 
         int? promptTokens = null;
         int? completionTokens = null;

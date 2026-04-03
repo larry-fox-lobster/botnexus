@@ -78,6 +78,10 @@ public sealed class AgentRunnerFactory : IAgentRunnerFactory
             MaxToolIterations = agentConfig.MaxToolIterations ?? defaults.MaxToolIterations
         };
 
+        var logger = _loggerFactory.CreateLogger<AgentRunnerFactory>();
+        logger.LogInformation("Creating agent '{AgentName}': configuredModel={ConfiguredModel}, maxTokens={MaxTokens}, contextWindowTokens={ContextWindowTokens}, temperature={Temperature}",
+            agentName, settings.Model, settings.MaxTokens, settings.ContextWindowTokens, settings.Temperature);
+
         var toolRegistry = new ToolRegistry(_metrics);
 
         var disallowed = new HashSet<string>(agentConfig.DisallowedTools, StringComparer.OrdinalIgnoreCase);

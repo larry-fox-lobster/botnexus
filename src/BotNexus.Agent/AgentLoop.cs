@@ -83,6 +83,14 @@ public sealed class AgentLoop
         });
 
         var session = await _sessionManager.GetOrCreateAsync(message.SessionKey, _agentName, cancellationToken).ConfigureAwait(false);
+        
+        // Set the model on the session if not already set
+        if (string.IsNullOrWhiteSpace(session.Model))
+        {
+            var configuredModel = string.IsNullOrWhiteSpace(_model) ? _settings.Model : _model;
+            session.Model = configuredModel;
+        }
+        
         var hookContext = new AgentHookContext(_agentName, message.SessionKey, message);
 
         foreach (var hook in _hooks)
@@ -135,7 +143,9 @@ public sealed class AgentLoop
 
                 var request = new ChatRequest(requestMessages, _settings, tools, systemPrompt);
                 var provider = ResolveProvider();
-                _logger.LogInformation("Calling provider {ProviderName} for agent {AgentName}", provider.GetType().Name, _agentName);
+                var actualModel = string.IsNullOrWhiteSpace(request.Settings.Model) ? provider.DefaultModel : request.Settings.Model;
+                _logger.LogInformation("Calling provider {ProviderName} for agent {AgentName}, model={Model}, contextWindowTokens={ContextWindowTokens}", 
+                    provider.GetType().Name, _agentName, actualModel, request.Settings.ContextWindowTokens);
                 var providerTimer = Stopwatch.StartNew();
                 var llmResponse = await provider.ChatAsync(request, cancellationToken).ConfigureAwait(false);
                 providerTimer.Stop();
@@ -287,14 +297,22 @@ public sealed class AgentLoop
         if (!string.IsNullOrWhiteSpace(_providerName))
         {
             var configured = _providerRegistry.Get(_providerName);
-            if (configured is not null) return configured;
+            if (configured is not null)
+            {
+                _logger.LogDebug("Resolved provider by name: {ProviderName}", _providerName);
+                return configured;
+            }
         }
 
         var configuredModel = string.IsNullOrWhiteSpace(_model) ? _settings.Model : _model;
         if (!string.IsNullOrWhiteSpace(configuredModel))
         {
             var fromModelPrefix = ResolveProviderFromModelPrefix(configuredModel);
-            if (fromModelPrefix is not null) return fromModelPrefix;
+            if (fromModelPrefix is not null)
+            {
+                _logger.LogDebug("Resolved provider from model prefix: {Model} -> {ProviderName}", configuredModel, fromModelPrefix.GetType().Name);
+                return fromModelPrefix;
+            }
 
             foreach (var name in _providerRegistry.GetProviderNames())
             {
@@ -302,13 +320,18 @@ public sealed class AgentLoop
                 if (provider is not null &&
                     string.Equals(provider.DefaultModel, configuredModel, StringComparison.OrdinalIgnoreCase))
                 {
+                    _logger.LogDebug("Resolved provider by default model match: {Model} -> {ProviderName}", configuredModel, provider.GetType().Name);
                     return provider;
                 }
             }
         }
 
         var byDefault = _providerRegistry.GetDefault();
-        if (byDefault is not null) return byDefault;
+        if (byDefault is not null)
+        {
+            _logger.LogDebug("Using default provider: {ProviderName}, defaultModel={DefaultModel}", byDefault.GetType().Name, byDefault.DefaultModel);
+            return byDefault;
+        }
 
         throw new InvalidOperationException(
             $"No LLM providers are registered for agent '{_agentName}'.");

@@ -48,6 +48,8 @@ public sealed class AnthropicProvider : LlmProviderBase
     /// <inheritdoc/>
     protected override async Task<LlmResponse> ChatCoreAsync(ChatRequest request, CancellationToken cancellationToken)
     {
+        var actualModel = string.IsNullOrWhiteSpace(request.Settings.Model) ? _defaultModel : request.Settings.Model;
+        Logger.LogDebug("AnthropicProvider: Sending chat request with model={Model}", actualModel);
         var body = BuildRequestBody(request, stream: false);
         var json = JsonSerializer.Serialize(body, _jsonOptions);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");

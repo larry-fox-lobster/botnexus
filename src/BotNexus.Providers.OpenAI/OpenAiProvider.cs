@@ -49,6 +49,8 @@ public sealed class OpenAiProvider : LlmProviderBase
     /// <inheritdoc/>
     protected override async Task<LlmResponse> ChatCoreAsync(ChatRequest request, CancellationToken cancellationToken)
     {
+        var actualModel = string.IsNullOrWhiteSpace(request.Settings.Model) ? _defaultModel : request.Settings.Model;
+        Logger.LogDebug("OpenAiProvider: Sending chat request with model={Model}", actualModel);
         var messages = BuildMessages(request);
         var options = BuildChatCompletionOptions(request);
 
