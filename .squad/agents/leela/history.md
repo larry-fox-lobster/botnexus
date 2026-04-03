@@ -770,3 +770,40 @@
 
 **Learning:** OAuth token lifecycle events are security-sensitive. Always log at WARNING level. Config overwrites should always backup first.
 
+---
+
+### 2026-04-02 — Incremental Build Performance Fix
+
+**Problem:** dev-loop.ps1 triggered full rebuilds (~10s) every time even when only one file changed. Jon wanted incremental builds to speed up the inner dev loop.
+
+**Root Cause:** 
+- `Resolve-Version` in `scripts/common.ps1` generates version string from git state: `0.0.0-dev.{hash}.dirty`
+- The `.dirty` suffix changes based on working tree state (`git status --porcelain`)
+- Every build passes `/p:Version=$version` to MSBuild
+- Version is stamped into assembly attributes → changing it forces recompilation of ALL projects
+- During dev: make change → version = `abc123.dirty` → build → commit → version = `abc123` → next build sees different version → full rebuild
+
+**Evidence:** 
+- Build with version A then version B: 10-20s (full rebuild)
+- Build twice with same version: 4-5s (incremental)
+- Version instability between dev-loop runs prevented incremental builds
+
+**Solution:** 
+- Modified `dev-loop.ps1` to set `$env:BOTNEXUS_VERSION = "0.0.0-dev"` before calling pack.ps1
+- `common.ps1` already checks this env var first (line 11), so all version calls return the same fixed value
+- Version remains constant across builds → MSBuild uses incremental compilation
+- CI/release can still override via environment variable to get git-based versions
+
+**Performance Impact:** 
+- Subsequent builds now ~50% faster (~5s vs ~10s)
+- Scales with project count — larger repos see bigger gains
+- Only affects local dev-loop; pack.ps1 standalone still uses git version by default
+
+**Files Changed:** 
+- `scripts/dev-loop.ps1`: Added env var initialization with explanatory comment
+- `scripts/pack.ps1`: Added comment explaining version resolution strategy
+
+**Commit:** 625fe65 "fix: enable incremental builds in dev-loop"
+
+**Learning:** MSBuild incremental build cache is invalidated when ANY build property changes, including Version. For fast local dev loops, use stable version strings. Reserve dynamic versions (git hash, timestamps) for release builds.
+
