@@ -405,7 +405,8 @@
             const div = document.createElement('div');
             div.className = `message ${entry.role}`;
             const time = entry.timestamp ? formatTime(entry.timestamp) : '';
-            div.innerHTML = `<div class="msg-header"><span class="msg-role">${escapeHtml(entry.role)}</span><span>${time}</span></div>${escapeHtml(entry.content)}`;
+            const contentHtml = entry.role === 'assistant' ? renderMarkdown(entry.content) : escapeHtml(entry.content);
+            div.innerHTML = `<div class="msg-header"><span class="msg-role">${escapeHtml(entry.role)}</span><span>${time}</span></div><div class="msg-content">${contentHtml}</div>`;
             elChatMessages.appendChild(div);
         }
     }
@@ -444,7 +445,7 @@
         div.className = 'message assistant';
         const time = entry.timestamp ? formatTime(entry.timestamp) : '';
         
-        let contentHtml = hasContent ? escapeHtml(entry.content) : '';
+        let contentHtml = hasContent ? `<div class="msg-content">${renderMarkdown(entry.content)}</div>` : '';
         let toolCallsHtml = '';
         
         if (hasToolCalls) {
@@ -491,7 +492,7 @@
         div.className = 'message assistant';
         const now = formatTime(new Date().toISOString());
         
-        let contentHtml = hasContent ? escapeHtml(msg.content) : '';
+        let contentHtml = hasContent ? `<div class="msg-content">${renderMarkdown(msg.content)}</div>` : '';
         let toolCallsHtml = '';
         
         if (hasToolCalls) {
@@ -587,7 +588,8 @@
         const div = document.createElement('div');
         div.className = `message ${role}`;
         const now = formatTime(new Date().toISOString());
-        div.innerHTML = `<div class="msg-header"><span class="msg-role">${escapeHtml(role)}</span><span>${now}</span></div>${escapeHtml(content)}`;
+        const contentHtml = role === 'assistant' ? renderMarkdown(content) : escapeHtml(content);
+        div.innerHTML = `<div class="msg-header"><span class="msg-role">${escapeHtml(role)}</span><span>${now}</span></div><div class="msg-content">${contentHtml}</div>`;
         elChatMessages.appendChild(div);
         scrollToBottom();
     }
