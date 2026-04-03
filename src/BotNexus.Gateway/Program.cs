@@ -165,18 +165,21 @@ app.MapGet("/api/sessions/{*key}", async (string key, ISessionManager sessionMan
     }, jsonOptions);
 });
 
-app.MapPost("/api/sessions/{*key}/hide", async (string key, ISessionManager sessionManager) =>
+app.MapPatch("/api/sessions/{*key}", async (string key, HttpRequest request, ISessionManager sessionManager) =>
 {
     var decoded = Uri.UnescapeDataString(key);
-    await sessionManager.SetHiddenAsync(decoded, true);
-    return Results.Json(new { key = decoded, hidden = true }, jsonOptions);
-});
-
-app.MapPost("/api/sessions/{*key}/unhide", async (string key, ISessionManager sessionManager) =>
-{
-    var decoded = Uri.UnescapeDataString(key);
-    await sessionManager.SetHiddenAsync(decoded, false);
-    return Results.Json(new { key = decoded, hidden = false }, jsonOptions);
+    using var reader = new StreamReader(request.Body);
+    var body = await reader.ReadToEndAsync();
+    var json = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(body);
+    
+    if (json != null && json.TryGetValue("hidden", out var hiddenObj))
+    {
+        var hidden = hiddenObj is JsonElement el ? el.GetBoolean() : Convert.ToBoolean(hiddenObj);
+        await sessionManager.SetHiddenAsync(decoded, hidden);
+        return Results.Json(new { key = decoded, hidden }, jsonOptions);
+    }
+    
+    return Results.BadRequest(new { error = "Missing 'hidden' property in request body" });
 });
 
 // --- REST API: Channels ---
