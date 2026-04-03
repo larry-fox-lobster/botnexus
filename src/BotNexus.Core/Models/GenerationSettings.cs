@@ -3,7 +3,7 @@ namespace BotNexus.Core.Models;
 /// <summary>Generation settings for LLM requests.</summary>
 public class GenerationSettings
 {
-    public string Model { get; set; } = "gpt-4o";
+    public string? Model { get; set; }
     public int? MaxTokens { get; set; }
     public double? Temperature { get; set; }
     public int? ContextWindowTokens { get; set; }

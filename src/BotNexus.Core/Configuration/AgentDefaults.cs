@@ -4,7 +4,7 @@ namespace BotNexus.Core.Configuration;
 public class AgentDefaults
 {
     public string Workspace { get; set; } = "~/.botnexus/workspace";
-    public string Model { get; set; } = "gpt-4o";
+    public string? Model { get; set; }
     public int? MaxTokens { get; set; }
     public int? ContextWindowTokens { get; set; }
     public double? Temperature { get; set; }
