@@ -595,3 +595,28 @@
 
 **Commit:** 70f4696 "Replace workspace template stubs with rich OpenClaw-inspired defaults"
 
+
+---
+
+### 2026-04-03 — CLI Agent Add: Workspace Bootstrap + ID Normalization
+
+**What:** Fixed CLI `botnexus agent add` command to properly bootstrap agent workspaces and normalize agent IDs.
+
+**Issues Fixed:**
+1. **Workspace bootstrapping:** CLI now calls `AgentWorkspace.InitializeAsync()` after adding agent to config. Creates agent folder with SOUL.md, IDENTITY.md, USER.md, AGENTS.md, TOOLS.md, HEARTBEAT.md, MEMORY.md, and memory/daily/ subdirectory.
+2. **ID normalization:** Agent IDs now normalized to lowercase with special chars replaced by dashes (e.g., "Nova Star" → ID "nova-star", folder "nova-star"). Display name preserves original casing in config.
+
+**Technical Changes:**
+- Added `NormalizeAgentId()` helper: lowercase + regex to replace non-alphanumeric with dashes, trim/collapse consecutive dashes
+- Updated `agent add` command to use normalized ID for config key and workspace creation
+- Updated `agent workspace` command to normalize input for folder lookup
+- Added BotNexus.Agent project reference to CLI project
+- Agent workspace folders now consistently use normalized lowercase IDs
+
+**Architecture Impact:**
+- Agent ID normalization happens at CLI boundary — config keys, folder names, workspace paths all use lowercase IDs
+- `AgentConfig.Name` property stores display name with proper casing for UI
+- Workspace bootstrap uses existing `AgentWorkspace.InitializeAsync()` — no duplication of bootstrap logic
+
+**Build Status:** ✅ All changes compile cleanly. No test regressions.
+
