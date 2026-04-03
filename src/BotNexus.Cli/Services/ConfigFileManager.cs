@@ -59,15 +59,51 @@ public sealed class ConfigFileManager
             File.Copy(configPath, backupPath, overwrite: true);
         }
 
-        var payload = new Dictionary<string, BotNexusConfig>
-        {
-            [BotNexusConfig.SectionName] = config
-        };
+        // CRITICAL: Perform surgical update using JsonNode to preserve all fields
+        // Never serialize the entire BotNexusConfig - it may not include provider-specific fields
+        var existingJson = File.Exists(configPath) ? File.ReadAllText(configPath) : "{}";
+        var rootNode = JsonNode.Parse(existingJson) ?? new JsonObject();
+        
+        if (rootNode is not JsonObject rootObj)
+            rootObj = new JsonObject();
 
-        var json = JsonSerializer.Serialize(payload, JsonOptions);
+        // Ensure BotNexus section exists
+        if (!rootObj.ContainsKey(BotNexusConfig.SectionName))
+            rootObj[BotNexusConfig.SectionName] = new JsonObject();
+
+        // Serialize the config to a temporary object, then merge into the existing structure
+        var configJson = JsonSerializer.Serialize(config, JsonOptions);
+        var configNode = JsonNode.Parse(configJson);
+        
+        if (configNode is JsonObject configObj)
+        {
+            // Deep merge: preserve fields not in the C# model
+            var targetSection = rootObj[BotNexusConfig.SectionName] as JsonObject ?? new JsonObject();
+            MergeJsonObjects(targetSection, configObj);
+            rootObj[BotNexusConfig.SectionName] = targetSection;
+        }
+
+        var json = rootObj.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(configPath, json);
 
         Console.WriteLine($"[INFO] Config file updated: {configPath}");
+    }
+
+    private static void MergeJsonObjects(JsonObject target, JsonObject source)
+    {
+        foreach (var property in source)
+        {
+            if (property.Value is JsonObject sourceObj && target[property.Key] is JsonObject targetObj)
+            {
+                // Recursively merge nested objects
+                MergeJsonObjects(targetObj, sourceObj);
+            }
+            else
+            {
+                // Overwrite with source value
+                target[property.Key] = property.Value?.DeepClone();
+            }
+        }
     }
 
     public bool TryValidateConfig(string homePath, out BotNexusConfig? config, out string message)

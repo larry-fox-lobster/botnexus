@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using BotNexus.Agent;
 using BotNexus.Channels.Base;
 using BotNexus.Core.Abstractions;
+using BotNexus.Core.Bus;
 using BotNexus.Core.Configuration;
 using BotNexus.Core.Extensions;
 using BotNexus.Core.Models;
@@ -710,6 +711,25 @@ app.MapGet("/api/tools", (IEnumerable<ITool> tools) =>
         parameterCount = t.Definition.Parameters.Count
     });
     return Results.Json(toolList, jsonOptions);
+});
+
+// --- REST API: System Messages ---
+app.MapGet("/api/system/messages", (SystemMessageStore messageStore, int? limit, long? since) =>
+{
+    IReadOnlyList<SystemMessage> messages;
+    
+    if (since.HasValue)
+    {
+        var sinceTimestamp = DateTimeOffset.FromUnixTimeSeconds(since.Value);
+        messages = messageStore.GetSince(sinceTimestamp);
+    }
+    else
+    {
+        var count = Math.Clamp(limit ?? 50, 1, 100);
+        messages = messageStore.GetRecent(count);
+    }
+    
+    return Results.Json(messages, jsonOptions);
 });
 
 // --- REST API: Skills ---

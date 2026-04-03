@@ -272,6 +272,11 @@ public sealed class CronServiceTests
             return ValueTask.CompletedTask;
         }
 
+        public ValueTask PublishSystemMessageAsync(SystemMessage message, CancellationToken cancellationToken = default)
+        {
+            return ValueTask.CompletedTask;
+        }
+
         public IActivitySubscription Subscribe() => throw new NotSupportedException();
     }
 

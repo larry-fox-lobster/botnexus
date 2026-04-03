@@ -143,6 +143,7 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
         if (_copilotAccessToken is not null && DateTimeOffset.UtcNow < _copilotExpiresAt - ExpirySkew)
             return _copilotAccessToken;
 
+        // Ensure we have a valid GitHub OAuth token before attempting exchange
         var githubToken = await GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
 
         using var exchangeRequest = new HttpRequestMessage(HttpMethod.Get, CopilotConfig.CopilotTokenExchangeUrl);
@@ -157,11 +158,23 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
         if (exchangeResponse.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
         {
             var body = await exchangeResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            Logger.LogWarning("Copilot token exchange failed (HTTP {StatusCode}): {Body}. Clearing cached GitHub OAuth token and prompting re-authentication.",
+            Logger.LogWarning("Copilot token exchange failed (HTTP {StatusCode}): {Body}. Clearing cached GitHub OAuth token and initiating re-authentication.",
                 (int)exchangeResponse.StatusCode, body);
-            _cachedToken = null;
-            await _tokenStore.ClearTokenAsync("copilot", cancellationToken).ConfigureAwait(false);
-            throw new HttpRequestException($"Copilot token exchange failed: {exchangeResponse.StatusCode}");
+            await InvalidateAndClearTokensAsync(cancellationToken).ConfigureAwait(false);
+            
+            // Retry authentication once - this will trigger device auth flow
+            Logger.LogInformation("Initiating device authentication flow...");
+            githubToken = await GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
+            
+            // Retry exchange with fresh token
+            using var retryRequest = new HttpRequestMessage(HttpMethod.Get, CopilotConfig.CopilotTokenExchangeUrl);
+            retryRequest.Headers.TryAddWithoutValidation("Authorization", $"token {githubToken}");
+            retryRequest.Headers.TryAddWithoutValidation("Accept", "application/json");
+            retryRequest.Headers.TryAddWithoutValidation("User-Agent", CopilotConfig.UserAgentValue);
+            retryRequest.Headers.TryAddWithoutValidation("Editor-Version", CopilotConfig.EditorVersion);
+            retryRequest.Headers.TryAddWithoutValidation("Editor-Plugin-Version", CopilotConfig.EditorPluginVersion);
+            
+            exchangeResponse = await _httpClient.SendAsync(retryRequest, cancellationToken).ConfigureAwait(false);
         }
 
         exchangeResponse.EnsureSuccessStatusCode();
@@ -208,8 +221,9 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
 
             if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
             {
-                _copilotAccessToken = null;
-                _copilotExpiresAt = default;
+                Logger.LogWarning("Authentication failed, clearing cached tokens and triggering re-authentication");
+                await InvalidateAndClearTokensAsync(cancellationToken).ConfigureAwait(false);
+                throw new HttpRequestException($"Authentication required. Token expired or missing. Re-authentication will be triggered on next request. (HTTP {(int)response.StatusCode})");
             }
         }
 
@@ -246,7 +260,7 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
                 completionTokens = completionTokensElement.GetInt32();
         }
 
-        return new LlmResponse(content, finishReason, toolCalls, promptTokens, completionTokens);
+        return new LlmResponse(content ?? string.Empty, finishReason, toolCalls, promptTokens, completionTokens);
     }
 
     public override async IAsyncEnumerable<string> ChatStreamAsync(
@@ -266,8 +280,9 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
 
             if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
             {
-                _copilotAccessToken = null;
-                _copilotExpiresAt = default;
+                Logger.LogWarning("Authentication failed during stream, clearing cached tokens");
+                await InvalidateAndClearTokensAsync(cancellationToken).ConfigureAwait(false);
+                throw new HttpRequestException($"Authentication required. Token expired or missing. Re-authentication will be triggered on next request. (HTTP {(int)response.StatusCode})");
             }
         }
 
@@ -322,10 +337,12 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
         }
     }
 
-    private async Task InvalidateTokenAsync(CancellationToken cancellationToken)
+    private async Task InvalidateAndClearTokensAsync(CancellationToken cancellationToken)
     {
         _copilotAccessToken = null;
         _copilotExpiresAt = default;
+        _cachedToken = null;
+        await _tokenStore.ClearTokenAsync("copilot", cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<HttpRequestMessage> CreateChatRequestAsync(
