@@ -164,6 +164,7 @@ Default settings for all agents. Individual agents can override any property.
 | `ContextWindowTokens` | int? | 65536 | Total context window size used for planning and session limits |
 | `Temperature` | double? | null | Randomness (0.0=deterministic, 1.0=creative). If unset, provider decides |
 | `MaxToolIterations` | int | 40 | Max tool call loops in a single agent cycle |
+| `MaxRepeatedToolCalls` | int | 2 | Max times the same tool can be called with identical arguments (loop detection) |
 | `Timezone` | string | `UTC` | Default timezone for agent operations (IANA format) |
 | `Named` | dict | `{}` | Per-agent customizations (see AgentConfig below) |
 
@@ -205,6 +206,7 @@ Override any default for a specific agent:
 | `MaxTokens` | int? | Override default max tokens. When `null`, provider uses its own default |
 | `Temperature` | double? | Override default temperature (0.0-2.0). When `null`, provider uses its own default |
 | `MaxToolIterations` | int | Override default max tool calls |
+| `MaxRepeatedToolCalls` | int | Override default repeated tool call limit (loop detection) |
 | `Timezone` | string | Override default timezone |
 | `EnableMemory` | bool | Enable persistent memory for this agent |
 | `DisallowedTools` | list | Tool names to exclude for this agent (e.g., `["shell", "filesystem"]`) — see [Internal Tools](#internal-tools) |
@@ -212,6 +214,59 @@ Override any default for a specific agent:
 | `Skills` | list | Named skill references (plugin extension names) |
 | `DisabledSkills` | list | Skill names or patterns to exclude for this agent (e.g., `["debug-*", "experimental-*", "test-skill"]`) — supports wildcards (`*`, `?`). See [Skills Guide](./skills.md#disabling-skills) |
 | `CronJobs` | list | **Deprecated.** Use centralized `Cron.Jobs` instead (see [Cron and Scheduling Guide](./cron-and-scheduling.md)). Legacy entries are auto-migrated at startup. |
+
+---
+
+#### Agent Iteration & Loop Detection
+
+Each agent's tool calling loop is bounded by two configurable limits to prevent infinite loops and excessive token usage:
+
+**MaxToolIterations** — Total number of LLM calls in a single agent cycle
+- **Default:** 40
+- **Purpose:** Limits total loop iterations; prevents runaway multi-turn conversations
+- **Typical usage:** File operations (5-10), analysis chains (10-20), complex planning (30-40)
+
+**MaxRepeatedToolCalls** — Max times the same tool can be called with identical arguments
+- **Default:** 2
+- **Purpose:** Detects when agents get stuck repeatedly calling the same tool without variation
+- **How it works:** Tracks tool signatures (`tool_name + arguments`); blocks execution when threshold is reached; returns error to LLM
+
+**Example Configuration:**
+
+```json
+{
+  "Agents": {
+    "MaxToolIterations": 40,
+    "MaxRepeatedToolCalls": 2,
+    "Named": {
+      "careful-agent": {
+        "MaxToolIterations": 10,        // Strict: max 10 LLM calls
+        "MaxRepeatedToolCalls": 1       // No retries allowed
+      },
+      "researcher": {
+        "MaxToolIterations": 100,       // Permissive: max 100 LLM calls
+        "MaxRepeatedToolCalls": 5       // Allow up to 5 retries per tool
+      }
+    }
+  }
+}
+```
+
+**Loop Detection Example:**
+
+When an agent calls `search_files("")` three times without changing arguments:
+
+```
+Iteration 0: search_files("") → executes (count: 1)
+Iteration 1: search_files("") → executes (count: 2)
+Iteration 2: search_files("") → blocked! count: 2 >= MaxRepeatedToolCalls: 2
+  └─ Agent receives error: "Tool 'search_files' called 3 times with identical arguments"
+```
+
+The agent then receives this error as a tool result and can decide to:
+1. Try a different search query
+2. Use a different tool
+3. Proceed with current context
 
 ---
 

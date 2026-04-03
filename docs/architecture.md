@@ -16,15 +16,17 @@
 6. [Core Abstractions](#core-abstractions)
 7. [Multi-Agent Routing](#multi-agent-routing)
 8. [Provider Architecture](#provider-architecture)
-9. [Agent Workspace and Memory](#agent-workspace-and-memory)
-10. [Session Management](#session-management)
-11. [Cron and Scheduling](#cron-and-scheduling)
-12. [Diagnostics (Doctor)](#diagnostics-doctor)
-13. [Configuration Hot Reload](#configuration-hot-reload)
-14. [Security Model](#security-model)
-15. [Observability](#observability)
-16. [Installation Layout](#installation-layout)
-17. [Component Reference](#component-reference)
+9. [Response Normalization & Tool Calling](#response-normalization--tool-calling)
+10. [Agent Loop & Loop Detection](#agent-loop--loop-detection)
+11. [Agent Workspace and Memory](#agent-workspace-and-memory)
+12. [Session Management](#session-management)
+13. [Cron and Scheduling](#cron-and-scheduling)
+14. [Diagnostics (Doctor)](#diagnostics-doctor)
+15. [Configuration Hot Reload](#configuration-hot-reload)
+16. [Security Model](#security-model)
+17. [Observability](#observability)
+18. [Installation Layout](#installation-layout)
+19. [Component Reference](#component-reference)
 
 ---
 
@@ -800,7 +802,447 @@ Example:
 
 ---
 
-## 9. Agent Workspace and Memory
+## 9. Response Normalization & Tool Calling
+
+Each LLM provider has a unique response format (OpenAI JSON, Anthropic blocks, GitHub Copilot proxy). The normalization layer ensures all responses convert to a canonical `LlmResponse` type that the agent loop consumes uniformly.
+
+### Canonical Response Type: LlmResponse
+
+**File:** `BotNexus.Core/Models/LlmResponse.cs`
+
+```csharp
+public record LlmResponse(
+    string Content,                              // Text response
+    FinishReason FinishReason,                  // Stop, ToolCalls, Length, ContentFilter, Other
+    IReadOnlyList<ToolCallRequest>? ToolCalls = null,  // Parsed tool calls
+    int? InputTokens = null,                    // Input token count
+    int? OutputTokens = null);                  // Output token count
+
+public enum FinishReason 
+{ 
+    Stop,           // Normal completion (model returned text, no tool calls)
+    ToolCalls,      // Model requested tool execution
+    Length,         // Hit max token limit
+    ContentFilter,  // Blocked by safety policy
+    Other           // Unknown/unexpected reason
+}
+
+public record ToolCallRequest(
+    string Id,                                  // Unique ID from provider
+    string ToolName,                            // Tool identifier
+    IReadOnlyDictionary<string, object?> Arguments);  // Normalized arguments
+```
+
+### Copilot Provider: GitHub Responses API
+
+**File:** `BotNexus.Providers.Copilot/CopilotProvider.cs`
+
+GitHub Copilot uses event-driven SSE (Server-Sent Events) streaming via the GitHub Responses API.
+
+#### Streaming Implementation
+
+**Endpoint:** `POST https://api.githubcopilot.com/chat/completions`  
+**Content-Type:** `application/json` (request), `text/event-stream` (response)
+
+```csharp
+public override async IAsyncEnumerable<string> ChatStreamAsync(
+    ChatRequest request,
+    [EnumeratorCancellation] CancellationToken cancellationToken = default)
+{
+    var payload = BuildRequestPayload(request, stream: true);
+    using var httpRequest = await CreateChatRequestAsync(payload, cancellationToken);
+    using var response = await _httpClient
+        .SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+    using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+    using var reader = new StreamReader(stream);
+
+    while (!cancellationToken.IsCancellationRequested)
+    {
+        var line = await reader.ReadLineAsync(cancellationToken);
+        if (line is null || !line.StartsWith("data: ", StringComparison.Ordinal))
+            continue;
+
+        var data = line["data: ".Length..];
+        if (data == "[DONE]")
+            yield break;
+
+        // Parse SSE JSON event
+        var jsonEvent = JsonDocument.Parse(data);
+        if (jsonEvent.RootElement.TryGetProperty("choices", out var choices) &&
+            choices.GetArrayLength() > 0)
+        {
+            var delta = choices[0].TryGetProperty("delta", out var d) ? d : default;
+            if (delta.TryGetProperty("content", out var content) &&
+                content.GetString() is { Length: > 0 } text)
+            {
+                yield return text;
+            }
+        }
+    }
+}
+```
+
+**Event Format:**
+```
+data: {"choices":[{"delta":{"content":"Hello"}}]}
+data: {"choices":[{"delta":{"content":" world"}}]}
+data: [DONE]
+```
+
+#### Non-Streaming Response Parsing
+
+```csharp
+public override async Task<LlmResponse> ChatAsync(ChatRequest request)
+{
+    var response = await ChatCoreAsync(request);
+    
+    // Merge multiple choices (Copilot proxy preserves backend-specific responses)
+    string content = string.Empty;
+    JsonElement? toolCallsElement = null;
+    string? finishReason = null;
+    
+    foreach (var choice in response.Choices)
+    {
+        if (choice.Message.Content is { Length: > 0 } text && string.IsNullOrEmpty(content))
+            content = text;
+        
+        if (toolCallsElement is null && choice.Message.ToolCalls?.Any() == true)
+            toolCallsElement = choice.Message.ToolCalls;
+        
+        if (finishReason is null)
+            finishReason = choice.FinishReason;
+    }
+    
+    var toolCalls = toolCallsElement.HasValue
+        ? ParseToolCalls(toolCallsElement.Value)
+        : null;
+    
+    return new LlmResponse(
+        Content: content,
+        FinishReason: MapFinishReason(finishReason),
+        ToolCalls: toolCalls,
+        InputTokens: response.Usage?.PromptTokens,
+        OutputTokens: response.Usage?.CompletionTokens);
+}
+```
+
+### Dual Tool Call Argument Format Handling
+
+**Critical Feature:** Copilot proxies requests to both OpenAI and Claude backends. Each returns tool call arguments in a different format, and both must normalize to `Dictionary<string, object?>`.
+
+**File:** `BotNexus.Providers.Copilot/CopilotProvider.cs` (Lines 556-632)
+
+```csharp
+private IReadOnlyList<ToolCallRequest> ParseToolCalls(JsonElement toolCallsElement)
+{
+    var result = new List<ToolCallRequest>();
+
+    foreach (var toolCall in toolCallsElement.EnumerateArray())
+    {
+        var id = toolCall.TryGetProperty("id", out var idEl) ? idEl.GetString() : "";
+        var name = toolCall.TryGetProperty("function", out var funcEl) &&
+                   funcEl.TryGetProperty("name", out var nameEl) 
+                   ? nameEl.GetString() : "";
+
+        // CRITICAL: Handle dual argument formats
+        Dictionary<string, object?> arguments = new();
+        if (toolCall.TryGetProperty("function", out var funcElement) &&
+            funcElement.TryGetProperty("arguments", out var argsElement))
+        {
+            if (argsElement.ValueKind == JsonValueKind.String)
+            {
+                // OpenAI format: arguments is a JSON string
+                var json = argsElement.GetString();
+                arguments = string.IsNullOrEmpty(json)
+                    ? new()
+                    : JsonSerializer.Deserialize<Dictionary<string, object?>>(json) ?? [];
+            }
+            else if (argsElement.ValueKind == JsonValueKind.Object)
+            {
+                // Claude format: arguments is already a JSON object
+                arguments = JsonSerializer.Deserialize<Dictionary<string, object?>>(
+                    argsElement.GetRawText()) ?? [];
+            }
+        }
+
+        result.Add(new ToolCallRequest(id, name, arguments));
+    }
+    return result;
+}
+```
+
+**Why Both Formats?**
+- **OpenAI**: Returns `"arguments": "{\"param\":\"value\"}"` (JSON string)
+- **Claude**: Returns `"arguments": {"param":"value"}` (JSON object)
+- **Copilot Proxy**: Passes through backend response as-is, so both formats appear
+
+### Provider Normalization: OpenAI vs Anthropic
+
+#### OpenAI Provider
+
+```csharp
+// Using OpenAI SDK (Anthropic.Sdk)
+var result = await _client.ChatAsync(new ChatCompletionCreateParams
+{
+    Model = request.Settings.Model,
+    Messages = ToOpenAiMessages(request.Messages),
+    Tools = ToOpenAiTools(request.Tools),
+    Stream = false
+});
+
+// Normalize to LlmResponse
+var content = result.Content.FirstOrDefault()?.Text ?? string.Empty;
+var toolCalls = result.ToolCalls?.Select(tc => new ToolCallRequest(
+    tc.Id,
+    tc.Function?.Name ?? string.Empty,
+    JsonSerializer.Deserialize<Dictionary<string, object?>>(tc.Function?.Arguments ?? "{}")
+)).ToList();
+
+return new LlmResponse(
+    content,
+    MapFinishReason(result.FinishReason),
+    toolCalls,
+    result.Usage?.InputTokenCount,
+    result.Usage?.OutputTokenCount);
+```
+
+#### Anthropic Provider
+
+```csharp
+// Anthropic uses content blocks instead of single content field
+var textBlock = response.Content
+    .OfType<TextBlock>()
+    .FirstOrDefault();
+
+var toolUseBlocks = response.Content
+    .OfType<ToolUseBlock>()
+    .Select(block => new ToolCallRequest(
+        block.Id,
+        block.Name,
+        JsonSerializer.Deserialize<Dictionary<string, object?>>(block.Input.ToString()) ?? []
+    )).ToList();
+
+return new LlmResponse(
+    textBlock?.Text ?? string.Empty,
+    MapFinishReason(response.StopReason),
+    toolUseBlocks.Count > 0 ? toolUseBlocks : null,
+    response.Usage?.InputTokens,
+    response.Usage?.OutputTokens);
+```
+
+### Finish Reason Mapping
+
+Each provider uses different string values for finish reasons. All normalize to the canonical `FinishReason` enum:
+
+```csharp
+private static FinishReason MapFinishReason(string? reason) => reason switch
+{
+    "stop" => FinishReason.Stop,                           // OpenAI, Copilot
+    "end_turn" => FinishReason.Stop,                       // Anthropic
+    "tool_calls" => FinishReason.ToolCalls,               // OpenAI, Copilot
+    "tool_use" => FinishReason.ToolCalls,                 // Anthropic
+    "length" => FinishReason.Length,
+    "max_tokens" => FinishReason.Length,                  // Anthropic variant
+    "content_filter" => FinishReason.ContentFilter,
+    _ => FinishReason.Other
+};
+```
+
+---
+
+## 10. Agent Loop & Loop Detection
+
+The agent loop orchestrates the multi-turn conversation with an LLM, executing tool calls and managing iteration limits. It includes built-in loop detection to prevent agents from getting stuck in infinite retry patterns.
+
+### Agent Loop Overview
+
+**File:** `BotNexus.Agent/AgentLoop.cs`
+
+The loop runs until one of these conditions is met:
+1. LLM returns `FinishReason == Stop` and content (normal completion)
+2. LLM returns no tool calls and no content (agent ready to finalize)
+3. Iteration limit reached (`MaxToolIterations`)
+4. Cancellation requested
+
+```csharp
+public async Task<LlmResponse> RunAsync(InboundMessage message)
+{
+    var session = await _sessionManager.GetSessionAsync(sessionKey);
+    var agentConfig = _agentRegistry.Get(agentName);
+    
+    int iteration = 0;
+    while (iteration < _maxToolIterations)
+    {
+        // 1. Build context and messages
+        var systemPrompt = await _contextBuilder.BuildSystemPromptAsync(agentName);
+        var chatRequest = new ChatRequest(
+            Messages: [new(MessageRole.System, systemPrompt), ...session.History],
+            Settings: agentConfig.Generation,
+            Tools: _toolRegistry.GetAvailableTools(agentName),
+            SystemPrompt: systemPrompt);
+        
+        // 2. Call LLM provider
+        var llmResponse = await provider.ChatAsync(chatRequest);
+        session.AddEntry(new SessionEntry(MessageRole.Assistant, llmResponse.Content, ...));
+        
+        // 3. Check finish reason
+        if (llmResponse.FinishReason != FinishReason.ToolCalls)
+        {
+            return llmResponse;  // Completion
+        }
+        
+        // 4. Execute tool calls (with loop detection)
+        foreach (var toolCall in llmResponse.ToolCalls)
+        {
+            var signature = ComputeToolCallSignature(toolCall);
+            var callCount = _toolCallSignatures.GetValueOrDefault(signature, 0);
+            
+            if (callCount >= MaxRepeatedToolCalls)
+            {
+                // Loop detected: block execution
+                session.AddEntry(new SessionEntry(
+                    MessageRole.Tool,
+                    $"Error: Loop detected. Tool '{toolCall.ToolName}' called {callCount + 1} times with identical arguments.",
+                    ToolName: toolCall.ToolName,
+                    ToolCallId: toolCall.Id));
+                continue;
+            }
+            
+            _toolCallSignatures[signature] = callCount + 1;
+            var result = await _toolRegistry.ExecuteAsync(toolCall);
+            session.AddEntry(new SessionEntry(MessageRole.Tool, result, ...));
+        }
+        
+        iteration++;
+    }
+    
+    return new LlmResponse("Max iterations reached", FinishReason.Stop);
+}
+```
+
+### Loop Detection: Signature-Based Tracking
+
+**Purpose:** Prevent agents from repeatedly calling the same tool with identical arguments.
+
+**How It Works:**
+
+1. **Compute Signature:** Hash tool name + normalized arguments
+   ```csharp
+   private string ComputeToolCallSignature(ToolCallRequest toolCall)
+   {
+       var argsJson = JsonSerializer.Serialize(
+           toolCall.Arguments,
+           new JsonSerializerOptions { WriteIndented = false });
+       return $"{toolCall.ToolName}::{argsJson}";
+   }
+   ```
+
+2. **Track Per-Session:** `Dictionary<string, int>` maps signature → call count
+   ```csharp
+   private readonly Dictionary<string, int> _toolCallSignatures = new();
+   ```
+
+3. **Block at Threshold:** When `callCount >= MaxRepeatedToolCalls`
+   ```csharp
+   if (callCount >= _settings.MaxRepeatedToolCalls)
+   {
+       // Return error to LLM instead of executing
+       var errorMsg = $"Error: Loop detected. Tool '{toolCall.ToolName}' called {callCount + 1} times...";
+       session.AddEntry(new(MessageRole.Tool, errorMsg, ...));
+       continue;  // Skip execution
+   }
+   ```
+
+### Configuration: Iteration & Repetition Limits
+
+**File:** `BotNexus.Core/Models/GenerationSettings.cs`
+
+```csharp
+public class GenerationSettings
+{
+    public int MaxToolIterations { get; set; } = 40;           // Total loop iterations
+    public int MaxRepeatedToolCalls { get; set; } = 2;         // Max identical calls
+}
+```
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `MaxToolIterations` | 40 | Max number of loop iterations (LLM calls + tool execution cycles) |
+| `MaxRepeatedToolCalls` | 2 | Max times the same tool can be called with identical arguments |
+
+### Per-Agent Configuration Override
+
+**File:** `BotNexus.Core/Configuration/AgentConfig.cs`
+
+```json
+{
+  "Agents": {
+    "Named": {
+      "careful-agent": {
+        "Model": "gpt-4o",
+        "MaxToolIterations": 20,        // Limit this agent to 20 iterations
+        "MaxRepeatedToolCalls": 1       // No repeated calls allowed
+      },
+      "explorative-agent": {
+        "Model": "gpt-4o",
+        "MaxToolIterations": 100,       // Allow more exploration
+        "MaxRepeatedToolCalls": 5       // Allow up to 5 retries
+      }
+    }
+  }
+}
+```
+
+When not overridden, agents inherit defaults from `Agents` section (see [Configuration](#configuration-sections)).
+
+### Iteration Flow Example
+
+```
+Iteration 0:
+  ├─ Build ChatRequest (system prompt + history + tools)
+  ├─ Call LLM → LlmResponse(content="Found 2 files", toolCalls=[list_files])
+  ├─ Add to session: Assistant message
+  ├─ Execute tool: list_files (signature: "list_files::{}")
+  │  └─ Increment counter: {"list_files::{}" → 1}
+  ├─ Add tool result to session
+  └─ Continue loop
+
+Iteration 1:
+  ├─ Build ChatRequest (includes file list in history)
+  ├─ Call LLM → LlmResponse(content="", toolCalls=[list_files])  ← SAME TOOL AGAIN
+  ├─ Check signature: "list_files::{}" → counter = 1
+  ├─ Check if 1 >= MaxRepeatedToolCalls (2) → false
+  ├─ Increment counter: {"list_files::{}" → 2}
+  ├─ Execute tool again
+  └─ Continue loop
+
+Iteration 2:
+  ├─ Build ChatRequest
+  ├─ Call LLM → LlmResponse(toolCalls=[list_files])  ← SAME TOOL YET AGAIN
+  ├─ Check signature: "list_files::{}" → counter = 2
+  ├─ Check if 2 >= MaxRepeatedToolCalls (2) → TRUE ✗
+  ├─ Block execution, add error message to session
+  ├─ Error: "Tool 'list_files' called 3 times with identical arguments"
+  ├─ Next LLM call receives this error
+  └─ Continue loop
+```
+
+### Best Practices
+
+**Setting Iteration Limits:**
+- **Default (40)**: Suitable for most multi-step workflows (file operations, analysis chains)
+- **Conservative (10-20)**: For safety-critical agents or fast feedback loops
+- **Permissive (50+)**: For complex research or planning tasks
+
+**Repeated Call Limits:**
+- **Default (2)**: Allow retry, block infinite loops
+- **Strict (1)**: No retries; useful for read-only operations
+- **Relaxed (3-5)**: For exploratory agents that may need multiple attempts
+
+---
+
+## 11. Agent Workspace and Memory
 
 Each agent has a persistent workspace for storing identity, personality, memory, and configuration. This enables agents to maintain state across deployments and builds system context from curated personality files and learned patterns.
 
@@ -945,7 +1387,7 @@ For detailed workspace and memory documentation, see [Agent Workspace and Memory
 
 ---
 
-## 10. Session Management
+## 12. Session Management
 
 Conversations are persisted to disk in a structured format, enabling session recovery and history inspection.
 
@@ -1015,7 +1457,7 @@ Each line is a `SessionEntry` JSON object:
 
 ---
 
-## 11. Cron and Scheduling
+## 13. Cron and Scheduling
 
 BotNexus provides a centralized **cron service** (`ICronService`) that schedules and executes jobs on a fixed tick interval, enabling automated agent prompts, system actions, and maintenance tasks.
 
@@ -1115,7 +1557,7 @@ For detailed configuration, examples, and troubleshooting, see [Cron and Schedul
 
 ---
 
-## 12. Diagnostics (Doctor)
+## 14. Diagnostics (Doctor)
 
 BotNexus includes a diagnostics system with 13 health checkups organized across 6 categories. These are used by the CLI `doctor` command and the `/api/doctor` Gateway endpoint.
 
@@ -1182,7 +1624,7 @@ Orchestrates checkup execution:
 
 ---
 
-## 13. Configuration Hot Reload
+## 15. Configuration Hot Reload
 
 BotNexus applies most configuration changes live when `config.json` is saved — no Gateway restart required.
 
@@ -1209,7 +1651,7 @@ A `BackgroundService` that monitors config changes via `IOptionsMonitor<BotNexus
 
 ---
 
-## 14. Security Model
+## 16. Security Model
 
 ### Authentication
 
@@ -1261,7 +1703,7 @@ Currently not implemented. Future consideration:
 
 ---
 
-## 15. Observability
+## 17. Observability
 
 BotNexus provides multiple observability mechanisms to monitor health and behavior.
 
@@ -1355,7 +1797,7 @@ public enum ActivityEventType
 
 ---
 
-## 16. Installation Layout
+## 18. Installation Layout
 
 ### Runtime Directory Structure
 
@@ -1408,7 +1850,7 @@ On first run:
 
 ---
 
-## 17. Component Reference
+## 19. Component Reference
 
 ### Class Hierarchy
 

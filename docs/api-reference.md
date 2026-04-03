@@ -741,6 +741,72 @@ Each tool call shows:
 
 ---
 
+## Loop Detection & Iteration Limits
+
+### Configuration-Only Feature
+
+Agent loop detection and iteration limits are configured via `config.json` and the [Configuration Guide](configuration.md) — they are not exposed through REST API endpoints. This is intentional to ensure consistency and prevent accidental runtime misconfigurations.
+
+### Settings
+
+Two settings control the agent loop behavior:
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `MaxToolIterations` | 40 | Max number of LLM calls in a single agent cycle |
+| `MaxRepeatedToolCalls` | 2 | Max times the same tool can be called with identical arguments |
+
+### Configuration Example
+
+```json
+{
+  "BotNexus": {
+    "Agents": {
+      "MaxToolIterations": 40,
+      "MaxRepeatedToolCalls": 2,
+      "Named": {
+        "careful-agent": {
+          "MaxToolIterations": 10,
+          "MaxRepeatedToolCalls": 1
+        },
+        "researcher": {
+          "MaxToolIterations": 100,
+          "MaxRepeatedToolCalls": 5
+        }
+      }
+    }
+  }
+}
+```
+
+### How Loop Detection Works
+
+When an agent repeatedly calls the same tool with identical arguments:
+
+1. **First call:** Tool signature computed (`tool_name + normalized_arguments`)
+2. **Second call:** Signature compared to first; counter incremented to 2
+3. **Threshold reached:** If counter ≥ `MaxRepeatedToolCalls`, execution is blocked
+4. **LLM receives error:** Error returned to agent: `"Tool 'X' called N times with identical arguments"`
+5. **Agent recovers:** Agent can now try a different tool or modify arguments
+
+**Example:**
+
+```
+Iteration 0: search_files("") → executes (count: 1)
+Iteration 1: search_files("") → executes (count: 2)
+Iteration 2: search_files("") → BLOCKED (count: 2 >= MaxRepeatedToolCalls: 2)
+```
+
+### Best Practices
+
+- **Most agents (10-40 iterations):** Default settings work well
+- **Safety-critical agents:** Use `MaxToolIterations=10-20, MaxRepeatedToolCalls=1`
+- **Exploratory/research agents:** Use `MaxToolIterations=50+, MaxRepeatedToolCalls=3-5`
+
+For detailed configuration guidance, see [Configuration Guide § Agent Iteration & Loop Detection](configuration.md#agent-iteration--loop-detection).
+
+---
+
 ## See Also
 
 - [Configuration Guide](configuration.md) — Detailed configuration options
