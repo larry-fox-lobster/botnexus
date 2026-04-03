@@ -63,6 +63,37 @@
 
 ---
 
+## 2026-04-03T20:23:07Z — Agentic Streaming Sprint (Post-Sprint Sync)
+
+**Status:** ✅ Complete  
+**Team:** Leela (Lead) + Bender (Runtime) + Fry (Web)  
+**Outcome:** WebUI renders tool progress + thinking indicators inline with response deltas  
+
+**Achievements:**
+- Tool progress message handler added to WebSocket consumer
+- Visual indicators (🔧 tool, 💭 thinking) render inline with deltas
+- Thinking indicator activates during agent processing, shows progress
+- Tool visibility toggle respected in streaming context
+- Message flow ordering: thinking → delta → tool progress → response
+- All visual elements render identically in history and live streams
+
+**UI Rendering:**
+1. **Thinking State** — Activates when agent enters tool block, shows pulsing animation
+2. **Tool Progress** — "🔧 Using tool: X" emojis render inline with deltas
+3. **Processing Indicators** — "💭 Processing..." between tool blocks
+4. **Response Content** — Final response deltas continue flowing
+5. **Toggle State** — Tools hidden when toggle is off, all messages visible when on
+
+**WebSocket Handlers Updated:**
+- `handleWsMessage()` now routes `tool_progress` messages to inline renderer
+- `renderAssistantWithToolsLive()` ensures tool calls visible in live responses
+- Margin collapse (`.message.tool.hidden { margin: 0; }`) prevents whitespace gaps
+- History replay mirrors live stream rendering for UI consistency
+
+**Orchestration Log:** `.squad/orchestration-log/2026-04-03T20-23-07Z-fry.md`
+
+---
+
 ### 2026-04-03 — Model Selector UI + Tool Visibility (Parallel with Farnsworth)
 
 **Session:** Sprint 4 parallel UI and config work  

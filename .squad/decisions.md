@@ -3042,3 +3042,93 @@ Modern LLMs sometimes narrate their plan before executing it. This is a thinking
 **What:** When any agent changes an API contract (endpoints, request/response format), they MUST identify and flag all downstream consumers (WebUI, CLI, tests) that need updating. The coordinator should chain the UI update immediately, not leave it broken.  
 **Why:** Leela changed session hide from POST to PATCH but didn't flag that Fry's UI code was using the old endpoint. API changes without consumer updates break the system.
 
+---
+
+## 2026-04-03T20:23:07Z: Agentic Streaming Architecture Decision
+
+**Author:** Leela (Lead/Architect)  
+**Date:** 2026-04-03T19:30:00Z  
+**Status:** ✅ Implemented  
+**Commit:** `a4c5ac5`, `4a69997`  
+**Team:** Leela (Lead) + Bender (Runtime) + Fry (Web)
+
+### Problem
+Jon identified a critical UX gap: BotNexus agents don't behave like true agentic systems. They process requests silently and return only the final result, creating a "black box" experience where users don't know if the agent is working or broken.
+
+**Comparison:**
+- **Copilot CLI/Nanobot:** Agents stream intermediate text ("Let me check that..."), show tool usage indicators, provide real-time progress updates
+- **BotNexus (before):** Agent receives request → processes silently → returns final response only
+
+### Root Cause
+The agent loop was designed as a synchronous request-response pipeline with no intermediate output:
+1. No streaming during LLM generation — Used `ChatAsync()` instead of `ChatStreamAsync()`
+2. No progress events during tool execution — Tools ran silently
+3. No way to emit intermediate updates — `ProcessAsync()` returns `Task<string>` (final result only)
+4. Infrastructure existed but unused — Providers implement streaming, WebSocketChannel has `SendDeltaAsync()`, IActivityStream ready for events
+
+### Solution Implemented
+Implemented callback-based streaming mechanism to enable real-time updates:
+
+**Leela's Core Architecture (Lead):**
+- Added optional `Func<string, Task>? onDelta` callback parameter to `AgentLoop.ProcessAsync()`
+- AgentLoop uses `ChatStreamAsync()` when callback provided AND tools not in use
+- Tool progress events via IActivityStream — "🔧 Using tool: X" messages
+- Conditional streaming (disabled with tools due to provider limitations)
+
+**Bender's Gateway Integration (Runtime):**
+- Tool progress forwarding via onDelta callback → WebSocket delta messages
+- Processing indicators ("💭 Processing tool results...") between tool blocks
+- WebSocket message flow: thinking → delta → tool progress → response
+- No subscription required (unlike old ActivityStream approach)
+
+**Fry's WebUI Rendering (Web):**
+- WebSocket message handlers for tool progress + thinking indicators
+- Visual indicators (🔧 tool, 💭 thinking) render inline with response deltas
+- Tool visibility toggle respected in streaming context
+- Message flow ordering: thinking → delta → tool progress → response
+
+### Key Design Decisions
+
+**1. Callback-Based vs Event-Based**
+- **Chosen:** Callback
+- **Why:** Simpler, no new interfaces, works with existing `IChannel.SendDeltaAsync()`
+
+**2. Streaming Disabled When Tools Present**
+- **Chosen:** Conditional streaming (`tools == null || tools.Count == 0`)
+- **Why:** Most provider streaming implementations don't support tool calls yet. Non-streaming required for tool iteration cycles.
+
+**3. Backward Compatibility**
+- **Chosen:** Streaming is opt-in via callback parameter
+- **Why:** Existing code without callback continues unchanged
+
+### Benefits
+1. Feels Like a Real Agent — Users see agent "thinking" and working
+2. Tool Visibility — Progress indicators during tool execution
+3. Multi-Iteration Transparency — Progress across tool loops
+4. Reduced Perceived Latency — Streaming text appears faster
+5. Better Debugging — Activity stream shows each step
+6. Backward Compatible — No breaking changes
+
+### Limitations
+1. No Streaming During Tool Iterations — Tools present → non-streaming only
+2. Channel Must Support Streaming — Currently only WebSocketChannel
+3. Provider Differences — Streaming quality varies by provider
+
+### Validation
+- ✅ All 396 unit tests pass
+- ✅ Build succeeds with 0 errors
+- ✅ Backward compatibility maintained
+- ✅ End-to-end flow: User → Provider → Agent → Gateway → WebSocket → WebUI
+
+### Impact
+**Files Changed:**
+- `src/BotNexus.Agent/AgentLoop.cs` — Streaming callback, IActivityStream, conditional streaming
+- `src/BotNexus.Agent/AgentRunner.cs` — Delta callback creation
+- `src/BotNexus.Agent/AgentRunnerFactory.cs` — IActivityStream wiring
+- WebUI `chat.js` — Tool progress message handlers + visual indicators
+
+**Zero Breaking Changes** — Pure enhancement, all existing functionality preserved.
+
+### Decision
+✅ Approved and implemented across all three layers. BotNexus agents now stream responses in real-time and show tool execution progress end-to-end.
+
