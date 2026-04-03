@@ -91,8 +91,9 @@ public static class BotNexusServiceExtensions
             var channel = sp.GetServices<IChannel>().FirstOrDefault();
             var router = new CommandRouter(logger, channel);
             var sessionManager = sp.GetRequiredService<ISessionManager>();
+            var providerRegistry = sp.GetRequiredService<ProviderRegistry>();
             var heartbeatService = sp.GetService<IHeartbeatService>();
-            BuiltinCommands.Register(router, sessionManager, heartbeatService);
+            BuiltinCommands.Register(router, sessionManager, providerRegistry, heartbeatService);
             return router;
         });
 

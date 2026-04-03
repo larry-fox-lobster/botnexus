@@ -70,7 +70,9 @@
     const COMMANDS = [
         { name: '/help', description: 'Show available commands and their descriptions' },
         { name: '/reset', description: 'Reset the current conversation session' },
-        { name: '/status', description: 'Show system status and last heartbeat time' }
+        { name: '/status', description: 'Show system status and last heartbeat time' },
+        { name: '/models', description: 'List all available models by provider' },
+        { name: '/model', description: 'List all available models by provider (alias for /models)' }
     ];
 
     function showCommandPalette(filter) {

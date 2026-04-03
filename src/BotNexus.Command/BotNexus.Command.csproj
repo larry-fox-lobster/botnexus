@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BotNexus.Core\BotNexus.Core.csproj" />
+    <ProjectReference Include="..\BotNexus.Providers.Base\BotNexus.Providers.Base.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
