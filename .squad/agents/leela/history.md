@@ -662,3 +662,52 @@
 
 **Build Status:** ✅ All changes compile cleanly. No test regressions.
 
+
+---
+
+### 2026-04-02 — Agent Loop Aligned to Industry Standard
+
+**Task:** Two-part fix: (1) Remove Bender's non-standard continuation detection, (2) Investigate why agents narrate instead of using tools.
+
+**Part 1 — Remove Keyword-Based Continuation Detection:**
+- **Removed:** Bender's keyword detection ("I'll", "I will", "proceed", "next") that prompted agents to continue
+- **Added:** Nanobot-style finalization retry — when LLM returns blank content (no tool calls, no text), retry ONCE with "You have finished the tool work. Provide your final answer now." with tools disabled
+- **Standard Pattern Now:**
+  - Tool calls present → execute, continue loop
+  - No tool calls + text content → final answer, break
+  - No tool calls + blank content → finalization retry (nanobot pattern), then break
+  - Max iterations → force stop
+
+**Part 2 — Root Cause Analysis & Fix:**
+- **Problem:** Agents were saying "I'll do X" without making tool calls (narration instead of action)
+- **Investigation:**
+  1. Reviewed AgentContextBuilder.cs — system prompt lacked tool-use instructions
+  2. Compared with nanobot's context.py — their system prompt explicitly instructs: "USE tools proactively", "do not just describe what you would do — do it"
+  3. Verified Copilot provider formats tools correctly (API 	ools parameter) ✅
+  4. Issue: System prompt said "Use tools deliberately" but didn't say "USE THEM NOW, don't narrate"
+  
+- **Fix:** Added explicit tool-use instructions to BuildIdentityBlock():
+  `
+  ### Tool Use Instructions
+  - You have access to tools to accomplish tasks. USE them proactively — do not just narrate what you would do.
+  - When you need information or need to perform an action, call the appropriate tool immediately rather than describing it or asking the user.
+  - Always use tools when they can help. Do not just describe what you would do — actually do it.
+  - State your intent briefly, then make the tool call(s). Do not predict or claim results before receiving them.
+  `
+
+**Research Findings:**
+- **Surveyed frameworks:** nanobot, LangChain, CrewAI, OpenAI, Anthropic docs
+- **Standard pattern:** ALL use "tool calls → execute; no tool calls + content → break" as baseline
+- **ONLY nanobot** uses finalization retry for blank responses (proven in production)
+- **ZERO frameworks** use keyword-based continuation detection
+- **Best practice:** Tools must be mentioned in BOTH system prompt (instructions) AND API parameters (structural)
+
+**Commit:** 8951925 — "Align agent loop to industry standard and add tool-use instructions"
+
+**Impact:**
+- Agents will now USE tools instead of narrating what they'll do
+- Loop behavior matches industry standard (Anthropic, OpenAI, nanobot patterns)
+- Finalization retry handles edge case of blank responses gracefully
+- No breaking changes — backward compatible
+
+**Build & Test:** ✅ All tests pass, solution builds cleanly

@@ -164,7 +164,12 @@
                 connectionId = msg.connection_id;
                 break;
             case 'response':
-                appendChatMessage('assistant', msg.content);
+                // Check if response includes tool calls
+                if (msg.toolCalls && msg.toolCalls.length > 0) {
+                    renderAssistantWithToolsLive(msg);
+                } else {
+                    appendChatMessage('assistant', msg.content);
+                }
                 break;
             case 'delta':
                 appendDelta(msg.content);
@@ -298,7 +303,7 @@
                     <span class="tool-args-preview">${escapeHtml(argsPreview)}</span>
                 </span>`;
             }).join(' ');
-            toolCallsHtml = `<div class="${showTools ? '' : 'hidden'}" style="margin-top: 6px;">${toolSummaries}</div>`;
+            toolCallsHtml = `<div class="${showTools ? '' : 'hidden'}">${toolSummaries}</div>`;
         }
         
         div.innerHTML = `
@@ -317,6 +322,49 @@
         }
         
         elChatMessages.appendChild(div);
+    }
+
+    function renderAssistantWithToolsLive(msg) {
+        // Remove any pending delta element
+        const pending = elChatMessages.querySelector('.message.assistant.streaming');
+        if (pending) {
+            pending.remove();
+        }
+
+        const div = document.createElement('div');
+        div.className = 'message assistant';
+        const now = formatTime(new Date().toISOString());
+        
+        let toolCallsHtml = '';
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+            const toolSummaries = msg.toolCalls.map(tc => {
+                const argsPreview = formatToolArgsPreview(tc);
+                return `<span class="tool-call-summary" data-tool-index="${msg.toolCalls.indexOf(tc)}">
+                    <span class="tool-icon">🔧</span>
+                    <span class="tool-name">${escapeHtml(tc.toolName || tc.name || 'unknown')}</span>
+                    <span class="tool-args-preview">${escapeHtml(argsPreview)}</span>
+                </span>`;
+            }).join(' ');
+            toolCallsHtml = `<div class="${showTools ? '' : 'hidden'}">${toolSummaries}</div>`;
+        }
+        
+        div.innerHTML = `
+            <div class="msg-header"><span class="msg-role">ASSISTANT</span><span>${now}</span></div>
+            ${escapeHtml(msg.content)}
+            ${toolCallsHtml}
+        `;
+        
+        // Attach click handlers after adding to DOM
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+            setTimeout(() => {
+                div.querySelectorAll('.tool-call-summary').forEach((el, idx) => {
+                    el.addEventListener('click', () => openToolModal(msg.toolCalls[idx]));
+                });
+            }, 0);
+        }
+        
+        elChatMessages.appendChild(div);
+        scrollToBottom();
     }
 
     function formatToolArgsPreview(entry) {
