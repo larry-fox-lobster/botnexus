@@ -143,9 +143,7 @@ Default settings for all agents. Individual agents can override any property.
   "Agents": {
     "Workspace": "~/.botnexus/workspace",
     "Model": "gpt-4o",
-    "MaxTokens": 8192,
     "ContextWindowTokens": 65536,
-    "Temperature": 0.1,
     "MaxToolIterations": 40,
     "Timezone": "UTC",
     "Named": {
@@ -162,9 +160,9 @@ Default settings for all agents. Individual agents can override any property.
 |----------|------|---------|-------------|
 | `Workspace` | string | `~/.botnexus/workspace` | Directory for agent session data, memory, and local files |
 | `Model` | string | `gpt-4o` | Default LLM model name (e.g., gpt-4o, gpt-4-turbo, claude-3-5-sonnet) |
-| `MaxTokens` | int | 8192 | Max tokens per response (provider-specific limits apply) |
-| `ContextWindowTokens` | int | 65536 | Total context window size used for planning and session limits |
-| `Temperature` | double | 0.1 | Randomness (0.0=deterministic, 1.0=creative) |
+| `MaxTokens` | int? | null | Max tokens per response (if unset, provider decides) |
+| `ContextWindowTokens` | int? | 65536 | Total context window size used for planning and session limits |
+| `Temperature` | double? | null | Randomness (0.0=deterministic, 1.0=creative). If unset, provider decides |
 | `MaxToolIterations` | int | 40 | Max tool call loops in a single agent cycle |
 | `Timezone` | string | `UTC` | Default timezone for agent operations (IANA format) |
 | `Named` | dict | `{}` | Per-agent customizations (see AgentConfig below) |
@@ -204,11 +202,12 @@ Override any default for a specific agent:
 | `Workspace` | string | Custom workspace directory for this agent |
 | `Model` | string | Override default model for this agent |
 | `Provider` | string | Override default provider (copilot, openai, anthropic, etc.) |
-| `MaxTokens` | int | Override default max tokens |
-| `Temperature` | double | Override default temperature |
+| `MaxTokens` | int? | Override default max tokens. When `null`, provider uses its own default |
+| `Temperature` | double? | Override default temperature (0.0-2.0). When `null`, provider uses its own default |
 | `MaxToolIterations` | int | Override default max tool calls |
 | `Timezone` | string | Override default timezone |
 | `EnableMemory` | bool | Enable persistent memory for this agent |
+| `DisallowedTools` | list | Tool names to exclude for this agent (e.g., `["shell", "filesystem"]`) — see [Internal Tools](#internal-tools) |
 | `McpServers` | list | MCP servers enabled for this agent (see [MCP Servers](#mcp-servers)) |
 | `Skills` | list | Named skill references (plugin extension names) |
 | `CronJobs` | list | **Deprecated.** Use centralized `Cron.Jobs` instead (see [Cron and Scheduling Guide](./cron-and-scheduling.md)). Legacy entries are auto-migrated at startup. |
@@ -511,6 +510,40 @@ Tool and extension tool settings.
 | `Extensions` | dict | Per-extension configuration (arbitrary key/value pairs) |
 | `McpServers` | dict | MCP server configurations (see below) |
 
+#### Internal Tools (Auto-Registered)
+
+Every agent automatically gets access to these internal tools:
+
+| Tool | Purpose | Default Status | Can Disable |
+|------|---------|-----------------|------------|
+| `filesystem` | Read/write files on disk | Enabled | Yes |
+| `web_fetch` | Fetch content from URLs | Enabled | Yes |
+| `send_message` | Send messages via channels | Enabled | Yes |
+| `cron` | Schedule periodic tasks | Enabled | Yes |
+| `shell` | Execute shell commands | Enabled if `Exec.Enable=true` | Yes |
+
+**Disabling Tools per Agent:**
+
+Use the `DisallowedTools` array in agent configuration to disable specific tools:
+
+```json
+{
+  "Agents": {
+    "Named": {
+      "secure-agent": {
+        "DisallowedTools": ["shell", "filesystem"]
+      }
+    }
+  }
+}
+```
+
+**Tool Logging and Visibility:**
+
+- Tool calls are logged per provider call with the actual model used
+- WebUI shows/hides tool calls via the **🔧 Tools** toggle (collapsible summaries)
+- Tool arguments are previewed (truncated to 80 chars) with click-to-expand modal
+
 #### ExecConfig
 
 | Property | Type | Default | Description |
@@ -620,10 +653,53 @@ BotNexus monitors `~/.botnexus/config.json` for changes and applies most configu
 | Setting | Effect |
 |---------|--------|
 | `Agents.Named.*` | Agent runners are rebuilt with new model, temperature, prompt, etc. |
-| `Agents` defaults (Model, MaxTokens, etc.) | All agents inherit updated defaults |
+| `Agents` defaults (Model, MaxTokens, Temperature, etc.) | All agents inherit updated defaults |
 | `Providers.*` | Provider registry is refreshed; new/changed provider configs take effect |
 | `Cron.*` | Cron jobs are reloaded (schedules, new jobs, removed jobs) |
 | `Gateway.ApiKey` | API key middleware uses the new key immediately |
+
+### Nullable Parameters (Provider Defaults)
+
+When `MaxTokens` or `Temperature` are not specified (null), providers use their own defaults:
+
+```json
+{
+  "Agents": {
+    "Model": "gpt-4o",
+    "MaxTokens": null,      // Provider uses OpenAI default (e.g., 4096)
+    "Temperature": null     // Provider uses OpenAI default (e.g., 0.7)
+  }
+}
+```
+
+**Fallback Order:**
+1. Agent-specific config (if set)
+2. Default agent config (if set)
+3. Provider's built-in default
+
+**Benefits:**
+- Keeps config minimal (only override when needed)
+- Providers can optimize defaults per model
+- Easy to test different models without reconfig
+
+**Example:**
+```json
+{
+  "Agents": {
+    "Named": {
+      "fast-agent": {
+        "Model": "gpt-4o",
+        "Temperature": 0.5     // Set explicitly
+        // MaxTokens not set → use OpenAI default
+      },
+      "creative-agent": {
+        "Model": "claude-3-5-sonnet",
+        // Both MaxTokens and Temperature use Anthropic defaults
+      }
+    }
+  }
+}
+```
 
 ### What requires a restart
 
@@ -868,9 +944,7 @@ Use `appsettings.Development.json` for local dev secrets (add to .gitignore):
 {
   "BotNexus": {
     "Agents": {
-      "Model": "gpt-4o",
-      "MaxTokens": 8192,
-      "Temperature": 0.1
+      "Model": "gpt-4o"
     },
     "Providers": {
       "copilot": {
@@ -903,7 +977,6 @@ Use `appsettings.Development.json` for local dev secrets (add to .gitignore):
   "BotNexus": {
     "Agents": {
       "Model": "gpt-4o",
-      "MaxTokens": 8192,
       "Named": {
         "planner": {
           "Model": "gpt-4-turbo",
@@ -942,7 +1015,6 @@ Use `appsettings.Development.json` for local dev secrets (add to .gitignore):
     "Agents": {
       "Workspace": "~/.botnexus/workspace",
       "Model": "gpt-4o",
-      "MaxTokens": 8192,
       "Named": {
         "researcher": {
           "Model": "gpt-4o",

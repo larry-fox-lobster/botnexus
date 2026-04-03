@@ -20,6 +20,12 @@ New to BotNexus? The **Getting Started** guide walks you from clone → build �
 - **CLI Tool** — `botnexus` command-line interface for config, agents, providers, doctor, and Gateway lifecycle
 - **Diagnostics** — 13 health checkups across 6 categories with auto-fix support (`botnexus doctor`)
 - **Hot Reload** — Edit `config.json` and changes apply live (agents, providers, cron) — no restart needed
+- **REST API** — Agent CRUD, session management, system status endpoints
+- **WebUI** — Real-time chat with model selector, tool visibility toggle, and command palette (`/help`, `/reset`, `/status`)
+- **Tool Control** — Disable tools per agent via `DisallowedTools` config
+- **Model Logging** — Actual model used logged per provider call for debugging and observability
+- **Config Audit** — Config changes backed up to `.bak`, OAuth token operations logged
+- **Agent Templates** — Auto-bootstrapped workspace with SOUL.md, IDENTITY.md, USER.md, HEARTBEAT.md, MEMORY.md
 
 ## Quick Start
 
@@ -96,6 +102,8 @@ On first run, BotNexus creates `~/.botnexus/` with a default `config.json`. Edit
 ## Documentation
 
 - **[Getting Started](docs/getting-started.md)** ← Start here
+- [API Reference](docs/api-reference.md) — REST API endpoints (agents, sessions, system)
+- [Development Workflow](docs/development-workflow.md) — Build, test, and deploy with dev-loop script
 - [Architecture Overview](docs/architecture.md)
 - [Configuration Guide](docs/configuration.md)
 - [Extension Development](docs/extension-development.md)
