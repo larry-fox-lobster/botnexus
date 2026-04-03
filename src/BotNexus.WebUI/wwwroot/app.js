@@ -1052,17 +1052,22 @@
         defaultOpt.textContent = '(default)';
         elModelSelect.appendChild(defaultOpt);
 
-        // Add all models from all providers
+        // Collect unique models across all providers and sort
+        const uniqueModels = new Set();
         for (const providerData of models) {
-            const provider = providerData.provider;
             const providerModels = providerData.models || [];
-            
             for (const model of providerModels) {
-                const opt = document.createElement('option');
-                opt.value = model;
-                opt.textContent = model;
-                elModelSelect.appendChild(opt);
+                uniqueModels.add(model);
             }
+        }
+        
+        // Convert to array, sort alphabetically, and add to dropdown
+        const sortedModels = Array.from(uniqueModels).sort();
+        for (const model of sortedModels) {
+            const opt = document.createElement('option');
+            opt.value = model;
+            opt.textContent = model;
+            elModelSelect.appendChild(opt);
         }
     }
 
