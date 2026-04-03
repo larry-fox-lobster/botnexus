@@ -130,6 +130,13 @@ $versionPayload | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $versionPat
 $configPath = Join-Path $HOME ".botnexus\config.json"
 if (Test-Path -LiteralPath $configPath) {
     try {
+        Write-Host "[INFO] Updating config.json with ExtensionsPath..."
+        
+        # Backup config before modification
+        $backupPath = "$configPath.bak"
+        Copy-Item -LiteralPath $configPath -Destination $backupPath -Force
+        Write-Host "[INFO] Created backup at $backupPath"
+        
         $configRaw = Get-Content -LiteralPath $configPath -Raw
         $configJson = $configRaw | ConvertFrom-Json
         $extensionsPath = Join-Path $resolvedInstallPath "extensions"
@@ -139,7 +146,7 @@ if (Test-Path -LiteralPath $configPath) {
         }
 
         $configJson | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $configPath -Encoding UTF8
-        Write-Host "Updated ExtensionsPath in $configPath"
+        Write-Host "[INFO] Updated ExtensionsPath in $configPath to $extensionsPath"
     }
     catch {
         Write-Warning "Could not update $configPath`: $($_.Exception.Message)"

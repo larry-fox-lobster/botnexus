@@ -50,14 +50,24 @@ public sealed class ConfigFileManager
     public void SaveConfig(string homePath, BotNexusConfig config)
     {
         Directory.CreateDirectory(homePath);
+        var configPath = GetConfigPath(homePath);
+
+        // Backup existing config before overwriting
+        if (File.Exists(configPath))
+        {
+            var backupPath = configPath + ".bak";
+            File.Copy(configPath, backupPath, overwrite: true);
+        }
+
         var payload = new Dictionary<string, BotNexusConfig>
         {
             [BotNexusConfig.SectionName] = config
         };
 
-        var configPath = GetConfigPath(homePath);
         var json = JsonSerializer.Serialize(payload, JsonOptions);
         File.WriteAllText(configPath, json);
+
+        Console.WriteLine($"[INFO] Config file updated: {configPath}");
     }
 
     public bool TryValidateConfig(string homePath, out BotNexusConfig? config, out string message)
@@ -112,6 +122,7 @@ public sealed class ConfigFileManager
     {
         var config = LoadConfig(homePath);
         config.Agents.Named[name] = agent;
+        Console.WriteLine($"[INFO] Adding agent '{name}' to configuration");
         SaveConfig(homePath, config);
     }
 
@@ -119,6 +130,7 @@ public sealed class ConfigFileManager
     {
         var config = LoadConfig(homePath);
         config.Providers[name] = provider;
+        Console.WriteLine($"[WARN] Adding/updating provider '{name}' configuration");
         SaveConfig(homePath, config);
     }
 
@@ -126,6 +138,7 @@ public sealed class ConfigFileManager
     {
         var config = LoadConfig(homePath);
         config.Channels.Instances[type] = channel;
+        Console.WriteLine($"[INFO] Adding channel '{type}' to configuration");
         SaveConfig(homePath, config);
     }
 
