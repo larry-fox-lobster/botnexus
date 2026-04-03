@@ -65,6 +65,8 @@
     const elBtnSaveAgent = $('#btn-save-agent');
     const elBtnCancelAgent = $('#btn-cancel-agent');
     const elBtnAddAgent = $('#btn-add-agent');
+    const elSystemMessageBanner = $('#system-message-banner');
+    const elSystemMessageClose = elSystemMessageBanner ? elSystemMessageBanner.querySelector('.system-message-close') : null;
 
     // --- Commands ---
     const COMMANDS = [
@@ -206,7 +208,13 @@
                 appendDelta(msg.content);
                 break;
             case 'activity':
-                if (msg.event) addActivityItem(msg.event);
+                if (msg.event) {
+                    addActivityItem(msg.event);
+                    // Handle system messages
+                    if (msg.event.eventType === 'SystemMessage') {
+                        handleSystemMessage(msg.event);
+                    }
+                }
                 break;
         }
     }
@@ -566,6 +574,97 @@
         const deltaEl = streaming.querySelector('.delta-content');
         deltaEl.textContent += content;
         scrollToBottom();
+    }
+
+    // --- System Messages ---
+    function handleSystemMessage(event) {
+        const metadata = event.metadata || {};
+        const messageType = metadata.type;
+
+        if (messageType === 'device_auth') {
+            showDeviceAuthBanner(event, metadata);
+        } else if (messageType === 'auth_success') {
+            hideSystemMessageBanner();
+            showSuccessNotification('✓ Authentication successful');
+        } else if (messageType === 'provider_status') {
+            showProviderStatusBanner(event, metadata);
+        } else {
+            // Generic system message
+            showGenericSystemMessage(event);
+        }
+    }
+
+    function showDeviceAuthBanner(event, metadata) {
+        if (!elSystemMessageBanner) return;
+        
+        const verificationUri = metadata.verification_uri || metadata.verificationUri;
+        const userCode = metadata.user_code || metadata.userCode;
+        const provider = metadata.provider || 'Service';
+        
+        elSystemMessageBanner.className = 'system-message-banner device-auth';
+        const icon = elSystemMessageBanner.querySelector('.system-message-icon');
+        const title = elSystemMessageBanner.querySelector('.system-message-title');
+        const body = elSystemMessageBanner.querySelector('.system-message-body');
+        
+        icon.textContent = '🔐';
+        title.textContent = 'Authentication Required';
+        
+        body.innerHTML = `
+            <p>Please authenticate with ${escapeHtml(provider)} to continue.</p>
+            ${verificationUri ? `<p><a href="${escapeHtml(verificationUri)}" target="_blank" rel="noopener noreferrer" class="auth-link">${escapeHtml(verificationUri)}</a></p>` : ''}
+            ${userCode ? `<div class="auth-code-container">
+                <div class="auth-code-label">Enter this code:</div>
+                <div class="auth-code" onclick="navigator.clipboard.writeText('${escapeHtml(userCode)}'); this.nextElementSibling.style.display='inline'; setTimeout(() => this.nextElementSibling.style.display='none', 2000);" title="Click to copy">${escapeHtml(userCode)}</div>
+                <span class="auth-code-copied" style="display:none;">✓ Copied!</span>
+            </div>` : ''}
+            <p class="auth-waiting">⏳ Waiting for authentication...</p>
+        `;
+    }
+
+    function showProviderStatusBanner(event, metadata) {
+        if (!elSystemMessageBanner) return;
+        
+        elSystemMessageBanner.className = 'system-message-banner provider-status';
+        const icon = elSystemMessageBanner.querySelector('.system-message-icon');
+        const title = elSystemMessageBanner.querySelector('.system-message-title');
+        const body = elSystemMessageBanner.querySelector('.system-message-body');
+        
+        icon.textContent = '📡';
+        title.textContent = metadata.title || 'Provider Status';
+        body.innerHTML = `<p>${escapeHtml(event.content || '')}</p>`;
+    }
+
+    function showGenericSystemMessage(event) {
+        if (!elSystemMessageBanner) return;
+        
+        const metadata = event.metadata || {};
+        elSystemMessageBanner.className = 'system-message-banner generic';
+        const icon = elSystemMessageBanner.querySelector('.system-message-icon');
+        const title = elSystemMessageBanner.querySelector('.system-message-title');
+        const body = elSystemMessageBanner.querySelector('.system-message-body');
+        
+        icon.textContent = 'ℹ️';
+        title.textContent = metadata.title || 'System Message';
+        body.innerHTML = `<p>${escapeHtml(event.content || '')}</p>`;
+    }
+
+    function hideSystemMessageBanner() {
+        if (!elSystemMessageBanner) return;
+        elSystemMessageBanner.classList.add('hidden');
+    }
+
+    function showSuccessNotification(message) {
+        // Create a temporary success notification
+        const notif = document.createElement('div');
+        notif.className = 'success-notification';
+        notif.textContent = message;
+        document.body.appendChild(notif);
+        
+        setTimeout(() => notif.classList.add('show'), 10);
+        setTimeout(() => {
+            notif.classList.remove('show');
+            setTimeout(() => notif.remove(), 300);
+        }, 3000);
     }
 
     function startNewChat() {
@@ -1135,6 +1234,11 @@
             elFormAgentMaxTokens.value = '';
         }
     });
+
+    // System message banner close button
+    if (elSystemMessageClose) {
+        elSystemMessageClose.addEventListener('click', hideSystemMessageBanner);
+    }
 
     // Close modals on Escape key
     document.addEventListener('keydown', (e) => {

@@ -440,6 +440,141 @@ body {
     cursor: not-allowed;
 }
 
+/* === System Message Banner === */
+.system-message-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,152,0,0.1);
+    border-left: 4px solid var(--warning);
+}
+.system-message-banner.hidden {
+    display: none;
+}
+.system-message-banner.device-auth {
+    background: rgba(255,152,0,0.12);
+    border-left-color: var(--warning);
+}
+.system-message-banner.provider-status {
+    background: rgba(74,158,255,0.1);
+    border-left-color: var(--accent);
+}
+.system-message-banner.generic {
+    background: rgba(255,255,255,0.05);
+    border-left-color: var(--border);
+}
+.system-message-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.system-message-content {
+    flex: 1;
+    min-width: 0;
+}
+.system-message-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text-primary);
+}
+.system-message-body {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+.system-message-body p {
+    margin: 4px 0;
+}
+.system-message-body .auth-link {
+    color: var(--accent);
+    text-decoration: none;
+    word-break: break-all;
+}
+.system-message-body .auth-link:hover {
+    text-decoration: underline;
+}
+.auth-code-container {
+    margin: 8px 0;
+    padding: 8px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 6px;
+    display: inline-block;
+}
+.auth-code-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+.auth-code {
+    font-family: var(--font-mono);
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--warning);
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    user-select: all;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+.auth-code:hover {
+    background: rgba(255,152,0,0.15);
+}
+.auth-code-copied {
+    font-size: 0.75rem;
+    color: var(--success);
+    margin-left: 8px;
+    font-weight: 600;
+}
+.auth-waiting {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+.system-message-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+.system-message-close:hover {
+    background: rgba(255,255,255,0.1);
+    color: var(--text-primary);
+}
+
+/* === Success Notification === */
+.success-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--success);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 10000;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s;
+}
+.success-notification.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 .chat-messages {
     flex: 1;
     overflow-y: auto;
