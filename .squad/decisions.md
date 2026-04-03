@@ -2786,3 +2786,83 @@ A new **Lifecycle Operations** routing table in the agent file maps triggers to 
 **By:** Jon Bullen (via Leela)
 **What:** All agents must git add + git commit their changes after completing work. Commit messages must include the Co-authored-by Copilot trailer.
 **Why:** User directive — changes were not being committed after agent work sessions.
+
+---
+
+## Recent Decisions
+# Decision: Build-Once Pattern for Parallel Packaging
+
+**Date:** 2026-04-02  
+**Author:** Leela  
+**Status:** ✅ Implemented  
+
+## Context
+
+The `scripts/pack.ps1` script packages 9 BotNexus components (Gateway, CLI, 3 providers, 3 channels, 1 tool) into .nupkg files for the local install workflow. To speed up packaging, parallel `dotnet publish` was attempted.
+
+**Failed Approach 1 (Bender's first attempt):** "Build once + publish --no-build in parallel"
+- Result: Intermittent PE metadata corruption in Gateway.dll (ref assemblies)
+- Root cause: Unknown at the time, suspected ref assembly race condition
+
+**Failed Approach 2 (Bender's second attempt):** "Restore once + publish --no-restore in parallel"
+- Result: `dotnet publish failed for BotNexus.Providers.OpenAI with exit code 1`
+- Root cause: `--no-restore` only skips package restore, NOT building. Multiple parallel publishes still build, causing `obj/` file contention on shared dependencies (BotNexus.Core, BotNexus.Providers.Base, BotNexus.Channels.Base).
+
+## Decision
+
+**Use "Build Once + Publish --no-build in Parallel" — but build the SOLUTION, not individual projects.**
+
+### Implementation
+
+```powershell
+# Step 1: Build the entire solution once
+dotnet build BotNexus.slnx --configuration Release /p:Version=$version
+
+# Step 2: Publish each project in parallel with --no-build
+dotnet publish {project} --configuration Release --output {path} --no-build
+```
+
+### Why This Works
+
+1. **Solution build is serial** — MSBuild handles shared dependencies correctly, no contention
+2. **Publish with --no-build only copies files** — safe to parallelize, no compilation
+3. **Version properties must be passed to both** — build sets version, publish respects it
+4. **Configuration must match** — publish with `--no-build` requires same config as build
+
+### Why Previous Approaches Failed
+
+| Approach | Issue | Why It Failed |
+|----------|-------|---------------|
+| Build projects individually + publish --no-build | PE metadata corruption | Building individual projects in parallel causes ref assembly race conditions |
+| Restore once + publish --no-restore | Exit code 1, obj/ contention | `--no-restore` only skips package fetch, still builds; parallel builds of BotNexus.Core clash |
+| Isolated IntermediateOutputPath per publish | Not attempted | Requires per-project obj/ paths, complex MSBuild properties, maintenance burden |
+
+## Consequences
+
+### Positive
+- ✅ Reliable: No race conditions, 100% reproducible
+- ✅ Fast: Solution build is optimized by MSBuild, parallel publish for file copy
+- ✅ Simple: Two clear steps, easy to understand and debug
+- ✅ Maintainable: Standard MSBuild flags, no hacks or workarounds
+
+### Negative
+- Build phase is serial (but this is correct behavior for shared dependencies)
+- Must pass version properties to both `build` and `publish` (minor duplication)
+
+### Team Guidelines
+
+**For any script that packages multiple projects with shared dependencies:**
+1. Build the solution ONCE with all version/config properties
+2. Publish projects in parallel with `--no-build` and matching config/version
+3. NEVER use `--no-restore` thinking it skips build — it doesn't
+4. NEVER build individual projects in parallel if they share dependencies
+
+**ThrottleLimit:** Use 4-8 for publish operations (I/O bound). Avoid high limits for build operations (CPU bound).
+
+## Related
+
+- **Commit:** 5f4b0bc "Fix pack.ps1 parallel publish race condition"  
+- **Script:** `scripts/pack.ps1`  
+- **Dependencies:** All 9 components → BotNexus.Core; Providers → BotNexus.Providers.Base; Channels → BotNexus.Channels.Base  
+- **Testing:** Verified with `.\scripts\pack.ps1` and `.\scripts\dev-loop.ps1` end-to-end
+

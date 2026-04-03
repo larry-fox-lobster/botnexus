@@ -491,3 +491,39 @@
 - ✅ Build time ~30s, parallelism maintained in publish/packaging phase
 
 **Commit:** 5f4b0bc "Fix pack.ps1 parallel publish race condition"
+
+### 2026-04-02 — Fixed Cron Tool Array Schema for Copilot API Compliance
+
+**Trigger:** Jon reported errors when running BotNexus. Investigation of platform logs revealed HTTP 400 errors from Copilot API: `"Invalid schema for function 'cron': In context=('properties', 'output_channels'), array schema missing items."`
+
+**Root Cause:**
+- The `cron` tool's `output_channels` parameter was defined as type "array" but lacked the required `items` property
+- JSON Schema specification requires arrays to specify what type of elements they contain via an `items` field
+- `ToolParameterSchema` record only supported `Type`, `Description`, `Required`, and `EnumValues` — no `Items` property
+- Both CopilotProvider and OpenAiProvider's `BuildParameterSchema` methods didn't handle nested schema for array items
+
+**Solution:**
+1. Added `Items` property to `ToolParameterSchema` record (nullable, for recursive schema definition)
+2. Updated `CopilotProvider.BuildParameterSchema` to include `items` field when parameter has Items defined
+3. Updated `OpenAiProvider.BuildParameterSchema` to include `items` field when parameter has Items defined
+4. Fixed `CronTool` definition to specify `Items: new("string", "Channel name")` for output_channels array
+
+**Key Files Modified:**
+- `src/BotNexus.Core/Models/ToolDefinition.cs` — Added Items parameter to ToolParameterSchema
+- `src/BotNexus.Providers.Copilot/CopilotProvider.cs` — BuildParameterSchema now includes items for arrays
+- `src/BotNexus.Providers.OpenAI/OpenAiProvider.cs` — BuildParameterSchema now includes items for arrays
+- `src/BotNexus.Agent/Tools/CronTool.cs` — output_channels now specifies Items type
+
+**Testing:**
+- ✅ Solution builds cleanly: `dotnet build --no-incremental` (exit 0)
+- ✅ CronTool tests pass: 2 succeeded, 0 failed
+- ✅ No breaking changes to existing tool definitions
+
+**Key Learnings:**
+- Log location: `~/.botnexus/logs/botnexus-{date}.log` (Serilog with daily rolling, 14 day retention)
+- Copilot API strictly enforces JSON Schema compliance, OpenAI may be more lenient
+- When defining array-type tool parameters, ALWAYS specify Items to avoid API rejection
+- Tool schema validation happens at runtime when provider serializes tools for LLM API
+- Both OpenAI and Copilot providers use similar schema building logic (Anthropic doesn't support tools yet)
+
+**Commit:** a99808a "Fix cron tool array schema for Copilot API compliance"
