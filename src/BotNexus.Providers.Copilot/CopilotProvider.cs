@@ -371,6 +371,14 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
             };
             if (parameter.Value.EnumValues is { Count: > 0 })
                 schema["enum"] = parameter.Value.EnumValues;
+            if (parameter.Value.Items is not null)
+            {
+                schema["items"] = new Dictionary<string, object?>
+                {
+                    ["type"] = parameter.Value.Items.Type,
+                    ["description"] = parameter.Value.Items.Description
+                };
+            }
 
             properties[parameter.Key] = schema;
             if (parameter.Value.Required)

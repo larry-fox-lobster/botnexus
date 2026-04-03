@@ -139,10 +139,24 @@ public sealed class OpenAiProvider : LlmProviderBase
 
         var properties = tool.Parameters.ToDictionary(
             p => p.Key,
-            p => (object)new Dictionary<string, object>
+            p =>
             {
-                ["type"] = p.Value.Type,
-                ["description"] = p.Value.Description
+                var schema = new Dictionary<string, object>
+                {
+                    ["type"] = p.Value.Type,
+                    ["description"] = p.Value.Description
+                };
+                if (p.Value.EnumValues is { Count: > 0 })
+                    schema["enum"] = p.Value.EnumValues;
+                if (p.Value.Items is not null)
+                {
+                    schema["items"] = new Dictionary<string, object>
+                    {
+                        ["type"] = p.Value.Items.Type,
+                        ["description"] = p.Value.Items.Description
+                    };
+                }
+                return (object)schema;
             });
 
         var schema = new Dictionary<string, object>

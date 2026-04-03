@@ -5,7 +5,8 @@ public record ToolParameterSchema(
     string Type,
     string Description,
     bool Required = false,
-    IReadOnlyList<string>? EnumValues = null);
+    IReadOnlyList<string>? EnumValues = null,
+    ToolParameterSchema? Items = null);
 
 /// <summary>A tool that can be called by the LLM.</summary>
 public record ToolDefinition(

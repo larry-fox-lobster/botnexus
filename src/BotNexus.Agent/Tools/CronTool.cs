@@ -45,7 +45,8 @@ public sealed class CronTool : ToolBase
             ["session"] = new("string", "Session mode: new, persistent, or named:<key>", Required: false),
             ["timezone"] = new("string", "Timezone ID for schedule evaluation (optional)", Required: false),
             ["enabled"] = new("boolean", "Whether the scheduled job is enabled", Required: false),
-            ["output_channels"] = new("array", "Optional channels to route agent output to", Required: false)
+            ["output_channels"] = new("array", "Optional channels to route agent output to", Required: false,
+                Items: new("string", "Channel name"))
         });
 
     /// <inheritdoc/>
