@@ -3029,3 +3029,8 @@ Modern LLMs sometimes narrate their plan before executing it. This is a thinking
 
 ---
 
+### 2026-04-02T23:55:22Z: User directive — API changes must flag downstream consumers
+**By:** Jon Bullen (via Copilot)  
+**What:** When any agent changes an API contract (endpoints, request/response format), they MUST identify and flag all downstream consumers (WebUI, CLI, tests) that need updating. The coordinator should chain the UI update immediately, not leave it broken.  
+**Why:** Leela changed session hide from POST to PATCH but didn't flag that Fry's UI code was using the old endpoint. API changes without consumer updates break the system.
+

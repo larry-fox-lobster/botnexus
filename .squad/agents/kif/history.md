@@ -93,3 +93,25 @@
 
 **Key design choice:** Used the template version of squad.agent.md (v0.9.1, 946 lines) as the stable source for extraction. The live agent file had already been restructured to reference this skill via a pointer at line 25. All on-demand reference pointers to `.squad/templates/` preserved as-is.
 
+## Sprint: 2026-04-03T07:31:24Z
+
+**What:** Comprehensive platform sprint — configuration alignment, provider model exposure, test coverage, documentation.
+
+**Team Output:**
+- 6 agents coordinated on common objective
+- 1 critical runtime bug fixed (model resolution)
+- 45 new tests passing (516 total)
+- 950+ lines of documentation
+- 5 configuration mismatches resolved
+- Full provider model API exposure
+
+**Cross-Agent Dependencies Resolved:**
+- Farnsworth's model provider APIs enable Fry's UI dropdown
+- Bender's bug fix validates Farnsworth's model interface
+- Nibbler's config cleanup enables Hermes' test scenarios
+- Kif's docs explain all changes for future maintainers
+
+**Decisions:** API consumer flagging directive (see .squad/decisions.md)
+
+---
+
