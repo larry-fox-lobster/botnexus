@@ -93,6 +93,14 @@ public sealed class AgentLoop
 
         var session = await _sessionManager.GetOrCreateAsync(message.SessionKey, _agentName, cancellationToken).ConfigureAwait(false);
         
+        // Check for model override in message metadata
+        var effectiveModel = _model;
+        if (message.Metadata.TryGetValue("model", out var modelOverride) && modelOverride is string modelStr && !string.IsNullOrWhiteSpace(modelStr))
+        {
+            effectiveModel = modelStr;
+            _logger.LogInformation("Model override from message metadata: {Model}", effectiveModel);
+        }
+        
         var hookContext = new AgentHookContext(_agentName, message.SessionKey, message);
 
         foreach (var hook in _hooks)
@@ -143,8 +151,18 @@ public sealed class AgentLoop
                     .Where(static m => !string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
-                var request = new ChatRequest(requestMessages, _settings, tools, systemPrompt);
-                var provider = ResolveProvider();
+                // Clone settings to apply effective model override without mutating original
+                var effectiveSettings = new GenerationSettings
+                {
+                    Model = effectiveModel ?? _settings.Model,
+                    MaxTokens = _settings.MaxTokens,
+                    Temperature = _settings.Temperature,
+                    ContextWindowTokens = _settings.ContextWindowTokens,
+                    MaxToolIterations = _settings.MaxToolIterations
+                };
+
+                var request = new ChatRequest(requestMessages, effectiveSettings, tools, systemPrompt);
+                var provider = ResolveProvider(effectiveModel);
                 var actualModel = string.IsNullOrWhiteSpace(request.Settings.Model) ? provider.DefaultModel : request.Settings.Model;
                 
                 // Set the session model if not already set (use the resolved actual model)
@@ -245,11 +263,11 @@ public sealed class AgentLoop
                         
                         var finalizationRequest = new ChatRequest(
                             finalizationMessages.Where(static m => !string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase)).ToList(),
-                            _settings,
+                            effectiveSettings,
                             Tools: null, // Disable tools for finalization
                             systemPrompt);
                         
-                        var finalizationProvider = ResolveProvider();
+                        var finalizationProvider = ResolveProvider(effectiveModel);
                         var finalizationTimer = Stopwatch.StartNew();
                         var finalizationResponse = await finalizationProvider.ChatAsync(finalizationRequest, cancellationToken).ConfigureAwait(false);
                         finalizationTimer.Stop();
@@ -356,7 +374,7 @@ public sealed class AgentLoop
             _toolRegistry.Register(tool);
     }
 
-    private ILlmProvider ResolveProvider()
+    private ILlmProvider ResolveProvider(string? modelOverride = null)
     {
         if (!string.IsNullOrWhiteSpace(_providerName))
         {
@@ -368,7 +386,9 @@ public sealed class AgentLoop
             }
         }
 
-        var configuredModel = string.IsNullOrWhiteSpace(_model) ? _settings.Model : _model;
+        var configuredModel = string.IsNullOrWhiteSpace(modelOverride) 
+            ? (string.IsNullOrWhiteSpace(_model) ? _settings.Model : _model)
+            : modelOverride;
         if (!string.IsNullOrWhiteSpace(configuredModel))
         {
             var fromModelPrefix = ResolveProviderFromModelPrefix(configuredModel);

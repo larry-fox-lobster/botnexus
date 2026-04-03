@@ -230,6 +230,8 @@ public sealed class GatewayWebSocketHandler
         var agentName = string.IsNullOrWhiteSpace(dto.AgentName) ? dto.Agent : dto.AgentName;
         if (!string.IsNullOrWhiteSpace(agentName))
             metadata["agent"] = agentName;
+        if (!string.IsNullOrWhiteSpace(dto.Model))
+            metadata["model"] = dto.Model;
         return metadata;
     }
 
@@ -253,7 +255,8 @@ internal sealed record WsInboundMessage(
     [property: JsonPropertyName("content")] string? Content,
     [property: JsonPropertyName("session_id")] string? SessionId,
     [property: JsonPropertyName("agent")] string? Agent,
-    [property: JsonPropertyName("agent_name")] string? AgentName);
+    [property: JsonPropertyName("agent_name")] string? AgentName,
+    [property: JsonPropertyName("model")] string? Model);
 
 /// <summary>Initial "connected" event sent to a WebSocket client on connection.</summary>
 internal sealed record WsConnectedMessage(
