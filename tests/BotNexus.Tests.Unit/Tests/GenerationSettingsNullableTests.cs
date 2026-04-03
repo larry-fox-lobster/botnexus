@@ -106,7 +106,7 @@ public class GenerationSettingsNullableTests
 
         settings.Temperature.Should().BeNull();
         settings.MaxTokens.Should().BeNull();
-        settings.Model.Should().Be("gpt-4o"); // Default model
+        settings.Model.Should().BeNull(); // Model is now nullable
         settings.MaxToolIterations.Should().Be(40); // Default iterations
     }
 }

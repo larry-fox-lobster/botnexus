@@ -20,7 +20,7 @@ public sealed class AnthropicExtensionRegistrar : IExtensionRegistrar
 
             return new AnthropicProvider(
                 apiKey: providerConfig.ApiKey,
-                model: providerConfig.DefaultModel ?? botConfig.Agents.Model,
+                model: providerConfig.DefaultModel ?? botConfig.Agents.Model ?? "claude-3-5-sonnet-20241022",
                 apiBase: providerConfig.ApiBase,
                 logger: logger,
                 maxRetries: providerConfig.MaxRetries);

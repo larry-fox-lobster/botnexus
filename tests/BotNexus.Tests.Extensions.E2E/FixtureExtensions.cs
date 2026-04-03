@@ -48,7 +48,24 @@ public sealed class FixtureLlmProvider(IConfiguration configuration) : ILlmProvi
         ChatRequest request,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        yield return "fixture-stream";
+        var lastUserMessage = request.Messages.LastOrDefault(m => string.Equals(m.Role, "user", StringComparison.OrdinalIgnoreCase))?.Content ?? string.Empty;
+        var toolMessage = request.Messages.LastOrDefault(m => m.Content.StartsWith("fixture-tool:", StringComparison.OrdinalIgnoreCase))?.Content;
+        var hasFixtureTool = request.Tools?.Any(t => string.Equals(t.Name, FixtureEchoTool.ToolName, StringComparison.OrdinalIgnoreCase)) == true;
+
+        if (!string.IsNullOrWhiteSpace(toolMessage))
+        {
+            yield return $"provider[{_defaultModel}]:tool-finished:{toolMessage}";
+        }
+        else if (lastUserMessage.Contains("use tool", StringComparison.OrdinalIgnoreCase) && hasFixtureTool)
+        {
+            // Can't return tool calls in streaming mode - this should use ChatAsync
+            yield return $"provider[{_defaultModel}]:no-tools-in-stream";
+        }
+        else
+        {
+            yield return $"provider[{_defaultModel}]:{lastUserMessage}";
+        }
+        
         await Task.CompletedTask;
     }
 }

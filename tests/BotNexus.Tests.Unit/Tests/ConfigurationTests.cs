@@ -20,7 +20,7 @@ public class ConfigurationTests
         var config = BuildConfig(new Dictionary<string, string?>());
         var botNexusConfig = new BotNexusConfig();
 
-        botNexusConfig.Agents.Model.Should().Be("gpt-4o");
+        botNexusConfig.Agents.Model.Should().BeNull(); // Model is now nullable
         botNexusConfig.Agents.MaxTokens.Should().BeNull();
         botNexusConfig.Agents.Temperature.Should().BeNull();
         botNexusConfig.Gateway.Port.Should().Be(18790);

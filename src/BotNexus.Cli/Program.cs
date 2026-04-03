@@ -98,7 +98,7 @@ static Command BuildConfigCommand(Option<string?> homeOption, ConfigFileManager 
 
         var config = new BotNexusConfig();
         var providerName = ConsoleOutput.Prompt("Provider", "copilot");
-        var model = ConsoleOutput.Prompt("Model", config.Agents.Model);
+        var model = ConsoleOutput.Prompt("Model", config.Agents.Model ?? "claude-3-5-sonnet-20241022");
         var portText = ConsoleOutput.Prompt("Gateway port", config.Gateway.Port.ToString());
         if (!int.TryParse(portText, out var port))
         {
@@ -149,7 +149,7 @@ static Command BuildAgentCommand(Option<string?> homeOption, ConfigFileManager c
         }
 
         var provider = ConsoleOutput.Prompt("Provider", config.Providers.Keys.FirstOrDefault() ?? "copilot");
-        var model = ConsoleOutput.Prompt("Model", config.Agents.Model);
+        var model = ConsoleOutput.Prompt("Model", config.Agents.Model ?? "claude-3-5-sonnet-20241022");
         configManager.AddAgent(homePath, agentId, new AgentConfig
         {
             Name = displayName,

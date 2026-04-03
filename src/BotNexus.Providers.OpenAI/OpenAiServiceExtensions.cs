@@ -20,7 +20,7 @@ public sealed class OpenAiExtensionRegistrar : IExtensionRegistrar
 
             return new OpenAiProvider(
                 apiKey: providerConfig.ApiKey,
-                model: providerConfig.DefaultModel ?? botConfig.Agents.Model,
+                model: providerConfig.DefaultModel ?? botConfig.Agents.Model ?? "gpt-4o",
                 apiBase: providerConfig.ApiBase,
                 logger: logger,
                 maxRetries: providerConfig.MaxRetries);
