@@ -238,7 +238,7 @@ public sealed class AgentContextBuilder : IContextBuilder
 
     private int ResolveContextWindowChars()
     {
-        var tokens = _config.Agents.ContextWindowTokens;
+        var tokens = _config.Agents.ContextWindowTokens ?? 65536;
         return Math.Max(1, tokens) * ApproxCharsPerToken;
     }
 

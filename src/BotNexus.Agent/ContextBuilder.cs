@@ -27,7 +27,7 @@ public sealed class ContextBuilder
         InboundMessage inboundMessage,
         GenerationSettings settings)
     {
-        var maxChars = settings.ContextWindowTokens * ApproxCharsPerToken;
+        var maxChars = (settings.ContextWindowTokens ?? 65536) * ApproxCharsPerToken;
         var messages = new List<ChatMessage>();
 
         // Add the new user message

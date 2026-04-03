@@ -172,11 +172,15 @@ public sealed class AnthropicProvider : LlmProviderBase
         var body = new Dictionary<string, object?>
         {
             ["model"] = settings.Model,
-            ["max_tokens"] = settings.MaxTokens,
-            ["temperature"] = settings.Temperature,
             ["messages"] = messages,
             ["stream"] = stream
         };
+
+        // Only include max_tokens and temperature if explicitly set
+        // Note: Anthropic requires max_tokens, so use a sensible default if not set
+        body["max_tokens"] = settings.MaxTokens ?? 8192;
+        if (settings.Temperature.HasValue)
+            body["temperature"] = settings.Temperature.Value;
 
         var systemPrompt = request.SystemPrompt
             ?? request.Messages.FirstOrDefault(m => m.Role == "system")?.Content;

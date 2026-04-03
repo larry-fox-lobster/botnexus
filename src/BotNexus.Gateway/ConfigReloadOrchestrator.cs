@@ -226,7 +226,7 @@ public sealed class ConfigReloadOrchestrator : BackgroundService
             previous.Agents.ContextWindowTokens != current.Agents.ContextWindowTokens ||
             previous.Agents.MaxToolIterations != current.Agents.MaxToolIterations ||
             !string.Equals(previous.Agents.Timezone, current.Agents.Timezone, StringComparison.Ordinal) ||
-            Math.Abs(previous.Agents.Temperature - current.Agents.Temperature) > double.Epsilon;
+            !NullableDoubleEquals(previous.Agents.Temperature, current.Agents.Temperature);
 
         if (defaultsChanged || !JsonEquivalent(previous.Agents.Named, current.Agents.Named))
         {
@@ -269,6 +269,13 @@ public sealed class ConfigReloadOrchestrator : BackgroundService
             JsonSerializer.Serialize(left, JsonOptions),
             JsonSerializer.Serialize(right, JsonOptions),
             StringComparison.Ordinal);
+
+    private static bool NullableDoubleEquals(double? left, double? right)
+    {
+        if (!left.HasValue && !right.HasValue) return true;
+        if (!left.HasValue || !right.HasValue) return false;
+        return Math.Abs(left.Value - right.Value) <= double.Epsilon;
+    }
 
     private static BotNexusConfig CloneConfig(BotNexusConfig config)
     {

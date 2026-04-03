@@ -109,11 +109,13 @@ public sealed class OpenAiProvider : LlmProviderBase
     private ChatCompletionOptions BuildChatCompletionOptions(ChatRequest request)
     {
         var settings = request.Settings;
-        var options = new ChatCompletionOptions
-        {
-            MaxOutputTokenCount = settings.MaxTokens,
-            Temperature = (float)settings.Temperature,
-        };
+        var options = new ChatCompletionOptions();
+
+        // Only set max tokens and temperature if explicitly configured
+        if (settings.MaxTokens.HasValue)
+            options.MaxOutputTokenCount = settings.MaxTokens.Value;
+        if (settings.Temperature.HasValue)
+            options.Temperature = (float)settings.Temperature.Value;
 
         if (request.Tools is { Count: > 0 })
         {

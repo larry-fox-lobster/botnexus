@@ -335,10 +335,14 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
         {
             ["model"] = string.IsNullOrWhiteSpace(request.Settings.Model) ? _defaultModel : request.Settings.Model,
             ["messages"] = messages,
-            ["max_tokens"] = request.Settings.MaxTokens,
-            ["temperature"] = request.Settings.Temperature,
             ["stream"] = stream
         };
+
+        // Only include max_tokens and temperature if explicitly set
+        if (request.Settings.MaxTokens.HasValue)
+            payload["max_tokens"] = request.Settings.MaxTokens.Value;
+        if (request.Settings.Temperature.HasValue)
+            payload["temperature"] = request.Settings.Temperature.Value;
 
         if (request.Tools is { Count: > 0 })
         {
