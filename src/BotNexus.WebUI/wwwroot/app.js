@@ -157,6 +157,12 @@
         elStatusText.textContent = labels[state] || state;
     }
 
+    function cleanupStreamingElements() {
+        // Remove all streaming indicators when a final response arrives
+        const streamingElements = elChatMessages.querySelectorAll('.message.assistant.streaming');
+        streamingElements.forEach(el => el.remove());
+    }
+
     // --- WS message handler ---
     function handleWsMessage(msg) {
         switch (msg.type) {
@@ -164,10 +170,14 @@
                 connectionId = msg.connection_id;
                 break;
             case 'response':
+                // Clean up any streaming indicators first
+                cleanupStreamingElements();
+                
                 // Check if response includes tool calls
                 if (msg.toolCalls && msg.toolCalls.length > 0) {
                     renderAssistantWithToolsLive(msg);
-                } else {
+                } else if (msg.content && msg.content.trim()) {
+                    // Only render if content is non-empty
                     appendChatMessage('assistant', msg.content);
                 }
                 break;
@@ -259,7 +269,8 @@
             renderToolCall(entry);
         } else if (entry.role === 'assistant' && entry.toolCalls) {
             renderAssistantWithTools(entry);
-        } else {
+        } else if (entry.content && entry.content.trim()) {
+            // Only render non-empty messages
             const div = document.createElement('div');
             div.className = `message ${entry.role}`;
             const time = entry.timestamp ? formatTime(entry.timestamp) : '';
@@ -289,12 +300,23 @@
     }
 
     function renderAssistantWithTools(entry) {
+        const hasContent = entry.content && entry.content.trim();
+        const hasToolCalls = entry.toolCalls && entry.toolCalls.length > 0;
+        
+        // If no content and no tool calls, don't render anything
+        if (!hasContent && !hasToolCalls) return;
+        
+        // If only tool calls and they're hidden, don't render a message bubble
+        if (!hasContent && hasToolCalls && !showTools) return;
+        
         const div = document.createElement('div');
         div.className = 'message assistant';
         const time = entry.timestamp ? formatTime(entry.timestamp) : '';
         
+        let contentHtml = hasContent ? escapeHtml(entry.content) : '';
         let toolCallsHtml = '';
-        if (entry.toolCalls && entry.toolCalls.length > 0) {
+        
+        if (hasToolCalls) {
             const toolSummaries = entry.toolCalls.map(tc => {
                 const argsPreview = formatToolArgsPreview(tc);
                 return `<span class="tool-call-summary" data-tool-index="${entry.toolCalls.indexOf(tc)}">
@@ -308,12 +330,12 @@
         
         div.innerHTML = `
             <div class="msg-header"><span class="msg-role">${escapeHtml(entry.role)}</span><span>${time}</span></div>
-            ${escapeHtml(entry.content)}
+            ${contentHtml}
             ${toolCallsHtml}
         `;
         
         // Attach click handlers after adding to DOM
-        if (entry.toolCalls && entry.toolCalls.length > 0) {
+        if (hasToolCalls) {
             setTimeout(() => {
                 div.querySelectorAll('.tool-call-summary').forEach((el, idx) => {
                     el.addEventListener('click', () => openToolModal(entry.toolCalls[idx]));
@@ -325,18 +347,23 @@
     }
 
     function renderAssistantWithToolsLive(msg) {
-        // Remove any pending delta element
-        const pending = elChatMessages.querySelector('.message.assistant.streaming');
-        if (pending) {
-            pending.remove();
-        }
+        const hasContent = msg.content && msg.content.trim();
+        const hasToolCalls = msg.toolCalls && msg.toolCalls.length > 0;
+        
+        // If no content and no tool calls, don't render anything
+        if (!hasContent && !hasToolCalls) return;
+        
+        // If only tool calls and they're hidden, don't render a message bubble
+        if (!hasContent && hasToolCalls && !showTools) return;
 
         const div = document.createElement('div');
         div.className = 'message assistant';
         const now = formatTime(new Date().toISOString());
         
+        let contentHtml = hasContent ? escapeHtml(msg.content) : '';
         let toolCallsHtml = '';
-        if (msg.toolCalls && msg.toolCalls.length > 0) {
+        
+        if (hasToolCalls) {
             const toolSummaries = msg.toolCalls.map(tc => {
                 const argsPreview = formatToolArgsPreview(tc);
                 return `<span class="tool-call-summary" data-tool-index="${msg.toolCalls.indexOf(tc)}">
@@ -350,12 +377,12 @@
         
         div.innerHTML = `
             <div class="msg-header"><span class="msg-role">ASSISTANT</span><span>${now}</span></div>
-            ${escapeHtml(msg.content)}
+            ${contentHtml}
             ${toolCallsHtml}
         `;
         
         // Attach click handlers after adding to DOM
-        if (msg.toolCalls && msg.toolCalls.length > 0) {
+        if (hasToolCalls) {
             setTimeout(() => {
                 div.querySelectorAll('.tool-call-summary').forEach((el, idx) => {
                     el.addEventListener('click', () => openToolModal(msg.toolCalls[idx]));
@@ -420,15 +447,13 @@
     }
 
     function appendChatMessage(role, content) {
+        // Skip rendering if content is empty/whitespace
+        if (!content || !content.trim()) return;
+        
         const div = document.createElement('div');
         div.className = `message ${role}`;
         const now = formatTime(new Date().toISOString());
         div.innerHTML = `<div class="msg-header"><span class="msg-role">${escapeHtml(role)}</span><span>${now}</span></div>${escapeHtml(content)}`;
-        // Remove any pending delta element
-        const pending = elChatMessages.querySelector('.message.assistant.streaming');
-        if (pending && role === 'assistant') {
-            pending.remove();
-        }
         elChatMessages.appendChild(div);
         scrollToBottom();
     }
