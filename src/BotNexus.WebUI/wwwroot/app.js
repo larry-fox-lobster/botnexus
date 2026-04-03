@@ -815,11 +815,8 @@
             elProvidersList.appendChild(el);
         }
 
-        // Extract models for the model selector
-        availableModels = providers
-            .map(p => p.defaultModel || p.model)
-            .filter(m => m && m !== 'N/A');
-        populateModelSelector();
+        // Populate model selector in chat header
+        await populateModelSelector();
         
         // Populate provider dropdown in agent form
         elFormAgentProvider.innerHTML = '<option value="">Select provider...</option>';
@@ -830,20 +827,35 @@
             elFormAgentProvider.appendChild(opt);
         }
         
-        // Populate model dropdown in agent form
-        elFormAgentModel.innerHTML = '<option value="">Select model...</option>';
-        for (const p of providers) {
-            const model = p.defaultModel || p.model;
-            if (model && model !== 'N/A') {
-                const opt = document.createElement('option');
-                opt.value = model;
-                opt.textContent = model;
-                elFormAgentModel.appendChild(opt);
+        // Populate model dropdown in agent form with ALL models
+        await populateAgentFormModels();
+    }
+
+    async function loadModels() {
+        if (modelsData) {
+            return modelsData;
+        }
+        
+        try {
+            const models = await fetchJson('/models');
+            if (!models || models.length === 0) {
+                console.warn('No models returned from /api/models');
+                return null;
             }
+            modelsData = models;
+            return models;
+        } catch (err) {
+            console.error('Failed to load models:', err);
+            return null;
         }
     }
 
-    function populateModelSelector() {
+    async function populateModelSelector() {
+        const models = await loadModels();
+        if (!models) {
+            return;
+        }
+
         elModelSelect.innerHTML = '';
         
         // Add a default option
@@ -852,12 +864,44 @@
         defaultOpt.textContent = '(default)';
         elModelSelect.appendChild(defaultOpt);
 
-        // Add available models
-        for (const model of availableModels) {
-            const opt = document.createElement('option');
-            opt.value = model;
-            opt.textContent = model;
-            elModelSelect.appendChild(opt);
+        // Add all models from all providers
+        for (const providerData of models) {
+            const provider = providerData.provider;
+            const providerModels = providerData.models || [];
+            
+            for (const model of providerModels) {
+                const opt = document.createElement('option');
+                opt.value = model;
+                opt.textContent = model;
+                elModelSelect.appendChild(opt);
+            }
+        }
+    }
+
+    async function populateAgentFormModels(selectedProvider = null) {
+        const models = await loadModels();
+        if (!models) {
+            elFormAgentModel.innerHTML = '<option value="">No models available</option>';
+            return;
+        }
+
+        elFormAgentModel.innerHTML = '<option value="">Select model...</option>';
+        
+        for (const providerData of models) {
+            const provider = providerData.provider;
+            const providerModels = providerData.models || [];
+            
+            // If a provider is selected, only show models for that provider
+            if (selectedProvider && provider !== selectedProvider) {
+                continue;
+            }
+            
+            for (const model of providerModels) {
+                const opt = document.createElement('option');
+                opt.value = model;
+                opt.textContent = model;
+                elFormAgentModel.appendChild(opt);
+            }
         }
     }
 
@@ -1069,6 +1113,12 @@
     elBtnCancelAgent.addEventListener('click', closeAgentForm);
     elBtnSaveAgent.addEventListener('click', saveAgent);
     elBtnAddAgent.addEventListener('click', openAddAgentForm);
+    
+    // Provider selection in agent form — filter models by provider
+    elFormAgentProvider.addEventListener('change', () => {
+        const selectedProvider = elFormAgentProvider.value;
+        populateAgentFormModels(selectedProvider || null);
+    });
     
     // Checkbox toggles for nullable fields
     elFormAgentTemperatureEnabled.addEventListener('change', () => {
