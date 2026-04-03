@@ -85,10 +85,16 @@ public sealed class AgentLoop
         var session = await _sessionManager.GetOrCreateAsync(message.SessionKey, _agentName, cancellationToken).ConfigureAwait(false);
         
         // Set the model on the session if not already set
+        var configuredModel = string.IsNullOrWhiteSpace(_model) ? _settings.Model : _model;
         if (string.IsNullOrWhiteSpace(session.Model))
         {
-            var configuredModel = string.IsNullOrWhiteSpace(_model) ? _settings.Model : _model;
             session.Model = configuredModel;
+        }
+        
+        // Ensure settings reflect the configured model for this agent
+        if (!string.IsNullOrWhiteSpace(configuredModel) && !string.Equals(_settings.Model, configuredModel, StringComparison.Ordinal))
+        {
+            _settings.Model = configuredModel;
         }
         
         var hookContext = new AgentHookContext(_agentName, message.SessionKey, message);
@@ -144,8 +150,8 @@ public sealed class AgentLoop
                 var request = new ChatRequest(requestMessages, _settings, tools, systemPrompt);
                 var provider = ResolveProvider();
                 var actualModel = string.IsNullOrWhiteSpace(request.Settings.Model) ? provider.DefaultModel : request.Settings.Model;
-                _logger.LogInformation("Calling provider {ProviderName} for agent {AgentName}, model={Model}, contextWindowTokens={ContextWindowTokens}", 
-                    provider.GetType().Name, _agentName, actualModel, request.Settings.ContextWindowTokens);
+                _logger.LogInformation("Agent {AgentName} configured with model={ConfiguredModel}, resolved to provider={ProviderName}, sending model={ActualModel}, contextWindowTokens={ContextWindowTokens}", 
+                    _agentName, _model ?? _settings.Model, provider.GetType().Name, actualModel, request.Settings.ContextWindowTokens);
                 var providerTimer = Stopwatch.StartNew();
                 var llmResponse = await provider.ChatAsync(request, cancellationToken).ConfigureAwait(false);
                 providerTimer.Stop();
