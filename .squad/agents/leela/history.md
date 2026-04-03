@@ -2,8 +2,77 @@
 
 - **Owner:** Jon Bullen
 - **Project:** BotNexus — modular AI agent execution platform (OpenClaw-like) built in C#/.NET. Lean core with extension points for assembly-based plugins. Multiple agent execution modes (local, sandbox, container, remote). Currently focusing on local execution. SOLID patterns with vigilance against over-abstraction. Comprehensive testing (unit + E2E integration).
-- **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI), Session, Tools.GitHub, WebUI
+- **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI/Copilot), Session, Tools.GitHub, WebUI
 - **Created:** 2026-04-01
+
+## 2026-04-03T22:30:00Z — Multi-Turn Tool Call Bug Fix (Lead)
+
+**Timestamp:** 2026-04-03T22:30:00Z  
+**Status:** ✅ Complete  
+**Requested by:** Jon Bullen (CRITICAL PRIORITY)  
+**Scope:** Fix tool call parsing failure in CopilotProvider breaking multi-turn agent loops
+
+**Problem Identified:**
+Jon reported that Nova agent (using Claude via Copilot proxy) would exit the agent loop after tool calls without processing results or responding. Logs showed:
+```
+CopilotProvider: tools=8, messages=3          ← 8 tools sent ✅
+finish_reason=tool_calls/"ToolCalls", tool_calls=0  ← API says "tool_calls" but ZERO parsed!
+breaking loop at iteration 0, FinishReason="ToolCalls", ToolCalls=0  ← Loop exits
+```
+
+**Root Cause Analysis:**
+`ParseToolCalls()` in CopilotProvider.cs (line 510) only handled OpenAI's tool call format where `function.arguments` is a JSON **string**:
+```csharp
+var argumentsJson = argumentsElement.GetString();  // Returns null if arguments is JSON object!
+```
+
+When using Claude models through the Copilot proxy, the API returns `arguments` as a JSON **object**, not a string. `GetString()` returned null, resulting in empty arguments dictionaries. The tool call structure was valid but unparsed, causing:
+1. `toolCalls` list to be empty (even though API returned tool_calls)
+2. Agent loop to exit with `FinishReason=ToolCalls` but `ToolCalls.Count=0`
+3. No tool execution, no follow-up turn, no final answer
+
+**Solution Implemented:**
+
+1. **Added format detection** — Check `argumentsElement.ValueKind`:
+   - If `String`: OpenAI format → use `GetString()` then deserialize
+   - If `Object`: Claude/Copilot format → use `GetRawText()` and deserialize
+   - Else: log warning and use empty dict
+
+2. **Added diagnostic logging:**
+   - INFO: Raw `tool_calls` JSON from API (before parsing)
+   - WARN: Tool calls missing `function` property
+   - WARN: Unexpected `arguments.ValueKind`
+   - DEBUG: Each parsed tool call with argument count
+
+3. **Changed method signature** — `ParseToolCalls` from `static` to instance method to access `Logger`
+
+**Testing:**
+- ✅ Build: 0 errors, 0 warnings
+- ✅ Tests: 396 unit tests passing
+- ✅ E2E: Filesystem tool call → parsed → executed → final response ✅
+- ✅ E2E: Cron tool call → parsed → executed → final response ✅
+- ✅ Logs confirm: `tool_calls=1` (not 0), arguments properly deserialized
+
+**Multi-Turn Flow Verified:**
+```
+User: "List files in Q:\repos\botnexus"
+→ LLM: finish_reason=tool_calls, tool_calls=1 (filesystem)
+→ Agent: executing 1 tool calls (iteration 0) ✅
+→ Tool: returns directory listing
+→ LLM: receives tool results, generates final response
+→ User: sees markdown table of files ✅
+```
+
+**Key Learning:**
+Provider abstraction must handle format variations when proxying different model families. The Copilot API acts as a proxy that normalizes requests but preserves some Claude-specific response formats. Testing with actual API responses (not mocks) is critical.
+
+**Commits:**
+- `dd0343a`: fix(copilot): Handle both JSON string and object formats for tool call arguments
+
+**Outcome:**
+Multi-turn agent loops now work correctly with Claude models via Copilot proxy. Nova can execute tools, process results, and respond. No more premature loop exits. The fix is backward-compatible with OpenAI format.
+
+---
 
 ## 2026-04-03T22:00:00Z — Build Failure Prevention Retrospective (Lead)
 
