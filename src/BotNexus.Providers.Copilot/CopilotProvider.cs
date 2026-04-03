@@ -245,27 +245,44 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
 
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         
-        // Log full response for debugging
-        Logger.LogDebug("CopilotProvider: Response body: {ResponseContent}", responseContent);
+        // Log response for debugging (debug level to avoid noise)
+        Logger.LogDebug("CopilotProvider: Raw response body: {ResponseContent}", responseContent);
         
         using var document = JsonDocument.Parse(responseContent);
         var root = document.RootElement;
-        var choice = root.GetProperty("choices")[0];
-        var message = choice.GetProperty("message");
+        var choices = root.GetProperty("choices");
+        
+        // Claude via Copilot may split content and tool_calls across multiple choices.
+        // Merge all choices: collect content from first choice with content, tool_calls from any choice that has them.
+        string content = string.Empty;
+        string? finishReasonStr = null;
+        JsonElement? toolCallsElement = null;
 
-        var content = message.TryGetProperty("content", out var contentElement)
-            ? contentElement.GetString() ?? string.Empty
-            : string.Empty;
-        var finishReasonStr = choice.TryGetProperty("finish_reason", out var finishReasonElement)
-            ? finishReasonElement.GetString()
-            : null;
+        foreach (var choice in choices.EnumerateArray())
+        {
+            var msg = choice.GetProperty("message");
+
+            if (string.IsNullOrEmpty(content) && msg.TryGetProperty("content", out var contentEl))
+            {
+                var text = contentEl.GetString();
+                if (!string.IsNullOrEmpty(text))
+                    content = text;
+            }
+
+            if (toolCallsElement is null && msg.TryGetProperty("tool_calls", out var tcEl) && tcEl.ValueKind == JsonValueKind.Array && tcEl.GetArrayLength() > 0)
+                toolCallsElement = tcEl;
+
+            if (finishReasonStr is null && choice.TryGetProperty("finish_reason", out var frEl))
+                finishReasonStr = frEl.GetString();
+        }
+
         var finishReason = MapFinishReason(finishReasonStr);
 
         IReadOnlyList<ToolCallRequest>? toolCalls = null;
-        if (message.TryGetProperty("tool_calls", out var toolCallsElement) && toolCallsElement.ValueKind == JsonValueKind.Array)
+        if (toolCallsElement is not null)
         {
-            Logger.LogInformation("CopilotProvider: Raw tool_calls JSON: {ToolCallsJson}", toolCallsElement.GetRawText());
-            toolCalls = ParseToolCalls(toolCallsElement);
+            Logger.LogInformation("CopilotProvider: Raw tool_calls JSON: {ToolCallsJson}", toolCallsElement.Value.GetRawText());
+            toolCalls = ParseToolCalls(toolCallsElement.Value);
         }
 
         Logger.LogInformation("Copilot response: model={Model}, content_length={ContentLength}, finish_reason={FinishReasonRaw}/{FinishReasonMapped}, tool_calls={ToolCallCount}",
