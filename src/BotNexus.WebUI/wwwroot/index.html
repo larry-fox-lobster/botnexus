@@ -120,6 +120,11 @@
                         <select id="agent-select" class="agent-select"></select>
                         <label for="model-select" class="agent-select-label">Model:</label>
                         <select id="model-select" class="agent-select"></select>
+                        <label class="toggle-switch" title="Show/hide tool calls">
+                            <input type="checkbox" id="toggle-tools">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="toggle-label">🔧 Tools</span>
                     </div>
                 </div>
                 <div id="chat-messages" class="chat-messages">
@@ -133,6 +138,31 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Tool Detail Modal -->
+    <div id="tool-modal" class="tool-modal hidden">
+        <div class="tool-modal-overlay"></div>
+        <div class="tool-modal-content">
+            <div class="tool-modal-header">
+                <h3>🔧 Tool Details</h3>
+                <button class="tool-modal-close" title="Close">&times;</button>
+            </div>
+            <div class="tool-modal-body">
+                <div class="tool-modal-section">
+                    <div class="tool-modal-label">Tool Name:</div>
+                    <div class="tool-modal-value" id="modal-tool-name"></div>
+                </div>
+                <div class="tool-modal-section">
+                    <div class="tool-modal-label">Arguments:</div>
+                    <pre class="tool-modal-code" id="modal-tool-args"></pre>
+                </div>
+                <div class="tool-modal-section">
+                    <div class="tool-modal-label">Output:</div>
+                    <pre class="tool-modal-code" id="modal-tool-output"></pre>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>

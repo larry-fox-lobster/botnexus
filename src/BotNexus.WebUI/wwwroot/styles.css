@@ -379,6 +379,12 @@ body {
     gap: 0.5rem;
 }
 
+.toggle-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
 .agent-select-label {
     font-size: 0.85rem;
     color: var(--text-muted);
@@ -435,12 +441,11 @@ body {
     border-bottom-left-radius: 2px;
 }
 .message.tool {
-    background: var(--msg-tool-bg);
+    background: transparent;
     align-self: flex-start;
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    border-bottom-left-radius: 2px;
     max-width: 95%;
+    padding: 0;
+    margin: 2px 0;
 }
 .message.system {
     background: rgba(255,152,0,0.1);
@@ -534,6 +539,143 @@ body {
     font-size: 0.7rem;
     color: var(--text-muted);
     border-top: 1px solid var(--border);
+}
+
+/* === Tool Call Summary === */
+.tool-call-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+    max-width: 500px;
+}
+.tool-call-summary:hover {
+    background: rgba(255,255,255,0.1);
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+.tool-call-summary .tool-icon {
+    font-size: 0.85rem;
+}
+.tool-call-summary .tool-name {
+    font-weight: 600;
+    color: var(--accent);
+}
+.tool-call-summary .tool-args-preview {
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+}
+
+/* === Tool Call Modal === */
+.tool-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.tool-modal.hidden {
+    display: none;
+}
+.tool-modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(2px);
+}
+.tool-modal-content {
+    position: relative;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: 90%;
+    max-width: 700px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.tool-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+.tool-modal-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+.tool-modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.8rem;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    line-height: 1;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+.tool-modal-close:hover {
+    background: rgba(255,255,255,0.1);
+    color: var(--text-primary);
+}
+.tool-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+.tool-modal-section {
+    margin-bottom: 16px;
+}
+.tool-modal-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+}
+.tool-modal-value {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+}
+.tool-modal-code {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    padding: 12px;
+    border-radius: 4px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+    margin: 0;
 }
 
 /* === Utilities === */

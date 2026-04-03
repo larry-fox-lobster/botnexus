@@ -16,6 +16,7 @@
     let reconnectTimer = null;
     let commandPaletteIndex = -1;
     let availableModels = [];
+    let showTools = false;
 
     // --- DOM refs ---
     const $ = (sel) => document.querySelector(sel);
@@ -41,6 +42,10 @@
     const elAgentSelect = $('#agent-select');
     const elModelSelect = $('#model-select');
     const elCommandPalette = $('#command-palette');
+    const elToggleTools = $('#toggle-tools');
+    const elToolModal = $('#tool-modal');
+    const elToolModalClose = $('.tool-modal-close');
+    const elToolModalOverlay = $('.tool-modal-overlay');
 
     // --- Commands ---
     const COMMANDS = [
@@ -245,13 +250,108 @@
     }
 
     function renderHistoryEntry(entry) {
+        if (entry.role === 'tool') {
+            renderToolCall(entry);
+        } else if (entry.role === 'assistant' && entry.toolCalls) {
+            renderAssistantWithTools(entry);
+        } else {
+            const div = document.createElement('div');
+            div.className = `message ${entry.role}`;
+            const time = entry.timestamp ? formatTime(entry.timestamp) : '';
+            div.innerHTML = `<div class="msg-header"><span class="msg-role">${escapeHtml(entry.role)}</span><span>${time}</span></div>${escapeHtml(entry.content)}`;
+            elChatMessages.appendChild(div);
+        }
+    }
+
+    function renderToolCall(entry) {
         const div = document.createElement('div');
-        div.className = `message ${entry.role}`;
-        const time = entry.timestamp ? formatTime(entry.timestamp) : '';
-        let roleLabel = entry.role;
-        if (entry.role === 'tool' && entry.toolName) roleLabel = `tool: ${entry.toolName}`;
-        div.innerHTML = `<div class="msg-header"><span class="msg-role">${escapeHtml(roleLabel)}</span><span>${time}</span></div>${escapeHtml(entry.content)}`;
+        div.className = `message tool ${showTools ? '' : 'hidden'}`;
+        
+        const toolName = entry.toolName || 'unknown';
+        const argsPreview = formatToolArgsPreview(entry);
+        
+        const summary = document.createElement('div');
+        summary.className = 'tool-call-summary';
+        summary.innerHTML = `
+            <span class="tool-icon">🔧</span>
+            <span class="tool-name">${escapeHtml(toolName)}</span>
+            <span class="tool-args-preview">${escapeHtml(argsPreview)}</span>
+        `;
+        summary.addEventListener('click', () => openToolModal(entry));
+        
+        div.appendChild(summary);
         elChatMessages.appendChild(div);
+    }
+
+    function renderAssistantWithTools(entry) {
+        const div = document.createElement('div');
+        div.className = 'message assistant';
+        const time = entry.timestamp ? formatTime(entry.timestamp) : '';
+        
+        let toolCallsHtml = '';
+        if (entry.toolCalls && entry.toolCalls.length > 0) {
+            const toolSummaries = entry.toolCalls.map(tc => {
+                const argsPreview = formatToolArgsPreview(tc);
+                return `<span class="tool-call-summary" data-tool-index="${entry.toolCalls.indexOf(tc)}">
+                    <span class="tool-icon">🔧</span>
+                    <span class="tool-name">${escapeHtml(tc.toolName || tc.name || 'unknown')}</span>
+                    <span class="tool-args-preview">${escapeHtml(argsPreview)}</span>
+                </span>`;
+            }).join(' ');
+            toolCallsHtml = `<div class="${showTools ? '' : 'hidden'}" style="margin-top: 6px;">${toolSummaries}</div>`;
+        }
+        
+        div.innerHTML = `
+            <div class="msg-header"><span class="msg-role">${escapeHtml(entry.role)}</span><span>${time}</span></div>
+            ${escapeHtml(entry.content)}
+            ${toolCallsHtml}
+        `;
+        
+        // Attach click handlers after adding to DOM
+        if (entry.toolCalls && entry.toolCalls.length > 0) {
+            setTimeout(() => {
+                div.querySelectorAll('.tool-call-summary').forEach((el, idx) => {
+                    el.addEventListener('click', () => openToolModal(entry.toolCalls[idx]));
+                });
+            }, 0);
+        }
+        
+        elChatMessages.appendChild(div);
+    }
+
+    function formatToolArgsPreview(entry) {
+        const args = entry.arguments || entry.args || {};
+        const pairs = [];
+        
+        for (const [key, value] of Object.entries(args)) {
+            let valStr = '';
+            if (typeof value === 'string') {
+                valStr = value.length > 40 ? value.substring(0, 40) + '...' : value;
+            } else {
+                valStr = JSON.stringify(value);
+                if (valStr.length > 40) valStr = valStr.substring(0, 40) + '...';
+            }
+            pairs.push(`${key}: "${valStr}"`);
+        }
+        
+        const preview = pairs.join(', ');
+        return preview.length > 80 ? preview.substring(0, 80) + '...' : preview;
+    }
+
+    function openToolModal(toolData) {
+        const toolName = toolData.toolName || toolData.name || 'unknown';
+        const args = toolData.arguments || toolData.args || {};
+        const output = toolData.content || toolData.output || toolData.result || '(no output)';
+        
+        $('#modal-tool-name').textContent = toolName;
+        $('#modal-tool-args').textContent = JSON.stringify(args, null, 2);
+        $('#modal-tool-output').textContent = output;
+        
+        elToolModal.classList.remove('hidden');
+    }
+
+    function closeToolModal() {
+        elToolModal.classList.add('hidden');
     }
 
     // --- Chat ---
@@ -622,6 +722,30 @@
             sendWs({ type: 'subscribe' });
         }
         // Note: unsubscribe isn't supported yet; the subscription lives for the connection
+    });
+
+    elToggleTools.addEventListener('change', () => {
+        showTools = elToggleTools.checked;
+        // Toggle visibility of all tool messages
+        elChatMessages.querySelectorAll('.message.tool').forEach(el => {
+            el.classList.toggle('hidden', !showTools);
+        });
+        // Toggle visibility of tool call summaries in assistant messages
+        elChatMessages.querySelectorAll('.message.assistant > div:not(.msg-header)').forEach(el => {
+            if (el.querySelector('.tool-call-summary')) {
+                el.classList.toggle('hidden', !showTools);
+            }
+        });
+    });
+
+    elToolModalClose.addEventListener('click', closeToolModal);
+    elToolModalOverlay.addEventListener('click', closeToolModal);
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !elToolModal.classList.contains('hidden')) {
+            closeToolModal();
+        }
     });
 
     // Section toggles
