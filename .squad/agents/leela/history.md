@@ -9,6 +9,27 @@
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
+### 2026-04-03 — Sprint 4 Completion — Model Selector UI + Config Hardening
+
+**Spawn Date:** 2026-04-03T03:22:49Z  
+**Status:** Success (4 agents, 7 work items, 0 blockers)
+
+**Summary:**
+- **Leela (Lead):** Orchestrated parallel agent work. Validated agent dependencies. No overlaps detected. All agents committed their work as expected.
+- **Fry (Web Dev):** Delivered model selector dropdown UI + tool call visibility toggle. Models loaded from /api/providers. Tool messages hidden by default with toggle.
+- **Farnsworth (Platform Dev):** Made Temperature, MaxTokens, ContextWindowTokens nullable across config stack. All 3 providers (Copilot, OpenAI, Anthropic) now use own defaults when not explicitly configured. Unblocks future model-specific tuning.
+- **Build status:** ✅ All tests passing. Zero errors. Conventional commits used.
+
+**Decisions Archived:**
+- User directive: Always route work to agents (no coordinator domain work)
+- User directive: Maximize parallel agent spawning (multi-agent is default)
+- Decision: Nullable generation settings for provider defaults (architectural)
+- Decision: Workspace templates follow OpenClaw pattern (foundational)
+
+**Next Phase:** Model selector integration testing with live providers. Tool visibility in production WebUI.
+
+---
+
 ### 2026-04-01 — Initial Architecture Review & Implementation Plan (Rev 2)
 
 **Build & Test Baseline:**
@@ -527,3 +548,50 @@
 - Both OpenAI and Copilot providers use similar schema building logic (Anthropic doesn't support tools yet)
 
 **Commit:** a99808a "Fix cron tool array schema for Copilot API compliance"
+
+### 2026-04-03 — Workspace Template Integration from OpenClaw
+
+**Task:** Replace placeholder workspace template stubs with rich, useful defaults inspired by OpenClaw framework.
+
+**Research:**
+- Found OpenClaw repo: openclaw/openclaw on GitHub (346k stars, main TypeScript AI assistant framework)
+- Located official templates in docs/reference/templates/:
+  - SOUL.md — Agent personality, values, boundaries, and behavioral guidelines
+  - IDENTITY.md — Name, creature type, vibe, emoji (agent self-definition)
+  - USER.md — Human profile capture (name, pronouns, timezone, context)
+  - AGENTS.md — Workspace guide with startup routine, memory practices, boundaries
+  - TOOLS.md — Local environment-specific notes and preferences
+  - HEARTBEAT.md — Periodic instruction patterns
+  - MEMORY.md concept described in AGENTS.md (curated long-term memory)
+
+**Implementation:**
+- Updated src/BotNexus.Agent/AgentWorkspace.cs with OpenClaw-inspired templates
+- Replaced HTML comment stubs with structured, example-rich templates
+- Added AGENTS.md and TOOLS.md to BootstrapFiles dictionary (new files)
+- Enhanced HEARTBEAT.md with example tasks and guidance
+- Created comprehensive MEMORY.md template with example entries and maintenance guidance
+- All templates provide clear sections, example content, and explain their purpose
+
+**Key Principles from OpenClaw:**
+- **Personality over placeholders:** Templates establish an agent identity and voice
+- **Examples show the way:** Each file includes sample content showing what good entries look like
+- **Memory is file-based:** "Mental notes" don't survive sessions — write everything down
+- **Clear boundaries:** Define what's safe to do freely vs. what needs permission
+- **Curated memory:** Daily logs (raw) vs. MEMORY.md (distilled wisdom)
+
+**Files Modified:**
+- src/BotNexus.Agent/AgentWorkspace.cs — Replaced all 5 stub templates + added 2 new files (AGENTS.md, TOOLS.md)
+
+**Testing:**
+- ✅ Solution builds cleanly: dotnet build (exit 0)
+- ✅ No breaking changes to workspace initialization logic
+- ✅ All template files are valid markdown with proper structure
+
+**Key Learning:**
+- OpenClaw's templates focus on agent autonomy and personality development
+- Templates should be opinionated enough to guide but generic enough to adapt
+- Memory practices are critical: file-based persistence, daily vs. long-term, proactive maintenance
+- Workspace files aren't just config — they're the agent's continuity across sessions
+
+**Commit:** 70f4696 "Replace workspace template stubs with rich OpenClaw-inspired defaults"
+

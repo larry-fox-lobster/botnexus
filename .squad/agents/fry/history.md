@@ -5,6 +5,34 @@
 - **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI), Session, Tools.GitHub, WebUI
 - **Created:** 2026-04-01
 
+## Recent Session Summaries
+
+### 2026-04-03 — Model Selector UI + Tool Visibility (Parallel with Farnsworth)
+
+**Session:** Sprint 4 parallel UI and config work  
+**Status:** ✅ Success (both tasks completed)
+
+**Model Selector Task (feat: model-selector, commit bae2e25):**
+- Added dropdown selector to chat UI header for both new and existing sessions
+- Models loaded dynamically from /api/providers endpoint
+- Selected model passed through WebSocket payload
+- Works with existing and new sessions
+
+**Tool Calls Visibility Task (feat(webui): tool-calls, commit feat(webui)):**
+- Added collapsible tool call blocks in chat messages
+- Tools filter toggle (🔧) in header to show/hide tool interactions
+- Tool messages hidden by default (reduces UI clutter)
+- Can be toggled on-demand to inspect tool execution
+
+**Dependencies:** Both tasks completed cleanly without blocking each other. Farnsworth's nullable config work provided foundation, but both UI tasks were independent of that.
+
+**Learnings:**
+- WebSocket model field should be passed from client → server for provider selection
+- Tool visibility toggle pattern is reusable for other message type filters
+- Model selector dropdown can be pre-populated from config or fetched live
+
+---
+
 ## Team Directives (All Agents Must Follow)
 
 1. **Dynamic Assembly Loading** (2026-04-01T16:29Z)

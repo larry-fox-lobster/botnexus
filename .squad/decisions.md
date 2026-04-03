@@ -2445,6 +2445,52 @@ cron-consistency-review ─── (after docs)
 *Leela — BotNexus Lead/Architect*
 *Plan version: 1.0 — 2026-04-02*
 
+---
+
+### 12. User Directive — Always Route Work to Agents (2026-04-02T20:08:21Z)
+
+**By:** Jon Bullen (via Copilot)
+**Status:** Approved
+
+**What:** The coordinator MUST NEVER do domain work directly. Always route to the appropriate team member. This ensures commits happen, history is tracked, and the team learns. No exceptions.
+
+**Why:** User request — captured for team memory. When coordinator does work directly, commits get missed and team knowledge doesn't accumulate.
+
+---
+
+### 13. User Directive — Maximize Parallel Agent Work (2026-04-02T20:08:21Z)
+
+**By:** Jon Bullen (via Copilot)
+**Status:** Approved
+
+**What:** The coordinator MUST fan out aggressively — if 3-5 agents can start work simultaneously, launch them ALL in one turn. No more sequential one-at-a-time spawns. This is the same priority level as "always commit small pieces" and "always write good commit messages". Non-negotiable.
+
+**Why:** User request — captured for team memory. Throughput is a first-class concern. Speed of delivery matters.
+
+---
+
+### 14. Decision: Nullable Generation Settings for Provider Defaults (2026-04-02)
+
+**Status:** Implemented  
+**Owner:** Farnsworth  
+**Commit:** 6434ce5
+
+See full decision in `.squad/decisions/inbox/farnsworth-nullable-generation-settings.md` (merged herein for archival).
+
+**Summary:** Temperature, MaxTokens, and ContextWindowTokens are now nullable across GenerationSettings, AgentDefaults, and all 3 provider implementations (Copilot, OpenAI, Anthropic). Providers now use their own defaults when not explicitly configured. This enables flexible per-provider configuration and unblocks model selector UI work.
+
+---
+
+### 15. Decision: Workspace Templates Follow OpenClaw Pattern (2026-04-02)
+
+**Status:** Implemented  
+**Owner:** Leela (Lead)  
+**Commit:** 70f4696
+
+See full decision in `.squad/decisions/inbox/leela-workspace-templates.md` (merged herein for archival).
+
+**Summary:** Replaced placeholder workspace stubs with rich, OpenClaw-inspired templates that provide clear structure, example content, and establish agent personality, boundaries, and memory practices. Includes SOUL.md, IDENTITY.md, USER.md, AGENTS.md, TOOLS.md, HEARTBEAT.md, MEMORY.md templates. Enables agent workspace infrastructure for session-to-session continuity.
+
 
 
 ---
