@@ -406,3 +406,38 @@ Jon reported "exceeding max prompt tokens" errors. The configured model should h
 - Look for hardcoded token limits in provider implementations
 - Add error logging when token limits are exceeded to capture the actual limit vs request size
 
+### Model Resolution Bug Fixed (2025-01-30)
+
+**Problem:** Agent "Nova" was configured with `model: "claude-opus-4.6"` but was actually using `gpt-4o` instead. The model resolution logic was broken.
+
+**Root Cause:** AgentRunnerFactory creates a GenerationSettings object and passes it to AgentLoop, along with a separate `model` parameter. When the agent has an explicit model configured, AgentLoop was using `_model` for session tracking but NOT updating `_settings.Model` before creating ChatRequest objects. This caused the ChatRequest to contain the default model from settings (`gpt-4o`) instead of the configured model (`claude-opus-4.6`).
+
+**The Flow:**
+1. AgentRunnerFactory creates `GenerationSettings { Model = "claude-opus-4.6" }` and passes `model: "claude-opus-4.6"` separately to AgentLoop
+2. AgentLoop constructor stores both `_settings` (GenerationSettings object) and `_model` (string)
+3. In ProcessAsync(), the session.Model is set correctly using `_model ?? _settings.Model`
+4. BUT when creating ChatRequest, it passes `_settings` directly without updating `_settings.Model` to match `_model`
+5. CopilotProvider reads `request.Settings.Model` and sees `gpt-4o` (the default from GenerationSettings class)
+
+**Solution:** In AgentLoop.ProcessAsync(), before the agent loop starts, compute the configured model once and ensure `_settings.Model` is updated to match:
+```csharp
+var configuredModel = string.IsNullOrWhiteSpace(_model) ? _settings.Model : _model;
+if (!string.IsNullOrWhiteSpace(configuredModel) && !string.Equals(_settings.Model, configuredModel, StringComparison.Ordinal))
+{
+    _settings.Model = configuredModel;
+}
+```
+
+**Additional Fix:** Enhanced logging to show the configured model, provider name, and actual model being sent:
+```csharp
+_logger.LogInformation("Agent {AgentName} configured with model={ConfiguredModel}, resolved to provider={ProviderName}, sending model={ActualModel}, contextWindowTokens={ContextWindowTokens}", 
+    _agentName, _model ?? _settings.Model, provider.GetType().Name, actualModel, request.Settings.ContextWindowTokens);
+```
+
+**Files Modified:**
+- BotNexus.Agent/AgentLoop.cs
+
+**Commit:** 29c1f3a (fix: model resolution - ensure settings reflect configured model)
+
+**Key Insight:** When configuration flows through multiple objects (settings, agent config, constructor parameters), ensure that the canonical value is propagated to all places where it's read. Don't assume that setting it in one place (constructor parameter) will automatically update it in another (settings object).
+
