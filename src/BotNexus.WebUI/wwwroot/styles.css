@@ -652,6 +652,29 @@ body {
     50% { opacity: 1; }
 }
 
+/* Tool progress indicators */
+.tool-progress-indicator {
+    background: transparent;
+    align-self: flex-start;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    padding: 6px 12px;
+    animation: tool-progress-pulse 1.2s ease-in-out infinite;
+}
+
+.tool-progress-inline {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-top: 6px;
+    font-style: italic;
+    animation: tool-progress-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes tool-progress-pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
 /* === Chat Input === */
 .chat-input-area {
     padding: 12px 20px;

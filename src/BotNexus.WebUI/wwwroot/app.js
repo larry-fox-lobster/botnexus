@@ -188,6 +188,10 @@
         // Remove thinking indicator when final response arrives
         const thinkingElements = elChatMessages.querySelectorAll('.message.thinking');
         thinkingElements.forEach(el => el.remove());
+        
+        // Remove standalone tool progress indicators
+        const toolProgressElements = elChatMessages.querySelectorAll('.tool-progress-indicator');
+        toolProgressElements.forEach(el => el.remove());
     }
 
     function showThinkingIndicator() {
@@ -223,6 +227,9 @@
                 break;
             case 'delta':
                 appendDelta(msg.content);
+                break;
+            case 'tool_progress':
+                appendToolProgress(msg);
                 break;
             case 'activity':
                 if (msg.event) {
@@ -597,6 +604,58 @@
         }
         const deltaEl = streaming.querySelector('.delta-content');
         deltaEl.textContent += content;
+        scrollToBottom();
+    }
+
+    function appendToolProgress(msg) {
+        // Only show if tools toggle is on
+        if (!showTools) return;
+        
+        const tool = msg.tool || 'unknown';
+        const action = msg.action || '';
+        const args = msg.args || {};
+        
+        // Build a descriptive message based on tool/action/args
+        let description = '';
+        if (tool === 'filesystem' && action === 'read' && args.path) {
+            description = `Reading ${args.path}`;
+        } else if (tool === 'filesystem' && action === 'write' && args.path) {
+            description = `Writing ${args.path}`;
+        } else if (action && args.path) {
+            description = `${action} ${args.path}`;
+        } else if (action) {
+            description = `${tool}: ${action}`;
+        } else {
+            description = tool;
+        }
+        
+        // Check if we have an active streaming message
+        let streaming = elChatMessages.querySelector('.message.assistant.streaming');
+        if (!streaming) {
+            // If no streaming message, show tool progress as a separate indicator
+            const existing = elChatMessages.querySelector('.tool-progress-indicator');
+            if (existing) {
+                // Update existing indicator
+                existing.textContent = `🔧 ${description}...`;
+            } else {
+                // Create new indicator
+                const indicator = document.createElement('div');
+                indicator.className = 'tool-progress-indicator';
+                indicator.textContent = `🔧 ${description}...`;
+                elChatMessages.appendChild(indicator);
+            }
+        } else {
+            // Tool progress within streaming response
+            // Check if there's already a tool progress element in the streaming bubble
+            let toolProgress = streaming.querySelector('.tool-progress-inline');
+            if (!toolProgress) {
+                toolProgress = document.createElement('div');
+                toolProgress.className = 'tool-progress-inline';
+                streaming.appendChild(toolProgress);
+            }
+            toolProgress.textContent = `🔧 ${description}...`;
+        }
+        
         scrollToBottom();
     }
 
