@@ -31,6 +31,18 @@
 - Tool visibility toggle pattern is reusable for other message type filters
 - Model selector dropdown can be pre-populated from config or fetched live
 
+### 2026-04-03 — Tool Call Display Redesign (Scribe cross-agent update)
+
+**Task:** Compact summary view with clickable detail modal  
+**Status:** ✅ Complete  
+**Timestamp:** 2026-04-03T04:50:00Z  
+
+- Tool calls now display as `🔧 toolname(args)` in compact form
+- Click opens full response in scrollable modal
+- Tools toggle (🔧) still works as before
+- Better signal-to-noise ratio in complex agent interactions
+- Coordinated with Bender's multi-turn improvements
+
 ---
 
 ## Team Directives (All Agents Must Follow)

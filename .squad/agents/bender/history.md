@@ -46,6 +46,19 @@ Build is clean, tests pass. ProviderRegistry exists but is unused — evaluate i
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
+### 2026-04-03 — Agent Loop Multi-Turn Continuation Fix (Scribe cross-agent update)
+
+**Task:** Fixed agent loop continuation when LLM narrates intent without tool calls  
+**Status:** ✅ Complete  
+**Timestamp:** 2026-04-03T04:50:00Z  
+**Commits:** 259beb2, fd7171c  
+
+- Added continuation intent detection in AgentLoop.cs
+- Platform nudges LLM to proceed when narrating intent without immediate tool calls
+- Nanobot runner pattern researched for implementation guidance
+- Multi-turn agent loops now handle implicit intent continuation correctly
+- Coordinated with Fry's tool UI improvements for better display
+
 ### 2026-04-02 — Agent Loop Continuation Prompting
 
 **Problem Solved:** Agent loop was stopping prematurely when the LLM narrated its next action ("I'll proceed to do X next") but didn't make tool calls. The loop only continued when `FinishReason == ToolCalls`, causing agents to describe work without executing it.
