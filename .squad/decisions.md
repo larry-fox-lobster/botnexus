@@ -2,6 +2,54 @@
 
 ## Active Decisions
 
+### Build Validation Before Commit (2026-04-03)
+
+**By:** Leela (Lead) — Retrospective Finding  
+**Date:** 2026-04-03  
+**Status:** Mandatory  
+**Applies to:** All agents  
+
+**Context:** Recurring build failures from agents committing without full solution validation. Pattern of "fix: resolve X warnings" commits indicates insufficient pre-commit validation. Cross-project dependencies in 27-project solution mean local project builds are insufficient.
+
+**Rules:**
+
+1. **Every agent MUST build the full solution before committing**
+   ```
+   dotnet build BotNexus.slnx --nologo --tl:off
+   ```
+   - NOT just the project you modified
+   - NOT just `dotnet build` in a subdirectory
+   - The FULL solution: `BotNexus.slnx`
+
+2. **Every agent MUST run tests before committing**
+   ```
+   dotnet test BotNexus.slnx --nologo --tl:off --no-build
+   ```
+   - At minimum: unit tests
+   - Recommended: include integration tests for high-risk changes
+   - E2E tests optional (expensive, reserved for major changes)
+
+3. **Pre-commit hook enforces this automatically**
+   - Installed at: `.git/hooks/pre-commit`
+   - Runs on every `git commit`
+   - Can be bypassed with `--no-verify` (DISCOURAGED except for docs-only commits)
+
+4. **Zero tolerance for build warnings**
+   - Treat warnings as errors
+   - Fix or suppress (with justification) before committing
+   - Nullable warnings are NOT optional — fix them
+
+**Why:** Cross-project dependencies in 27-project solution amplify the cost of partial validation. Pre-commit hook + team discipline = stable main branch.
+
+**Exceptions:**
+- Documentation-only commits (no code changes) MAY skip pre-commit with `--no-verify`
+- `.squad/` metadata updates MAY skip validation
+- When pre-commit hook fails due to environment issues, resolve environment first — do NOT bypass
+
+**See also:** `.squad/decisions/inbox/leela-retro-build-failures.md` for full retrospective analysis.
+
+---
+
 ### System Messages Sprint Decisions (2026-04-03)
 
 ### 2026-04-03T10:29:01Z: User request — thinking/processing indicator in WebUI
@@ -3131,4 +3179,59 @@ Implemented callback-based streaming mechanism to enable real-time updates:
 
 ### Decision
 ✅ Approved and implemented across all three layers. BotNexus agents now stream responses in real-time and show tool execution progress end-to-end.
+
+
+## From: 2026-04-03-multi-turn-debug.md
+
+# Multi-Turn Tool Calling Investigation — Partial Fix
+
+**Date:** 2026-04-03T21:52:00Z  
+**Author:** Leela (Lead)  
+**Status:** Partial Fix — Needs Follow-up  
+**Priority:** P0 (Critical)
+
+## Summary
+
+Investigated multi-turn tool calling failure for Nova agent. Fixed WebSocket routing bug that was preventing Nova from being invoked. Discovered that multi-turn IS working but exhibits infinite loop behavior — agent repeatedly calls the same tool without processing results.
+
+## Decision
+
+**COMMIT:** WebSocket agent query parameter support and enhanced logging (`2c8bc05`)
+
+**What Was Fixed:**
+1. WebSocket `?agent=nova` query parameter now correctly routes to Nova agent
+2. CopilotProvider enhanced with INFO/DEBUG logging for tool counts and payloads
+3. Priority order for agent selection: message.agent_name > message.agent > query ?agent=
+
+**What Still Needs Investigation:**
+Multi-turn tool calling loops infinitely — same tool called repeatedly (iterations 0,1,2,3,4...). This suggests:
+- Tool results might not be reaching the LLM in subsequent requests
+- Payload format might be incorrect for Copilot API or Claude models
+- May need empty `tools: []` array for Anthropic models (per Pi implementation research)
+
+## Recommendation
+
+**NEXT SESSION:** Capture actual HTTP request payload with DEBUG logging enabled to verify:
+1. Are tool results in the messages array?
+2. Is `tool_call_id` correctly referencing previous assistant call?
+3. Are tools definitions present in all requests?
+4. Compare Nova (claude-opus-4.6) vs assistant (gpt-4o) payloads
+
+**Test:** Run `test-nova-simple.ps1` with DEBUG logging and inspect logs for "Request payload"
+
+## References
+
+- Investigation doc: `.squad/agents/leela/multi-turn-investigation.md`
+- Pi agent research: Documented streaming + tool calling approach from badlogic/pi-mono
+- Commit: `2c8bc05` — WebSocket routing fix + enhanced logging
+
+
+
+## From: copilot-directive-ceremonies.md
+
+### 2026-04-03T14:23:34Z: User directive — ceremonies must run on every interaction
+**By:** Jon Bullen (via Copilot)
+**What:** The coordinator MUST check ceremonies.md before and after every batch of agent work. Design Reviews before multi-agent spawns, Consistency Reviews after every sprint, Retrospectives after failures. No exceptions — these are configured for a reason.
+**Why:** Ceremonies have been consistently skipped, leading to inconsistencies, stale docs, and missed quality gates accumulating across sprints.
+
 

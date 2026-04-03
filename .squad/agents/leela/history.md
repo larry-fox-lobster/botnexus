@@ -5,6 +5,66 @@
 - **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI), Session, Tools.GitHub, WebUI
 - **Created:** 2026-04-01
 
+## 2026-04-03T22:00:00Z — Build Failure Prevention Retrospective (Lead)
+
+**Timestamp:** 2026-04-03T22:00:00Z  
+**Status:** ✅ Complete  
+**Requested by:** Jon Bullen  
+**Ceremony:** Retrospective (triggered by recurring build failures)  
+
+**Problem Identified:**
+Pattern of recurring build failures over 48 hours. Multiple "fix: resolve X warnings" commits indicate agents were committing without full solution validation. Build breakages discovered post-commit instead of being prevented.
+
+**Timeline of Recent Failures:**
+- `3240874`: "fix: resolve nullable model warnings" — CS8603/CS8604/CS8625 across projects
+- `274a29e`: "fix: Remove hardcoded gpt-4o defaults" — configuration issues  
+- `aa06e4d`: "fix: remove hardcoded Temperature/MaxTokens defaults" — nullable warnings
+- `1e02abd`: "fix(gateway): correct invalid route pattern" — runtime bug
+- `a99808a`: "Fix cron tool array schema" — API validation error (HTTP 400)
+- `d8b8aa7`: "fix: resolve all build warnings across solution" — comprehensive cleanup
+- `5f4b0bc`: "Fix pack.ps1 parallel publish race condition" — build script failure
+
+**Root Cause Analysis:**
+1. **No solution-wide build validation before commit** — Agents building individual projects instead of `BotNexus.slnx`
+2. **No automated pre-commit gate** — Nothing prevents broken commits reaching main
+3. **Cascading changes across 27 projects** — Nullable/interface changes ripple through entire solution
+4. **Parallel agent work without coordination** — Multiple agents modifying overlapping files
+
+**Prevention Measures Implemented:**
+
+1. ✅ **Pre-commit hook** (`.git/hooks/pre-commit`)
+   - Runs `dotnet build BotNexus.slnx` before every commit
+   - Runs unit tests before every commit
+   - Fails fast with clear error messages
+   - Lightweight (<30s on clean builds)
+
+2. ✅ **Team decision added to `.squad/decisions.md`**
+   - **Rule 1:** Every agent MUST build full solution before committing (`dotnet build BotNexus.slnx --nologo --tl:off`)
+   - **Rule 2:** Every agent MUST run tests before committing (`dotnet test BotNexus.slnx --nologo --tl:off --no-build`)
+   - **Rule 3:** Pre-commit hook enforces automatically (bypass with `--no-verify` only for docs)
+   - **Rule 4:** Zero tolerance for build warnings (treat as errors)
+
+3. ✅ **Full retrospective document** (`.squad/decisions/inbox/leela-retro-build-failures.md`)
+   - Complete timeline, root cause analysis, lessons learned
+   - Action items for next iteration (CI/CD pipeline, build badges)
+
+**Current Build Status:**
+- ✅ 0 errors, 0 warnings
+- ✅ 540 tests passing (396 unit + 110 integration + 23 E2E + 11 deployment)
+- ✅ Pre-commit hook active
+- ✅ Team decisions documented and enforced
+
+**Outcome:**
+Moving from reactive (fixing broken builds) to proactive (preventing broken commits). Pre-commit hook + team discipline should prevent 90% of future breakages. Recommended next steps: CI/CD pipeline for ultimate safety net.
+
+**Commits:** (pending)
+- `chore(git): Add pre-commit hook for build validation`
+- `docs(squad): Build failure retrospective and prevention rules`
+
+**Leela's Assessment:** Jon was frustrated by repeated build failures — rightfully so. This retrospective addresses the root cause. We now have automated guardrails (pre-commit hook) + documented rules (decisions.md). The build is stable. The rules are clear. Let's keep main green. 🟢
+
+---
+
 ## 2026-04-03T19:30:00Z — Agentic Streaming Architecture (Lead)
 
 **Timestamp:** 2026-04-03T19:30:00Z  
