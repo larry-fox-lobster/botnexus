@@ -281,7 +281,15 @@ public sealed class AgentLoop
 
                 foreach (var toolCall in llmResponse.ToolCalls!)
                 {
-                    // Publish tool execution progress event
+                    var toolProgressMessage = $"🔧 Using tool: {toolCall.ToolName}";
+                    
+                    // Stream tool progress via callback if available
+                    if (onDelta is not null)
+                    {
+                        await onDelta($"\n\n{toolProgressMessage}\n").ConfigureAwait(false);
+                    }
+                    
+                    // Also publish to activity stream for subscribers
                     if (_activityStream is not null)
                     {
                         await _activityStream.PublishAsync(new Core.Models.ActivityEvent(
@@ -290,7 +298,7 @@ public sealed class AgentLoop
                             $"{message.Channel}:{message.ChatId}",
                             message.ChatId,
                             _agentName,
-                            $"🔧 Using tool: {toolCall.ToolName}",
+                            toolProgressMessage,
                             DateTimeOffset.UtcNow), cancellationToken).ConfigureAwait(false);
                     }
                     
@@ -301,6 +309,12 @@ public sealed class AgentLoop
                         DateTimeOffset.UtcNow,
                         ToolName: toolCall.ToolName,
                         ToolCallId: toolCall.Id));
+                }
+                
+                // After tool execution, let the client know we're processing the results
+                if (onDelta is not null && llmResponse.ToolCalls!.Count > 0)
+                {
+                    await onDelta("\n\n💭 Processing tool results...\n").ConfigureAwait(false);
                 }
             }
 
