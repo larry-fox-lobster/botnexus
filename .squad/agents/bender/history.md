@@ -5,6 +5,71 @@
 - **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI), Session, Tools.GitHub, WebUI
 - **Created:** 2026-04-01
 
+## 2026-04-03T20:00:00Z — Streaming Gateway Integration (Runtime)
+
+**Timestamp:** 2026-04-03T20:00:00Z  
+**Status:** ✅ Complete  
+**Requested by:** Jon Bullen  
+**Scope:** Wire streaming callbacks from AgentLoop through to WebSocket clients
+
+**Context:**
+Leela implemented streaming callbacks in AgentLoop (commit `a4c5ac5`) with:
+- `ChatStreamAsync()` for LLM response streaming
+- `onDelta` callback parameter in `ProcessAsync()`
+- Tool progress events via `IActivityStream`
+
+However, tool progress events only reached clients who explicitly subscribed to ActivityStream. Most clients expected streaming to "just work" without extra setup.
+
+**Problem:**
+1. **Tool progress required subscription** — WebSocket clients needed to send `{"type": "subscribe"}` to see tool events
+2. **Inconsistent experience** — Content deltas flowed automatically, but tool progress didn't
+3. **Missing processing indicators** — No feedback when agent was thinking after tool execution
+
+**Solution Implemented:**
+Extended streaming callback flow to send tool progress directly via `onDelta`:
+
+1. **Tool execution progress** — Before each tool call, emit `"🔧 Using tool: {toolName}"` via callback
+2. **Processing indicators** — After tool execution completes, emit `"💭 Processing tool results..."` via callback
+3. **Backward compatible** — Activity stream still receives events for subscribers who want system-wide monitoring
+
+**Technical Changes:**
+- Modified `AgentLoop.cs` (lines 282-319):
+  - Extract tool progress message to variable
+  - Send via `onDelta` callback if available
+  - Send to activity stream for backward compatibility
+  - Add processing indicator after tool loop completes
+
+**WebSocket Message Flow:**
+```
+User sends: {"type": "message", "content": "check the codebase"}
+
+Agent streams back:
+{"type": "delta", "content": "Let me check that..."}
+{"type": "delta", "content": "\n\n🔧 Using tool: filesystem\n"}
+{"type": "delta", "content": "\n\n💭 Processing tool results...\n"}
+{"type": "delta", "content": "I found 42 files..."}
+{"type": "response", "content": "Let me check that...\n\n🔧 Using tool: filesystem\n\n💭 Processing tool results...\n\nI found 42 files..."}
+```
+
+**Testing:**
+- All 10 AgentLoop unit tests pass ✅
+- Build succeeds with 0 errors ✅
+- Backward compatibility maintained (activity stream still works)
+
+**Commit:** `4a69997` — feat(agent): Stream tool progress and processing indicators to WebSocket clients
+
+**Architecture Note:**
+This completes the streaming pipeline Leela built:
+- **Provider layer** → `ChatStreamAsync()` emits LLM deltas
+- **Agent layer** → `ProcessAsync(onDelta)` emits tool progress + processing indicators
+- **Runner layer** → Creates callback when `channel.SupportsStreaming == true`
+- **Channel layer** → `SendDeltaAsync()` formats and sends to WebSocket
+- **Gateway layer** → `WebSocketHandler` writes JSON to socket
+
+WebSocket clients now see true agentic behavior without extra setup. No subscription required.
+
+---
+
 ## 2026-04-03T17:45:00Z — System Messages Sprint (Team Sync)
 
 **Lead:** Leela  
