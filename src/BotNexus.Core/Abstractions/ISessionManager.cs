@@ -19,4 +19,10 @@ public interface ISessionManager
 
     /// <summary>Returns all active session keys.</summary>
     Task<IReadOnlyList<string>> ListKeysAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Sets the hidden flag for a session.</summary>
+    Task SetHiddenAsync(string sessionKey, bool hidden, CancellationToken cancellationToken = default);
+
+    /// <summary>Gets the hidden flag for a session (returns false if session doesn't exist).</summary>
+    Task<bool> IsHiddenAsync(string sessionKey, CancellationToken cancellationToken = default);
 }

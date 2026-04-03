@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using BotNexus.Channels.Base;
 using BotNexus.Core.Abstractions;
 using BotNexus.Core.Configuration;
@@ -99,22 +100,31 @@ app.MapHealthChecks("/ready", new HealthCheckOptions
 });
 
 // --- REST API: Sessions ---
-app.MapGet("/api/sessions", async (ISessionManager sessionManager, IOptions<BotNexusConfig> config) =>
+app.MapGet("/api/sessions", async (ISessionManager sessionManager, IOptions<BotNexusConfig> config, HttpContext context) =>
 {
     var defaultAgent = config.Value.Agents.Named.Keys.FirstOrDefault() ?? "default";
+    var includeHidden = context.Request.Query.TryGetValue("includeHidden", out var value) &&
+                        bool.TryParse(value, out var hidden) && hidden;
+
     var keys = await sessionManager.ListKeysAsync();
     var sessions = new List<object>();
     foreach (var key in keys)
     {
+        var isHidden = await sessionManager.IsHiddenAsync(key);
+        if (isHidden && !includeHidden)
+            continue;
+
         var session = await sessionManager.GetOrCreateAsync(key, defaultAgent);
         sessions.Add(new
         {
             key = session.Key,
             agentName = session.AgentName,
+            model = session.Model,
             createdAt = session.CreatedAt,
             updatedAt = session.UpdatedAt,
             messageCount = session.History.Count,
-            channel = session.Key.Contains(':') ? session.Key[..session.Key.IndexOf(':')] : "unknown"
+            channel = session.Key.Contains(':') ? session.Key[..session.Key.IndexOf(':')] : "unknown",
+            hidden = isHidden
         });
     }
     return Results.Json(sessions, jsonOptions);
@@ -128,13 +138,16 @@ app.MapGet("/api/sessions/{*key}", async (string key, ISessionManager sessionMan
     if (session.History.Count == 0 && session.CreatedAt == session.UpdatedAt)
         return Results.NotFound(new { error = "Session not found" });
 
+    var isHidden = await sessionManager.IsHiddenAsync(decoded);
     return Results.Json(new
     {
         key = session.Key,
         agentName = session.AgentName,
+        model = session.Model,
         channel = session.Key.Contains(':') ? session.Key[..session.Key.IndexOf(':')] : "unknown",
         createdAt = session.CreatedAt,
         updatedAt = session.UpdatedAt,
+        hidden = isHidden,
         history = session.History.Select(e => new
         {
             role = e.Role.ToString().ToLowerInvariant(),
@@ -150,6 +163,20 @@ app.MapGet("/api/sessions/{*key}", async (string key, ISessionManager sessionMan
             })
         })
     }, jsonOptions);
+});
+
+app.MapPost("/api/sessions/{*key}/hide", async (string key, ISessionManager sessionManager) =>
+{
+    var decoded = Uri.UnescapeDataString(key);
+    await sessionManager.SetHiddenAsync(decoded, true);
+    return Results.Json(new { key = decoded, hidden = true }, jsonOptions);
+});
+
+app.MapPost("/api/sessions/{*key}/unhide", async (string key, ISessionManager sessionManager) =>
+{
+    var decoded = Uri.UnescapeDataString(key);
+    await sessionManager.SetHiddenAsync(decoded, false);
+    return Results.Json(new { key = decoded, hidden = false }, jsonOptions);
 });
 
 // --- REST API: Channels ---
@@ -199,6 +226,377 @@ app.MapGet("/api/agents", (IOptions<BotNexusConfig> config) =>
 
     return Results.Json(agents, jsonOptions);
 });
+
+app.MapGet("/api/agents/{name}", (string name, IOptions<BotNexusConfig> config) =>
+{
+    var agentDefaults = config.Value.Agents;
+    
+    if (!agentDefaults.Named.TryGetValue(name, out var agentCfg))
+        return Results.Json(new { error = $"Agent '{name}' not found." }, jsonOptions, statusCode: 404);
+
+    return Results.Json(new
+    {
+        name,
+        systemPrompt = agentCfg.SystemPrompt,
+        systemPromptFile = agentCfg.SystemPromptFile,
+        workspace = agentCfg.Workspace,
+        model = agentCfg.Model ?? agentDefaults.Model,
+        provider = agentCfg.Provider,
+        maxTokens = agentCfg.MaxTokens ?? agentDefaults.MaxTokens,
+        temperature = agentCfg.Temperature ?? agentDefaults.Temperature,
+        maxToolIterations = agentCfg.MaxToolIterations ?? agentDefaults.MaxToolIterations,
+        timezone = agentCfg.Timezone ?? agentDefaults.Timezone,
+        enableMemory = agentCfg.EnableMemory,
+        maxContextFileChars = agentCfg.MaxContextFileChars,
+        consolidationModel = agentCfg.ConsolidationModel,
+        memoryConsolidationIntervalHours = agentCfg.MemoryConsolidationIntervalHours,
+        autoLoadMemory = agentCfg.AutoLoadMemory,
+        mcpServers = agentCfg.McpServers,
+        skills = agentCfg.Skills,
+        disallowedTools = agentCfg.DisallowedTools
+    }, jsonOptions);
+});
+
+app.MapPost("/api/agents", async (HttpContext httpContext, IOptions<BotNexusConfig> config, IAgentWorkspaceFactory workspaceFactory) =>
+{
+    CreateAgentRequest? body;
+    try
+    {
+        body = await httpContext.Request.ReadFromJsonAsync<CreateAgentRequest>(jsonOptions);
+    }
+    catch
+    {
+        return Results.Json(new { error = "Invalid JSON body." }, jsonOptions, statusCode: 400);
+    }
+
+    if (body is null || string.IsNullOrWhiteSpace(body.Name))
+        return Results.Json(new { error = "Agent name is required." }, jsonOptions, statusCode: 400);
+
+    var agentId = NormalizeAgentId(body.Name);
+    if (string.IsNullOrWhiteSpace(agentId))
+        return Results.Json(new { error = "Invalid agent name." }, jsonOptions, statusCode: 400);
+
+    var agentDefaults = config.Value.Agents;
+    if (agentDefaults.Named.ContainsKey(agentId))
+        return Results.Json(new { error = $"Agent '{agentId}' already exists." }, jsonOptions, statusCode: 409);
+
+    var configPath = Path.Combine(botNexusHome, "config.json");
+    var configJson = await File.ReadAllTextAsync(configPath);
+    var configDoc = JsonDocument.Parse(configJson);
+    var rootElement = configDoc.RootElement;
+
+    using var stream = new MemoryStream();
+    using var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true });
+    
+    writer.WriteStartObject();
+    foreach (var property in rootElement.EnumerateObject())
+    {
+        if (property.Name == "BotNexus")
+        {
+            writer.WritePropertyName("BotNexus");
+            writer.WriteStartObject();
+            foreach (var bnProperty in property.Value.EnumerateObject())
+            {
+                if (bnProperty.Name == "Agents")
+                {
+                    writer.WritePropertyName("Agents");
+                    writer.WriteStartObject();
+                    foreach (var agentProperty in bnProperty.Value.EnumerateObject())
+                    {
+                        if (agentProperty.Name == "Named")
+                        {
+                            writer.WritePropertyName("Named");
+                            writer.WriteStartObject();
+                            
+                            // Copy existing agents
+                            foreach (var existingAgent in agentProperty.Value.EnumerateObject())
+                            {
+                                writer.WritePropertyName(existingAgent.Name);
+                                existingAgent.Value.WriteTo(writer);
+                            }
+                            
+                            // Add new agent
+                            writer.WritePropertyName(agentId);
+                            writer.WriteStartObject();
+                            writer.WriteString("Name", agentId);
+                            if (!string.IsNullOrWhiteSpace(body.SystemPrompt))
+                                writer.WriteString("SystemPrompt", body.SystemPrompt);
+                            if (!string.IsNullOrWhiteSpace(body.SystemPromptFile))
+                                writer.WriteString("SystemPromptFile", body.SystemPromptFile);
+                            if (!string.IsNullOrWhiteSpace(body.Model))
+                                writer.WriteString("Model", body.Model);
+                            if (!string.IsNullOrWhiteSpace(body.Provider))
+                                writer.WriteString("Provider", body.Provider);
+                            if (body.MaxTokens.HasValue)
+                                writer.WriteNumber("MaxTokens", body.MaxTokens.Value);
+                            if (body.Temperature.HasValue)
+                                writer.WriteNumber("Temperature", body.Temperature.Value);
+                            if (body.MaxToolIterations.HasValue)
+                                writer.WriteNumber("MaxToolIterations", body.MaxToolIterations.Value);
+                            if (!string.IsNullOrWhiteSpace(body.Timezone))
+                                writer.WriteString("Timezone", body.Timezone);
+                            writer.WriteEndObject();
+                            
+                            writer.WriteEndObject();
+                        }
+                        else
+                        {
+                            writer.WritePropertyName(agentProperty.Name);
+                            agentProperty.Value.WriteTo(writer);
+                        }
+                    }
+                    writer.WriteEndObject();
+                }
+                else
+                {
+                    writer.WritePropertyName(bnProperty.Name);
+                    bnProperty.Value.WriteTo(writer);
+                }
+            }
+            writer.WriteEndObject();
+        }
+        else
+        {
+            writer.WritePropertyName(property.Name);
+            property.Value.WriteTo(writer);
+        }
+    }
+    writer.WriteEndObject();
+    writer.Flush();
+
+    var updatedJson = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+    await File.WriteAllTextAsync(configPath, updatedJson);
+
+    // Bootstrap workspace
+    var workspace = workspaceFactory.Create(agentId);
+    await workspace.InitializeAsync();
+
+    return Results.Json(new
+    {
+        name = agentId,
+        systemPrompt = body.SystemPrompt,
+        systemPromptFile = body.SystemPromptFile,
+        model = body.Model ?? agentDefaults.Model,
+        provider = body.Provider,
+        maxTokens = body.MaxTokens ?? agentDefaults.MaxTokens,
+        temperature = body.Temperature ?? agentDefaults.Temperature,
+        maxToolIterations = body.MaxToolIterations ?? agentDefaults.MaxToolIterations,
+        timezone = body.Timezone ?? agentDefaults.Timezone
+    }, jsonOptions, statusCode: 201);
+});
+
+app.MapPut("/api/agents/{name}", async (string name, HttpContext httpContext, IOptions<BotNexusConfig> config) =>
+{
+    var agentDefaults = config.Value.Agents;
+    if (!agentDefaults.Named.ContainsKey(name))
+        return Results.Json(new { error = $"Agent '{name}' not found." }, jsonOptions, statusCode: 404);
+
+    UpdateAgentRequest? body;
+    try
+    {
+        body = await httpContext.Request.ReadFromJsonAsync<UpdateAgentRequest>(jsonOptions);
+    }
+    catch
+    {
+        return Results.Json(new { error = "Invalid JSON body." }, jsonOptions, statusCode: 400);
+    }
+
+    if (body is null)
+        return Results.Json(new { error = "Request body is required." }, jsonOptions, statusCode: 400);
+
+    var configPath = Path.Combine(botNexusHome, "config.json");
+    var configJson = await File.ReadAllTextAsync(configPath);
+    var configDoc = JsonDocument.Parse(configJson);
+    var rootElement = configDoc.RootElement;
+
+    using var stream = new MemoryStream();
+    using var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true });
+    
+    writer.WriteStartObject();
+    foreach (var property in rootElement.EnumerateObject())
+    {
+        if (property.Name == "BotNexus")
+        {
+            writer.WritePropertyName("BotNexus");
+            writer.WriteStartObject();
+            foreach (var bnProperty in property.Value.EnumerateObject())
+            {
+                if (bnProperty.Name == "Agents")
+                {
+                    writer.WritePropertyName("Agents");
+                    writer.WriteStartObject();
+                    foreach (var agentProperty in bnProperty.Value.EnumerateObject())
+                    {
+                        if (agentProperty.Name == "Named")
+                        {
+                            writer.WritePropertyName("Named");
+                            writer.WriteStartObject();
+                            
+                            foreach (var existingAgent in agentProperty.Value.EnumerateObject())
+                            {
+                                writer.WritePropertyName(existingAgent.Name);
+                                if (existingAgent.Name == name)
+                                {
+                                    // Update this agent
+                                    writer.WriteStartObject();
+                                    writer.WriteString("Name", name);
+                                    if (body.SystemPrompt is not null)
+                                        writer.WriteString("SystemPrompt", body.SystemPrompt);
+                                    if (body.SystemPromptFile is not null)
+                                        writer.WriteString("SystemPromptFile", body.SystemPromptFile);
+                                    if (body.Model is not null)
+                                        writer.WriteString("Model", body.Model);
+                                    if (body.Provider is not null)
+                                        writer.WriteString("Provider", body.Provider);
+                                    if (body.MaxTokens.HasValue)
+                                        writer.WriteNumber("MaxTokens", body.MaxTokens.Value);
+                                    if (body.Temperature.HasValue)
+                                        writer.WriteNumber("Temperature", body.Temperature.Value);
+                                    if (body.MaxToolIterations.HasValue)
+                                        writer.WriteNumber("MaxToolIterations", body.MaxToolIterations.Value);
+                                    if (body.Timezone is not null)
+                                        writer.WriteString("Timezone", body.Timezone);
+                                    writer.WriteEndObject();
+                                }
+                                else
+                                {
+                                    existingAgent.Value.WriteTo(writer);
+                                }
+                            }
+                            
+                            writer.WriteEndObject();
+                        }
+                        else
+                        {
+                            writer.WritePropertyName(agentProperty.Name);
+                            agentProperty.Value.WriteTo(writer);
+                        }
+                    }
+                    writer.WriteEndObject();
+                }
+                else
+                {
+                    writer.WritePropertyName(bnProperty.Name);
+                    bnProperty.Value.WriteTo(writer);
+                }
+            }
+            writer.WriteEndObject();
+        }
+        else
+        {
+            writer.WritePropertyName(property.Name);
+            property.Value.WriteTo(writer);
+        }
+    }
+    writer.WriteEndObject();
+    writer.Flush();
+
+    var updatedJson = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+    await File.WriteAllTextAsync(configPath, updatedJson);
+
+    return Results.Json(new
+    {
+        name,
+        systemPrompt = body.SystemPrompt,
+        systemPromptFile = body.SystemPromptFile,
+        model = body.Model,
+        provider = body.Provider,
+        maxTokens = body.MaxTokens,
+        temperature = body.Temperature,
+        maxToolIterations = body.MaxToolIterations,
+        timezone = body.Timezone
+    }, jsonOptions);
+});
+
+app.MapDelete("/api/agents/{name}", async (string name, IOptions<BotNexusConfig> config) =>
+{
+    var agentDefaults = config.Value.Agents;
+    if (!agentDefaults.Named.ContainsKey(name))
+        return Results.Json(new { error = $"Agent '{name}' not found." }, jsonOptions, statusCode: 404);
+
+    var configPath = Path.Combine(botNexusHome, "config.json");
+    var configJson = await File.ReadAllTextAsync(configPath);
+    var configDoc = JsonDocument.Parse(configJson);
+    var rootElement = configDoc.RootElement;
+
+    using var stream = new MemoryStream();
+    using var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true });
+    
+    writer.WriteStartObject();
+    foreach (var property in rootElement.EnumerateObject())
+    {
+        if (property.Name == "BotNexus")
+        {
+            writer.WritePropertyName("BotNexus");
+            writer.WriteStartObject();
+            foreach (var bnProperty in property.Value.EnumerateObject())
+            {
+                if (bnProperty.Name == "Agents")
+                {
+                    writer.WritePropertyName("Agents");
+                    writer.WriteStartObject();
+                    foreach (var agentProperty in bnProperty.Value.EnumerateObject())
+                    {
+                        if (agentProperty.Name == "Named")
+                        {
+                            writer.WritePropertyName("Named");
+                            writer.WriteStartObject();
+                            
+                            foreach (var existingAgent in agentProperty.Value.EnumerateObject())
+                            {
+                                if (existingAgent.Name != name)
+                                {
+                                    writer.WritePropertyName(existingAgent.Name);
+                                    existingAgent.Value.WriteTo(writer);
+                                }
+                            }
+                            
+                            writer.WriteEndObject();
+                        }
+                        else
+                        {
+                            writer.WritePropertyName(agentProperty.Name);
+                            agentProperty.Value.WriteTo(writer);
+                        }
+                    }
+                    writer.WriteEndObject();
+                }
+                else
+                {
+                    writer.WritePropertyName(bnProperty.Name);
+                    bnProperty.Value.WriteTo(writer);
+                }
+            }
+            writer.WriteEndObject();
+        }
+        else
+        {
+            writer.WritePropertyName(property.Name);
+            property.Value.WriteTo(writer);
+        }
+    }
+    writer.WriteEndObject();
+    writer.Flush();
+
+    var updatedJson = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+    await File.WriteAllTextAsync(configPath, updatedJson);
+
+    return Results.Json(new { name, deleted = true }, jsonOptions);
+});
+
+// Local helper function for agent ID normalization
+static string NormalizeAgentId(string agentName)
+{
+    if (string.IsNullOrWhiteSpace(agentName))
+        return string.Empty;
+
+    var normalized = agentName.Trim().ToLowerInvariant();
+    normalized = Regex.Replace(normalized, @"[^a-z0-9]+", "-");
+    normalized = normalized.Trim('-');
+    normalized = Regex.Replace(normalized, @"-+", "-");
+
+    return normalized;
+}
 
 // --- REST API: Providers ---
 app.MapGet("/api/providers", (ProviderRegistry providerRegistry) =>
@@ -556,3 +954,23 @@ public partial class Program { }
 
 internal sealed record EnableRequest(bool Enabled);
 internal sealed record ShutdownRequest(string? Reason);
+internal sealed record CreateAgentRequest(
+    string Name,
+    string? SystemPrompt = null,
+    string? SystemPromptFile = null,
+    string? Model = null,
+    string? Provider = null,
+    int? MaxTokens = null,
+    double? Temperature = null,
+    int? MaxToolIterations = null,
+    string? Timezone = null);
+internal sealed record UpdateAgentRequest(
+    string? SystemPrompt = null,
+    string? SystemPromptFile = null,
+    string? Model = null,
+    string? Provider = null,
+    int? MaxTokens = null,
+    double? Temperature = null,
+    int? MaxToolIterations = null,
+    string? Timezone = null);
+

@@ -128,12 +128,78 @@ public sealed class SessionManager : ISessionManager
         }
     }
 
+    /// <inheritdoc/>
+    public async Task SetHiddenAsync(string sessionKey, bool hidden, CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var filePath = GetFilePath(sessionKey);
+            var metaPath = Path.ChangeExtension(filePath, ".meta.json");
+            
+            // Read existing metadata or create default
+            SessionMeta? meta = null;
+            if (File.Exists(metaPath))
+            {
+                try
+                {
+                    var metaJson = await File.ReadAllTextAsync(metaPath, cancellationToken).ConfigureAwait(false);
+                    meta = JsonSerializer.Deserialize<SessionMeta>(metaJson, _jsonOptions);
+                }
+                catch { /* best-effort */ }
+            }
+
+            // If we have metadata or the session exists, update the hidden flag
+            if (meta is not null || File.Exists(filePath))
+            {
+                var agentName = meta?.AgentName ?? "default";
+                var model = meta?.Model;
+                meta = new SessionMeta(agentName, hidden, model);
+                var newMetaJson = JsonSerializer.Serialize(meta, _jsonOptions);
+                await File.WriteAllTextAsync(metaPath, newMetaJson, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> IsHiddenAsync(string sessionKey, CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var filePath = GetFilePath(sessionKey);
+            var metaPath = Path.ChangeExtension(filePath, ".meta.json");
+            
+            if (!File.Exists(metaPath))
+                return false;
+
+            try
+            {
+                var metaJson = await File.ReadAllTextAsync(metaPath, cancellationToken).ConfigureAwait(false);
+                var meta = JsonSerializer.Deserialize<SessionMeta>(metaJson, _jsonOptions);
+                return meta?.Hidden ?? false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     private async Task<Core.Models.Session> LoadFromFileAsync(string sessionKey, string agentName, CancellationToken cancellationToken)
     {
         var session = new Core.Models.Session { Key = sessionKey, AgentName = agentName };
         var filePath = GetFilePath(sessionKey);
 
-        // Load agent name from metadata sidecar if available
+        // Load agent name and model from metadata sidecar if available
         var metaPath = Path.ChangeExtension(filePath, ".meta.json");
         if (File.Exists(metaPath))
         {
@@ -141,8 +207,13 @@ public sealed class SessionManager : ISessionManager
             {
                 var metaJson = await File.ReadAllTextAsync(metaPath, cancellationToken).ConfigureAwait(false);
                 var meta = JsonSerializer.Deserialize<SessionMeta>(metaJson, _jsonOptions);
-                if (meta is not null && !string.IsNullOrWhiteSpace(meta.AgentName))
-                    session.AgentName = meta.AgentName;
+                if (meta is not null)
+                {
+                    if (!string.IsNullOrWhiteSpace(meta.AgentName))
+                        session.AgentName = meta.AgentName;
+                    if (!string.IsNullOrWhiteSpace(meta.Model))
+                        session.Model = meta.Model;
+                }
             }
             catch { /* best-effort */ }
         }
@@ -177,7 +248,7 @@ public sealed class SessionManager : ISessionManager
         {
             try
             {
-                var metaJson = JsonSerializer.Serialize(new SessionMeta(session.AgentName), _jsonOptions);
+                var metaJson = JsonSerializer.Serialize(new SessionMeta(session.AgentName, Hidden: false, session.Model), _jsonOptions);
                 await File.WriteAllTextAsync(metaPath, metaJson, cancellationToken).ConfigureAwait(false);
             }
             catch { /* best-effort migration */ }
@@ -192,9 +263,20 @@ public sealed class SessionManager : ISessionManager
         var lines = session.History.Select(e => JsonSerializer.Serialize(e, _jsonOptions));
         await File.WriteAllLinesAsync(filePath, lines, cancellationToken).ConfigureAwait(false);
 
-        // Write metadata sidecar
+        // Write metadata sidecar (preserve existing hidden flag if it exists)
         var metaPath = Path.ChangeExtension(filePath, ".meta.json");
-        var meta = new SessionMeta(session.AgentName);
+        var existingHidden = false;
+        if (File.Exists(metaPath))
+        {
+            try
+            {
+                var existingJson = await File.ReadAllTextAsync(metaPath, cancellationToken).ConfigureAwait(false);
+                var existingMeta = JsonSerializer.Deserialize<SessionMeta>(existingJson, _jsonOptions);
+                existingHidden = existingMeta?.Hidden ?? false;
+            }
+            catch { /* best-effort */ }
+        }
+        var meta = new SessionMeta(session.AgentName, existingHidden, session.Model);
         var metaJson = JsonSerializer.Serialize(meta, _jsonOptions);
         await File.WriteAllTextAsync(metaPath, metaJson, cancellationToken).ConfigureAwait(false);
     }
@@ -209,4 +291,4 @@ public sealed class SessionManager : ISessionManager
         => Uri.UnescapeDataString(encoded.Replace("_", "%"));
 }
 
-internal sealed record SessionMeta(string AgentName);
+internal sealed record SessionMeta(string AgentName, bool Hidden = false, string? Model = null);

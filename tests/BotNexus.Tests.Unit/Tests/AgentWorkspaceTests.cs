@@ -46,12 +46,12 @@ public sealed class AgentWorkspaceTests : IDisposable
     }
 
     [Fact]
-    public async Task InitializeAsync_DoesNotCreateAgentsOrToolsStubs()
+    public async Task InitializeAsync_CreatesAgentsAndToolsStubs()
     {
         await _workspace.InitializeAsync();
 
-        _workspace.FileExists("AGENTS.md").Should().BeFalse();
-        _workspace.FileExists("TOOLS.md").Should().BeFalse();
+        _workspace.FileExists("AGENTS.md").Should().BeTrue();
+        _workspace.FileExists("TOOLS.md").Should().BeTrue();
     }
 
     [Fact]

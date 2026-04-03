@@ -21,8 +21,8 @@ public class ConfigurationTests
         var botNexusConfig = new BotNexusConfig();
 
         botNexusConfig.Agents.Model.Should().Be("gpt-4o");
-        botNexusConfig.Agents.MaxTokens.Should().Be(8192);
-        botNexusConfig.Agents.Temperature.Should().Be(0.1);
+        botNexusConfig.Agents.MaxTokens.Should().BeNull();
+        botNexusConfig.Agents.Temperature.Should().BeNull();
         botNexusConfig.Gateway.Port.Should().Be(18790);
         botNexusConfig.Api.Port.Should().Be(8900);
     }
