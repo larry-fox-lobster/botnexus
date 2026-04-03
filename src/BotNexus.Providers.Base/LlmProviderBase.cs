@@ -62,7 +62,7 @@ public abstract class LlmProviderBase : ILlmProvider
     }
 
     /// <inheritdoc/>
-    public abstract IAsyncEnumerable<string> ChatStreamAsync(ChatRequest request, CancellationToken cancellationToken = default);
+    public abstract IAsyncEnumerable<StreamingChatChunk> ChatStreamAsync(ChatRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>Performs the actual chat request. Override in derived classes.</summary>
     protected abstract Task<LlmResponse> ChatCoreAsync(ChatRequest request, CancellationToken cancellationToken);

@@ -44,7 +44,7 @@ public sealed class FixtureLlmProvider(IConfiguration configuration) : ILlmProvi
         return Task.FromResult(new LlmResponse($"provider[{_defaultModel}]:{lastUserMessage}", FinishReason.Stop));
     }
 
-    public async IAsyncEnumerable<string> ChatStreamAsync(
+    public async IAsyncEnumerable<StreamingChatChunk> ChatStreamAsync(
         ChatRequest request,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -54,16 +54,16 @@ public sealed class FixtureLlmProvider(IConfiguration configuration) : ILlmProvi
 
         if (!string.IsNullOrWhiteSpace(toolMessage))
         {
-            yield return $"provider[{_defaultModel}]:tool-finished:{toolMessage}";
+            yield return StreamingChatChunk.FromContentDelta($"provider[{_defaultModel}]:tool-finished:{toolMessage}");
         }
         else if (lastUserMessage.Contains("use tool", StringComparison.OrdinalIgnoreCase) && hasFixtureTool)
         {
             // Can't return tool calls in streaming mode - this should use ChatAsync
-            yield return $"provider[{_defaultModel}]:no-tools-in-stream";
+            yield return StreamingChatChunk.FromContentDelta($"provider[{_defaultModel}]:no-tools-in-stream");
         }
         else
         {
-            yield return $"provider[{_defaultModel}]:{lastUserMessage}";
+            yield return StreamingChatChunk.FromContentDelta($"provider[{_defaultModel}]:{lastUserMessage}");
         }
         
         await Task.CompletedTask;
