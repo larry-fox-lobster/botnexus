@@ -209,7 +209,21 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
     {
         var payload = BuildRequestPayload(request, stream: false);
         var modelUsed = payload["model"]?.ToString() ?? _defaultModel;
-        Logger.LogDebug("CopilotProvider: Sending chat request with model={Model}", modelUsed);
+        var toolCount = request.Tools?.Count ?? 0;
+        
+        Logger.LogInformation("CopilotProvider: Sending chat request with model={Model}, tools={ToolCount}, messages={MessageCount}", 
+            modelUsed, toolCount, request.Messages.Count);
+        
+        if (toolCount > 0)
+        {
+            Logger.LogInformation("CopilotProvider: Tools in request: {ToolNames}", 
+                string.Join(", ", request.Tools!.Select(t => t.Name)));
+        }
+        
+        // Log the full payload for debugging
+        var payloadJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = false });
+        Logger.LogDebug("CopilotProvider: Request payload: {Payload}", payloadJson);
+        
         using var httpRequest = await CreateChatRequestAsync(payload, cancellationToken).ConfigureAwait(false);
         using var response = await _httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
 
@@ -230,6 +244,10 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
         response.EnsureSuccessStatusCode();
 
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        
+        // Log full response for debugging
+        Logger.LogDebug("CopilotProvider: Response body: {ResponseContent}", responseContent);
+        
         using var document = JsonDocument.Parse(responseContent);
         var root = document.RootElement;
         var choice = root.GetProperty("choices")[0];
@@ -247,8 +265,14 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
         if (message.TryGetProperty("tool_calls", out var toolCallsElement) && toolCallsElement.ValueKind == JsonValueKind.Array)
             toolCalls = ParseToolCalls(toolCallsElement);
 
-        Logger.LogDebug("Copilot response: model={Model}, content_length={ContentLength}, finish_reason={FinishReasonRaw}/{FinishReasonMapped}, tool_calls={ToolCallCount}",
+        Logger.LogInformation("Copilot response: model={Model}, content_length={ContentLength}, finish_reason={FinishReasonRaw}/{FinishReasonMapped}, tool_calls={ToolCallCount}",
             modelUsed, content?.Length ?? 0, finishReasonStr ?? "null", finishReason, toolCalls?.Count ?? 0);
+        
+        if (toolCalls is { Count: > 0 })
+        {
+            Logger.LogInformation("CopilotProvider: Tool calls returned: {ToolCallNames}", 
+                string.Join(", ", toolCalls.Select(tc => $"{tc.ToolName}(id={tc.Id})")));
+        }
 
         int? promptTokens = null;
         int? completionTokens = null;

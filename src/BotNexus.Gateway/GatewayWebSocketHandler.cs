@@ -51,7 +51,10 @@ public sealed class GatewayWebSocketHandler
     {
         using var socket = await context.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false);
         var connectionId = Guid.NewGuid().ToString("N");
-        _logger.LogInformation("WebSocket client connected: {ConnectionId}", connectionId);
+        
+        // Extract agent name from query string if provided
+        var agentFromQuery = context.Request.Query["agent"].FirstOrDefault();
+        _logger.LogInformation("WebSocket client connected: {ConnectionId}, agent={AgentName}", connectionId, agentFromQuery ?? "default");
 
         var responseReader = _wsChannel.AddConnection(connectionId);
 
@@ -65,7 +68,7 @@ public sealed class GatewayWebSocketHandler
         IActivitySubscription? activitySub = null;
         Task? activityTask = null;
 
-        var readerTask = ReadFromClientAsync(socket, connectionId, () =>
+        var readerTask = ReadFromClientAsync(socket, connectionId, agentFromQuery, () =>
         {
             if (activitySub is not null) return; // already subscribed
             activitySub = _activityStream.Subscribe();
@@ -106,7 +109,7 @@ public sealed class GatewayWebSocketHandler
         _logger.LogInformation("WebSocket client disconnected: {ConnectionId}", connectionId);
     }
 
-    private async Task ReadFromClientAsync(WebSocket socket, string connectionId,
+    private async Task ReadFromClientAsync(WebSocket socket, string connectionId, string? agentFromQuery,
         Action onSubscribe, CancellationToken ct)
     {
         var buffer = new byte[4096];
@@ -127,7 +130,7 @@ public sealed class GatewayWebSocketHandler
                     continue;
                 }
 
-                var inbound = ToInboundMessage(dto, connectionId);
+                var inbound = ToInboundMessage(dto, connectionId, agentFromQuery);
                 if (inbound is null) continue;
 
                 await _messageBus.PublishAsync(inbound, ct).ConfigureAwait(false);
@@ -205,7 +208,7 @@ public sealed class GatewayWebSocketHandler
         }
     }
 
-    private InboundMessage? ToInboundMessage(WsInboundMessage dto, string connectionId)
+    private InboundMessage? ToInboundMessage(WsInboundMessage dto, string connectionId, string? agentFromQuery)
     {
         if (dto.Content is null)
         {
@@ -220,14 +223,19 @@ public sealed class GatewayWebSocketHandler
             Content: dto.Content,
             Timestamp: DateTimeOffset.UtcNow,
             Media: [],
-            Metadata: BuildMetadata(dto),
+            Metadata: BuildMetadata(dto, agentFromQuery),
             SessionKeyOverride: string.IsNullOrEmpty(dto.SessionId) ? null : dto.SessionId);
     }
 
-    private static IReadOnlyDictionary<string, object> BuildMetadata(WsInboundMessage dto)
+    private static IReadOnlyDictionary<string, object> BuildMetadata(WsInboundMessage dto, string? agentFromQuery)
     {
         var metadata = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        
+        // Priority: message.agent_name > message.agent > query string agent
         var agentName = string.IsNullOrWhiteSpace(dto.AgentName) ? dto.Agent : dto.AgentName;
+        if (string.IsNullOrWhiteSpace(agentName))
+            agentName = agentFromQuery;
+        
         if (!string.IsNullOrWhiteSpace(agentName))
             metadata["agent"] = agentName;
         if (!string.IsNullOrWhiteSpace(dto.Model))
