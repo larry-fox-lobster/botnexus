@@ -4548,3 +4548,721 @@ graph TD
 
 ---
 
+
+---
+
+
+# Decision: BotNexus.Providers.Core — Standalone Pi-Mono Port
+
+**By:** Farnsworth (Platform Dev)  
+**Date:** 2026-04-04  
+**Status:** Implemented  
+**Requested by:** Jon Bullen
+
+## Context
+
+Jon requested a standalone C#/.NET 10 port of the core abstractions from [pi-mono's AI package](https://github.com/badlogic/pi-mono/tree/main/packages/ai/src). This project has **zero dependencies** on the existing BotNexus platform — it's the foundation for a new provider architecture.
+
+## Decision
+
+Created `src/providers/BotNexus.Providers.Core/` as a self-contained class library targeting `net10.0`. Only external dependency: `Microsoft.Extensions.Logging.Abstractions`.
+
+## What Was Ported
+
+| Pi-Mono Source | C# Target | Notes |
+|---|---|---|
+| `types.ts` content blocks | `Models/ContentBlock.cs` | Abstract record + JsonPolymorphic with "type" discriminator |
+| `types.ts` messages | `Models/Messages.cs` | Abstract record + JsonPolymorphic with "role" discriminator |
+| `types.ts` UserMessage content union | `Models/UserMessageContent.cs` | Custom JsonConverter for string-or-array pattern |
+| `types.ts` enums | `Models/Enums.cs` | JsonStringEnumMemberName for wire-compatible values |
+| `types.ts` Usage/UsageCost | `Models/Usage.cs` | Mutable Usage class (matches pi-mono mutation pattern) |
+| `types.ts` Model | `Models/LlmModel.cs` | Immutable record |
+| `types.ts` StreamOptions | `StreamOptions.cs` | CancellationToken replaces AbortSignal |
+| `types.ts` events | `Streaming/AssistantMessageEvent.cs` | Abstract record hierarchy |
+| `utils/event-stream.ts` | `Streaming/LlmStream.cs` | System.Threading.Channels replaces queue+waiting pattern |
+| `api-registry.ts` | `Registry/ApiProviderRegistry.cs` | ConcurrentDictionary, thread-safe |
+| `models.ts` | `Registry/ModelRegistry.cs` | ConcurrentDictionary, includes CalculateCost |
+| `stream.ts` | `LlmClient.cs` | Static stream/complete functions |
+| `env-api-keys.ts` | `EnvironmentApiKeys.cs` | All provider→env var mappings |
+| `providers/transform-messages.ts` | `Utilities/MessageTransformer.cs` | Cross-provider message normalization |
+| `utils/json-parse.ts` | `Utilities/StreamingJsonParser.cs` | Partial JSON repair for streaming |
+| `utils/sanitize-unicode.ts` | `Utilities/UnicodeSanitizer.cs` | Unpaired surrogate replacement |
+| `providers/simple-options.ts` | `Utilities/SimpleOptionsHelper.cs` | Thinking budget calculation |
+| `providers/github-copilot-headers.ts` | `Utilities/CopilotHeaders.cs` | Shared Copilot header helpers |
+| `types.ts` OpenAICompletionsCompat | `Compatibility/OpenAICompletionsCompat.cs` | Compat flags record |
+
+## Key Design Choices
+
+1. **Records for immutable types, classes for mutable** — ContentBlock, Messages, LlmModel use records. Usage and StreamOptions use classes to allow mutation during streaming.
+2. **Channel\<T\> for LlmStream** — Idiomatic C# replacement for pi-mono's queue+waiting async iterator.
+3. **ConcurrentDictionary for registries** — Thread-safe without explicit locking.
+4. **JsonPolymorphic for serialization** — ContentBlock uses "type", Message uses "role" as discriminators, matching pi-mono wire format.
+
+## Impact
+
+- No existing projects affected — standalone library
+- Added to `BotNexus.slnx`, builds clean (0 warnings, 0 errors)
+- Future provider implementations can reference this instead of BotNexus.Providers.Base
+
+
+---
+
+
+# Decision: OpenAI Completions Provider (Providers.Core Architecture)
+
+**Author:** Farnsworth (Platform Dev)
+**Date:** 2026-04-04
+**Status:** Implemented
+**Scope:** `src/providers/BotNexus.Providers.OpenAI/`
+
+## Summary
+
+Created the OpenAI Chat Completions API provider under the new `BotNexus.Providers.Core` architecture, porting from pi-mono's `providers/openai-completions.ts`.
+
+## Key Decisions
+
+### 1. Raw HttpClient over OpenAI SDK
+Used `HttpClient` directly for SSE streaming instead of the official OpenAI .NET SDK. This gives full control over headers, compat settings, thinking format support, and SSE parsing — critical for supporting non-standard endpoints (Cerebras, xAI, DeepSeek, etc.) via `OpenAICompletionsCompat`.
+
+### 2. Assembly name disambiguation
+Set `<AssemblyName>BotNexus.Providers.OpenAI.Completions</AssemblyName>` to avoid output collision with the old legacy provider at `src/BotNexus.Providers.OpenAI/` which still exists in the solution. Namespace remains `BotNexus.Providers.OpenAI`. Same pattern as the Copilot provider dual.
+
+### 3. JsonObject/JsonNode for payload building
+Consistent with the Copilot provider — uses `System.Text.Json.Nodes.JsonObject` for dynamic request payload construction. Avoids anonymous type issues with `System.Text.Json` serialization and gives full control over field inclusion/exclusion based on compat settings.
+
+### 4. State machine SSE parsing
+Streaming parser tracks text, thinking, and tool call blocks via index-based state. Blocks are opened/closed explicitly with Start/Delta/End events. Tool calls track per-SSE-index to handle parallel tool calls. `StreamingJsonParser` from Core handles partial JSON in tool call arguments during streaming.
+
+### 5. OpenAICompletionsCompat support
+Full compat surface supported: developer role, strict schema mode, max_tokens field name, thinking format (openai vs zAI/qwen style), usage in streaming, tool result name requirement, assistant-after-tool-result insertion. All driven by model metadata — no hardcoded provider detection.
+
+## Files Created
+
+- `BotNexus.Providers.OpenAI.csproj` — NET 10.0, references only Core
+- `OpenAICompletionsOptions.cs` — Extends StreamOptions with ToolChoice, ReasoningEffort
+- `OpenAICompletionsProvider.cs` — Full IApiProvider implementation (~500 lines)
+
+## Build Status
+
+Full solution: 0 errors, 0 warnings.
+
+
+---
+
+
+# Architecture Decision: LLM Provider Abstraction Layer
+
+**Author:** Leela (Lead/Architect)  
+**Date:** 2026-04-04  
+**Status:** Proposed  
+**Requested by:** Jon Bullen  
+**Reference:** [pi-mono/packages/ai](https://github.com/badlogic/pi-mono/tree/main/packages/ai) (TypeScript)
+
+---
+
+## Summary
+
+This document defines the C#/.NET 10 port of pi-mono's LLM provider abstraction layer. It maps every pi-mono concept to an idiomatic C# equivalent, covering types, streaming, registration, and cross-provider message transformation. These are concrete decisions, not options lists.
+
+---
+
+## 1. Project Structure
+
+```
+src/providers/
+  BotNexus.Providers.Core/       — Types, interfaces, registries, utilities
+  BotNexus.Providers.Anthropic/  — Anthropic Messages API
+  BotNexus.Providers.OpenAI/     — OpenAI Chat Completions + Responses API
+  BotNexus.Providers.OpenAICompat/ — Ollama, vLLM, LM Studio (OpenAI-compatible)
+  BotNexus.Providers.Copilot/    — GitHub Copilot (OAuth proxy)
+```
+
+Each provider project references only `BotNexus.Providers.Core`. No provider references another provider. Assembly-level isolation ensures providers can be loaded/deployed independently.
+
+---
+
+## 2. Type Hierarchy — Content Blocks
+
+Pi-mono uses a discriminated union via `type` field. C# uses abstract records with a sealed hierarchy.
+
+```csharp
+// BotNexus.Providers.Core/Types/ContentBlock.cs
+
+public abstract record ContentBlock;
+
+public sealed record TextContent(string Text, string? TextSignature = null) : ContentBlock;
+
+public sealed record ThinkingContent(
+    string Thinking,
+    string? ThinkingSignature = null,
+    bool Redacted = false) : ContentBlock;
+
+public sealed record ImageContent(string Data, string MimeType) : ContentBlock;
+
+public sealed record ToolCallContent(
+    string Id,
+    string Name,
+    IReadOnlyDictionary<string, object?> Arguments,
+    string? ThoughtSignature = null) : ContentBlock;
+```
+
+**Decision:** `record` not `class` — immutability by default, value equality for testing, `with` expressions for transformation. The `sealed` keyword on each leaf prevents open extension (the set of content block types is fixed by API contract).
+
+**Mapping:**
+| pi-mono (TS) | BotNexus (C#) |
+|---|---|
+| `{ type: "text", text, textSignature? }` | `TextContent` |
+| `{ type: "thinking", thinking, thinkingSignature?, redacted? }` | `ThinkingContent` |
+| `{ type: "image", data, mimeType }` | `ImageContent` |
+| `{ type: "toolCall", id, name, arguments, thoughtSignature? }` | `ToolCallContent` |
+
+---
+
+## 3. Type Hierarchy — Messages
+
+```csharp
+// BotNexus.Providers.Core/Types/Message.cs
+
+public abstract record Message(long Timestamp);
+
+public sealed record UserMessage : Message
+{
+    // Content is either a plain string or structured blocks (text + image)
+    public string? TextContent { get; init; }
+    public IReadOnlyList<ContentBlock>? ContentBlocks { get; init; }
+    public UserMessage(long Timestamp) : base(Timestamp) { }
+}
+
+public sealed record AssistantMessage : Message
+{
+    public required IReadOnlyList<ContentBlock> Content { get; init; }
+    public required string Api { get; init; }
+    public required string Provider { get; init; }
+    public required string Model { get; init; }
+    public string? ResponseId { get; init; }
+    public required Usage Usage { get; init; }
+    public required StopReason StopReason { get; init; }
+    public string? ErrorMessage { get; init; }
+    public AssistantMessage(long Timestamp) : base(Timestamp) { }
+}
+
+public sealed record ToolResultMessage : Message
+{
+    public required string ToolCallId { get; init; }
+    public required string ToolName { get; init; }
+    public required IReadOnlyList<ContentBlock> Content { get; init; } // TextContent | ImageContent
+    public bool IsError { get; init; }
+    public ToolResultMessage(long Timestamp) : base(Timestamp) { }
+}
+```
+
+**Decision:** `UserMessage` supports both `string` content and structured blocks — matching pi-mono's `string | (TextContent | ImageContent)[]`. The type test (`message is UserMessage`) replaces pi-mono's `role` check.
+
+---
+
+## 4. Usage, StopReason, Cost
+
+```csharp
+public sealed record TokenCost(
+    decimal Input,
+    decimal Output,
+    decimal CacheRead,
+    decimal CacheWrite,
+    decimal Total);
+
+public sealed record Usage(
+    int Input,
+    int Output,
+    int CacheRead,
+    int CacheWrite,
+    int TotalTokens,
+    TokenCost Cost);
+
+public enum StopReason
+{
+    Stop,
+    Length,
+    ToolUse,
+    Error,
+    Aborted
+}
+```
+
+**Decision:** `decimal` for cost (financial precision). `int` for token counts (no provider returns fractional tokens). Direct 1:1 map from pi-mono's structure.
+
+---
+
+## 5. Context and Tool
+
+```csharp
+public sealed record ConversationContext(
+    IReadOnlyList<Message> Messages,
+    string? SystemPrompt = null,
+    IReadOnlyList<ToolDefinition>? Tools = null);
+
+public sealed record ToolDefinition(
+    string Name,
+    string Description,
+    JsonElement Parameters); // JSON Schema as System.Text.Json element
+```
+
+**Decision:** `JsonElement` for tool parameters — pi-mono uses TypeBox schemas which are JSON Schema at runtime. `JsonElement` is zero-copy, serializable, and doesn't force a specific schema library. Callers build schemas with whatever tool they like (JsonSchema.Net, manual JsonNode, etc.).
+
+---
+
+## 6. Model Metadata
+
+```csharp
+public sealed record ModelCost(
+    decimal Input,        // $/million tokens
+    decimal Output,
+    decimal CacheRead,
+    decimal CacheWrite);
+
+public sealed record ModelInfo
+{
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public required string Api { get; init; }        // e.g. "anthropic-messages", "openai-completions"
+    public required string Provider { get; init; }    // e.g. "anthropic", "openai"
+    public required string BaseUrl { get; init; }
+    public required bool Reasoning { get; init; }
+    public required IReadOnlyList<string> Input { get; init; } // ["text"] or ["text", "image"]
+    public required ModelCost Cost { get; init; }
+    public required int ContextWindow { get; init; }
+    public required int MaxTokens { get; init; }
+    public IReadOnlyDictionary<string, string>? Headers { get; init; }
+    public OpenAICompatSettings? Compat { get; init; }
+}
+
+public sealed record OpenAICompatSettings(
+    bool SupportsStore = false,
+    bool SupportsStreamOptions = true,
+    bool SupportsDeveloperRole = false,
+    bool SupportsStrictSchema = false,
+    bool RequiresAssistantAfterToolResult = false,
+    IReadOnlyDictionary<string, string>? ReasoningEffortMap = null);
+```
+
+**Decision:** `ModelInfo` instead of generic `Model<TApi>` — C# doesn't benefit from the TypeScript branded-string pattern. The `Api` field is a plain string that the API registry uses as a lookup key. This avoids artificial generic constraints while preserving the same extensibility.
+
+---
+
+## 7. Streaming — The Core Decision
+
+### 7.1 Why `IAsyncEnumerable<T>` + `Task<T>`
+
+Pi-mono's `EventStream<T, R>` is an async iterable that also exposes a `result(): Promise<R>`. The natural C# equivalent:
+
+```csharp
+public interface ICompletionStream : IAsyncEnumerable<StreamEvent>
+{
+    /// <summary>
+    /// Awaitable result. Resolves when the stream completes (done or error).
+    /// Can be awaited without iterating events (equivalent to pi-mono's complete()).
+    /// </summary>
+    Task<AssistantMessage> ResultAsync { get; }
+}
+```
+
+**Decision:** `IAsyncEnumerable<StreamEvent>` for iteration, `Task<AssistantMessage>` for the final result. NOT `System.Threading.Channels` — Channels are a lower-level primitive suited for producer/consumer pipelines where backpressure matters. Our events are small and fast; `IAsyncEnumerable` gives us native `await foreach` syntax and composability with LINQ.
+
+### 7.2 Implementation
+
+```csharp
+public sealed class CompletionStream : ICompletionStream
+{
+    private readonly Channel<StreamEvent> _channel = Channel.CreateUnbounded<StreamEvent>();
+    private readonly TaskCompletionSource<AssistantMessage> _resultTcs = new();
+
+    public Task<AssistantMessage> ResultAsync => _resultTcs.Task;
+
+    // Producer API (called by providers)
+    public void Push(StreamEvent evt)
+    {
+        _channel.Writer.TryWrite(evt);
+
+        if (evt is StreamEvent.Done done)
+            _resultTcs.TrySetResult(done.Message);
+        else if (evt is StreamEvent.Error error)
+            _resultTcs.TrySetResult(error.ErrorMessage);
+    }
+
+    public void End(AssistantMessage? result = null)
+    {
+        if (result is not null)
+            _resultTcs.TrySetResult(result);
+        _channel.Writer.TryComplete();
+    }
+
+    public async IAsyncEnumerator<StreamEvent> GetAsyncEnumerator(
+        CancellationToken cancellationToken = default)
+    {
+        await foreach (var evt in _channel.Reader.ReadAllAsync(cancellationToken))
+            yield return evt;
+    }
+}
+```
+
+**Decision:** Channel is used internally as the backing buffer (unbounded, matching pi-mono's queue behavior), but the public API is `IAsyncEnumerable<StreamEvent>`. This gives us the simplicity of pi-mono's push/end/iterate pattern with proper cancellation support via `CancellationToken`.
+
+### 7.3 Convenience Methods
+
+```csharp
+// Top-level static methods matching pi-mono's stream/complete/streamSimple/completeSimple
+public static class LlmStream
+{
+    public static ICompletionStream Stream(ModelInfo model, ConversationContext context,
+        StreamOptions? options = null, CancellationToken ct = default);
+
+    public static async Task<AssistantMessage> CompleteAsync(ModelInfo model, ConversationContext context,
+        StreamOptions? options = null, CancellationToken ct = default)
+    {
+        var s = Stream(model, context, options, ct);
+        return await s.ResultAsync;
+    }
+
+    public static ICompletionStream StreamSimple(ModelInfo model, ConversationContext context,
+        SimpleStreamOptions? options = null, CancellationToken ct = default);
+
+    public static async Task<AssistantMessage> CompleteSimpleAsync(ModelInfo model, ConversationContext context,
+        SimpleStreamOptions? options = null, CancellationToken ct = default)
+    {
+        var s = StreamSimple(model, context, options, ct);
+        return await s.ResultAsync;
+    }
+}
+```
+
+---
+
+## 8. Stream Events
+
+Pi-mono uses a discriminated union with 10+ event types. C# uses abstract record + sealed leaves.
+
+```csharp
+public abstract record StreamEvent
+{
+    public sealed record Start(AssistantMessage Partial) : StreamEvent;
+    public sealed record TextStart(int ContentIndex, AssistantMessage Partial) : StreamEvent;
+    public sealed record TextDelta(int ContentIndex, string Delta, AssistantMessage Partial) : StreamEvent;
+    public sealed record TextEnd(int ContentIndex, string Content, AssistantMessage Partial) : StreamEvent;
+    public sealed record ThinkingStart(int ContentIndex, AssistantMessage Partial) : StreamEvent;
+    public sealed record ThinkingDelta(int ContentIndex, string Delta, AssistantMessage Partial) : StreamEvent;
+    public sealed record ThinkingEnd(int ContentIndex, string Content, AssistantMessage Partial) : StreamEvent;
+    public sealed record ToolCallStart(int ContentIndex, AssistantMessage Partial) : StreamEvent;
+    public sealed record ToolCallDelta(int ContentIndex, string Delta, AssistantMessage Partial) : StreamEvent;
+    public sealed record ToolCallEnd(int ContentIndex, ToolCallContent ToolCall, AssistantMessage Partial) : StreamEvent;
+    public sealed record Done(StopReason Reason, AssistantMessage Message) : StreamEvent;
+    public sealed record Error(StopReason Reason, AssistantMessage ErrorMessage) : StreamEvent;
+}
+```
+
+**Decision:** Nested sealed records inside an abstract record. This gives us exhaustive pattern matching in `switch`:
+
+```csharp
+await foreach (var evt in stream)
+{
+    switch (evt)
+    {
+        case StreamEvent.TextDelta td:
+            Console.Write(td.Delta);
+            break;
+        case StreamEvent.Done done:
+            Console.WriteLine($"\nFinished: {done.Reason}");
+            break;
+    }
+}
+```
+
+---
+
+## 9. Stream Options
+
+```csharp
+public record StreamOptions
+{
+    public float? Temperature { get; init; }
+    public int? MaxTokens { get; init; }
+    public string? ApiKey { get; init; }
+    public CancellationToken CancellationToken { get; init; }
+    public string? SessionId { get; init; }
+    public CacheRetention CacheRetention { get; init; } = CacheRetention.Short;
+    public IReadOnlyDictionary<string, string>? Headers { get; init; }
+    public int? MaxRetryDelayMs { get; init; }
+    public IReadOnlyDictionary<string, object?>? Metadata { get; init; }
+}
+
+public record SimpleStreamOptions : StreamOptions
+{
+    public ThinkingLevel? Reasoning { get; init; }
+    public ThinkingBudgets? ThinkingBudgets { get; init; }
+}
+
+public enum ThinkingLevel { Minimal, Low, Medium, High, XHigh }
+public enum CacheRetention { None, Short, Long }
+
+public sealed record ThinkingBudgets(
+    int Minimal = 1024,
+    int Low = 2048,
+    int Medium = 8192,
+    int High = 16384);
+```
+
+**Decision:** `CancellationToken` replaces pi-mono's `AbortSignal`. `record` (not `sealed`) for options — provider-specific options extend via inheritance (e.g., `AnthropicStreamOptions : StreamOptions`).
+
+---
+
+## 10. Provider Contract — API Provider Interface
+
+```csharp
+public interface IApiProvider
+{
+    /// <summary>The API type this provider handles (e.g. "anthropic-messages").</summary>
+    string Api { get; }
+
+    /// <summary>Provider-specific streaming with full options.</summary>
+    ICompletionStream Stream(ModelInfo model, ConversationContext context,
+        StreamOptions? options = null, CancellationToken ct = default);
+
+    /// <summary>Unified streaming with reasoning level abstraction.</summary>
+    ICompletionStream StreamSimple(ModelInfo model, ConversationContext context,
+        SimpleStreamOptions? options = null, CancellationToken ct = default);
+}
+```
+
+**Decision:** Interface, not delegate. Pi-mono uses objects `{ api, stream, streamSimple }` — in C# an interface is the idiomatic equivalent. Each provider assembly implements this interface once per API type. The interface carries the `Api` discriminator so the registry knows what it handles.
+
+---
+
+## 11. API Registry
+
+```csharp
+public interface IApiProviderRegistry
+{
+    void Register(IApiProvider provider, string? sourceId = null);
+    IApiProvider? Get(string api);
+    IReadOnlyList<IApiProvider> GetAll();
+    void Unregister(string sourceId);
+    void Clear();
+}
+
+// Default implementation: thread-safe, singleton
+public sealed class ApiProviderRegistry : IApiProviderRegistry
+{
+    private readonly ConcurrentDictionary<string, (IApiProvider Provider, string? SourceId)> _providers = new();
+    // ...
+}
+```
+
+**Decision:** `ConcurrentDictionary` for thread safety. Interface-based so it can be registered in DI and mocked in tests. The `sourceId` pattern from pi-mono is preserved — it allows dynamic provider registration/unregistration (extensions).
+
+**DI registration:**
+```csharp
+services.AddSingleton<IApiProviderRegistry, ApiProviderRegistry>();
+services.AddSingleton<IApiProvider, AnthropicProvider>(); // auto-registered at startup
+services.AddSingleton<IApiProvider, OpenAICompletionsProvider>();
+services.AddSingleton<IApiProvider, OpenAIResponsesProvider>();
+services.AddSingleton<IApiProvider, CopilotProvider>();
+```
+
+A hosted service iterates all `IApiProvider` at startup and calls `registry.Register()`.
+
+---
+
+## 12. Model Registry
+
+```csharp
+public interface IModelRegistry
+{
+    ModelInfo? Find(string provider, string modelId);
+    IReadOnlyList<ModelInfo> GetAll();
+    IReadOnlyList<ModelInfo> GetByProvider(string provider);
+    IReadOnlyList<string> GetProviders();
+    void Register(string provider, ModelInfo model);
+    void RegisterProvider(string providerName, IReadOnlyList<ModelInfo> models);
+    void UnregisterProvider(string providerName);
+}
+```
+
+**Decision:** Separate from API registry (matching pi-mono's separation). Models are data; API providers are behavior. Built-in models loaded from embedded JSON or code-generated source (same pattern as pi-mono's `models.generated.ts`). Dynamic registration supports extension scenarios.
+
+---
+
+## 13. Cross-Provider Message Transformation
+
+```csharp
+public static class MessageTransformer
+{
+    /// <summary>
+    /// Transform messages for cross-provider compatibility.
+    /// Handles: thinking block conversion, tool call ID normalization,
+    /// errored message removal, orphaned tool call synthetic results.
+    /// </summary>
+    public static IReadOnlyList<Message> Transform(
+        IReadOnlyList<Message> messages,
+        ModelInfo targetModel,
+        Func<string, ModelInfo, AssistantMessage, string>? normalizeToolCallId = null);
+}
+```
+
+**Decision:** Static utility method, not a service. Pi-mono's `transformMessages` is a pure function — same in C#. The logic is:
+
+1. **First pass:** Map messages, converting thinking blocks to text when source model differs from target, normalizing tool call IDs, stripping redacted thinking across models.
+2. **Second pass:** Insert synthetic tool results for orphaned tool calls, skip errored/aborted assistant messages.
+
+The `normalizeToolCallId` delegate matches pi-mono's callback pattern — each provider knows its own ID constraints (Anthropic: `^[a-zA-Z0-9_-]{1,64}$`, OpenAI: max 40 chars).
+
+---
+
+## 14. Provider Implementation Pattern
+
+Each provider follows the same template (matching pi-mono's provider files):
+
+```csharp
+// BotNexus.Providers.Anthropic/AnthropicProvider.cs
+public sealed class AnthropicProvider : IApiProvider
+{
+    public string Api => "anthropic-messages";
+
+    public ICompletionStream Stream(ModelInfo model, ConversationContext context,
+        StreamOptions? options = null, CancellationToken ct = default)
+    {
+        var stream = new CompletionStream();
+        var output = CreateOutput(model);
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var client = CreateClient(model, options);
+                var anthropicMessages = ConvertMessages(context, model);
+                var anthropicStream = client.Messages.StreamAsync(...);
+
+                stream.Push(new StreamEvent.Start(output));
+
+                await foreach (var evt in anthropicStream.WithCancellation(ct))
+                {
+                    // Parse SSE events, push StreamEvent.TextDelta etc.
+                }
+
+                stream.Push(new StreamEvent.Done(output.StopReason, output));
+                stream.End();
+            }
+            catch (Exception ex)
+            {
+                output = output with { StopReason = ct.IsCancellationRequested ? StopReason.Aborted : StopReason.Error,
+                                       ErrorMessage = ex.Message };
+                stream.Push(new StreamEvent.Error(output.StopReason, output));
+                stream.End();
+            }
+        }, ct);
+
+        return stream;
+    }
+
+    public ICompletionStream StreamSimple(ModelInfo model, ConversationContext context,
+        SimpleStreamOptions? options = null, CancellationToken ct = default)
+    {
+        // Map SimpleStreamOptions.Reasoning → AnthropicOptions (thinkingEnabled, budget, effort)
+        // Then delegate to Stream()
+    }
+}
+```
+
+**Decision:** `Task.Run` for the background producer (matching pi-mono's `(async () => { ... })()` IIFE pattern). The stream is returned synchronously; events arrive asynchronously. Error handling follows pi-mono's contract: errors are encoded in the stream as `StreamEvent.Error`, never thrown.
+
+---
+
+## 15. Cost Calculation
+
+```csharp
+public static class CostCalculator
+{
+    public static TokenCost Calculate(ModelInfo model, Usage usage)
+    {
+        var inputCost = usage.Input * model.Cost.Input / 1_000_000m;
+        var outputCost = usage.Output * model.Cost.Output / 1_000_000m;
+        var cacheReadCost = usage.CacheRead * model.Cost.CacheRead / 1_000_000m;
+        var cacheWriteCost = usage.CacheWrite * model.Cost.CacheWrite / 1_000_000m;
+        return new TokenCost(inputCost, outputCost, cacheReadCost, cacheWriteCost,
+            inputCost + outputCost + cacheReadCost + cacheWriteCost);
+    }
+}
+```
+
+---
+
+## 16. Relationship to Existing BotNexus Types
+
+The existing `ILlmProvider`, `LlmResponse`, and `FinishReason` in `BotNexus.Core` are **not replaced** — they remain for the current platform integration. The new `BotNexus.Providers.Core` is a standalone package. When we wire the new provider layer into the platform, we'll add a thin adapter:
+
+```csharp
+// Future: bridge new providers into existing agent loop
+public class ProviderBridge : ILlmProvider
+{
+    private readonly IApiProviderRegistry _registry;
+    private readonly IModelRegistry _models;
+
+    public async Task<LlmResponse> ChatAsync(ChatRequest request, CancellationToken ct)
+    {
+        var model = _models.Find(request.Provider, request.Model);
+        var context = MapToConversationContext(request);
+        var result = await LlmStream.CompleteSimpleAsync(model, context, ct: ct);
+        return MapToLlmResponse(result);
+    }
+}
+```
+
+This preserves backward compatibility while decoupling the new provider layer from existing platform dependencies.
+
+---
+
+## 17. Summary of Key Decisions
+
+| Concept | TS (pi-mono) | C# (BotNexus) | Rationale |
+|---|---|---|---|
+| Content blocks | Union type `{ type: "text" \| ... }` | `abstract record ContentBlock` + sealed leaves | Exhaustive pattern matching |
+| Messages | `UserMessage \| AssistantMessage \| ToolResultMessage` | `abstract record Message` + sealed leaves | Same |
+| Streaming primitive | `EventStream<T, R>` (async iterable + promise) | `ICompletionStream` (`IAsyncEnumerable` + `Task`) | Native `await foreach` |
+| Stream backing | Push queue | `Channel<T>` (internal) | Thread-safe, backpressure-free |
+| Events | Union type `AssistantMessageEvent` | `abstract record StreamEvent` + nested sealed | Nested for discoverability |
+| Options | `interface StreamOptions` | `record StreamOptions` | `with` expressions, inheritance |
+| Abort | `AbortSignal` | `CancellationToken` | Native .NET |
+| Provider contract | `{ api, stream, streamSimple }` | `IApiProvider` interface | Idiomatic C# |
+| Registry | `Map<string, RegisteredApiProvider>` | `ConcurrentDictionary` behind `IApiProviderRegistry` | Thread-safe, DI-friendly |
+| Model | `Model<TApi>` generic | `ModelInfo` record | No benefit from generic in C# |
+| Tool params | TypeBox `TSchema` | `JsonElement` | Zero-copy JSON Schema |
+| Immutability | Mutable objects built up during streaming | Immutable records; providers use builder pattern internally | Records for public API; mutable builder for internal streaming |
+| Cost | `number` | `decimal` | Financial precision |
+| Type discrimination | `role` / `type` string fields | C# pattern matching (`is`, `switch`) | Type system does the work |
+
+---
+
+## 18. What This Does NOT Cover (Yet)
+
+- **OAuth:** Deferred. Pi-mono's OAuth system is complex (Anthropic, Google, GitHub, OpenAI Codex). We'll add it when we wire providers into the platform.
+- **Environment API key resolution:** Deferred. Will use `IConfiguration` when integrated.
+- **Code-generated model catalog:** Will do separately once the core types are stable.
+- **OpenAI-compat auto-detection:** Deferred to the `BotNexus.Providers.OpenAICompat` implementation phase.
+
+---
+
+## 19. Implementation Order
+
+1. `BotNexus.Providers.Core` — Types, interfaces, `CompletionStream`, registries, `MessageTransformer`
+2. `BotNexus.Providers.Anthropic` — First provider (most complex streaming, good test case)
+3. `BotNexus.Providers.OpenAI` — Second provider (Completions + Responses)
+4. Unit tests for core types and streaming
+5. Integration tests with real API calls
+6. `BotNexus.Providers.Copilot` + `BotNexus.Providers.OpenAICompat`
+7. Bridge adapter to existing `ILlmProvider`
+
+
+---
+
+
+### 2026-04-04T22:10:00Z: User directive
+**By:** Jon Bullen (via Copilot)
+**What:** The new agent project under src/agent/ may ONLY reference projects in src/providers/. References to BotNexus.Core, BotNexus.Providers.Base, or any other projects outside src/providers/ are NOT allowed. This is a hard constraint — violation means failure.
+**Why:** User request — the new agent must follow the same clean dependency pattern as the pi-mono repo, depending only on the providers packages (the equivalent of @mariozechner/pi-ai).
