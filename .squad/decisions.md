@@ -4495,3 +4495,56 @@ graph TD
 
 **Questions? Comments? Escalate to Leela.**
 
+---
+
+### 2026-04-04T21:13:46Z: User Directive — Small, Precise Commits
+
+**By:** Jon Bullen (via Copilot)  
+**Status:** Approved
+
+**What:** Commits must be small and precise — staged incrementally throughout the work, not batched at the end.
+
+**Why:** User request — captured for team memory. All agents must commit in small, focused stages as they complete each logical unit of work.
+
+---
+
+### 2026-04-04T21:25:00Z: User Directive — Agent Port Directory Structure
+
+**By:** Jon Bullen (via Copilot)  
+**Status:** Approved
+
+**What:** The agent port project must live under `src/agent/` directory (e.g., `src/agent/BotNexus.AgentCore/`), NOT flat at `src/BotNexus.AgentCore/`. This follows the organizational pattern used by `src/providers/` and `src/channels/`.
+
+**Why:** User request — the `src/agent/` directory groups agent-related projects, mirroring the existing `providers` and `channels` folder conventions.
+
+---
+
+### Decision: Multi-Sprint Plan to Port pi-mono Agent into BotNexus
+
+**Author:** Leela (Lead/Architect)  
+**Date:** 2026-04-05  
+**Status:** Proposed  
+**Requested by:** Jon Bullen (via Copilot)
+
+**Summary:** Port the `@mariozechner/pi-agent-core` TypeScript package into a new standalone C#/.NET project: **`BotNexus.AgentCore`**. This is a 4-sprint effort that creates a clean, pi-mono-faithful agent loop engine referencing only `BotNexus.Providers.Base` (and transitively `BotNexus.Core`). It does NOT modify or integrate with the existing `BotNexus.Agent`.
+
+**Key Architecture Decisions:**
+- **Location:** `src/agent/BotNexus.AgentCore/` (follows src/providers/ convention)
+- **Test project:** `tests/BotNexus.AgentCore.Tests/`
+- **Dependency Graph:**
+  ```
+  BotNexus.AgentCore
+    └── BotNexus.Providers.Base
+          └── BotNexus.Core
+  ```
+- **EventStream → ChannelReader:** Using `System.Threading.Channels.Channel<AgentEvent>`
+- **AbortSignal → CancellationToken:** Standard C# cancellation pattern
+- **Event Hierarchy:** Record types with discriminated union pattern
+- **Tool Interface:** `IAgentTool` with typed parameters and result handling
+
+**Deliverable:** Full 4-sprint implementation plan with 8 upfront architecture decisions, detailed sprint roadmap, and team assignments ready at `.squad/decisions/inbox/leela-agent-port-plan.md` (merged here).
+
+**Next Steps:** Team reviews plan and begins Sprint 1 implementation.
+
+---
+
