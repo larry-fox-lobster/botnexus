@@ -1054,6 +1054,47 @@ eloadOnChange: true + ConfigReloadOrchestrator hosted service using IOptionsMoni
 **Architecture Impact:**
 - Agent ID normalization happens at CLI boundary — config keys, folder names, workspace paths all use lowercase IDs
 - `AgentConfig.Name` property stores display name with proper casing for UI
+
+---
+
+## 2026-04-05T00:00:00Z — pi-mono Agent Port Planning (Lead)
+
+**Timestamp:** 2026-04-05T00:00:00Z  
+**Status:** ✅ Plan Complete  
+**Requested by:** Jon Bullen (via Copilot)  
+**Scope:** Create a multi-sprint plan for porting `@mariozechner/pi-agent-core` into BotNexus
+
+## Learnings
+
+### pi-mono Agent Architecture
+- **types.ts**: 10+ type definitions forming a discriminated-union event system, typed tool definitions with TypeBox schemas, extensible messages via declaration merging, AgentState as mutable state container
+- **agent-loop.ts**: The core engine — outer loop (follow-ups) → inner loop (tool calls + steering) → streamAssistantResponse → executeToolCalls. Two execution modes: sequential and parallel. BeforeToolCall/AfterToolCall hooks allow skip/modify.
+- **agent.ts**: Stateful wrapper with PendingMessageQueue, ActiveRun lifecycle, subscribe/unsubscribe pattern, abort/waitForIdle/reset. Single active run constraint.
+- **proxy.ts**: Browser-specific proxy streaming — not applicable to C#/.NET server-side. Excluded from port scope.
+
+### Key Architectural Decisions for the Port
+- **Project name:** `BotNexus.AgentCore` — mirrors pi-agent-core naming
+- **Dependency boundary:** Only `BotNexus.Providers.Base` (→ Core). Zero coupling to existing `BotNexus.Agent`
+- **EventStream:** `ChannelReader<AgentEvent>` via `System.Threading.Channels` — idiomatic C# async streaming
+- **Events:** Record hierarchy with abstract base + 10 subtypes, pattern-matchable
+- **Messages:** Independent `AgentMessage` hierarchy, NOT extending `ChatMessage`. Convert at the LLM call boundary.
+- **Tools:** New `IAgentTool` interface (richer than `ITool`) with `ToolAdapter` for wrapping existing tools
+- **AbortSignal → CancellationToken**, subscribe → IDisposable pattern
+- **Thread safety required** — unlike JS single-threaded model, Agent class needs synchronization
+
+### Key File Paths
+- Plan document: `.squad/decisions/inbox/leela-agent-port-plan.md`
+- Target project: `src/BotNexus.AgentCore/`
+- Target test project: `tests/BotNexus.AgentCore.Tests/`
+- Existing agent (DO NOT MODIFY): `src/BotNexus.Agent/`
+- Existing Core types to reuse: `ChatMessage`, `ChatRequest`, `ToolDefinition`, `ToolCallRequest`, `StreamingChatChunk`, `LlmResponse`, `ILlmProvider`, `ModelDefinition`
+
+### Reuse Strategy
+- **Reuse directly:** `ToolDefinition`, `ILlmProvider`, `StreamingChatChunk`, `LlmResponse`, `ModelDefinition`, `ChatRequest`
+- **Wrap/convert:** `ChatMessage` ↔ `AgentMessage` at the boundary
+- **New:** `AgentEvent`, `AgentState`, `IAgentTool`, `AgentToolResult`, `AgentLoopConfig`, `Agent`
+
+**Decision Document:** `.squad/decisions/inbox/leela-agent-port-plan.md`
 - Workspace bootstrap uses existing `AgentWorkspace.InitializeAsync()` — no duplication of bootstrap logic
 
 **Build Status:** ✅ All changes compile cleanly. No test regressions.
