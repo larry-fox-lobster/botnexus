@@ -439,8 +439,12 @@ public sealed class AnthropicMessagesHandler : IApiFormatHandler
     
     private HttpRequestMessage CreateHttpRequest(ModelDefinition model, Dictionary<string, object?> payload, string apiKey)
     {
-        var json = JsonSerializer.Serialize(payload);
+        var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
         var url = $"{model.BaseUrl.TrimEnd('/')}/v1/messages";
+        
+        // Log the full request payload for debugging multi-turn tool calls
+        _logger.LogInformation("Anthropic Messages API Request:\nModel: {Model}\nURL: {Url}\nPayload:\n{Payload}", 
+            model.Id, url, json);
         
         var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
@@ -455,6 +459,19 @@ public sealed class AnthropicMessagesHandler : IApiFormatHandler
         request.Headers.TryAddWithoutValidation("accept", "application/json");
         request.Headers.TryAddWithoutValidation("anthropic-dangerous-direct-browser-access", "true");
         request.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
+        
+        // Copilot-specific headers for multi-turn tool calling (Pi pattern)
+        var messages = payload["messages"] as List<Dictionary<string, object?>>;
+        if (messages is not null)
+        {
+            request.Headers.TryAddWithoutValidation("X-Initiator", InferCopilotInitiator(messages));
+            request.Headers.TryAddWithoutValidation("Openai-Intent", "conversation-edits");
+            
+            if (HasVisionContent(messages))
+            {
+                request.Headers.TryAddWithoutValidation("Copilot-Vision-Request", "true");
+            }
+        }
         
         // Add model-specific headers (User-Agent, Editor-Version, etc.)
         if (model.Headers is not null)
@@ -476,4 +493,46 @@ public sealed class AnthropicMessagesHandler : IApiFormatHandler
         "stop_sequence" => FinishReason.Stop,
         _ => FinishReason.Other
     };
+    
+    /// <summary>
+    /// Infer X-Initiator header value for Copilot routing.
+    /// "user" if last message is user-initiated, "agent" if agent-initiated (tool results, assistant).
+    /// Pi pattern: github-copilot-headers.ts, inferCopilotInitiator()
+    /// </summary>
+    private static string InferCopilotInitiator(List<Dictionary<string, object?>> messages)
+    {
+        if (messages.Count == 0) return "user";
+        
+        var lastMessage = messages[^1];
+        var role = lastMessage.TryGetValue("role", out var roleObj) ? roleObj?.ToString() : null;
+        
+        // If last message is NOT user, then it's agent-initiated
+        return role != "user" ? "agent" : "user";
+    }
+    
+    /// <summary>
+    /// Check if any message contains vision/image content.
+    /// Pi pattern: github-copilot-headers.ts, hasCopilotVisionInput()
+    /// </summary>
+    private static bool HasVisionContent(List<Dictionary<string, object?>> messages)
+    {
+        foreach (var msg in messages)
+        {
+            if (!msg.TryGetValue("content", out var contentObj)) continue;
+            
+            // Content can be string or array of blocks
+            if (contentObj is List<Dictionary<string, object?>> contentBlocks)
+            {
+                foreach (var block in contentBlocks)
+                {
+                    if (block.TryGetValue("type", out var typeObj) && typeObj?.ToString() == "image")
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        return false;
+    }
 }
