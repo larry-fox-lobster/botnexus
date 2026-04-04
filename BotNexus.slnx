@@ -28,6 +28,9 @@
     <Project Path="src/providers/BotNexus.Providers.OpenAICompat/BotNexus.Providers.OpenAICompat.csproj" />
     <Project Path="src/providers/BotNexus.Providers.Copilot/BotNexus.Providers.Copilot.csproj" />
   </Folder>
+  <Folder Name="/src/agent/">
+    <Project Path="src/agent/BotNexus.AgentCore/BotNexus.AgentCore.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/BotNexus.Tests.Extensions.Convention/BotNexus.Tests.Extensions.Convention.csproj" />
     <Project Path="tests/BotNexus.Tests.Extensions.E2E/BotNexus.Tests.Extensions.E2E.csproj" />
@@ -41,5 +44,6 @@
     <Project Path="tests/BotNexus.Providers.Core.Tests/BotNexus.Providers.Core.Tests.csproj" />
     <Project Path="tests/BotNexus.Providers.OpenAI.Tests/BotNexus.Providers.OpenAI.Tests.csproj" />
     <Project Path="tests/BotNexus.Providers.Anthropic.Tests/BotNexus.Providers.Anthropic.Tests.csproj" />
+    <Project Path="tests/BotNexus.AgentCore.Tests/BotNexus.AgentCore.Tests.csproj" />
   </Folder>
 </Solution>
