@@ -1,49 +1,20 @@
 <Solution>
-  <Folder Name="/src/">
-    <Project Path="src/BotNexus.Agent/BotNexus.Agent.csproj" />
-    <Project Path="src/BotNexus.Api/BotNexus.Api.csproj" />
-    <Project Path="src/channels/BotNexus.Channels.Base/BotNexus.Channels.Base.csproj" />
-    <Project Path="src/channels/BotNexus.Channels.Discord/BotNexus.Channels.Discord.csproj" />
-    <Project Path="src/channels/BotNexus.Channels.Slack/BotNexus.Channels.Slack.csproj" />
-    <Project Path="src/channels/BotNexus.Channels.Telegram/BotNexus.Channels.Telegram.csproj" />
-    <Project Path="src/BotNexus.Cli/BotNexus.Cli.csproj" />
-    <Project Path="src/BotNexus.Command/BotNexus.Command.csproj" />
-    <Project Path="src/BotNexus.Core/BotNexus.Core.csproj" />
-    <Project Path="src/BotNexus.Diagnostics/BotNexus.Diagnostics.csproj" />
-    <Project Path="src/BotNexus.Cron/BotNexus.Cron.csproj" />
-    <Project Path="src/BotNexus.Gateway/BotNexus.Gateway.csproj" />
-    <Project Path="src/BotNexus.Heartbeat/BotNexus.Heartbeat.csproj" />
-    <Project Path="src/BotNexus.Providers.Anthropic/BotNexus.Providers.Anthropic.csproj" />
-    <Project Path="src/BotNexus.Providers.Base/BotNexus.Providers.Base.csproj" />
-    <Project Path="src/BotNexus.Providers.Copilot/BotNexus.Providers.Copilot.csproj" />
-    <Project Path="src/BotNexus.Providers.OpenAI/BotNexus.Providers.OpenAI.csproj" />
-    <Project Path="src/BotNexus.Session/BotNexus.Session.csproj" />
-    <Project Path="src/BotNexus.Tools.GitHub/BotNexus.Tools.GitHub.csproj" />
-    <Project Path="src/BotNexus.WebUI/BotNexus.WebUI.csproj" />
+  <Folder Name="/src/agent/">
+    <Project Path="src/agent/BotNexus.AgentCore/BotNexus.AgentCore.csproj" />
   </Folder>
   <Folder Name="/src/providers/">
-    <Project Path="src/providers/BotNexus.Providers.Anthropic/BotNexus.Providers.Anthropic.csproj" />
     <Project Path="src/providers/BotNexus.Providers.Core/BotNexus.Providers.Core.csproj" />
+    <Project Path="src/providers/BotNexus.Providers.Anthropic/BotNexus.Providers.Anthropic.csproj" />
     <Project Path="src/providers/BotNexus.Providers.OpenAI/BotNexus.Providers.OpenAI.csproj" />
     <Project Path="src/providers/BotNexus.Providers.OpenAICompat/BotNexus.Providers.OpenAICompat.csproj" />
     <Project Path="src/providers/BotNexus.Providers.Copilot/BotNexus.Providers.Copilot.csproj" />
   </Folder>
-  <Folder Name="/src/agent/">
-    <Project Path="src/agent/BotNexus.AgentCore/BotNexus.AgentCore.csproj" />
-  </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/BotNexus.Tests.Extensions.Convention/BotNexus.Tests.Extensions.Convention.csproj" />
-    <Project Path="tests/BotNexus.Tests.Extensions.E2E/BotNexus.Tests.Extensions.E2E.csproj" />
-    <Project Path="tests/BotNexus.Tests.Extensions.Registrar/BotNexus.Tests.Extensions.Registrar.csproj" />
-    <Project Path="tests/BotNexus.Tests.Integration/BotNexus.Tests.Integration.csproj" />
-    <Project Path="tests/BotNexus.Tests.Unit/BotNexus.Tests.Unit.csproj" />
-    <Project Path="tests/BotNexus.Tests.E2E/BotNexus.Tests.E2E.csproj" />
-    <Project Path="tests/BotNexus.Tests.Deployment/BotNexus.Tests.Deployment.csproj" />
-    <Project Path="tests/BotNexus.Providers.Copilot.Tests/BotNexus.Providers.Copilot.Tests.csproj" />
-    <Project Path="tests/BotNexus.Providers.OpenAICompat.Tests/BotNexus.Providers.OpenAICompat.Tests.csproj" />
-    <Project Path="tests/BotNexus.Providers.Core.Tests/BotNexus.Providers.Core.Tests.csproj" />
-    <Project Path="tests/BotNexus.Providers.OpenAI.Tests/BotNexus.Providers.OpenAI.Tests.csproj" />
-    <Project Path="tests/BotNexus.Providers.Anthropic.Tests/BotNexus.Providers.Anthropic.Tests.csproj" />
     <Project Path="tests/BotNexus.AgentCore.Tests/BotNexus.AgentCore.Tests.csproj" />
+    <Project Path="tests/BotNexus.Providers.Core.Tests/BotNexus.Providers.Core.Tests.csproj" />
+    <Project Path="tests/BotNexus.Providers.Anthropic.Tests/BotNexus.Providers.Anthropic.Tests.csproj" />
+    <Project Path="tests/BotNexus.Providers.OpenAI.Tests/BotNexus.Providers.OpenAI.Tests.csproj" />
+    <Project Path="tests/BotNexus.Providers.OpenAICompat.Tests/BotNexus.Providers.OpenAICompat.Tests.csproj" />
+    <Project Path="tests/BotNexus.Providers.Copilot.Tests/BotNexus.Providers.Copilot.Tests.csproj" />
   </Folder>
 </Solution>
