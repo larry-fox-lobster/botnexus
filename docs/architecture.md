@@ -682,7 +682,113 @@ public class AgentRunner : IAgentRunner
 
 ---
 
-## 8. Provider Architecture
+## 8. Provider Architecture (Pi-Style)
+
+BotNexus uses a **model-aware, handler-per-API-format** architecture inspired by Pi's type system. Each model is explicitly defined with its API requirements, and requests route to handlers based on API format, not provider name.
+
+### Core Concepts
+
+**ModelDefinition** — Explicit model metadata:
+- **Id**: Model identifier (e.g., `"claude-opus-4.6"`, `"gpt-4o"`, `"gpt-5"`)
+- **Name**: Human-readable name (e.g., `"Claude Opus 4.6"`)
+- **Api**: API format handler type (e.g., `"anthropic-messages"`, `"openai-completions"`, `"openai-responses"`)
+- **Provider**: Provider name (e.g., `"github-copilot"`, `"openai"`, `"anthropic"`)
+- **BaseUrl**: API endpoint (e.g., `"https://api.individual.githubcopilot.com"`)
+- **Headers**: Provider-specific HTTP headers (User-Agent, Editor-Version, etc.)
+- **Reasoning**: Whether the model supports extended thinking/reasoning modes
+- **Input**: Supported input types (`["text"]`, `["text", "image"]`)
+- **ContextWindow**: Maximum context window in tokens
+- **MaxTokens**: Maximum generated tokens
+
+**IApiFormatHandler** — Protocol abstraction:
+- Each handler implements the same interface but speaks a different API dialect
+- Routes determined by model definition, not provider name
+- Handlers share no implementation — each speaks its native API
+
+### Model → API Format Mapping
+
+| Model Family | API Format | Handler | Example Models |
+|---|---|---|---|
+| **Claude** | `anthropic-messages` | `AnthropicMessagesHandler` | claude-opus-4.6, claude-sonnet-4.6 |
+| **GPT-4, GPT-4o, o1, o3, Gemini** | `openai-completions` | `OpenAiCompletionsHandler` | gpt-4o, gpt-4o-mini, o1, o3, gemini-3-pro-preview |
+| **GPT-5** | `openai-responses` | `OpenAiResponsesHandler` | gpt-5, gpt-5.2, gpt-5.4 |
+
+### CopilotModels Registry
+
+**File:** `BotNexus.Providers.Base/CopilotModels.cs`
+
+All GitHub Copilot models are pre-registered with their API format and capability metadata:
+
+```csharp
+public static class CopilotModels
+{
+    // Claude models (anthropic-messages)
+    public static ModelDefinition Claude_Opus_4_6 = new(
+        Id: "claude-opus-4.6",
+        Name: "Claude Opus 4.6",
+        Api: "anthropic-messages",
+        Provider: "github-copilot",
+        BaseUrl: "https://api.individual.githubcopilot.com",
+        Headers: { /* Copilot headers */ },
+        Reasoning: true,
+        Input: ["text", "image"],
+        ContextWindow: 1000000,
+        MaxTokens: 64000
+    );
+    
+    // GPT-4o models (openai-completions)
+    public static ModelDefinition Gpt_4o = new(
+        Id: "gpt-4o",
+        Api: "openai-completions",
+        ...
+    );
+    
+    // GPT-5 models (openai-responses)
+    public static ModelDefinition Gpt_5_4 = new(
+        Id: "gpt-5.4",
+        Api: "openai-responses",
+        ...
+    );
+    
+    public static IReadOnlyList<ModelDefinition> All { get; }
+    public static ModelDefinition Resolve(string modelId);
+    public static bool TryResolve(string modelId, out ModelDefinition? model);
+}
+```
+
+### API Format Handler Interface
+
+**File:** `BotNexus.Providers.Base/IApiFormatHandler.cs`
+
+```csharp
+public interface IApiFormatHandler
+{
+    string ApiFormat { get; }
+    
+    Task<LlmResponse> ChatAsync(
+        ModelDefinition model, 
+        ChatRequest request, 
+        string apiKey, 
+        CancellationToken cancellationToken);
+    
+    IAsyncEnumerable<StreamingChatChunk> ChatStreamAsync(
+        ModelDefinition model, 
+        ChatRequest request, 
+        string apiKey, 
+        CancellationToken cancellationToken);
+}
+```
+
+### Handler Implementations
+
+**AnthropicMessagesHandler** — Speaks Anthropic Messages API  
+**OpenAiCompletionsHandler** — Speaks OpenAI Chat Completions API  
+**OpenAiResponsesHandler** — Speaks OpenAI Responses API  
+
+Each handler:
+- Accepts normalized `ChatRequest` and `ModelDefinition`
+- Translates to native API format
+- Returns normalized `LlmResponse`
 
 ### ILlmProvider Interface
 
@@ -698,6 +804,56 @@ public interface ILlmProvider
 }
 ```
 
+### Copilot Provider: Model-Aware Routing
+
+**File:** `BotNexus.Providers.Copilot/CopilotProvider.cs`
+
+The Copilot provider implements request routing based on model definition:
+
+```csharp
+public sealed class CopilotProvider : LlmProviderBase
+{
+    private readonly Dictionary<string, IApiFormatHandler> _handlers = new()
+    {
+        ["anthropic-messages"] = new AnthropicMessagesHandler(...),
+        ["openai-completions"] = new OpenAiCompletionsHandler(...),
+        ["openai-responses"] = new OpenAiResponsesHandler(...)
+    };
+    
+    protected override async Task<LlmResponse> ChatCoreAsync(
+        ChatRequest request, 
+        CancellationToken cancellationToken)
+    {
+        // 1. Resolve model from request
+        var model = CopilotModels.Resolve(request.Settings.Model);
+        
+        // 2. Get handler by API format
+        var handler = GetHandler(model.Api);
+        
+        // 3. Get Copilot access token (via GitHub OAuth exchange)
+        var apiKey = await GetCopilotAccessTokenAsync(cancellationToken);
+        
+        // 4. Route to handler
+        return await handler.ChatAsync(model, request, apiKey, cancellationToken);
+    }
+}
+```
+
+### Copilot Headers
+
+The Copilot API expects provider-specific headers for requests:
+
+```json
+{
+    "User-Agent": "GitHubCopilotChat/0.35.0",
+    "Editor-Version": "vscode/1.107.0",
+    "Editor-Plugin-Version": "copilot-chat/0.35.0",
+    "Copilot-Integration-Id": "vscode-chat"
+}
+```
+
+These headers are embedded in each `ModelDefinition` and applied by handlers. They identify the client to Copilot and enable proper routing and rate limiting.
+
 ### LlmProviderBase (Abstract Base)
 
 **File:** `BotNexus.Providers.Base/LlmProviderBase.cs`
@@ -709,69 +865,70 @@ Provides common infrastructure:
 - **Metrics**: Track latency and call counts
 - **Streaming**: SSE handling for streaming responses
 
+### How to Add a New Model or Handler
+
+#### 1. Add Model to CopilotModels
+
 ```csharp
-public abstract class LlmProviderBase : ILlmProvider
+// In CopilotModels.cs, add to the All list:
+new ModelDefinition(
+    Id: "new-model-id",
+    Name: "New Model",
+    Api: "api-format-name",  // Use existing or create new
+    Provider: "github-copilot",
+    BaseUrl: "https://api.individual.githubcopilot.com",
+    Headers: CopilotHeaders,
+    Reasoning: false,
+    Input: ["text"],
+    ContextWindow: 200000,
+    MaxTokens: 100000
+)
+```
+
+#### 2. If Adding a New API Format: Implement IApiFormatHandler
+
+```csharp
+public class NewApiFormatHandler : IApiFormatHandler
 {
-    public async Task<ChatResponse> ChatAsync(ChatRequest request)
+    public string ApiFormat => "new-api-format";
+    
+    public async Task<LlmResponse> ChatAsync(
+        ModelDefinition model, 
+        ChatRequest request, 
+        string apiKey, 
+        CancellationToken cancellationToken)
     {
-        return await RetryAsync(
-            () => ChatCoreAsync(request),
-            maxRetries: Generation.MaxRetries,
-            backoff: Generation.RetryBackoff
-        );
+        // Translate ChatRequest to native format
+        // Call API
+        // Translate response to LlmResponse
+        return new LlmResponse(...);
     }
     
-    protected abstract Task<ChatResponse> ChatCoreAsync(
-        ChatRequest request);
+    public async IAsyncEnumerable<StreamingChatChunk> ChatStreamAsync(...)
+    {
+        // Stream implementation
+    }
 }
 ```
 
-### Provider Implementations
+#### 3. Register Handler in CopilotProvider
 
-#### Copilot Provider (OAuth)
-
-**File:** `BotNexus.Providers.Copilot/CopilotProvider.cs`
-
-- **Auth**: GitHub OAuth device code flow
-- **Endpoint**: `https://api.githubcopilot.com`
-- **API Format**: OpenAI-compatible
-- **Default Model**: Latest Copilot model
-
+```csharp
+// In CopilotProvider constructor:
+_handlers = new()
+{
+    ["anthropic-messages"] = new AnthropicMessagesHandler(...),
+    ["openai-completions"] = new OpenAiCompletionsHandler(...),
+    ["openai-responses"] = new OpenAiResponsesHandler(...),
+    ["new-api-format"] = new NewApiFormatHandler(...)  // Add here
+};
 ```
-Device Code Flow:
-1. Request device code from GitHub
-2. Display code to user (e.g., "Enter code: ABCD-1234")
-3. Poll GitHub while user authorizes
-4. Receive access token on approval
-5. Cache token locally (encrypted)
-6. Use token for API calls
-```
-
-#### OpenAI Provider (API Key)
-
-**File:** `BotNexus.Providers.OpenAI/OpenAiProvider.cs`
-
-- **Auth**: API key authentication
-- **Endpoint**: `https://api.openai.com/v1` (or custom via `apiBase`)
-- **API Format**: Official OpenAI Chat Completions API
-- **Default Model**: `gpt-4o`
-- **Tooling**: Full support for tool calling
-
-#### Anthropic Provider (API Key)
-
-**File:** `BotNexus.Providers.Anthropic/AnthropicProvider.cs`
-
-- **Auth**: API key authentication
-- **Endpoint**: `https://api.anthropic.com`
-- **API Format**: Anthropic Messages API (converted to/from ChatRequest)
-- **Default Model**: `claude-3-5-sonnet-20241022`
-- **Tooling**: Partial support (no streaming tool use)
 
 ### Provider Registry
 
 **File:** `BotNexus.Providers.Base/ProviderRegistry.cs`
 
-The provider registry maintains a map of available providers and resolves which provider should handle a request:
+The provider registry maintains a map of available providers:
 
 ```csharp
 public class ProviderRegistry
@@ -780,24 +937,6 @@ public class ProviderRegistry
     public ILlmProvider GetDefault();
     public IEnumerable<string> GetProviderNames();
 }
-```
-
-### Provider Resolution Strategy (from AgentLoop)
-
-When processing a request, the agent selects a provider via this priority:
-
-1. **Explicit Configuration**: `AgentConfig.Provider` name
-2. **Model Prefix**: `"provider:model"` (e.g., `"anthropic:claude-3"`)
-3. **Default Model Match**: Model name matches provider's `DefaultModel`
-4. **Registry Default**: First registered provider
-5. **Error**: No provider available
-
-Example:
-
-```csharp
-// All of these resolve to OpenAI provider:
-"openai:gpt-4o"      // Explicit prefix
-"gpt-4o"             // Matches OpenAI's DefaultModel
 ```
 
 ---

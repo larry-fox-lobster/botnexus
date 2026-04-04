@@ -298,6 +298,98 @@ All providers inherit these properties:
 | `TimeoutSeconds` | int | 120 | Request timeout in seconds |
 | `MaxRetries` | int | 3 | Number of retries on transient failure |
 
+#### Copilot Provider: Supported Models
+
+The Copilot provider exposes **26 registered models** organized by API format:
+
+##### Claude Models (Anthropic Messages API)
+| Model ID | Name | Reasoning | Context | Max Output | Input Types |
+|---|---|---|---|---|---|
+| `claude-haiku-4.5` | Claude Haiku 4.5 | No | 200K | 8K | text, image |
+| `claude-opus-4.5` | Claude Opus 4.5 | No | 200K | 16K | text, image |
+| `claude-opus-4.6` | Claude Opus 4.6 | **Yes** | 1M | 64K | text, image |
+| `claude-sonnet-4` | Claude Sonnet 4 | No | 200K | 8K | text, image |
+| `claude-sonnet-4.5` | Claude Sonnet 4.5 | No | 200K | 8K | text, image |
+| `claude-sonnet-4.6` | Claude Sonnet 4.6 | **Yes** | 200K | 8K | text, image |
+
+##### GPT Models (OpenAI Completions API)
+| Model ID | Name | Reasoning | Context | Max Output | Input Types |
+|---|---|---|---|---|---|
+| `gpt-4o` | GPT-4o | No | 128K | 16K | text, image |
+| `gpt-4o-mini` | GPT-4o mini | No | 128K | 16K | text, image |
+| `gpt-4.1` | GPT-4.1 | No | 128K | 16K | text |
+| `o1` | o1 | **Yes** | 200K | 100K | text, image |
+| `o1-mini` | o1-mini | **Yes** | 128K | 65K | text |
+| `o3` | o3 | **Yes** | 200K | 100K | text |
+| `o3-mini` | o3-mini | **Yes** | 200K | 100K | text |
+| `o4-mini` | o4-mini | **Yes** | 200K | 100K | text |
+
+##### GPT-5 Models (OpenAI Responses API)
+| Model ID | Name | Reasoning | Context | Max Output | Input Types |
+|---|---|---|---|---|---|
+| `gpt-5` | GPT-5 | No | 200K | 100K | text |
+| `gpt-5-mini` | GPT-5 mini | No | 200K | 100K | text |
+| `gpt-5.1` | GPT-5.1 | No | 200K | 100K | text |
+| `gpt-5.2` | GPT-5.2 | No | 200K | 100K | text |
+| `gpt-5.2-codex` | GPT-5.2-Codex | No | 200K | 100K | text |
+| `gpt-5.4` | GPT-5.4 | No | 200K | 100K | text |
+| `gpt-5.4-mini` | GPT-5.4 mini | No | 200K | 100K | text |
+
+##### Gemini Models (OpenAI Completions API)
+| Model ID | Name | Reasoning | Context | Max Output | Input Types |
+|---|---|---|---|---|---|
+| `gemini-2.5-pro` | Gemini 2.5 Pro | No | 1M | 8K | text, image |
+| `gemini-3-flash-preview` | Gemini 3 Flash Preview | No | 1M | 8K | text, image |
+| `gemini-3-pro-preview` | Gemini 3 Pro Preview | No | 2M | 8K | text, image |
+| `gemini-3.1-pro-preview` | Gemini 3.1 Pro Preview | No | 2M | 8K | text, image |
+
+##### Grok Models (OpenAI Completions API)
+| Model ID | Name | Reasoning | Context | Max Output | Input Types |
+|---|---|---|---|---|---|
+| `grok-code-fast-1` | Grok Code Fast 1 | No | 131K | 32K | text |
+
+**Configuration Example:**
+
+```json
+{
+  "BotNexus": {
+    "Providers": {
+      "copilot": {
+        "Auth": "oauth",
+        "DefaultModel": "claude-opus-4.6",
+        "TimeoutSeconds": 120,
+        "MaxRetries": 3
+      }
+    },
+    "Agents": {
+      "Named": {
+        "analyst": {
+          "Model": "gpt-4o",
+          "Provider": "copilot"
+        },
+        "researcher": {
+          "Model": "gpt-5.4",
+          "Provider": "copilot"
+        },
+        "coder": {
+          "Model": "claude-opus-4.6",
+          "Provider": "copilot"
+        }
+      }
+    }
+  }
+}
+```
+
+**Key Points:**
+- **Single Provider**: All Copilot models route through the Copilot provider
+- **Model-Aware Routing**: Request model determines which API format handler is used
+- **Headers Applied Automatically**: Each model definition includes Copilot-specific headers
+- **API Format**: Claude models use Anthropic Messages API; GPT models use OpenAI Completions or Responses API
+- **Reasoning Support**: Models marked **Yes** support extended thinking/reasoning modes
+
+---
+
 #### Copilot Provider (OAuth Device Code Flow)
 
 **Folder:** `extensions/providers/copilot/`  
@@ -309,7 +401,7 @@ All providers inherit these properties:
     "copilot": {
       "Auth": "oauth",
       "DefaultModel": "gpt-4o",
-      "ApiBase": "https://api.githubcopilot.com",
+      "ApiBase": "https://api.individual.githubcopilot.com",
       "OAuthClientId": "Iv1.b507a08c87ecfe98",
       "TimeoutSeconds": 120,
       "MaxRetries": 3
@@ -326,9 +418,24 @@ All providers inherit these properties:
 
 **Properties:**
 - `Auth`: Must be `"oauth"` (required)
-- `DefaultModel`: Copilot-compatible model (typically `gpt-4o` or `gpt-4-turbo`)
-- `ApiBase`: GitHub Copilot endpoint (fixed value: `https://api.githubcopilot.com`)
+- `DefaultModel`: Any supported Copilot model ID (e.g., `claude-opus-4.6`, `gpt-5.4`, `gpt-4o`)
+- `ApiBase`: GitHub Copilot endpoint (fixed: `https://api.individual.githubcopilot.com`)
 - `OAuthClientId`: GitHub app client ID (defaults to official BotNexus client ID)
+
+**Copilot API Headers:**
+
+The Copilot API requires specific headers that are automatically applied:
+
+```
+User-Agent: GitHubCopilotChat/0.35.0
+Editor-Version: vscode/1.107.0
+Editor-Plugin-Version: copilot-chat/0.35.0
+Copilot-Integration-Id: vscode-chat
+```
+
+These headers identify the client to the Copilot API and enable proper rate limiting and routing.
+
+---
 
 #### OpenAI Provider
 

@@ -12,7 +12,8 @@ New to BotNexus? The **Getting Started** guide walks you from clone → build �
 
 - **Multi-Agent** — Run multiple agents with independent configs (model, provider, system prompt, tools)
 - **Multi-Channel** — Discord, Slack, Telegram, WebSocket, and REST API
-- **Multi-Provider** — GitHub Copilot (OAuth + Responses API), OpenAI, Anthropic, Azure OpenAI
+- **Multi-Provider** — GitHub Copilot (26 models: Claude, GPT, GPT-5, Gemini, Grok via model-aware routing), OpenAI, Anthropic, Azure OpenAI
+- **Model-Aware Routing** — Each model defines its API format (Anthropic Messages, OpenAI Completions, OpenAI Responses); requests route to the correct handler automatically
 - **Extensible** — Dynamic assembly loading with folder-based extension system
 - **Skills System** — Modular knowledge packages for agents (git workflows, coding standards, best practices)
 - **MCP Support** — Model Context Protocol servers (stdio and SSE transports)
@@ -98,11 +99,42 @@ On first run, BotNexus creates `~/.botnexus/` with a default `config.json`. Edit
 | **Cli** | `botnexus` command-line tool — config, agents, providers, doctor, Gateway lifecycle |
 | **Diagnostics** | 13 health checkups with auto-fix, used by CLI doctor and `/api/doctor` endpoint |
 | **Channels** | Discord, Slack, Telegram, WebSocket implementations |
-| **Providers** | Copilot (OAuth), OpenAI, Anthropic LLM backends |
+| **Providers** | Copilot (OAuth, model-aware routing), OpenAI, Anthropic LLM backends |
 | **Session** | JSONL-based conversation persistence |
 | **WebUI** | Real-time activity monitoring dashboard |
 
-## Documentation
+### Provider Model-Aware Routing
+
+BotNexus uses a **Pi-style, model-aware provider architecture**:
+
+- **ModelDefinition** — Each model explicitly declares its API format (Anthropic Messages, OpenAI Completions, OpenAI Responses)
+- **IApiFormatHandler** — Separate handler per API format (3 handlers in Copilot provider for 26 models)
+- **Automatic Routing** — Request model determines handler; no provider name needed
+- **Copilot Models** — 26 pre-registered models: Claude (6), GPT-4/4o/o1/o3 (8), GPT-5 (7), Gemini (4), Grok (1)
+
+Example:
+```json
+{
+  "Agents": {
+    "analyst": {
+      "Model": "gpt-4o",        // Routes to openai-completions handler
+      "Provider": "copilot"
+    },
+    "researcher": {
+      "Model": "gpt-5.4",       // Routes to openai-responses handler
+      "Provider": "copilot"
+    },
+    "coder": {
+      "Model": "claude-opus-4.6", // Routes to anthropic-messages handler
+      "Provider": "copilot"
+    }
+  }
+}
+```
+
+See [Architecture Guide](docs/architecture.md#provider-architecture-pi-style) and [Configuration Guide](docs/configuration.md#copilot-provider-supported-models) for details.
+
+
 
 - **[Getting Started](docs/getting-started.md)** ← Start here
 - [API Reference](docs/api-reference.md) — REST API endpoints (agents, sessions, system)
