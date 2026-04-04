@@ -1,16 +1,35 @@
 ---
-updated_at: 2026-04-05T00:00:00Z
-focus_area: pi-mono Agent Port
-active_issues:
-  - leela-agent-port-plan
+updated_at: 2026-04-04T22:30:00Z
+focus_area: Agent Port Completion — Integration Sprints Begin
+active_issues: []
+status: delivered
 ---
 
 # What We're Focused On
 
-Porting the pi-mono `@mariozechner/pi-agent-core` TypeScript agent package into a new standalone C#/.NET project: **`BotNexus.AgentCore`**. 4-sprint plan covering foundation types, agent loop engine, stateful Agent wrapper, and tests+docs. The new project references only `BotNexus.Providers.Base` — complete isolation from the existing `BotNexus.Agent`.
+**pi-mono Agent Core port COMPLETE.** All 4 sprints delivered on schedule.
 
-## Current Sprint
-Sprint 1 (Foundation) — waiting for Farnsworth to scaffold the project and define all types/interfaces. Leela gate review required before Sprint 2.
+## Delivery Summary
+
+| Metric | Value |
+|--------|-------|
+| Commits | 20 |
+| Source Files | 27 |
+| Tests | 26 passing |
+| Sprints | 4 |
+
+### What's Done
+- ✓ BotNexus.AgentCore project scaffold + types (Farnsworth, Sprint 1)
+- ✓ Agent loop engine: MessageConverter, ContextConverter, StreamAccumulator, ToolExecutor, AgentLoopRunner (Bender, Sprint 2)
+- ✓ Agent class + PendingMessageQueue + full public API + thread safety (Bender, Sprint 3)
+- ✓ XML docs enriched to pi-mono quality (Kif, Sprint 4)
+- ✓ 26 test cases + comprehensive README (Hermes + Kif, Sprint 4)
+- ✓ Decision inbox merged; team context updated
+
+## Next Phase
+
+**Integration sprints** — bind AgentCore into BotNexus platform services. Ready for deployment review.
 
 ## Team
-Leela (Lead), Farnsworth (Platform Dev), Bender (Runtime Dev), Fry (Web Dev), Amy (UI Designer), Hermes (Tester), Kif (Documentation) — cast from Futurama.
+
+Leela (Lead), Farnsworth (Platform Dev), Bender (Runtime Dev), Hermes (Tester), Kif (Documentation)

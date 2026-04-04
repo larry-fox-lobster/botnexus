@@ -5266,3 +5266,19 @@ This preserves backward compatibility while decoupling the new provider layer fr
 **By:** Jon Bullen (via Copilot)
 **What:** The new agent project under src/agent/ may ONLY reference projects in src/providers/. References to BotNexus.Core, BotNexus.Providers.Base, or any other projects outside src/providers/ are NOT allowed. This is a hard constraint — violation means failure.
 **Why:** User request — the new agent must follow the same clean dependency pattern as the pi-mono repo, depending only on the providers packages (the equivalent of @mariozechner/pi-ai).
+
+## Code Comments Quality Standard (2026-04-04)
+
+**By:** Jon Bullen (via Copilot)  
+**Date:** 2026-04-04T22:35:00Z  
+**Status:** Mandatory  
+**Applies to:** BotNexus.AgentCore port + all future C# projects  
+
+**Context:** pi-mono TypeScript agent package sets documentation standard. C# port must maintain same level of clarity and detail.
+
+**Rule:** Every method and property must have implementation details, contracts, and behavioral notes — not just summary descriptions. Match pi-mono quality exactly.
+
+**Why:** User directive — consistency with reference implementation; future developer clarity.
+
+---
+
