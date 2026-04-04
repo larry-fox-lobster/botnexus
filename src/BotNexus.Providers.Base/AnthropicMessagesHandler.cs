@@ -408,7 +408,8 @@ public sealed class AnthropicMessagesHandler : IApiFormatHandler
     private HttpRequestMessage CreateHttpRequest(ModelDefinition model, Dictionary<string, object?> payload, string apiKey)
     {
         var json = JsonSerializer.Serialize(payload);
-        var request = new HttpRequestMessage(HttpMethod.Post, "/v1/messages")
+        var url = $"{model.BaseUrl.TrimEnd('/')}/v1/messages";
+        var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
             Content = new StringContent(json, Encoding.UTF8, "application/json")
         };

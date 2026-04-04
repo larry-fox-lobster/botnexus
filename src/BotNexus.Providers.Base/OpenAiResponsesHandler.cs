@@ -414,7 +414,8 @@ public sealed class OpenAiResponsesHandler : IApiFormatHandler
     private HttpRequestMessage CreateHttpRequest(ModelDefinition model, Dictionary<string, object?> payload, string apiKey)
     {
         var json = JsonSerializer.Serialize(payload);
-        var request = new HttpRequestMessage(HttpMethod.Post, "/v1/responses")
+        var url = $"{model.BaseUrl.TrimEnd('/')}/v1/responses";
+        var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
             Content = new StringContent(json, Encoding.UTF8, "application/json")
         };
