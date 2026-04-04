@@ -361,7 +361,6 @@ public sealed class AgentLoop
                     _agentName, llmResponse.ToolCalls!.Count, iteration);
 
                 bool anyToolExecuted = false;
-                bool anyToolBlocked = false;
 
                 foreach (var toolCall in llmResponse.ToolCalls!)
                 {
@@ -373,7 +372,6 @@ public sealed class AgentLoop
                     if (currentCount >= maxRepeatedCalls)
                     {
                         // Block the repeated call and return error to LLM
-                        anyToolBlocked = true;
                         consecutiveBlockedCalls++;
                         
                         var errorMessage = $"Error: Loop detected. Tool '{toolCall.ToolName}' called {currentCount + 1} times with identical arguments. Try a different approach.";
