@@ -409,17 +409,22 @@ public sealed class AnthropicMessagesHandler : IApiFormatHandler
     {
         var json = JsonSerializer.Serialize(payload);
         var url = $"{model.BaseUrl.TrimEnd('/')}/v1/messages";
+        
         var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
-            Content = new StringContent(json, Encoding.UTF8, "application/json")
+            Content = new StringContent(json, Encoding.UTF8, "application/json"),
+            Version = new Version(1, 1),  // Force HTTP/1.1 to avoid HTTP/2 421 errors
+            VersionPolicy = HttpVersionPolicy.RequestVersionExact
         };
         
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         
-        // Anthropic-specific headers
+        // Headers required by Copilot proxy for proper routing (HTTP 421 fix)
+        request.Headers.TryAddWithoutValidation("accept", "application/json");
+        request.Headers.TryAddWithoutValidation("anthropic-dangerous-direct-browser-access", "true");
         request.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
         
-        // Add model-specific headers
+        // Add model-specific headers (User-Agent, Editor-Version, etc.)
         if (model.Headers is not null)
         {
             foreach (var (key, value) in model.Headers)

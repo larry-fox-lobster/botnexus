@@ -23,6 +23,7 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
     private readonly string _defaultModel;
     private string? _copilotAccessToken;
     private DateTimeOffset _copilotExpiresAt;
+    private string? _copilotApiEndpoint; // Dynamic API endpoint from token response
     private static readonly TimeSpan ExpirySkew = TimeSpan.FromSeconds(60);
     
     private readonly Dictionary<string, IApiFormatHandler> _handlers;
@@ -152,6 +153,22 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
         var token = root.GetProperty("token").GetString()
             ?? throw new InvalidOperationException("Copilot token exchange returned no token.");
 
+        // Extract the API endpoint from the token response (HTTP 421 fix)
+        // Enterprise: https://api.enterprise.githubcopilot.com
+        // Individual: https://api.individual.githubcopilot.com
+        if (root.TryGetProperty("endpoints", out var endpoints) &&
+            endpoints.TryGetProperty("api", out var apiEndpoint))
+        {
+            _copilotApiEndpoint = apiEndpoint.GetString();
+            Logger.LogInformation("Using Copilot API endpoint: {ApiEndpoint}", _copilotApiEndpoint);
+        }
+        else
+        {
+            // Fallback to default if endpoints not present
+            _copilotApiEndpoint = "https://api.individual.githubcopilot.com";
+            Logger.LogWarning("Token response missing endpoints.api, using fallback: {ApiEndpoint}", _copilotApiEndpoint);
+        }
+
         if (root.TryGetProperty("expires_at", out var expiresAtElement))
         {
             _copilotExpiresAt = expiresAtElement.ValueKind == JsonValueKind.Number
@@ -191,6 +208,12 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
         var handler = GetHandler(model.Api);
         var apiKey = await GetCopilotAccessTokenAsync(cancellationToken).ConfigureAwait(false);
         
+        // Use the dynamic API endpoint from token response (HTTP 421 fix)
+        if (!string.IsNullOrEmpty(_copilotApiEndpoint) && model.BaseUrl != _copilotApiEndpoint)
+        {
+            model = model with { BaseUrl = _copilotApiEndpoint };
+        }
+        
         Logger.LogInformation("Routing to {ApiFormat} handler for model {ModelId}", model.Api, model.Id);
         
         try
@@ -223,6 +246,12 @@ public sealed class CopilotProvider : LlmProviderBase, IOAuthProvider
         
         var handler = GetHandler(model.Api);
         var apiKey = await GetCopilotAccessTokenAsync(cancellationToken).ConfigureAwait(false);
+        
+        // Use the dynamic API endpoint from token response (HTTP 421 fix)
+        if (!string.IsNullOrEmpty(_copilotApiEndpoint) && model.BaseUrl != _copilotApiEndpoint)
+        {
+            model = model with { BaseUrl = _copilotApiEndpoint };
+        }
         
         Logger.LogInformation("Routing to {ApiFormat} streaming handler for model {ModelId}", model.Api, model.Id);
         
