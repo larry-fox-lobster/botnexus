@@ -4,8 +4,27 @@ using BotNexus.Providers.Core.Streaming;
 
 namespace BotNexus.AgentCore.Loop;
 
+/// <summary>
+/// Accumulates streaming LLM events into a final AssistantAgentMessage.
+/// </summary>
+/// <remarks>
+/// Handles StartEvent, TextDeltaEvent, ToolCallStartEvent, ToolCallDeltaEvent, ToolCallEndEvent,
+/// DoneEvent, and ErrorEvent. Emits corresponding AgentEvent for each provider event.
+/// Maintains tool call state to correlate deltas with tool IDs/names.
+/// </remarks>
 internal static class StreamAccumulator
 {
+    /// <summary>
+    /// Consume a provider LLM stream and emit agent events.
+    /// </summary>
+    /// <param name="stream">The provider event stream.</param>
+    /// <param name="emit">The event emission callback.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The final accumulated assistant message.</returns>
+    /// <remarks>
+    /// Emits MessageStartEvent → MessageUpdateEvent (0+) → MessageEndEvent.
+    /// Returns the completed message from DoneEvent or ErrorEvent.
+    /// </remarks>
     public static async Task<AssistantAgentMessage> AccumulateAsync(
         LlmStream stream,
         Func<AgentEvent, Task> emit,

@@ -7,8 +7,29 @@ namespace BotNexus.AgentCore.Loop;
 
 using AgentUserMessage = BotNexus.AgentCore.Types.UserMessage;
 
+/// <summary>
+/// Agent loop that works with AgentMessage throughout.
+/// Transforms to provider Message[] only at the LLM call boundary.
+/// </summary>
+/// <remarks>
+/// Implements the core turn loop: drain steering → call LLM → execute tools → drain steering → repeat.
+/// Follow-up messages trigger an additional loop cycle after all turns settle.
+/// </remarks>
 public static class AgentLoopRunner
 {
+    /// <summary>
+    /// Start a new agent run by appending prompts to the context timeline.
+    /// </summary>
+    /// <param name="prompts">The messages to append before running the loop.</param>
+    /// <param name="context">The current agent context.</param>
+    /// <param name="config">The loop configuration.</param>
+    /// <param name="emit">The event emission callback.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>All new messages produced during the run.</returns>
+    /// <remarks>
+    /// Emits AgentStartEvent, TurnStartEvent, then MessageStart/End for each prompt,
+    /// then enters the main loop. Used by Agent.PromptAsync.
+    /// </remarks>
     public static async Task<IReadOnlyList<AgentMessage>> RunAsync(
         IReadOnlyList<AgentMessage> prompts,
         AgentContext context,
@@ -45,6 +66,26 @@ public static class AgentLoopRunner
         return newMessages;
     }
 
+    /// <summary>
+    /// Continue an agent loop from the current context without adding a new message.
+    /// </summary>
+    /// <param name="context">The current agent context.</param>
+    /// <param name="config">The loop configuration.</param>
+    /// <param name="emit">The event emission callback.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>All new messages produced during the run.</returns>
+    /// <remarks>
+    /// <para>
+    /// Used for retries when the context already has a user message or tool results.
+    /// </para>
+    /// <para>
+    /// <strong>Important:</strong> The last message in context must convert to a user or tool result message
+    /// via ConvertToLlm. If it doesn't, the LLM provider will reject the request.
+    /// </para>
+    /// <para>
+    /// Throws InvalidOperationException if the last message is from the assistant.
+    /// </para>
+    /// </remarks>
     public static async Task<IReadOnlyList<AgentMessage>> ContinueAsync(
         AgentContext context,
         AgentLoopConfig config,

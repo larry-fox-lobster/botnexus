@@ -8,8 +8,20 @@ using ProviderAssistantMessage = BotNexus.Providers.Core.Models.AssistantMessage
 using ProviderToolResultMessage = BotNexus.Providers.Core.Models.ToolResultMessage;
 using AgentUserMessage = BotNexus.AgentCore.Types.UserMessage;
 
+/// <summary>
+/// Converts between agent messages and provider messages.
+/// </summary>
+/// <remarks>
+/// Handles UserMessage, AssistantAgentMessage, ToolResultAgentMessage conversions.
+/// Parses image data URIs for multimodal content.
+/// </remarks>
 internal static class MessageConverter
 {
+    /// <summary>
+    /// Convert agent messages to provider messages.
+    /// </summary>
+    /// <param name="agentMessages">The agent message timeline.</param>
+    /// <returns>Provider-compatible Message[] for LLM invocation.</returns>
     public static IReadOnlyList<Message> ToProviderMessages(IReadOnlyList<AgentMessage> agentMessages)
     {
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -34,6 +46,11 @@ internal static class MessageConverter
         return providerMessages;
     }
 
+    /// <summary>
+    /// Convert provider assistant message to agent assistant message.
+    /// </summary>
+    /// <param name="providerMessage">The provider assistant message.</param>
+    /// <returns>An AgentAssistantMessage with accumulated content, tool calls, and usage.</returns>
     public static AssistantAgentMessage ToAgentMessage(ProviderAssistantMessage providerMessage)
     {
         var text = string.Join(
@@ -59,6 +76,11 @@ internal static class MessageConverter
             Timestamp: DateTimeOffset.FromUnixTimeMilliseconds(providerMessage.Timestamp));
     }
 
+    /// <summary>
+    /// Convert agent tool result to provider tool result message.
+    /// </summary>
+    /// <param name="agentResult">The agent tool result message.</param>
+    /// <returns>A provider ToolResultMessage ready for LLM invocation.</returns>
     public static ProviderToolResultMessage ToToolResultMessage(ToolResultAgentMessage agentResult)
     {
         var blocks = agentResult.Result.Content

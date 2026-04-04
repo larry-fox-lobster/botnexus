@@ -6,20 +6,37 @@ namespace BotNexus.AgentCore.Types;
 /// Base event contract for the pi-mono style agent lifecycle event stream.
 /// </summary>
 /// <param name="Type">The event discriminator.</param>
-/// <param name="Timestamp">The event timestamp.</param>
+/// <param name="Timestamp">The event timestamp (UTC).</param>
+/// <remarks>
+/// Events are emitted via Agent.Subscribe listeners during agent runs.
+/// All events are awaited in listener order before the run proceeds.
+/// </remarks>
 public abstract record AgentEvent(AgentEventType Type, DateTimeOffset Timestamp);
 
 /// <summary>
 /// Raised when an agent run starts.
 /// </summary>
 /// <param name="Timestamp">The event timestamp.</param>
+/// <remarks>
+/// The first event in every PromptAsync or ContinueAsync run.
+/// Followed by TurnStartEvent.
+/// </remarks>
 public sealed record AgentStartEvent(DateTimeOffset Timestamp) : AgentEvent(AgentEventType.AgentStart, Timestamp);
 
 /// <summary>
 /// Raised when an agent run ends.
 /// </summary>
-/// <param name="Messages">The final message timeline.</param>
+/// <param name="Messages">The final message timeline including all new messages.</param>
 /// <param name="Timestamp">The event timestamp.</param>
+/// <remarks>
+/// <para>
+/// The final event for a run. The agent becomes idle after all listeners settle.
+/// Messages includes the full timeline, not just new messages from this run.
+/// </para>
+/// <para>
+/// Emitted after all turns and tool executions complete, or after an error/abort.
+/// </para>
+/// </remarks>
 public sealed record AgentEndEvent(IReadOnlyList<AgentMessage> Messages, DateTimeOffset Timestamp)
     : AgentEvent(AgentEventType.AgentEnd, Timestamp);
 
@@ -27,14 +44,22 @@ public sealed record AgentEndEvent(IReadOnlyList<AgentMessage> Messages, DateTim
 /// Raised when a new turn starts.
 /// </summary>
 /// <param name="Timestamp">The event timestamp.</param>
+/// <remarks>
+/// Emitted before each LLM call. A run may have multiple turns if steering messages
+/// are queued or tool calls require additional LLM invocations.
+/// </remarks>
 public sealed record TurnStartEvent(DateTimeOffset Timestamp) : AgentEvent(AgentEventType.TurnStart, Timestamp);
 
 /// <summary>
 /// Raised when a turn completes.
 /// </summary>
 /// <param name="Message">The assistant message produced for the turn.</param>
-/// <param name="ToolResults">The tool results produced in the turn.</param>
+/// <param name="ToolResults">The tool results produced in the turn (empty if no tools were called).</param>
 /// <param name="Timestamp">The event timestamp.</param>
+/// <remarks>
+/// Emitted after the assistant message and all tool results are finalized.
+/// Check Message.FinishReason for stop/error/aborted status.
+/// </remarks>
 public sealed record TurnEndEvent(
     AssistantAgentMessage Message,
     IReadOnlyList<ToolResultAgentMessage> ToolResults,
@@ -43,23 +68,31 @@ public sealed record TurnEndEvent(
 /// <summary>
 /// Raised when assistant message generation starts.
 /// </summary>
-/// <param name="Message">The in-progress assistant message.</param>
+/// <param name="Message">The initial (empty or partial) assistant message.</param>
 /// <param name="Timestamp">The event timestamp.</param>
+/// <remarks>
+/// Followed by zero or more MessageUpdateEvents, then MessageEndEvent.
+/// Use for UI streaming start markers.
+/// </remarks>
 public sealed record MessageStartEvent(AssistantAgentMessage Message, DateTimeOffset Timestamp)
     : AgentEvent(AgentEventType.MessageStart, Timestamp);
 
 /// <summary>
 /// Raised for streaming updates while generating an assistant message.
 /// </summary>
-/// <param name="Message">The current assistant message snapshot.</param>
-/// <param name="ContentDelta">The streamed content delta.</param>
-/// <param name="ToolCallId">The active streamed tool call identifier.</param>
-/// <param name="ToolName">The active streamed tool name.</param>
-/// <param name="ArgumentsDelta">The streamed tool arguments delta.</param>
-/// <param name="FinishReason">The optional streamed finish reason.</param>
+/// <param name="Message">The current assistant message snapshot (accumulated content).</param>
+/// <param name="ContentDelta">The streamed content delta (new text since last update).</param>
+/// <param name="ToolCallId">The active streamed tool call identifier when streaming tool calls.</param>
+/// <param name="ToolName">The active streamed tool name when streaming tool calls.</param>
+/// <param name="ArgumentsDelta">The streamed tool arguments delta (new JSON text since last update).</param>
+/// <param name="FinishReason">The optional streamed finish reason (set when streaming completes).</param>
 /// <param name="InputTokens">The optional streamed input token count.</param>
 /// <param name="OutputTokens">The optional streamed output token count.</param>
 /// <param name="Timestamp">The event timestamp.</param>
+/// <remarks>
+/// Emitted for each chunk during streaming. Message contains the full accumulated content.
+/// Use ContentDelta or ArgumentsDelta to display incremental updates in real-time.
+/// </remarks>
 public sealed record MessageUpdateEvent(
     AssistantAgentMessage Message,
     string? ContentDelta,
@@ -76,6 +109,10 @@ public sealed record MessageUpdateEvent(
 /// </summary>
 /// <param name="Message">The completed assistant message.</param>
 /// <param name="Timestamp">The event timestamp.</param>
+/// <remarks>
+/// The final message event for a turn. Message contains the complete content and tool calls.
+/// Followed by ToolExecutionStartEvent if Message.ToolCalls is non-empty.
+/// </remarks>
 public sealed record MessageEndEvent(AssistantAgentMessage Message, DateTimeOffset Timestamp)
     : AgentEvent(AgentEventType.MessageEnd, Timestamp);
 
@@ -84,8 +121,12 @@ public sealed record MessageEndEvent(AssistantAgentMessage Message, DateTimeOffs
 /// </summary>
 /// <param name="ToolCallId">The tool call identifier.</param>
 /// <param name="ToolName">The tool name.</param>
-/// <param name="Args">The validated tool arguments.</param>
+/// <param name="Args">The validated tool arguments (after PrepareArgumentsAsync).</param>
 /// <param name="Timestamp">The event timestamp.</param>
+/// <remarks>
+/// Emitted after argument validation and before-hooks, immediately before ExecuteAsync is called.
+/// For parallel execution, all ToolExecutionStartEvents are emitted before any tool executes.
+/// </remarks>
 public sealed record ToolExecutionStartEvent(
     string ToolCallId,
     string ToolName,
@@ -98,8 +139,11 @@ public sealed record ToolExecutionStartEvent(
 /// <param name="ToolCallId">The tool call identifier.</param>
 /// <param name="ToolName">The tool name.</param>
 /// <param name="Args">The validated tool arguments.</param>
-/// <param name="PartialResult">A partial tool result snapshot.</param>
+/// <param name="PartialResult">A partial tool result snapshot (optional).</param>
 /// <param name="Timestamp">The event timestamp.</param>
+/// <remarks>
+/// Reserved for future use. Tools may emit progress updates during long-running operations.
+/// </remarks>
 public sealed record ToolExecutionUpdateEvent(
     string ToolCallId,
     string ToolName,
@@ -113,8 +157,12 @@ public sealed record ToolExecutionUpdateEvent(
 /// <param name="ToolCallId">The tool call identifier.</param>
 /// <param name="ToolName">The tool name.</param>
 /// <param name="Result">The completed tool result.</param>
-/// <param name="IsError">Indicates whether the tool failed.</param>
+/// <param name="IsError">Indicates whether the tool failed (exception, validation error, or hook block).</param>
 /// <param name="Timestamp">The event timestamp.</param>
+/// <remarks>
+/// Emitted after ExecuteAsync completes (or fails) and after-hooks run.
+/// For parallel execution, ToolExecutionEndEvents are emitted in original assistant message order.
+/// </remarks>
 public sealed record ToolExecutionEndEvent(
     string ToolCallId,
     string ToolName,

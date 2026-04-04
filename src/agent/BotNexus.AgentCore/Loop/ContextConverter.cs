@@ -5,8 +5,22 @@ using BotNexus.Providers.Core.Models;
 
 namespace BotNexus.AgentCore.Loop;
 
+/// <summary>
+/// Converts AgentContext to provider Context for LLM invocation.
+/// </summary>
+/// <remarks>
+/// Calls ConvertToLlmDelegate to transform AgentMessage[] to provider Message[].
+/// Maps IAgentTool[] to provider Tool[] schemas.
+/// </remarks>
 internal static class ContextConverter
 {
+    /// <summary>
+    /// Convert agent context to provider context.
+    /// </summary>
+    /// <param name="agentContext">The agent context snapshot.</param>
+    /// <param name="convertToLlm">The message conversion delegate.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>A provider Context ready for LLM invocation.</returns>
     public static async Task<Context> ToProviderContext(
         AgentContext agentContext,
         ConvertToLlmDelegate convertToLlm,

@@ -5,8 +5,25 @@ using BotNexus.Providers.Core.Models;
 
 namespace BotNexus.AgentCore.Loop;
 
+/// <summary>
+/// Executes tool calls from assistant messages in sequential or parallel mode.
+/// </summary>
+/// <remarks>
+/// Coordinates argument validation, hook execution, and result collection.
+/// Emits ToolExecutionStartEvent and ToolExecutionEndEvent for each tool.
+/// In parallel mode, events are emitted in deterministic order (all starts, then all ends).
+/// </remarks>
 internal static class ToolExecutor
 {
+    /// <summary>
+    /// Execute all tool calls from an assistant message.
+    /// </summary>
+    /// <param name="context">The current agent context.</param>
+    /// <param name="assistantMessage">The assistant message containing tool calls.</param>
+    /// <param name="config">The loop configuration.</param>
+    /// <param name="emit">The event emission callback.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>Tool result messages in assistant source order.</returns>
     public static async Task<IReadOnlyList<ToolResultAgentMessage>> ExecuteAsync(
         AgentContext context,
         AssistantAgentMessage assistantMessage,

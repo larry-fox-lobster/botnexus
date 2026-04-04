@@ -7,6 +7,10 @@ namespace BotNexus.AgentCore;
 /// Thread-safe queue for steering and follow-up messages.
 /// Supports two drain modes: All (drain everything) or OneAtATime (drain one per call).
 /// </summary>
+/// <remarks>
+/// Used internally by Agent to manage steering and follow-up message injection.
+/// Thread-safe for concurrent Enqueue/Drain/Clear operations.
+/// </remarks>
 internal sealed class PendingMessageQueue
 {
     private readonly object _lock = new();

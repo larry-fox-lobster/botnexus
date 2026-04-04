@@ -8,15 +8,19 @@ namespace BotNexus.AgentCore.Configuration;
 /// Defines the immutable runtime contract for a pi-mono compatible agent loop.
 /// </summary>
 /// <param name="Model">The model definition used for provider calls.</param>
-/// <param name="ConvertToLlm">Converts agent messages to provider chat messages.</param>
-/// <param name="TransformContext">Transforms the agent message context before calls.</param>
-/// <param name="GetApiKey">Resolves provider API keys on demand.</param>
-/// <param name="GetSteeringMessages">Provides steering messages when configured.</param>
-/// <param name="GetFollowUpMessages">Provides follow-up messages when configured.</param>
-/// <param name="ToolExecutionMode">Controls tool execution ordering.</param>
-/// <param name="BeforeToolCall">Optional pre-tool-call hook.</param>
-/// <param name="AfterToolCall">Optional post-tool-call hook.</param>
-/// <param name="GenerationSettings">The generation settings for model calls.</param>
+/// <param name="ConvertToLlm">Converts agent messages to provider chat messages before each LLM call.</param>
+/// <param name="TransformContext">Transforms the agent message context before provider invocation (use for filtering, summarization).</param>
+/// <param name="GetApiKey">Resolves provider API keys on demand (called before each LLM invocation).</param>
+/// <param name="GetSteeringMessages">Provides steering messages when configured (drained at turn boundaries).</param>
+/// <param name="GetFollowUpMessages">Provides follow-up messages when configured (drained after runs complete).</param>
+/// <param name="ToolExecutionMode">Controls tool execution ordering (Sequential or Parallel).</param>
+/// <param name="BeforeToolCall">Optional pre-tool-call hook for validation and blocking.</param>
+/// <param name="AfterToolCall">Optional post-tool-call hook for result transformation.</param>
+/// <param name="GenerationSettings">The generation settings for model calls (temperature, maxTokens, etc.).</param>
+/// <remarks>
+/// AgentLoopConfig is built from AgentOptions at the start of each run.
+/// It is immutable and passed through the loop to ensure consistent configuration.
+/// </remarks>
 public record AgentLoopConfig(
     LlmModel Model,
     ConvertToLlmDelegate ConvertToLlm,

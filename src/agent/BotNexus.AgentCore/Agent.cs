@@ -5,6 +5,15 @@ using BotNexus.Providers.Core;
 
 namespace BotNexus.AgentCore;
 
+/// <summary>
+/// Stateful wrapper around the low-level agent loop.
+/// </summary>
+/// <remarks>
+/// Agent owns the current transcript, emits lifecycle events, executes tools,
+/// and exposes queueing APIs for steering and follow-up messages. It enforces
+/// single-run concurrency — only one PromptAsync/ContinueAsync may be active at a time.
+/// Listeners are awaited in subscription order and are included in the current run's settlement.
+/// </remarks>
 public sealed class Agent
 {
     private readonly AgentOptions _options;
@@ -21,6 +30,14 @@ public sealed class Agent
     private TaskCompletionSource? _activeRun;
     private AgentStatus _status = AgentStatus.Idle;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Agent"/> class.
+    /// </summary>
+    /// <param name="options">The agent configuration options.</param>
+    /// <remarks>
+    /// Creates internal message queues, copies initial state, and prepares the agent for runs.
+    /// The agent starts in Idle status.
+    /// </remarks>
     public Agent(AgentOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -40,8 +57,21 @@ public sealed class Agent
         _followUpQueue = new PendingMessageQueue(options.FollowUpMode);
     }
 
+    /// <summary>
+    /// Gets the current agent state.
+    /// </summary>
+    /// <remarks>
+    /// Assigning State.Tools or State.Messages copies the provided top-level array.
+    /// State mutations are visible immediately but do not affect in-flight runs.
+    /// </remarks>
     public AgentState State => _state;
 
+    /// <summary>
+    /// Gets the current agent execution status.
+    /// </summary>
+    /// <remarks>
+    /// Thread-safe. Returns Idle, Running, or Aborting.
+    /// </remarks>
     public AgentStatus Status
     {
         get
@@ -53,6 +83,37 @@ public sealed class Agent
         }
     }
 
+    /// <summary>
+    /// Subscribe to agent lifecycle events.
+    /// </summary>
+    /// <param name="listener">The event listener callback.</param>
+    /// <returns>A disposable subscription handle.</returns>
+    /// <remarks>
+    /// <para>
+    /// Listener promises are awaited in subscription order and are included in
+    /// the current run's settlement. Listeners also receive the active abort
+    /// signal for the current run.
+    /// </para>
+    /// <para>
+    /// agent_end is the final emitted event for a run, but the agent does not
+    /// become idle until all awaited listeners for that event have settled.
+    /// </para>
+    /// <para>
+    /// Thread-safe. Can be called while a run is active — new listeners will receive
+    /// events from the next turn boundary.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// using var subscription = agent.Subscribe(async (evt, ct) =>
+    /// {
+    ///     if (evt is MessageUpdateEvent update)
+    ///     {
+    ///         Console.Write(update.ContentDelta);
+    ///     }
+    /// });
+    /// </code>
+    /// </example>
     public IDisposable Subscribe(Func<AgentEvent, CancellationToken, Task> listener)
     {
         ArgumentNullException.ThrowIfNull(listener);
@@ -65,17 +126,58 @@ public sealed class Agent
         return new Subscription(this, listener);
     }
 
+    /// <summary>
+    /// Start a new agent run with a user text prompt.
+    /// </summary>
+    /// <param name="text">The user message text.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>All messages produced during the run (prompts, assistant messages, tool results).</returns>
+    /// <remarks>
+    /// Convenience overload that wraps the text in a UserMessage.
+    /// Blocks until the agent run completes or is aborted.
+    /// </remarks>
     public Task<IReadOnlyList<AgentMessage>> PromptAsync(string text, CancellationToken cancellationToken = default)
     {
         return PromptAsync(new UserMessage(text), cancellationToken);
     }
 
+    /// <summary>
+    /// Start a new agent run with a single message.
+    /// </summary>
+    /// <param name="message">The message to append to the timeline.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>All messages produced during the run.</returns>
+    /// <remarks>
+    /// Convenience overload that wraps the message in a list.
+    /// </remarks>
     public Task<IReadOnlyList<AgentMessage>> PromptAsync(AgentMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
         return PromptAsync([message], cancellationToken);
     }
 
+    /// <summary>
+    /// Start a new agent run with one or more messages.
+    /// </summary>
+    /// <param name="messages">The messages to append to the timeline.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>All messages produced during the run.</returns>
+    /// <remarks>
+    /// <para>
+    /// Throws InvalidOperationException if the agent is already running.
+    /// Drains queued steering messages before starting the loop.
+    /// </para>
+    /// <para>
+    /// All lifecycle events (agent_start, turn_start, message_start/update/end, tool_execution_start/end,
+    /// turn_end, agent_end) are emitted and awaited in order.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var result = await agent.PromptAsync("What is the weather?");
+    /// var lastMessage = result[^1] as AssistantAgentMessage;
+    /// </code>
+    /// </example>
     public Task<IReadOnlyList<AgentMessage>> PromptAsync(
         IReadOnlyList<AgentMessage> messages,
         CancellationToken cancellationToken = default)
@@ -91,6 +193,24 @@ public sealed class Agent
             cancellationToken);
     }
 
+    /// <summary>
+    /// Continue an agent loop from the current context without adding a new message.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>All messages produced during the run.</returns>
+    /// <remarks>
+    /// <para>
+    /// Used for retries when the context already has a user message or tool results.
+    /// If queued messages exist, drains them and calls PromptAsync instead.
+    /// </para>
+    /// <para>
+    /// <strong>Important:</strong> The last message in context must convert to a user or tool result message
+    /// via ConvertToLlm. If it doesn't, the LLM provider will reject the request.
+    /// </para>
+    /// <para>
+    /// Throws InvalidOperationException if the last message is from the assistant.
+    /// </para>
+    /// </remarks>
     public Task<IReadOnlyList<AgentMessage>> ContinueAsync(CancellationToken cancellationToken = default)
     {
         var queued = DrainQueuedMessages();
@@ -112,28 +232,65 @@ public sealed class Agent
             cancellationToken);
     }
 
+    /// <summary>
+    /// Enqueue a steering message to be injected at the next turn boundary.
+    /// </summary>
+    /// <param name="message">The message to enqueue.</param>
+    /// <remarks>
+    /// Steering messages are drained before each LLM call. Use for user interruptions,
+    /// context updates, or mid-run corrections. Thread-safe.
+    /// </remarks>
     public void Steer(AgentMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);
         _steeringQueue.Enqueue(message);
     }
 
+    /// <summary>
+    /// Enqueue a follow-up message to be injected after the current run completes.
+    /// </summary>
+    /// <param name="message">The message to enqueue.</param>
+    /// <remarks>
+    /// Follow-up messages are drained after the agent finishes a run with no pending tool calls.
+    /// Use for chained workflows or continuation prompts. Thread-safe.
+    /// </remarks>
     public void FollowUp(AgentMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);
         _followUpQueue.Enqueue(message);
     }
 
+    /// <summary>
+    /// Clears all enqueued steering messages.
+    /// </summary>
     public void ClearSteeringQueue() => _steeringQueue.Clear();
 
+    /// <summary>
+    /// Clears all enqueued follow-up messages.
+    /// </summary>
     public void ClearFollowUpQueue() => _followUpQueue.Clear();
 
+    /// <summary>
+    /// Clears both steering and follow-up message queues.
+    /// </summary>
     public void ClearAllQueues()
     {
         _steeringQueue.Clear();
         _followUpQueue.Clear();
     }
 
+    /// <summary>
+    /// Abort the currently running agent loop.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Sets status to Aborting, cancels the internal CancellationTokenSource, and waits
+    /// for the active run to settle. Swallows OperationCanceledException.
+    /// </para>
+    /// <para>
+    /// Thread-safe. No-op if the agent is already idle.
+    /// </para>
+    /// </remarks>
     public async Task AbortAsync()
     {
         Task? activeRunTask;
@@ -164,6 +321,14 @@ public sealed class Agent
         }
     }
 
+    /// <summary>
+    /// Wait for the agent to become idle.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <remarks>
+    /// Returns immediately if already idle. Otherwise, waits for the active run to settle.
+    /// Thread-safe.
+    /// </remarks>
     public async Task WaitForIdleAsync(CancellationToken cancellationToken = default)
     {
         Task? activeRunTask;
@@ -179,6 +344,18 @@ public sealed class Agent
         await activeRunTask.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Reset the agent to a clean initial state.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Cancels any active run, clears all message queues, clears the message timeline,
+    /// and resets error/streaming/pending state. Sets status to Idle.
+    /// </para>
+    /// <para>
+    /// Use with caution — this discards the conversation history.
+    /// </para>
+    /// </remarks>
     public void Reset()
     {
         CancellationTokenSource? cts;
