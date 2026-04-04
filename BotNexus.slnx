@@ -9,6 +9,9 @@
     <Project Path="src/providers/BotNexus.Providers.OpenAICompat/BotNexus.Providers.OpenAICompat.csproj" />
     <Project Path="src/providers/BotNexus.Providers.Copilot/BotNexus.Providers.Copilot.csproj" />
   </Folder>
+  <Folder Name="/src/coding-agent/">
+    <Project Path="src/coding-agent/BotNexus.CodingAgent/BotNexus.CodingAgent.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/BotNexus.AgentCore.Tests/BotNexus.AgentCore.Tests.csproj" />
     <Project Path="tests/BotNexus.Providers.Core.Tests/BotNexus.Providers.Core.Tests.csproj" />
@@ -16,5 +19,6 @@
     <Project Path="tests/BotNexus.Providers.OpenAI.Tests/BotNexus.Providers.OpenAI.Tests.csproj" />
     <Project Path="tests/BotNexus.Providers.OpenAICompat.Tests/BotNexus.Providers.OpenAICompat.Tests.csproj" />
     <Project Path="tests/BotNexus.Providers.Copilot.Tests/BotNexus.Providers.Copilot.Tests.csproj" />
+    <Project Path="tests/BotNexus.CodingAgent.Tests/BotNexus.CodingAgent.Tests.csproj" />
   </Folder>
 </Solution>
