@@ -21,6 +21,7 @@ public class CopilotProviderTests
             {
                 return JsonResponse("""{"token":"copilot-token","expires_at":9999999999}""");
             }
+            // gpt-4o uses OpenAI Completions API (/chat/completions)
             request.RequestUri!.AbsolutePath.Should().Be("/chat/completions");
             request.Headers.Authorization.Should().BeEquivalentTo(new AuthenticationHeaderValue("Bearer", "copilot-token"));
             return JsonResponse("""
@@ -36,7 +37,7 @@ public class CopilotProviderTests
             """);
         }))
         {
-            BaseAddress = new Uri("https://api.githubcopilot.com")
+            BaseAddress = new Uri("https://api.individual.githubcopilot.com")
         };
 
         var deviceFlow = BuildNoopDeviceFlow();
@@ -76,7 +77,7 @@ public class CopilotProviderTests
             };
         }))
         {
-            BaseAddress = new Uri("https://api.githubcopilot.com")
+            BaseAddress = new Uri("https://api.individual.githubcopilot.com")
         };
 
         var provider = new CopilotProvider(new CopilotConfig(), tokenStore, BuildNoopDeviceFlow(), NullLogger<CopilotProvider>.Instance, providerHttpClient);
@@ -125,7 +126,7 @@ public class CopilotProviderTests
         """);
         }))
         {
-            BaseAddress = new Uri("https://api.githubcopilot.com")
+            BaseAddress = new Uri("https://api.individual.githubcopilot.com")
         };
 
         var provider = new CopilotProvider(new CopilotConfig(), tokenStore, BuildNoopDeviceFlow(), NullLogger<CopilotProvider>.Instance, providerHttpClient);
@@ -216,7 +217,7 @@ public class CopilotProviderTests
             """);
         }))
         {
-            BaseAddress = new Uri("https://api.githubcopilot.com")
+            BaseAddress = new Uri("https://api.individual.githubcopilot.com")
         };
 
         var tokenStore = new InMemoryTokenStore();
@@ -276,7 +277,7 @@ public class CopilotProviderTests
             """);
         }))
         {
-            BaseAddress = new Uri("https://api.githubcopilot.com")
+            BaseAddress = new Uri("https://api.individual.githubcopilot.com")
         };
 
         var provider = new CopilotProvider(
