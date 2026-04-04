@@ -56,7 +56,7 @@ public sealed class AgentLoop
         IReadOnlyList<IAgentHook>? hooks = null,
         ILogger<AgentLoop>? logger = null,
         IBotNexusMetrics? metrics = null,
-        int maxToolIterations = 40,
+        int maxToolIterations = 20,
         IActivityStream? activityStream = null)
     {
         _agentName = agentName;
@@ -120,6 +120,7 @@ public sealed class AgentLoop
 
             var tools = _toolRegistry.GetDefinitions();
             var response = string.Empty;
+            int consecutiveBlockedCalls = 0;
 
             for (int iteration = 0; iteration < _maxToolIterations; iteration++)
             {
@@ -359,6 +360,9 @@ public sealed class AgentLoop
                 _logger.LogInformation("Agent {AgentName}: executing {Count} tool calls (iteration {Iteration})",
                     _agentName, llmResponse.ToolCalls!.Count, iteration);
 
+                bool anyToolExecuted = false;
+                bool anyToolBlocked = false;
+
                 foreach (var toolCall in llmResponse.ToolCalls!)
                 {
                     // Check for repeated tool call (loop detection)
@@ -369,9 +373,12 @@ public sealed class AgentLoop
                     if (currentCount >= maxRepeatedCalls)
                     {
                         // Block the repeated call and return error to LLM
+                        anyToolBlocked = true;
+                        consecutiveBlockedCalls++;
+                        
                         var errorMessage = $"Error: Loop detected. Tool '{toolCall.ToolName}' called {currentCount + 1} times with identical arguments. Try a different approach.";
-                        _logger.LogWarning("Agent {AgentName}: Blocked repeated tool call '{ToolName}' (attempt {Count}/{Max}), signature: {Signature}",
-                            _agentName, toolCall.ToolName, currentCount + 1, maxRepeatedCalls, signature);
+                        _logger.LogWarning("Agent {AgentName}: Blocked repeated tool call '{ToolName}' (attempt {Count}/{Max}), consecutive blocks: {ConsecutiveBlocks}, signature: {Signature}",
+                            _agentName, toolCall.ToolName, currentCount + 1, maxRepeatedCalls, consecutiveBlockedCalls, signature);
 
                         session.AddEntry(new SessionEntry(
                             MessageRole.Tool,
@@ -379,11 +386,25 @@ public sealed class AgentLoop
                             DateTimeOffset.UtcNow,
                             ToolName: toolCall.ToolName,
                             ToolCallId: toolCall.Id));
+                        
+                        // If we've hit 3 consecutive blocked calls, force break
+                        if (consecutiveBlockedCalls >= 3)
+                        {
+                            _logger.LogError("Agent {AgentName}: Breaking loop due to {Count} consecutive blocked tool calls", _agentName, consecutiveBlockedCalls);
+                            response = "I was unable to complete this task — the same tool call was attempted repeatedly. Please try rephrasing your request or breaking it into smaller steps.";
+                            session.AddEntry(new SessionEntry(
+                                MessageRole.Assistant,
+                                response,
+                                DateTimeOffset.UtcNow));
+                            break;
+                        }
+                        
                         continue;
                     }
 
                     // Increment the count for this signature
                     _toolCallSignatures[signature] = currentCount + 1;
+                    anyToolExecuted = true;
 
                     var toolProgressMessage = $"🔧 Using tool: {toolCall.ToolName}";
                     
@@ -413,6 +434,18 @@ public sealed class AgentLoop
                         DateTimeOffset.UtcNow,
                         ToolName: toolCall.ToolName,
                         ToolCallId: toolCall.Id));
+                }
+                
+                // Reset counter if at least one tool executed successfully
+                if (anyToolExecuted)
+                {
+                    consecutiveBlockedCalls = 0;
+                }
+                
+                // If we hit the circuit breaker, exit the outer loop
+                if (consecutiveBlockedCalls >= 3)
+                {
+                    break;
                 }
                 
                 // After tool execution, let the client know we're processing the results
