@@ -97,12 +97,17 @@ public class ToolExecutorTests
         results[0].Result.Content[0].Value.Should().Contain("not registered");
     }
 
-    [Fact]
-    public async Task ExecuteAsync_ToolLookup_IsCaseInsensitive()
+    [Theory]
+    [InlineData("bash", "Bash")]
+    [InlineData("bash", "BASH")]
+    [InlineData("bash", "bash")]
+    [InlineData("Read", "read")]
+    [InlineData("Read", "READ")]
+    public async Task ExecuteAsync_ToolLookup_IsCaseInsensitive(string registeredName, string requestedName)
     {
-        var tool = new RecordingTool("ReadFile");
+        var tool = new RecordingTool(registeredName);
         var context = new AgentContext(null, [], [tool]);
-        var assistant = CreateAssistantMessage(("t1", "readfile", "first"));
+        var assistant = CreateAssistantMessage(("t1", requestedName, "first"));
         var config = TestHelpers.CreateTestConfig();
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
@@ -125,6 +130,23 @@ public class ToolExecutorTests
         results.Should().ContainSingle();
         results[0].IsError.Should().BeFalse();
         results[0].Result.Content[0].Value.Should().Be("first");
+    }
+
+    [Theory]
+    [InlineData("missing_tool")]
+    [InlineData("")]
+    public async Task ExecuteAsync_ToolLookup_UnknownOrEmptyName_ReturnsError(string toolName)
+    {
+        var tool = new RecordingTool("bash");
+        var context = new AgentContext(null, [], [tool]);
+        var assistant = CreateAssistantMessage(("t1", toolName, "first"));
+        var config = TestHelpers.CreateTestConfig();
+
+        var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
+
+        results.Should().ContainSingle();
+        results[0].IsError.Should().BeTrue();
+        results[0].Result.Content[0].Value.Should().Contain("not registered");
     }
 
     [Fact]
@@ -246,6 +268,31 @@ public class ToolExecutorTests
             AgentEventType.MessageStart,
             AgentEventType.MessageEnd,
             AgentEventType.ToolExecutionStart);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ParallelMode_ToolExecutionStartAlwaysPrecedesMatchingEnd()
+    {
+        var tool = new RecordingTool("echo", delayMs: 20);
+        var context = new AgentContext(null, [], [tool]);
+        var assistant = CreateAssistantMessage(("t1", "echo", "first"), ("t2", "echo", "second"));
+        var events = new List<AgentEvent>();
+        var config = TestHelpers.CreateTestConfig(toolExecutionMode: ToolExecutionMode.Parallel);
+
+        _ = await ToolExecutor.ExecuteAsync(context, assistant, config, evt =>
+        {
+            events.Add(evt);
+            return Task.CompletedTask;
+        }, CancellationToken.None);
+
+        var starts = events.OfType<ToolExecutionStartEvent>().ToDictionary(evt => evt.ToolCallId, evt => events.IndexOf(evt));
+        var ends = events.OfType<ToolExecutionEndEvent>().ToDictionary(evt => evt.ToolCallId, evt => events.IndexOf(evt));
+
+        starts.Keys.Should().BeEquivalentTo(ends.Keys);
+        foreach (var toolCallId in starts.Keys)
+        {
+            starts[toolCallId].Should().BeLessThan(ends[toolCallId]);
+        }
     }
 
     private static AssistantAgentMessage CreateAssistantMessage(params (string id, string name, string value)[] toolCalls)

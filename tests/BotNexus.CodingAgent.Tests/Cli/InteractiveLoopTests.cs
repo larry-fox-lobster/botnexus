@@ -1,13 +1,17 @@
 using System.Reflection;
+using System.Text.Json;
 using BotNexus.AgentCore;
 using BotNexus.AgentCore.Configuration;
+using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
 using BotNexus.CodingAgent.Auth;
 using BotNexus.CodingAgent.Cli;
+using BotNexus.CodingAgent.Extensions;
 using BotNexus.CodingAgent.Session;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
 using BotNexus.Providers.Core.Registry;
+using BotNexus.Providers.Core.Streaming;
 using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests.Cli;
@@ -101,6 +105,129 @@ public sealed class InteractiveLoopTests : IDisposable
         fileContent.Should().Contain("\"value\":\"gpt-4.1 \\u2192 custom-model\"");
     }
 
+    [Fact]
+    public async Task RunAsync_AfterPrompt_PersistsSessionFile()
+    {
+        var session = await _sessionManager.CreateSessionAsync(_workingDirectory, "persist-after-prompt");
+        var interactiveLoop = new InteractiveLoop();
+        var llmClient = CreateLlmClient(new ScriptedProvider(_ => CreateAssistantTextStream("assistant reply")));
+        var agent = CreateRuntimeAgent(llmClient);
+        var extensionRunner = new ExtensionRunner([]);
+        var originalIn = Console.In;
+        Console.SetIn(new StringReader("hello\n/quit\n"));
+
+        try
+        {
+            await interactiveLoop.RunAsync(
+                agent,
+                _config,
+                llmClient,
+                _modelRegistry,
+                _authManager,
+                extensionRunner,
+                _sessionManager,
+                session,
+                _output,
+                CancellationToken.None);
+        }
+        finally
+        {
+            Console.SetIn(originalIn);
+        }
+
+        var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{session.Id}.jsonl");
+        var fileContent = await File.ReadAllTextAsync(sessionPath);
+        fileContent.Should().Contain("\"type\":\"message\"");
+        fileContent.Should().Contain("assistant reply");
+    }
+
+    [Fact]
+    public async Task RunAsync_WithToolResult_DoesNotPersistIntermediateToolLeaf()
+    {
+        var session = await _sessionManager.CreateSessionAsync(_workingDirectory, "persist-assistant-only");
+        var interactiveLoop = new InteractiveLoop();
+        var provider = new ScriptedProvider(callNumber => callNumber == 1
+            ? CreateToolUseStream("bash", "tc-1")
+            : CreateAssistantTextStream("done"));
+        var llmClient = CreateLlmClient(provider);
+        var agent = CreateRuntimeAgent(llmClient, [new StubTool("bash")]);
+        var extensionRunner = new ExtensionRunner([]);
+        var originalIn = Console.In;
+        Console.SetIn(new StringReader("run tool\n/quit\n"));
+
+        try
+        {
+            await interactiveLoop.RunAsync(
+                agent,
+                _config,
+                llmClient,
+                _modelRegistry,
+                _authManager,
+                extensionRunner,
+                _sessionManager,
+                session,
+                _output,
+                CancellationToken.None);
+        }
+        finally
+        {
+            Console.SetIn(originalIn);
+        }
+
+        var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{session.Id}.jsonl");
+        var lines = await File.ReadAllLinesAsync(sessionPath);
+        lines.Count(line => line.Contains("\"key\":\"leaf\"", StringComparison.Ordinal)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenSessionPersistenceThrows_DoesNotCrashLoop()
+    {
+        var session = new SessionInfo(
+            Id: "missing-session",
+            Name: "missing",
+            CreatedAt: DateTimeOffset.UtcNow,
+            UpdatedAt: DateTimeOffset.UtcNow,
+            MessageCount: 0,
+            Model: null,
+            WorkingDirectory: _workingDirectory,
+            Version: 2,
+            ParentSessionId: null,
+            ActiveLeafId: null,
+            SessionFilePath: Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", "missing-session.jsonl"));
+        var interactiveLoop = new InteractiveLoop();
+        var llmClient = CreateLlmClient(new ScriptedProvider(_ => CreateAssistantTextStream("assistant")));
+        var agent = CreateRuntimeAgent(llmClient);
+        var extensionRunner = new ExtensionRunner([]);
+        var originalIn = Console.In;
+        Console.SetIn(new StringReader("/quit\n"));
+        var missingPath = session.SessionFilePath!;
+        if (File.Exists(missingPath))
+        {
+            File.Delete(missingPath);
+        }
+
+        try
+        {
+            var action = async () => await interactiveLoop.RunAsync(
+                agent,
+                _config,
+                llmClient,
+                _modelRegistry,
+                _authManager,
+                extensionRunner,
+                _sessionManager,
+                session,
+                _output,
+                CancellationToken.None);
+
+            await action.Should().NotThrowAsync();
+        }
+        finally
+        {
+            Console.SetIn(originalIn);
+        }
+    }
+
     private Agent CreateAgent()
     {
         var model = new LlmModel(
@@ -124,6 +251,48 @@ public sealed class InteractiveLoopTests : IDisposable
             ConvertToLlm: (_, _) => Task.FromResult<IReadOnlyList<Message>>([]),
             TransformContext: (messages, _) => Task.FromResult(messages),
             GetApiKey: (_, _) => Task.FromResult<string?>(null),
+            GetSteeringMessages: null,
+            GetFollowUpMessages: null,
+            ToolExecutionMode: ToolExecutionMode.Sequential,
+            BeforeToolCall: null,
+            AfterToolCall: null,
+            GenerationSettings: new SimpleStreamOptions(),
+            SteeringMode: QueueMode.OneAtATime,
+            FollowUpMode: QueueMode.OneAtATime,
+            SessionId: null);
+
+        return new Agent(options);
+    }
+
+    private LlmClient CreateLlmClient(IApiProvider provider)
+    {
+        var registry = new ApiProviderRegistry();
+        registry.Register(provider);
+        return new LlmClient(registry, _modelRegistry);
+    }
+
+    private Agent CreateRuntimeAgent(LlmClient llmClient, IReadOnlyList<IAgentTool>? tools = null)
+    {
+        var model = new LlmModel(
+            Id: "test-model",
+            Name: "test-model",
+            Api: "test-api",
+            Provider: "github-copilot",
+            BaseUrl: "https://example.invalid",
+            Reasoning: false,
+            Input: ["text"],
+            Cost: new ModelCost(0, 0, 0, 0),
+            ContextWindow: 100000,
+            MaxTokens: 8192,
+            Headers: null);
+
+        var options = new AgentOptions(
+            InitialState: new AgentInitialState(Model: model, Tools: tools ?? []),
+            Model: model,
+            LlmClient: llmClient,
+            ConvertToLlm: DefaultMessageConverter.ConvertToLlm,
+            TransformContext: (messages, _) => Task.FromResult(messages),
+            GetApiKey: (_, _) => Task.FromResult<string?>("test-key"),
             GetSteeringMessages: null,
             GetFollowUpMessages: null,
             ToolExecutionMode: ToolExecutionMode.Sequential,
@@ -171,5 +340,87 @@ public sealed class InteractiveLoopTests : IDisposable
         {
             Directory.Delete(_workingDirectory, recursive: true);
         }
+    }
+
+    private static LlmStream CreateAssistantTextStream(string text)
+    {
+        var stream = new LlmStream();
+        var message = new AssistantMessage(
+            Content: [new TextContent(text)],
+            Api: "test-api",
+            Provider: "github-copilot",
+            ModelId: "test-model",
+            Usage: Usage.Empty(),
+            StopReason: StopReason.Stop,
+            ErrorMessage: null,
+            ResponseId: "resp_1",
+            Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        stream.Push(new StartEvent(message));
+        stream.Push(new TextStartEvent(0, message));
+        stream.Push(new TextDeltaEvent(0, text, message));
+        stream.Push(new TextEndEvent(0, text, message));
+        stream.Push(new DoneEvent(StopReason.Stop, message));
+        stream.End(message);
+        return stream;
+    }
+
+    private static LlmStream CreateToolUseStream(string toolName, string toolCallId)
+    {
+        var stream = new LlmStream();
+        var toolCall = new ToolCallContent(toolCallId, toolName, new Dictionary<string, object?> { ["value"] = "x" });
+        var message = new AssistantMessage(
+            Content: [toolCall],
+            Api: "test-api",
+            Provider: "github-copilot",
+            ModelId: "test-model",
+            Usage: Usage.Empty(),
+            StopReason: StopReason.ToolUse,
+            ErrorMessage: null,
+            ResponseId: "resp_tool",
+            Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        stream.Push(new StartEvent(message));
+        stream.Push(new ToolCallStartEvent(0, message));
+        stream.Push(new ToolCallDeltaEvent(0, "{\"value\":\"x\"}", message));
+        stream.Push(new ToolCallEndEvent(0, toolCall, message));
+        stream.Push(new DoneEvent(StopReason.ToolUse, message));
+        stream.End(message);
+        return stream;
+    }
+
+    private sealed class ScriptedProvider(Func<int, LlmStream> streamFactory) : IApiProvider
+    {
+        private int _callCount;
+        public string Api => "test-api";
+
+        public LlmStream Stream(LlmModel model, Context context, StreamOptions? options = null)
+        {
+            _ = model;
+            _ = context;
+            _ = options;
+            return streamFactory(Interlocked.Increment(ref _callCount));
+        }
+
+        public LlmStream StreamSimple(LlmModel model, Context context, SimpleStreamOptions? options = null)
+            => Stream(model, context, options);
+    }
+
+    private sealed class StubTool(string name) : IAgentTool
+    {
+        private static readonly JsonElement Schema = JsonDocument.Parse("""{"type":"object"}""").RootElement.Clone();
+        public string Name => name;
+        public string Label => name;
+        public Tool Definition => new(name, "stub tool", Schema);
+
+        public Task<IReadOnlyDictionary<string, object?>> PrepareArgumentsAsync(
+            IReadOnlyDictionary<string, object?> arguments,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(arguments);
+
+        public Task<AgentToolResult> ExecuteAsync(
+            string toolCallId,
+            IReadOnlyDictionary<string, object?> arguments,
+            CancellationToken cancellationToken = default,
+            AgentToolUpdateCallback? onUpdate = null)
+            => Task.FromResult(new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, "ok")]));
     }
 }

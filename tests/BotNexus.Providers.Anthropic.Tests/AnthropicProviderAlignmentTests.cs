@@ -383,6 +383,231 @@ public class AnthropicProviderAlignmentTests
     }
 
     [Fact]
+    public async Task Stream_ToolUse_WithThoughtSignature_IncludesSignatureField()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var assistant = new AssistantMessage(
+            Content:
+            [
+                new ToolCallContent("toolu_01", "search", new Dictionary<string, object?> { ["query"] = "test" }, "sig-tool-123")
+            ],
+            Api: model.Api,
+            Provider: model.Provider,
+            ModelId: model.Id,
+            Usage: Usage.Empty(),
+            StopReason: StopReason.ToolUse,
+            ErrorMessage: null,
+            ResponseId: "resp_1",
+            Timestamp: timestamp);
+        var context = new Context(
+            SystemPrompt: "system",
+            Messages: [new UserMessage(new UserMessageContent("hello"), timestamp), assistant]);
+
+        var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        var toolUse = body.RootElement.GetProperty("messages")[1].GetProperty("content")[0];
+        toolUse.GetProperty("signature").GetString().Should().Be("sig-tool-123");
+    }
+
+    [Fact]
+    public async Task Stream_ToolUse_WithoutThoughtSignature_DoesNotIncludeSignatureField()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var assistant = new AssistantMessage(
+            Content:
+            [
+                new ToolCallContent("toolu_01", "search", new Dictionary<string, object?> { ["query"] = "test" })
+            ],
+            Api: model.Api,
+            Provider: model.Provider,
+            ModelId: model.Id,
+            Usage: Usage.Empty(),
+            StopReason: StopReason.ToolUse,
+            ErrorMessage: null,
+            ResponseId: "resp_1",
+            Timestamp: timestamp);
+        var context = new Context(
+            SystemPrompt: "system",
+            Messages: [new UserMessage(new UserMessageContent("hello"), timestamp), assistant]);
+
+        var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        var toolUse = body.RootElement.GetProperty("messages")[1].GetProperty("content")[0];
+        toolUse.TryGetProperty("signature", out _).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("auto", "auto", null)]
+    [InlineData("any", "any", null)]
+    [InlineData("Read", "tool", "Read")]
+    public async Task Stream_ToolChoice_StringValues_MapToAnthropicObjectSyntax(
+        string configuredToolChoice,
+        string expectedType,
+        string? expectedName)
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var context = TestHelpers.MakeContext();
+        var options = new AnthropicOptions { ApiKey = "test-key" };
+        SetToolChoice(options, configuredToolChoice);
+
+        var stream = provider.Stream(model, context, options);
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        var toolChoice = body.RootElement.GetProperty("tool_choice");
+        toolChoice.GetProperty("type").GetString().Should().Be(expectedType);
+        if (expectedName is null)
+        {
+            toolChoice.TryGetProperty("name", out _).Should().BeFalse();
+        }
+        else
+        {
+            toolChoice.GetProperty("name").GetString().Should().Be(expectedName);
+        }
+    }
+
+    [Fact]
+    public async Task Stream_ToolChoice_ObjectValue_PassesThroughUnchanged()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var context = TestHelpers.MakeContext();
+        var options = new AnthropicOptions { ApiKey = "test-key" };
+        var configured = new Dictionary<string, object?>
+        {
+            ["type"] = "auto",
+            ["disable_parallel_tool_use"] = true
+        };
+        SetToolChoice(options, configured);
+
+        var stream = provider.Stream(model, context, options);
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        var toolChoice = body.RootElement.GetProperty("tool_choice");
+        toolChoice.GetProperty("type").GetString().Should().Be("auto");
+        toolChoice.GetProperty("disable_parallel_tool_use").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Stream_ToolChoice_DictionaryWithMixedValues_PassesThroughUnchanged()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var context = TestHelpers.MakeContext();
+        var options = new AnthropicOptions { ApiKey = "test-key" };
+        var configured = new Dictionary<string, object?>
+        {
+            ["type"] = "tool",
+            ["name"] = "Read",
+            ["disable_parallel_tool_use"] = true,
+            ["extra"] = 123
+        };
+        SetToolChoice(options, configured);
+
+        var stream = provider.Stream(model, context, options);
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        var toolChoice = body.RootElement.GetProperty("tool_choice");
+        toolChoice.GetProperty("type").GetString().Should().Be("tool");
+        toolChoice.GetProperty("name").GetString().Should().Be("Read");
+        toolChoice.GetProperty("disable_parallel_tool_use").GetBoolean().Should().BeTrue();
+        toolChoice.GetProperty("extra").GetInt32().Should().Be(123);
+    }
+
+    [Fact]
+    public async Task Stream_EmitsMessageStartBeforeContentAndToolCallStartBeforeEnd()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: content_block_start
+            data: {"type":"content_block_start","index":0,"content_block":{"type":"text"}}
+
+            event: content_block_delta
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hello"}}
+
+            event: content_block_stop
+            data: {"type":"content_block_stop","index":0}
+
+            event: content_block_start
+            data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"tool_1","name":"read"}}
+
+            event: content_block_delta
+            data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"path\":\"README.md\"}"}}
+
+            event: content_block_stop
+            data: {"type":"content_block_stop","index":1}
+
+            event: message_delta
+            data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var context = TestHelpers.MakeContext();
+
+        var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
+        var eventTypes = new List<string>();
+        await foreach (var evt in stream)
+        {
+            eventTypes.Add(evt.Type);
+        }
+
+        eventTypes.IndexOf("start").Should().BeLessThan(eventTypes.IndexOf("text_start"));
+        eventTypes.IndexOf("text_start").Should().BeLessThan(eventTypes.IndexOf("text_end"));
+        eventTypes.IndexOf("toolcall_start").Should().BeLessThan(eventTypes.IndexOf("toolcall_end"));
+    }
+
+    [Fact]
     public void Constructor_ThrowsWhenHttpClientIsNull()
     {
         var act = () => _ = new AnthropicProvider(null!);
@@ -396,6 +621,13 @@ public class AnthropicProviderAlignmentTests
         {
             Content = new StringContent(payload, Encoding.UTF8, "text/event-stream")
         };
+
+    private static void SetToolChoice(AnthropicOptions options, object? value)
+    {
+        var property = typeof(AnthropicOptions).GetProperty("ToolChoice");
+        property.Should().NotBeNull();
+        property!.SetValue(options, value);
+    }
 
     private sealed class RecordingHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory) : HttpMessageHandler
     {

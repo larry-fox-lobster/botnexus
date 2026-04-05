@@ -94,6 +94,157 @@ public sealed class SkillsLoaderTests : IDisposable
         duplicateSkills[0].Should().Contain("First body");
     }
 
+    [Fact]
+    public void LoadSkills_SkillUnderNodeModules_IsIgnored()
+    {
+        var skillDirectory = Path.Combine(_tempDirectory, ".botnexus-agent", "skills", "node_modules", "ignored");
+        Directory.CreateDirectory(skillDirectory);
+        File.WriteAllText(Path.Combine(skillDirectory, "SKILL.md"), """
+            ---
+            name: ignored-node-modules
+            description: Should be ignored
+            ---
+            Body
+            """);
+
+        var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
+
+        skills.Should().NotContain(skill => skill.Contains("ignored-node-modules", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LoadSkills_SkillUnderBin_IsIgnored()
+    {
+        var skillDirectory = Path.Combine(_tempDirectory, ".botnexus-agent", "skills", "bin", "ignored");
+        Directory.CreateDirectory(skillDirectory);
+        File.WriteAllText(Path.Combine(skillDirectory, "SKILL.md"), """
+            ---
+            name: ignored-bin
+            description: Should be ignored
+            ---
+            Body
+            """);
+
+        var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
+
+        skills.Should().NotContain(skill => skill.Contains("ignored-bin", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LoadSkills_SkillInRegularDirectory_IsIncluded()
+    {
+        var skillDirectory = Path.Combine(_tempDirectory, ".botnexus-agent", "skills", "normal");
+        Directory.CreateDirectory(skillDirectory);
+        File.WriteAllText(Path.Combine(skillDirectory, "SKILL.md"), """
+            ---
+            name: normal-skill
+            description: Should load
+            ---
+            Normal body
+            """);
+
+        var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
+
+        skills.Should().Contain(skill => skill.Contains("name: normal-skill", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LoadSkills_RespectsCustomGitignorePatterns()
+    {
+        Directory.CreateDirectory(Path.Combine(_tempDirectory, ".botnexus-agent", "skills"));
+        File.WriteAllText(Path.Combine(_tempDirectory, ".gitignore"), "custom-ignore/\n");
+
+        var ignoredSkillDirectory = Path.Combine(_tempDirectory, ".botnexus-agent", "skills", "custom-ignore", "hidden");
+        Directory.CreateDirectory(ignoredSkillDirectory);
+        File.WriteAllText(Path.Combine(ignoredSkillDirectory, "SKILL.md"), """
+            ---
+            name: ignored-by-gitignore
+            description: Should be ignored
+            ---
+            Hidden body
+            """);
+
+        var visibleSkillDirectory = Path.Combine(_tempDirectory, ".botnexus-agent", "skills", "visible");
+        Directory.CreateDirectory(visibleSkillDirectory);
+        File.WriteAllText(Path.Combine(visibleSkillDirectory, "SKILL.md"), """
+            ---
+            name: visible-skill
+            description: Should load
+            ---
+            Visible body
+            """);
+
+        var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
+
+        skills.Should().Contain(skill => skill.Contains("visible-skill", StringComparison.Ordinal));
+        skills.Should().NotContain(skill => skill.Contains("ignored-by-gitignore", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LoadSkills_WhenSkillIsInDefaultIgnoredDirectory_SkipsSkill()
+    {
+        var ignoredSkillDirectory = Path.Combine(_tempDirectory, ".botnexus-agent", "skills", "node_modules", "pkg");
+        Directory.CreateDirectory(ignoredSkillDirectory);
+        File.WriteAllText(Path.Combine(ignoredSkillDirectory, "SKILL.md"), """
+            ---
+            name: ignored-skill
+            description: Should be ignored
+            ---
+            Ignored body
+            """);
+
+        var allowedSkillDirectory = Path.Combine(_tempDirectory, ".botnexus-agent", "skills", "allowed");
+        Directory.CreateDirectory(allowedSkillDirectory);
+        File.WriteAllText(Path.Combine(allowedSkillDirectory, "SKILL.md"), """
+            ---
+            name: allowed-skill
+            description: Allowed
+            ---
+            Allowed body
+            """);
+
+        var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
+
+        skills.Should().ContainSingle(skill => skill.Contains("name: allowed-skill", StringComparison.Ordinal));
+        skills.Should().NotContain(skill => skill.Contains("name: ignored-skill", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LoadSkills_WhenGitIgnoreNegatesDirectory_RespectsNegation()
+    {
+        var skillsRoot = Path.Combine(_tempDirectory, ".botnexus-agent", "skills");
+        Directory.CreateDirectory(skillsRoot);
+        File.WriteAllText(Path.Combine(skillsRoot, ".gitignore"), """
+            ignored/
+            !ignored/allowed/
+            """);
+
+        var blockedDirectory = Path.Combine(skillsRoot, "ignored", "blocked");
+        Directory.CreateDirectory(blockedDirectory);
+        File.WriteAllText(Path.Combine(blockedDirectory, "SKILL.md"), """
+            ---
+            name: blocked-skill
+            description: Blocked
+            ---
+            Blocked body
+            """);
+
+        var allowedDirectory = Path.Combine(skillsRoot, "ignored", "allowed");
+        Directory.CreateDirectory(allowedDirectory);
+        File.WriteAllText(Path.Combine(allowedDirectory, "SKILL.md"), """
+            ---
+            name: allowed-from-gitignore
+            description: Allowed by negation
+            ---
+            Allowed body
+            """);
+
+        var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
+
+        skills.Should().Contain(skill => skill.Contains("name: allowed-from-gitignore", StringComparison.Ordinal));
+        skills.Should().NotContain(skill => skill.Contains("name: blocked-skill", StringComparison.Ordinal));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempDirectory))

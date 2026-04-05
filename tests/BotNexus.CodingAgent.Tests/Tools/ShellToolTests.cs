@@ -50,6 +50,25 @@ public sealed class ShellToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WhenCallerCancels_ReturnsCancelledResult()
+    {
+        using var cancellationSource = new CancellationTokenSource(millisecondsDelay: 200);
+        var result = await _tool.ExecuteAsync(
+            "test-call",
+            new Dictionary<string, object?>
+            {
+                ["command"] = "python -c \"import time; time.sleep(2)\""
+            },
+            cancellationSource.Token);
+
+        result.Content[0].Value.Should().Contain("cancelled");
+        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
+        result.Details.As<ShellTool.ShellToolDetails>().ExitCode.Should().Be(-1);
+        result.Details.As<ShellTool.ShellToolDetails>().TimedOut.Should().BeFalse();
+        result.Details.As<ShellTool.ShellToolDetails>().IsError.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WhenOutputExceedsLimit_ReturnsTruncatedTailWithPrefix()
     {
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?>
@@ -59,6 +78,59 @@ public sealed class ShellToolTests
 
         result.Content[0].Value.Should().Contain("[Output truncated at 51200 bytes]");
         result.Content[0].Value.Should().NotContain("TAIL-MARKER");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenCancelled_ReturnsCleanErrorAndKillsProcess()
+    {
+        var pidFile = Path.Combine(Path.GetTempPath(), $"botnexus-shelltool-pid-{Guid.NewGuid():N}.txt");
+        var commandPath = pidFile.Replace("\\", "/", StringComparison.Ordinal);
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
+
+        var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?>
+        {
+            ["command"] = $"python -c \"import os,time,pathlib;pathlib.Path(r'{commandPath}').write_text(str(os.getpid()));time.sleep(30)\""
+        }, cts.Token);
+
+        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
+        result.Details.As<ShellTool.ShellToolDetails>().ExitCode.Should().Be(-1);
+        result.Details.As<ShellTool.ShellToolDetails>().IsError.Should().BeTrue();
+
+        if (File.Exists(pidFile))
+        {
+            var pidText = await File.ReadAllTextAsync(pidFile);
+            if (int.TryParse(pidText, out var pid))
+            {
+                var processIsRunning = true;
+                try
+                {
+                    using var process = Process.GetProcessById(pid);
+                    processIsRunning = !process.HasExited;
+                }
+                catch (ArgumentException)
+                {
+                    processIsRunning = false;
+                }
+
+                processIsRunning.Should().BeFalse();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenProcessAlreadyCompleted_BeforeCancellation_ReturnsNormalResult()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+
+        var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?>
+        {
+            ["command"] = "python -c \"print('done')\""
+        }, cts.Token);
+
+        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
+        result.Details.As<ShellTool.ShellToolDetails>().ExitCode.Should().Be(0);
+        result.Details.As<ShellTool.ShellToolDetails>().IsError.Should().BeFalse();
+        result.Content[0].Value.Should().Contain("done");
     }
 
     [Fact]
