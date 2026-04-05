@@ -1,23 +1,35 @@
 ---
-updated_at: 2026-04-05T18:30:00Z
-focus_area: Gateway Service P1 Fixes + Process Improvements
-active_issues: [streaming history drop, test file renames, sealed modifiers, CancellationToken naming, ChannelManager reduction, session store bootstrap, ConfigureAwait documentation]
-status: design_review_complete
+updated_at: 2026-04-05T20:37:00Z
+focus_area: Gateway Phase 2 — Integration Testing + Live Validation
+active_issues: [shared streaming helper extraction, decisions.md archival, provider conformance tests]
+status: p1_sprint_complete
 ---
 
 # What We're Focused On
 
-**Gateway Service architecture approved A-.** Design review and consistency review complete. 5 projects (11 interfaces) audited. 30 tests passing. 5 P1 issues identified for remediation sprint. Port audit phases 1-5 complete; 153 findings triaged, ~95 resolved. Next: fix Gateway P1 issues, extend test coverage, implement Phase 2 stubs (DefaultAgentCommunicator, ApiKeyGatewayAuthHandler).
+**Gateway P1 Remediation + WebUI Sprint complete.** All 9 P1 issues fixed, 1 P0 found and fixed (WebSocket history loss). 3 new projects added (WebUI, Channels.Tui, Channels.Telegram). 18 new tests. Design review A-. Next: integration testing with live Copilot provider, Phase 2 stubs expansion, shared streaming helper extraction.
 
 ## Current Status
 
-✅ **Sprint:** Gateway reviews complete (design + consistency)  
-✅ **Build:** 0 errors, 0 warnings  
-✅ **Tests:** 501 passing (134 Core + 54 Anthropic + 42 OpenAI + 24 OpenAICompat + 15 Copilot + 52 AgentCore + 117 CodingAgent + 30 Gateway + 33 other)  
-✅ **P0s:** 32/32 closed across all audit phases  
-✅ **Gateway Architecture:** A- grade (1 real bug P1-1, 4 housekeeping P1s)  
-📋 **Decisions:** 26+ architecture decisions locked (AD-1–AD-17 + P0-1–P0-7 + Gateway review decisions)  
+✅ **Sprint:** Gateway P1 remediation complete  
+✅ **Build:** 0 errors, 15 warnings (all pre-existing CodingAgent)  
+✅ **Tests:** 583 passing (155 Core + 70 Anthropic + 49 OpenAI + 29 OpenAICompat + 15 Copilot + 71 AgentCore + 146 CodingAgent + 48 Gateway)  
+✅ **P0s:** 0 open (1 found by design review, fixed same sprint)  
+✅ **P1s:** 0 open (9 fixed this sprint)
+✅ **Gateway Architecture:** A- grade, SOLID 5/5  
+✅ **New Projects:** BotNexus.WebUI, BotNexus.Channels.Tui, BotNexus.Channels.Telegram
+📋 **Decisions:** 30+ architecture decisions locked  
 📋 **Port audit:** 5 phases complete + remediation
+
+## Completed — Gateway P1 Remediation + WebUI Sprint
+
+- **Bender:** Fixed 6 P1 issues (streaming history, IOptionsMonitor, ChannelManager, session store, CancellationToken, ConfigureAwait) + P0 WebSocket history fix. 7 commits.
+- **Hermes:** 4 new test suites (InProcessIsolationStrategy, FileSessionStore, DefaultAgentCommunicator, GatewayWebSocketHandler). 18 new tests. Gateway 30→48.
+- **Fry:** Built BotNexus.WebUI from scratch — HTML/CSS/JS chat interface with WebSocket streaming, tool call display, dark theme.
+- **Farnsworth:** Created TUI + Telegram channel stubs, then fixed 3 P1s (base class, options pattern, IChannelManager interface). 5 commits.
+- **Leela:** Design review A-. Found 1 P0 (WebSocket history), 3 P1s (all fixed).
+- **Nibbler:** Consistency review "Good". 1 P1 fixed, 3 P2s logged.
+- **Scribe:** Session log, decision merge, orchestration log.
 
 ## Completed — Gateway Service Architecture Review (Design + Consistency)
 
@@ -37,18 +49,12 @@ status: design_review_complete
 
 ## Remaining Backlog
 
-### Gateway P1 — Remediation Sprint (READY)
-- **P1-1 (BLOCKER):** Streaming history drop in `GatewayHost.DispatchAsync` — session resume broken
-- **P1-2:** SetDefaultAgent leaks concrete type through DI — needs interface or options pattern
-- **P1-3:** ChannelManager duplicates GatewayHost lifecycle — reduce or remove
-- **P1-4:** No ISessionStore default registered — runtime error with no guidance
-- **P1-5:** 5 test files have wrong names — misleading coverage signals
-
-### Gateway P1 — Consistency (READY)
-- **P1-01:** CancellationToken `ct` vs `cancellationToken` naming split
-- **P1-02:** ConfigureAwait(false) divergence — document policy or add to FileSessionStore
-- **P1-03:** Test file names don't match classes (duplicate of P1-5)
-- **P1-04:** Gateway test classes missing `sealed` modifier
+### Phase 2 — Next Sprint (READY)
+- **Shared streaming helper** — Extract `StreamToHistoryAsync` from GatewayHost + GatewayWebSocketHandler (P1)
+- **ApiKeyGatewayAuthHandler expansion** — Multi-tenant support
+- **Integration tests** — Live testing with Copilot provider via `.botnexus-agent/auth.json`
+- **WebUI polish** — Test with live Gateway, add error states, loading indicators
+- **decisions.md archival** — Archive old entries to reduce file size from ~378KB
 
 ### Phase 2 Stubs (Backlog)
 - DefaultAgentCommunicator stub
@@ -70,11 +76,11 @@ status: design_review_complete
 - Full CLI flag parity, slash command parity
 
 ## Next Sprint Priorities
-1. **Gateway P1 fixes** — Fix streaming history (P1-1), SetDefaultAgent pattern (P1-2), ChannelManager (P1-3), session store bootstrap (P1-4)
-2. **Gateway test cleanup** — Rename 5 test files (P1-5), add sealed modifiers (P1-04)
-3. **Gateway consistency pass** — CancellationToken naming (P1-01), ConfigureAwait documentation (P1-02)
-4. **Expand Gateway test coverage** — Add tests for InProcessIsolationStrategy, GatewayWebSocketHandler, FileSessionStore
-5. **Phase 2 stubs** — DefaultAgentCommunicator, ApiKeyGatewayAuthHandler multi-tenant
+1. **Integration testing** — Live test with Copilot provider, validate WebUI end-to-end
+2. **Shared streaming helper** — Extract duplicated streaming→history logic (GatewayHost + WebSocketHandler)
+3. **ApiKeyGatewayAuthHandler** — Multi-tenant API key support
+4. **decisions.md archival** — Rotate old entries to decisions-archive.md
+5. **Missing providers** — Google, Bedrock, Azure, Mistral, Codex stubs
 
 ## Key Architecture Decisions (Locked)
 
