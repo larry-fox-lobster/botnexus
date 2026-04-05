@@ -100,7 +100,7 @@ internal static class Program
             try
             {
                 output.WriteWelcome(agent.State.Model.Id, session);
-                await RunSinglePromptAsync(agent, command.InitialPrompt, output).ConfigureAwait(false);
+                await RunSinglePromptAsync(agent, command.InitialPrompt, output, config, llmClient, authManager, extensionRunner).ConfigureAwait(false);
                 session = UpdateSessionSnapshot(session, agent);
                 await sessionManager.SaveSessionAsync(session, agent.State.Messages).ConfigureAwait(false);
                 return 0;
@@ -136,9 +136,17 @@ internal static class Program
         return 0;
     }
 
-    private static async Task RunSinglePromptAsync(Agent agent, string prompt, OutputFormatter output)
+    private static async Task RunSinglePromptAsync(
+        Agent agent,
+        string prompt,
+        OutputFormatter output,
+        CodingAgentConfig config,
+        LlmClient llmClient,
+        AuthManager authManager,
+        ExtensionRunner extensionRunner)
     {
-        using var subscription = agent.Subscribe((@event, ct) =>
+        var sessionCompactor = new SessionCompactor();
+        using var subscription = agent.Subscribe(async (@event, ct) =>
         {
             switch (@event)
             {
@@ -152,15 +160,57 @@ internal static class Program
                     output.WriteToolEnd(toolEnd.ToolName, !toolEnd.IsError);
                     break;
                 case TurnEndEvent:
+                    await CompactIfNeededAsync(agent, config, llmClient, authManager, extensionRunner, sessionCompactor, ct).ConfigureAwait(false);
                     output.WriteTurnSeparator();
                     break;
             }
 
             _ = ct;
-            return Task.CompletedTask;
         });
 
         await agent.PromptAsync(new UserMessage(prompt)).ConfigureAwait(false);
+    }
+
+    private static async Task CompactIfNeededAsync(
+        Agent agent,
+        CodingAgentConfig config,
+        LlmClient llmClient,
+        AuthManager authManager,
+        ExtensionRunner extensionRunner,
+        SessionCompactor compactor,
+        CancellationToken cancellationToken)
+    {
+        var apiKey = await authManager.GetApiKeyAsync(config, agent.State.Model.Provider, cancellationToken).ConfigureAwait(false);
+        var compacted = await compactor.CompactAsync(
+                agent.State.Messages,
+                new SessionCompactor.SessionCompactionOptions(
+                    MaxContextTokens: config.MaxContextTokens,
+                    ReserveTokens: Math.Max(2048, Math.Min(16384, config.MaxContextTokens / 5)),
+                    KeepRecentTokens: Math.Max(4096, Math.Min(30000, config.MaxContextTokens / 4)),
+                    KeepRecentCount: 10,
+                    LlmClient: llmClient,
+                    Model: agent.State.Model,
+                    ApiKey: apiKey,
+                    Headers: agent.State.Model.Headers,
+                    OnCompactionAsync: async (context, hookCt) =>
+                        await extensionRunner.OnCompactionAsync(
+                                new CompactionLifecycleContext(
+                                    context.MessagesToSummarize,
+                                    context.RecentMessages,
+                                    context.ReadFiles,
+                                    context.ModifiedFiles,
+                                    context.Summary),
+                                hookCt)
+                            .ConfigureAwait(false)),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (ReferenceEquals(compacted, agent.State.Messages))
+        {
+            return;
+        }
+
+        agent.State.Messages = compacted;
     }
 
     private static void ApplyOverrides(CodingAgentConfig config, CommandOptions command)
