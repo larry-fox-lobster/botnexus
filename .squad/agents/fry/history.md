@@ -433,3 +433,12 @@ See decisions.md "Part 4: Implementation Phases & Work Items" for full roadmap w
 - Activity feed uses `insertBefore(el, firstChild)` for newest-first ordering with max item trim
 
 **Decisions:** All 6 features shipped as single commit (interleaved across 3 tightly-coupled files)
+
+### P0-3 Event Listener Leak Fix (2026-07-24)
+**Timestamp:** 2026-07-24
+**Status:** Complete
+**Commit:** c80a259 — fix(webui): replace per-element listeners with event delegation [P0]
+
+**Fix:** Replaced three per-element addEventListener calls (thinking toggle, tool call click, tool history click) with a single delegated click handler on #chat-messages using event.target.closest(). History tool calls now store data in activeToolCalls map via generated callId instead of closures.
+
+**Pattern Established:** Event delegation on stable parent containers for all dynamically-created interactive elements. Data needed by handlers stored as data-* attributes or in shared lookup maps rather than closure variables.

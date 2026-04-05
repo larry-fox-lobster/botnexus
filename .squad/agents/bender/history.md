@@ -757,3 +757,10 @@ Participated in design review ceremony for Phase 3 architecture. All ADs approve
 - `StreamingSessionHelper` in `src\gateway\BotNexus.Gateway\Streaming\` now centralizes stream-to-history behavior (content accumulation, tool start/end entries, optional stream errors, session save) and supports per-event callbacks for channel/WebSocket emission.
 - `GatewayHost` and `GatewayWebSocketHandler` now both route streaming through the helper, preserving existing output behavior while removing duplicated history logic.
 - Gateway stream contracts now include `AgentStreamEventType.ThinkingDelta` + `AgentStreamEvent.ThinkingContent`; `InProcessAgentHandle` maps `MessageUpdateEvent.IsThinking` to thinking deltas, and WebSocket emits `{ "type": "thinking_delta", "delta": "...", "messageId": "..." }` without persisting thinking content to session history.
+
+### 2026-04-06 — Gateway P0 runtime safety fixes
+- `GatewaySession` now owns thread-safe history mutation (`AddEntry`, `AddEntries`, `GetHistorySnapshot`) behind a per-session lock, preventing concurrent `History` corruption from host + streaming + WebSocket paths.
+- Gateway mutation callers (`GatewayHost`, `StreamingSessionHelper`, `GatewayWebSocketHandler`, `ChatController`) now use safe session methods instead of direct `History.Add*`.
+- `FileSessionStore` now writes from `GetHistorySnapshot()` and loads via batched entries to avoid unsafe concurrent enumeration/mutation.
+- `InProcessAgentHandle.StreamAsync` now catches subscription callback exceptions, logs, emits `AgentStreamEventType.Error`, and completes the stream channel with the exception so clients receive failure signals.
+- Prompt background task now logs prompt failures and distinguishes cancellation (`TrySetCanceled`) from faults (`TrySetException`), avoiding silent stream termination.

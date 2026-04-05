@@ -1,8 +1,8 @@
 ---
-updated_at: 2026-04-05T20:37:00Z
-focus_area: Gateway Phase 2 — Integration Testing + Live Validation
-active_issues: [shared streaming helper extraction, decisions.md archival, provider conformance tests]
-status: p1_sprint_complete
+updated_at: 2026-04-05T21:25:00Z
+focus_area: Gateway Phase 2 — Sprint Complete, P0 Remediation Next
+active_issues: [session history thread safety P0, subscription exception handling P0, WebUI event listener leaks P0, config subsystem tests P1]
+status: phase2_sprint_complete
 ---
 
 # What We're Focused On
