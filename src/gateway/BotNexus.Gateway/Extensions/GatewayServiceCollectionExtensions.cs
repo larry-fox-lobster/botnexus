@@ -15,6 +15,8 @@ using BotNexus.Gateway.Security;
 using BotNexus.Channels.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace BotNexus.Gateway.Extensions;
 
@@ -55,6 +57,13 @@ public static class GatewayServiceCollectionExtensions
         // Gateway host
         services.AddHostedService<GatewayHost>();
 
+        var defaultAgentConfigPath = Path.GetFullPath("agents");
+        if (Directory.Exists(defaultAgentConfigPath) &&
+            services.All(descriptor => descriptor.ServiceType != typeof(IAgentConfigurationSource)))
+        {
+            services.AddFileAgentConfiguration(defaultAgentConfigPath);
+        }
+
         return services;
     }
 
@@ -67,6 +76,44 @@ public static class GatewayServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(agentId);
         services.PostConfigure<GatewayOptions>(options => options.DefaultAgentId = agentId);
+        return services;
+    }
+
+    /// <summary>
+    /// Registers an agent configuration source and ensures configuration-driven agent loading is hosted.
+    /// </summary>
+    /// <typeparam name="T">The configuration source type.</typeparam>
+    /// <param name="services">Service collection.</param>
+    public static IServiceCollection AddAgentConfigurationSource<T>(this IServiceCollection services)
+        where T : class, IAgentConfigurationSource
+    {
+        services.AddSingleton<IAgentConfigurationSource, T>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AgentConfigurationHostedService>());
+        return services;
+    }
+
+    /// <summary>
+    /// Registers a file-based agent configuration source.
+    /// </summary>
+    /// <param name="services">Service collection.</param>
+    /// <param name="path">Directory containing agent configuration files.</param>
+    public static IServiceCollection AddFileAgentConfiguration(this IServiceCollection services, string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        services.AddSingleton<IAgentConfigurationSource>(serviceProvider =>
+        {
+            var hostEnvironment = serviceProvider.GetService<IHostEnvironment>();
+            var resolvedPath = Path.IsPathRooted(path)
+                ? path
+                : Path.GetFullPath(Path.Combine(hostEnvironment?.ContentRootPath ?? AppContext.BaseDirectory, path));
+
+            return new FileAgentConfigurationSource(
+                resolvedPath,
+                serviceProvider.GetRequiredService<ILogger<FileAgentConfigurationSource>>());
+        });
+
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AgentConfigurationHostedService>());
         return services;
     }
 }
