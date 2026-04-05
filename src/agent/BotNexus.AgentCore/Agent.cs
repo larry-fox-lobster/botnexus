@@ -30,6 +30,7 @@ public sealed class Agent
     private CancellationTokenSource? _cts;
     private TaskCompletionSource? _activeRun;
     private AgentStatus _status = AgentStatus.Idle;
+    private bool _suppressFollowUpDrainForNextRun;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Agent"/> class.
@@ -487,6 +488,8 @@ public sealed class Agent
     {
         BotNexus.Providers.Core.Models.LlmModel model;
         BotNexus.Providers.Core.Models.ThinkingLevel? thinkingLevel;
+        var suppressFollowUpDrain = _suppressFollowUpDrainForNextRun;
+        _suppressFollowUpDrainForNextRun = false;
         lock (_stateLock)
         {
             model = _state.Model;
@@ -507,7 +510,9 @@ public sealed class Agent
             _options.TransformContext,
             _options.GetApiKey,
             BuildQueueDelegate(_steeringQueue, _options.GetSteeringMessages),
-            BuildQueueDelegate(_followUpQueue, _options.GetFollowUpMessages),
+            suppressFollowUpDrain
+                ? static _ => Task.FromResult<IReadOnlyList<AgentMessage>>([])
+                : BuildQueueDelegate(_followUpQueue, _options.GetFollowUpMessages),
             _options.ToolExecutionMode,
             _options.BeforeToolCall,
             _options.AfterToolCall,
@@ -545,9 +550,15 @@ public sealed class Agent
 
     private IReadOnlyList<AgentMessage> DrainQueuedMessages()
     {
-        var messages = _steeringQueue.Drain().ToList();
-        messages.AddRange(_followUpQueue.Drain());
-        return messages;
+        var steering = _steeringQueue.Drain().ToList();
+        if (steering.Count > 0)
+        {
+            _suppressFollowUpDrainForNextRun = true;
+            return steering;
+        }
+
+        _suppressFollowUpDrainForNextRun = false;
+        return _followUpQueue.Drain().ToList();
     }
 
     private async Task HandleEventAsync(AgentEvent @event, CancellationToken cancellationToken)
