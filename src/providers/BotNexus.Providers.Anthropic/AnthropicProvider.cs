@@ -17,12 +17,33 @@ namespace BotNexus.Providers.Anthropic;
 public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvider
 {
     private const string ApiVersion = "2023-06-01";
+    private const string ClaudeCodeVersion = "2.1.75";
     private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+    private static readonly IReadOnlyDictionary<string, string> ClaudeCodeToolLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Read"] = "Read",
+        ["Write"] = "Write",
+        ["Edit"] = "Edit",
+        ["Bash"] = "Bash",
+        ["Grep"] = "Grep",
+        ["Glob"] = "Glob",
+        ["AskUserQuestion"] = "AskUserQuestion",
+        ["EnterPlanMode"] = "EnterPlanMode",
+        ["ExitPlanMode"] = "ExitPlanMode",
+        ["KillShell"] = "KillShell",
+        ["NotebookEdit"] = "NotebookEdit",
+        ["Skill"] = "Skill",
+        ["Task"] = "Task",
+        ["TaskOutput"] = "TaskOutput",
+        ["TodoWrite"] = "TodoWrite",
+        ["WebFetch"] = "WebFetch",
+        ["WebSearch"] = "WebSearch"
     };
 
     public string Api => "anthropic-messages";
@@ -158,8 +179,9 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
         }
         var baseUrl = model.BaseUrl.TrimEnd('/');
         var authMode = DetectAuthMode(apiKey, model);
+        var isOAuthToken = authMode == AuthMode.OAuth;
 
-        var requestBody = BuildRequestBody(model, context, options, anthropicOpts);
+        var requestBody = BuildRequestBody(model, context, options, anthropicOpts, isOAuthToken);
 
         if (options?.OnPayload is { } onPayload)
         {
@@ -227,7 +249,7 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
                 {
                     ProcessSseEvent(currentEvent, doc.RootElement, model, stream,
                         contentBlocks, blockTypes, textAccumulators, signatureAccumulators,
-                        toolCallIds, toolCallNames, usage,
+                        toolCallIds, toolCallNames, usage, context.Tools, isOAuthToken,
                         ref responseId, ref stopReason, out usage);
                 }
 
@@ -246,7 +268,8 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
         Dictionary<int, StringBuilder> textAccumulators,
         Dictionary<int, StringBuilder> signatureAccumulators,
         Dictionary<int, string> toolCallIds, Dictionary<int, string> toolCallNames,
-        Usage usage, ref string? responseId, ref StopReason stopReason, out Usage updatedUsage)
+        Usage usage, IReadOnlyList<Tool>? tools, bool isOAuthToken,
+        ref string? responseId, ref StopReason stopReason, out Usage updatedUsage)
     {
         updatedUsage = usage;
         var type = data.TryGetProperty("type", out var typeProp)
@@ -269,7 +292,8 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
 
             case "content_block_start":
                 HandleContentBlockStart(data, model, stream, contentBlocks, blockTypes,
-                    textAccumulators, signatureAccumulators, toolCallIds, toolCallNames, usage, responseId);
+                    textAccumulators, signatureAccumulators, toolCallIds, toolCallNames, usage, responseId,
+                    tools, isOAuthToken);
                 break;
 
             case "content_block_delta":
@@ -309,7 +333,7 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
         Dictionary<int, StringBuilder> textAccumulators,
         Dictionary<int, StringBuilder> signatureAccumulators,
         Dictionary<int, string> toolCallIds, Dictionary<int, string> toolCallNames,
-        Usage usage, string? responseId)
+        Usage usage, string? responseId, IReadOnlyList<Tool>? tools, bool isOAuthToken)
     {
         var index = data.GetProperty("index").GetInt32();
         if (!data.TryGetProperty("content_block", out var block)) return;
@@ -338,7 +362,9 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
                 if (block.TryGetProperty("id", out var tcId))
                     toolCallIds[index] = tcId.GetString() ?? "";
                 if (block.TryGetProperty("name", out var tcName))
-                    toolCallNames[index] = tcName.GetString() ?? "";
+                    toolCallNames[index] = isOAuthToken
+                        ? FromClaudeCodeName(tcName.GetString() ?? "", tools)
+                        : tcName.GetString() ?? "";
                 stream.Push(new ToolCallStartEvent(index, partial));
                 break;
         }
@@ -434,9 +460,9 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
 
     private static Dictionary<string, object?> BuildRequestBody(
         LlmModel model, Context context, StreamOptions? options,
-        AnthropicOptions? anthropicOpts)
+        AnthropicOptions? anthropicOpts, bool isOAuthToken)
     {
-        var messages = ConvertMessages(context.Messages, model);
+        var messages = ConvertMessages(context.Messages, model, isOAuthToken);
 
         var body = new Dictionary<string, object?>
         {
@@ -447,7 +473,34 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
         };
 
         // System prompt as array of text blocks with cache control
-        if (context.SystemPrompt is { } systemPrompt)
+        if (isOAuthToken)
+        {
+            var cacheControl = BuildCacheControl(
+                options?.CacheRetention ?? CacheRetention.Short, model.BaseUrl);
+
+            var systemBlocks = new List<Dictionary<string, object?>>
+            {
+                new Dictionary<string, object?>
+                {
+                    ["type"] = "text",
+                    ["text"] = "You are Claude Code, Anthropic's official CLI for Claude.",
+                    ["cache_control"] = cacheControl
+                }
+            };
+
+            if (!string.IsNullOrWhiteSpace(context.SystemPrompt))
+            {
+                systemBlocks.Add(new Dictionary<string, object?>
+                {
+                    ["type"] = "text",
+                    ["text"] = UnicodeSanitizer.SanitizeSurrogates(context.SystemPrompt),
+                    ["cache_control"] = cacheControl
+                });
+            }
+
+            body["system"] = systemBlocks;
+        }
+        else if (context.SystemPrompt is { } systemPrompt)
         {
             var cacheControl = BuildCacheControl(
                 options?.CacheRetention ?? CacheRetention.Short, model.BaseUrl);
@@ -468,7 +521,7 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
         {
             body["tools"] = tools.Select(t => new Dictionary<string, object?>
             {
-                ["name"] = t.Name,
+                ["name"] = isOAuthToken ? ToClaudeCodeName(t.Name) : t.Name,
                 ["description"] = t.Description,
                 ["input_schema"] = t.Parameters
             }).ToList();
@@ -539,7 +592,7 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
     #region Message Conversion
 
     private static List<Dictionary<string, object?>> ConvertMessages(
-        IReadOnlyList<Message> messages, LlmModel model)
+        IReadOnlyList<Message> messages, LlmModel model, bool isOAuthToken)
     {
         var transformed = MessageTransformer.TransformMessages(messages, model, NormalizeToolCallId);
         var result = new List<Dictionary<string, object?>>();
@@ -558,7 +611,7 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
 
                 case AssistantMessage assistant:
                     isLastToolResult = false;
-                    var assistantMessage = ConvertAssistantMessage(assistant);
+                    var assistantMessage = ConvertAssistantMessage(assistant, isOAuthToken);
                     if (assistantMessage is not null)
                         result.Add(assistantMessage);
                     break;
@@ -641,7 +694,7 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
         };
     }
 
-    private static Dictionary<string, object?>? ConvertAssistantMessage(AssistantMessage msg)
+    private static Dictionary<string, object?>? ConvertAssistantMessage(AssistantMessage msg, bool isOAuthToken)
     {
         var blocks = new List<object>();
 
@@ -704,7 +757,7 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
                     {
                         ["type"] = "tool_use",
                         ["id"] = toolCall.Id,
-                        ["name"] = toolCall.Name,
+                        ["name"] = isOAuthToken ? ToClaudeCodeName(toolCall.Name) : toolCall.Name,
                         ["input"] = toolCall.Arguments
                     });
                     break;
@@ -814,8 +867,10 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
 
             case AuthMode.OAuth:
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-                betaFeatures.Add("claude-code");
-                request.Headers.TryAddWithoutValidation("user-agent", "claude-cli");
+                var oauthBetas = $"claude-code-20250219,oauth-2025-04-20,{string.Join(",", betaFeatures)}";
+                request.Headers.TryAddWithoutValidation("anthropic-beta", oauthBetas);
+                request.Headers.TryAddWithoutValidation("user-agent", $"claude-cli/{ClaudeCodeVersion}");
+                request.Headers.TryAddWithoutValidation("x-app", "cli");
                 break;
 
             case AuthMode.Copilot:
@@ -823,7 +878,7 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
                 break;
         }
 
-        if (betaFeatures.Count > 0)
+        if (betaFeatures.Count > 0 && authMode != AuthMode.OAuth)
             request.Headers.TryAddWithoutValidation("anthropic-beta", string.Join(",", betaFeatures));
     }
 
@@ -892,6 +947,21 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
     private static bool IsOpus46Model(string modelId) =>
         modelId.Contains("opus-4-6", StringComparison.OrdinalIgnoreCase) ||
         modelId.Contains("opus-4.6", StringComparison.OrdinalIgnoreCase);
+
+    private static string ToClaudeCodeName(string name) =>
+        ClaudeCodeToolLookup.TryGetValue(name, out var canonical) ? canonical : name;
+
+    private static string FromClaudeCodeName(string name, IReadOnlyList<Tool>? tools)
+    {
+        if (tools is { Count: > 0 })
+        {
+            var matched = tools.FirstOrDefault(tool => string.Equals(tool.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (matched is not null)
+                return matched.Name;
+        }
+
+        return name;
+    }
 
     [GeneratedRegex("[^a-zA-Z0-9_-]")]
     private static partial Regex NonAlphanumericRegex();
