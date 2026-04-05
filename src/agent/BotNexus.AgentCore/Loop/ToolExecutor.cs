@@ -116,6 +116,7 @@ internal static class ToolExecutor
     {
         var preparedItems = new List<PreparedToolWorkItem>(toolCalls.Count);
         var completedItems = new List<ToolExecutionOutcome>(toolCalls.Count);
+        var resultSlots = new ToolResultAgentMessage?[toolCalls.Count];
 
         foreach (var (toolCall, index) in toolCalls.Select((toolCall, index) => (toolCall, index)))
         {
@@ -137,7 +138,21 @@ internal static class ToolExecutor
 
             if (preparation.Prepared is null)
             {
-                completedItems.Add(new ToolExecutionOutcome(index, toolCall, preparation.Result!, preparation.IsError, null, false));
+                var immediateResult = preparation.Result!;
+                await emit(new ToolExecutionEndEvent(
+                    toolCall.Id,
+                    toolCall.Name,
+                    immediateResult,
+                    preparation.IsError,
+                    DateTimeOffset.UtcNow)).ConfigureAwait(false);
+
+                resultSlots[index] = await EmitToolResultMessageAsync(
+                        toolCall,
+                        immediateResult,
+                        preparation.IsError,
+                        emit,
+                        cancellationToken)
+                    .ConfigureAwait(false);
             }
             else
             {
@@ -160,7 +175,6 @@ internal static class ToolExecutor
         completedItems.AddRange(await Task.WhenAll(executionTasks).ConfigureAwait(false));
         var ordered = completedItems.OrderBy(result => result.Index).ToList();
 
-        var results = new List<ToolResultAgentMessage>(ordered.Count);
         foreach (var outcome in ordered)
         {
             var result = outcome.Result;
@@ -187,16 +201,16 @@ internal static class ToolExecutor
                 isError,
                 DateTimeOffset.UtcNow)).ConfigureAwait(false);
 
-            results.Add(await EmitToolResultMessageAsync(
+            resultSlots[outcome.Index] = await EmitToolResultMessageAsync(
                     outcome.ToolCall,
                     result,
                     isError,
                     emit,
                     cancellationToken)
-                .ConfigureAwait(false));
+                .ConfigureAwait(false);
         }
 
-        return results;
+        return resultSlots.Where(result => result is not null).Select(result => result!).ToList();
     }
 
     private static async Task<ToolPreparation> PrepareToolCallAsync(
@@ -270,7 +284,7 @@ internal static class ToolExecutor
         }
         catch (Exception ex)
         {
-            result = BuildErrorResult($"Tool '{prepared.ToolCall.Name}' failed: {ex.Message}");
+            result = BuildErrorResult(ex.Message);
             isError = true;
         }
 

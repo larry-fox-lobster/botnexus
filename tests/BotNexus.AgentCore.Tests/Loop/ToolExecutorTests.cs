@@ -188,7 +188,31 @@ public class ToolExecutorTests
 
         results.Should().ContainSingle();
         results[0].IsError.Should().BeTrue();
-        results[0].Result.Content[0].Value.Should().Contain("failed");
+        results[0].Result.Content[0].Value.Should().Be("boom");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ParallelMode_EmitsImmediatePreparationFailureEndInline()
+    {
+        var tool = new RecordingTool("echo", delayMs: 50);
+        var context = new AgentContext(null, [], [tool]);
+        var assistant = CreateAssistantMessage(("missing", "missing_tool", "x"), ("t2", "echo", "second"));
+        var events = new List<AgentEvent>();
+        var config = TestHelpers.CreateTestConfig(toolExecutionMode: ToolExecutionMode.Parallel);
+
+        var results = await ToolExecutor.ExecuteAsync(context, assistant, config, evt =>
+        {
+            events.Add(evt);
+            return Task.CompletedTask;
+        }, CancellationToken.None);
+
+        results.Should().HaveCount(2);
+        events.Select(evt => evt.Type).Should().ContainInOrder(
+            AgentEventType.ToolExecutionStart,
+            AgentEventType.ToolExecutionEnd,
+            AgentEventType.MessageStart,
+            AgentEventType.MessageEnd,
+            AgentEventType.ToolExecutionStart);
     }
 
     private static AssistantAgentMessage CreateAssistantMessage(params (string id, string name, string value)[] toolCalls)
