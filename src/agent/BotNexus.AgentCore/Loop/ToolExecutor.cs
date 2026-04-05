@@ -3,7 +3,9 @@ using BotNexus.AgentCore.Hooks;
 using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
 using BotNexus.Providers.Core.Models;
+using BotNexus.Providers.Core.Validation;
 using System.Collections.Concurrent;
+using System.Text.Json;
 
 namespace BotNexus.AgentCore.Loop;
 
@@ -229,6 +231,16 @@ internal static class ToolExecutor
         if (tool is null)
         {
             return new ToolPreparation(null, BuildErrorResult($"Tool '{toolCall.Name}' is not registered."), true);
+        }
+
+        var argumentElement = JsonSerializer.SerializeToElement(rawArgs);
+        var (isValid, errors) = ToolCallValidator.Validate(argumentElement, tool.Definition.Parameters);
+        if (!isValid)
+        {
+            return new ToolPreparation(
+                null,
+                BuildErrorResult($"Invalid arguments for '{toolCall.Name}': {string.Join("; ", errors)}"),
+                true);
         }
 
         IReadOnlyDictionary<string, object?> validatedArgs;

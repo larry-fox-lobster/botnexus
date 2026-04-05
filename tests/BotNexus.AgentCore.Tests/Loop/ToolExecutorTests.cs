@@ -97,6 +97,33 @@ public class ToolExecutorTests
         results[0].Result.Content[0].Value.Should().Contain("not registered");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WhenSchemaValidationFails_ReturnsErrorBeforePreparingArguments()
+    {
+        var tool = new StrictSchemaTool("validator_tool");
+        var context = new AgentContext(null, [], [tool]);
+        var assistant = new AssistantAgentMessage(
+            Content: string.Empty,
+            ToolCalls:
+            [
+                new ToolCallContent(
+                    "t1",
+                    "validator_tool",
+                    new Dictionary<string, object?> { ["value"] = "first" })
+            ],
+            FinishReason: StopReason.ToolUse);
+        var config = TestHelpers.CreateTestConfig();
+
+        var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
+
+        results.Should().ContainSingle();
+        results[0].IsError.Should().BeTrue();
+        results[0].Result.Content[0].Value.Should().Contain("Invalid arguments for 'validator_tool'");
+        results[0].Result.Content[0].Value.Should().Contain("Missing required property 'path'");
+        tool.PrepareCallCount.Should().Be(0);
+        tool.ExecuteCount.Should().Be(0);
+    }
+
     [Theory]
     [InlineData("bash", "Bash")]
     [InlineData("bash", "BASH")]
@@ -359,6 +386,45 @@ public class ToolExecutorTests
             AgentToolUpdateCallback? onUpdate = null)
         {
             throw new InvalidOperationException("boom");
+        }
+    }
+
+    private sealed class StrictSchemaTool(string name) : IAgentTool
+    {
+        private static readonly JsonElement Schema = JsonDocument.Parse("""
+            {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              },
+              "required": ["path"]
+            }
+            """).RootElement.Clone();
+        private int _prepareCallCount;
+        private int _executeCount;
+
+        public string Name => name;
+        public string Label => name;
+        public int PrepareCallCount => _prepareCallCount;
+        public int ExecuteCount => _executeCount;
+        public Tool Definition => new(name, "strict schema tool", Schema);
+
+        public Task<IReadOnlyDictionary<string, object?>> PrepareArgumentsAsync(
+            IReadOnlyDictionary<string, object?> arguments,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _prepareCallCount);
+            return Task.FromResult(arguments);
+        }
+
+        public Task<AgentToolResult> ExecuteAsync(
+            string toolCallId,
+            IReadOnlyDictionary<string, object?> arguments,
+            CancellationToken cancellationToken = default,
+            AgentToolUpdateCallback? onUpdate = null)
+        {
+            Interlocked.Increment(ref _executeCount);
+            return Task.FromResult(new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, "ok")]));
         }
     }
 }
