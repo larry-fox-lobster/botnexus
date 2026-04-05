@@ -139,16 +139,31 @@ public sealed class OpenAIResponsesProvider(
         IReadOnlyList<Tool>? tools,
         StreamOptions? options)
     {
+        var input = ConvertMessages(messages, model);
+        if (!string.IsNullOrWhiteSpace(systemPrompt))
+        {
+            input.Insert(0, new JsonObject
+            {
+                ["type"] = "message",
+                ["role"] = model.Reasoning ? "developer" : "system",
+                ["content"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["type"] = "input_text",
+                        ["text"] = UnicodeSanitizer.SanitizeSurrogates(systemPrompt)
+                    }
+                }
+            });
+        }
+
         var payload = new JsonObject
         {
             ["model"] = model.Id,
             ["stream"] = true,
             ["store"] = false,
-            ["input"] = ConvertMessages(messages, model)
+            ["input"] = input
         };
-
-        if (!string.IsNullOrWhiteSpace(systemPrompt))
-            payload["instructions"] = UnicodeSanitizer.SanitizeSurrogates(systemPrompt);
 
         if (options?.MaxTokens is not null)
             payload["max_output_tokens"] = options.MaxTokens.Value;
