@@ -69,6 +69,12 @@ public class MessageConverterTests
     {
         var original = new AssistantAgentMessage(
             Content: "Round trip",
+            ContentBlocks:
+            [
+                new TextContent("Round trip"),
+                new ThinkingContent("internal reasoning", "sig-1"),
+                new ToolCallContent("tool-7", "get_current_time", new Dictionary<string, object?>())
+            ],
             ToolCalls: [new ToolCallContent("tool-7", "get_current_time", new Dictionary<string, object?>())],
             FinishReason: StopReason.ToolUse,
             Usage: new AgentUsage(3, 4),
@@ -85,6 +91,8 @@ public class MessageConverterTests
         roundTripped.Usage.OutputTokens.Should().Be(4);
         roundTripped.ToolCalls.Should().NotBeNull();
         roundTripped.ToolCalls!.Should().ContainSingle(call => call.Id == "tool-7");
+        roundTripped.ContentBlocks.Should().NotBeNull();
+        roundTripped.ContentBlocks!.OfType<ThinkingContent>().Should().ContainSingle(thinking => thinking.Thinking == "internal reasoning");
     }
 
     [Fact]

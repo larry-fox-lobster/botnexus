@@ -54,7 +54,8 @@ public sealed record AssistantAgentMessage(
     StopReason FinishReason = StopReason.Stop,
     AgentUsage? Usage = null,
     string? ErrorMessage = null,
-    DateTimeOffset? Timestamp = null) : AgentMessage("assistant");
+    DateTimeOffset? Timestamp = null,
+    IReadOnlyList<ContentBlock>? ContentBlocks = null) : AgentMessage("assistant");
 
 /// <summary>
 /// Represents a tool result message emitted after tool execution.

@@ -38,4 +38,26 @@ public class StreamAccumulatorTests
 
         eventTypes.Should().Equal(AgentEventType.MessageStart, AgentEventType.MessageEnd);
     }
+
+    [Fact]
+    public async Task AccumulateAsync_ErrorEventPreservesOriginalStopReason()
+    {
+        var stream = new LlmStream();
+        var errorMessage = new AssistantMessage(
+            Content: [new TextContent("aborted")],
+            Api: "test-api",
+            Provider: "test-provider",
+            ModelId: "test-model",
+            Usage: Usage.Empty(),
+            StopReason: StopReason.Aborted,
+            ErrorMessage: "aborted",
+            ResponseId: "resp_err",
+            Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+
+        stream.Push(new ErrorEvent(StopReason.Aborted, errorMessage));
+        stream.End(errorMessage);
+
+        var result = await StreamAccumulator.AccumulateAsync(stream, _ => Task.CompletedTask, CancellationToken.None);
+        result.FinishReason.Should().Be(StopReason.Aborted);
+    }
 }

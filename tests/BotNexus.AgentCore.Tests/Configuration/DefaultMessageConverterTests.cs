@@ -30,6 +30,12 @@ public class DefaultMessageConverterTests
         var converter = DefaultMessageConverter.Create();
         var message = new AssistantAgentMessage(
             Content: "assistant text",
+            ContentBlocks:
+            [
+                new TextContent("assistant text"),
+                new ThinkingContent("thinking"),
+                new ToolCallContent("tool-1", "calculate", new Dictionary<string, object?> { ["expression"] = "1+1" })
+            ],
             ToolCalls: [new ToolCallContent("tool-1", "calculate", new Dictionary<string, object?> { ["expression"] = "1+1" })],
             FinishReason: StopReason.ToolUse,
             Usage: new AgentUsage(10, 5));
@@ -39,6 +45,7 @@ public class DefaultMessageConverterTests
         result.Should().ContainSingle();
         var providerMessage = result[0].Should().BeOfType<ProviderAssistantMessage>().Subject;
         providerMessage.Content.OfType<TextContent>().Should().ContainSingle(content => content.Text == "assistant text");
+        providerMessage.Content.OfType<ThinkingContent>().Should().ContainSingle(content => content.Thinking == "thinking");
         providerMessage.Content.OfType<ToolCallContent>().Should().ContainSingle(call => call.Id == "tool-1");
         providerMessage.StopReason.Should().Be(StopReason.ToolUse);
         providerMessage.Usage.Input.Should().Be(10);
@@ -64,15 +71,13 @@ public class DefaultMessageConverterTests
     }
 
     [Fact]
-    public async Task Create_WrapsSystemMessageAsUserSummary()
+    public async Task Create_FiltersOutSystemMessages()
     {
         var converter = DefaultMessageConverter.Create();
 
         var result = await converter([new SystemAgentMessage("system context")], CancellationToken.None);
 
-        result.Should().ContainSingle();
-        var providerMessage = result[0].Should().BeOfType<ProviderUserMessage>().Subject;
-        providerMessage.Content.Text.Should().Be("<summary>\nsystem context\n</summary>");
+        result.Should().BeEmpty();
     }
 
     [Fact]
@@ -101,11 +106,10 @@ public class DefaultMessageConverterTests
 
         var result = await converter(messages, CancellationToken.None);
 
-        result.Should().HaveCount(4);
+        result.Should().HaveCount(3);
         result[0].Should().BeOfType<ProviderUserMessage>();
         result[1].Should().BeOfType<ProviderAssistantMessage>();
         result[2].Should().BeOfType<ProviderToolResultMessage>();
-        result[3].Should().BeOfType<ProviderUserMessage>();
     }
 
     [Fact]

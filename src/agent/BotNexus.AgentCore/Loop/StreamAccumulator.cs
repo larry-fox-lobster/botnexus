@@ -205,7 +205,7 @@ internal static class StreamAccumulator
                     break;
 
                 case ErrorEvent error:
-                    final = MessageConverter.ToAgentMessage(error.Error) with { FinishReason = StopReason.Error };
+                    final = MessageConverter.ToAgentMessage(error.Error) with { FinishReason = error.Reason };
                     if (!_startEmitted)
                     {
                         await emit(new MessageStartEvent(final, DateTimeOffset.UtcNow)).ConfigureAwait(false);

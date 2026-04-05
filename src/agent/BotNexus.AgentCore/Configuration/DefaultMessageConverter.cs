@@ -17,7 +17,7 @@ public static class DefaultMessageConverter
             return Task.FromResult<IReadOnlyList<Message>>([]);
 
         var filtered = messages
-            .Where(message => message?.Role is "user" or "assistant" or "tool" or "system")
+            .Where(message => message?.Role is "user" or "assistant" or "tool")
             .ToList();
 
         var converted = filtered
@@ -35,17 +35,8 @@ public static class DefaultMessageConverter
             AgentUserMessage user => ToProviderUserMessage(user),
             AssistantAgentMessage assistant => ToProviderAssistantMessage(assistant),
             ToolResultAgentMessage toolResult => ToProviderToolResultMessage(toolResult),
-            SystemAgentMessage system => ToProviderSummaryMessage(system),
             _ => null
         };
-    }
-
-    private static Message ToProviderSummaryMessage(SystemAgentMessage system)
-    {
-        var content = $"<summary>\n{system.Content}\n</summary>";
-        return new ProviderUserMessage(
-            Content: new UserMessageContent(content),
-            Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
     }
 
     private static Message ToProviderUserMessage(AgentUserMessage user)
@@ -75,12 +66,9 @@ public static class DefaultMessageConverter
 
     private static Message ToProviderAssistantMessage(AssistantAgentMessage assistant)
     {
-        var content = new List<ContentBlock>();
-        if (!string.IsNullOrEmpty(assistant.Content))
-            content.Add(new TextContent(assistant.Content));
-
-        if (assistant.ToolCalls is { Count: > 0 })
-            content.AddRange(assistant.ToolCalls);
+        var content = assistant.ContentBlocks is { Count: > 0 }
+            ? assistant.ContentBlocks.ToList()
+            : BuildAssistantContentBlocks(assistant);
 
         var usage = assistant.Usage is null
             ? Usage.Empty()
@@ -144,5 +132,17 @@ public static class DefaultMessageConverter
             mimeType = mediaTypePart;
 
         return (value[(commaIndex + 1)..], mimeType);
+    }
+
+    private static List<ContentBlock> BuildAssistantContentBlocks(AssistantAgentMessage assistant)
+    {
+        var content = new List<ContentBlock>();
+        if (!string.IsNullOrEmpty(assistant.Content))
+            content.Add(new TextContent(assistant.Content));
+
+        if (assistant.ToolCalls is { Count: > 0 })
+            content.AddRange(assistant.ToolCalls);
+
+        return content;
     }
 }

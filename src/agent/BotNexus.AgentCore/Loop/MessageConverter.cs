@@ -73,7 +73,8 @@ internal static class MessageConverter
             FinishReason: providerMessage.StopReason,
             Usage: usage,
             ErrorMessage: providerMessage.ErrorMessage,
-            Timestamp: DateTimeOffset.FromUnixTimeMilliseconds(providerMessage.Timestamp));
+            Timestamp: DateTimeOffset.FromUnixTimeMilliseconds(providerMessage.Timestamp),
+            ContentBlocks: providerMessage.Content.ToList());
     }
 
     /// <summary>
@@ -123,16 +124,9 @@ internal static class MessageConverter
 
     private static ProviderAssistantMessage ToProviderAssistantMessage(AssistantAgentMessage assistant, long fallbackTimestamp)
     {
-        var content = new List<ContentBlock>();
-        if (!string.IsNullOrEmpty(assistant.Content))
-        {
-            content.Add(new TextContent(assistant.Content));
-        }
-
-        if (assistant.ToolCalls is { Count: > 0 })
-        {
-            content.AddRange(assistant.ToolCalls);
-        }
+        var content = assistant.ContentBlocks is { Count: > 0 }
+            ? assistant.ContentBlocks.ToList()
+            : BuildAssistantContentBlocks(assistant);
 
         var usage = assistant.Usage is null
             ? Usage.Empty()
@@ -197,5 +191,21 @@ internal static class MessageConverter
         }
 
         return (value[(commaIndex + 1)..], mimeType);
+    }
+
+    private static List<ContentBlock> BuildAssistantContentBlocks(AssistantAgentMessage assistant)
+    {
+        var content = new List<ContentBlock>();
+        if (!string.IsNullOrEmpty(assistant.Content))
+        {
+            content.Add(new TextContent(assistant.Content));
+        }
+
+        if (assistant.ToolCalls is { Count: > 0 })
+        {
+            content.AddRange(assistant.ToolCalls);
+        }
+
+        return content;
     }
 }
