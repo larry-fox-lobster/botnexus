@@ -478,6 +478,7 @@ public sealed class Agent
 
         return new AgentLoopConfig(
             model,
+            _options.LlmClient,
             _options.ConvertToLlm,
             _options.TransformContext,
             _options.GetApiKey,

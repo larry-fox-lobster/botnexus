@@ -33,10 +33,10 @@ internal sealed class TestApiProvider : IApiProvider
     }
 }
 
-internal sealed class ApiProviderScope(string sourceId) : IDisposable
+internal sealed class ApiProviderScope(ApiProviderRegistry registry, string sourceId) : IDisposable
 {
     public void Dispose()
     {
-        ApiProviderRegistry.Unregister(sourceId);
+        registry.Unregister(sourceId);
     }
 }

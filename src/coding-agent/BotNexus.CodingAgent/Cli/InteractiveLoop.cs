@@ -3,6 +3,7 @@ using BotNexus.AgentCore;
 using BotNexus.AgentCore.Types;
 using BotNexus.CodingAgent.Auth;
 using BotNexus.CodingAgent.Session;
+using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Registry;
 
 namespace BotNexus.CodingAgent.Cli;
@@ -12,11 +13,11 @@ namespace BotNexus.CodingAgent.Cli;
 /// </summary>
 public sealed class InteractiveLoop
 {
-    private const int MessageCompactionThreshold = 100;
-
     public async Task RunAsync(
         Agent agent,
         CodingAgentConfig config,
+        LlmClient llmClient,
+        ModelRegistry modelRegistry,
         AuthManager authManager,
         SessionManager sessionManager,
         SessionInfo session,
@@ -25,6 +26,7 @@ public sealed class InteractiveLoop
     {
         ArgumentNullException.ThrowIfNull(agent);
         ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(llmClient);
         ArgumentNullException.ThrowIfNull(sessionManager);
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(output);
@@ -62,7 +64,7 @@ public sealed class InteractiveLoop
                     output.WriteToolEnd(toolEnd.ToolName, !toolEnd.IsError);
                     break;
                 case TurnEndEvent:
-                    CompactIfNeeded(agent, sessionCompactor);
+                    await CompactIfNeededAsync(agent, config, llmClient, authManager, sessionCompactor, eventCt).ConfigureAwait(false);
                     output.WriteTurnSeparator();
                     currentSession = UpdateSessionSnapshot(currentSession, agent);
                     await sessionManager.SaveSessionAsync(currentSession, agent.State.Messages).ConfigureAwait(false);
@@ -96,7 +98,7 @@ public sealed class InteractiveLoop
                     continue;
                 }
 
-                if (await HandleCommandAsync(trimmed, agent, config, authManager, output, currentSession) is { } updatedSession)
+                if (await HandleCommandAsync(trimmed, agent, config, modelRegistry, authManager, output, currentSession) is { } updatedSession)
                 {
                     currentSession = updatedSession;
                     if (trimmed.Equals("/quit", StringComparison.OrdinalIgnoreCase) ||
@@ -138,14 +140,35 @@ public sealed class InteractiveLoop
         }
     }
 
-    private static void CompactIfNeeded(Agent agent, SessionCompactor compactor)
+    private static async Task CompactIfNeededAsync(
+        Agent agent,
+        CodingAgentConfig config,
+        LlmClient llmClient,
+        AuthManager authManager,
+        SessionCompactor compactor,
+        CancellationToken cancellationToken)
     {
-        if (agent.State.Messages.Count <= MessageCompactionThreshold)
+        var apiKey = await authManager.GetApiKeyAsync(config, agent.State.Model.Provider, cancellationToken).ConfigureAwait(false);
+        var compacted = await compactor.CompactAsync(
+                agent.State.Messages,
+                new SessionCompactor.SessionCompactionOptions(
+                    MaxContextTokens: config.MaxContextTokens,
+                    ReserveTokens: Math.Max(2048, Math.Min(16384, config.MaxContextTokens / 5)),
+                    KeepRecentTokens: Math.Max(4096, Math.Min(30000, config.MaxContextTokens / 4)),
+                    KeepRecentCount: 10,
+                    LlmClient: llmClient,
+                    Model: agent.State.Model,
+                    ApiKey: apiKey,
+                    Headers: agent.State.Model.Headers),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (ReferenceEquals(compacted, agent.State.Messages))
         {
             return;
         }
 
-        agent.State.Messages = compactor.Compact(agent.State.Messages);
+        agent.State.Messages = compacted;
     }
 
     /// <summary>
@@ -155,6 +178,7 @@ public sealed class InteractiveLoop
         string input,
         Agent agent,
         CodingAgentConfig config,
+        ModelRegistry modelRegistry,
         AuthManager authManager,
         OutputFormatter output,
         SessionInfo session)
@@ -225,7 +249,7 @@ public sealed class InteractiveLoop
             }
 
             var provider = config.Provider ?? agent.State.Model.Provider;
-            agent.State.Model = ResolveModel(provider, modelId, config.MaxContextTokens);
+            agent.State.Model = ResolveModel(provider, modelId, config.MaxContextTokens, modelRegistry);
             var updated = UpdateSessionSnapshot(session, agent);
             output.WriteSessionInfo(updated);
             return updated;
@@ -244,14 +268,18 @@ public sealed class InteractiveLoop
         };
     }
 
-    private static BotNexus.Providers.Core.Models.LlmModel ResolveModel(string provider, string modelId, int maxContextTokens)
+    private static BotNexus.Providers.Core.Models.LlmModel ResolveModel(
+        string provider,
+        string modelId,
+        int maxContextTokens,
+        ModelRegistry modelRegistry)
     {
         if (provider.Equals("copilot", StringComparison.OrdinalIgnoreCase))
         {
             provider = "github-copilot";
         }
 
-        var existing = ModelRegistry.GetModel(provider, modelId);
+        var existing = modelRegistry.GetModel(provider, modelId);
         if (existing is not null)
         {
             return existing;

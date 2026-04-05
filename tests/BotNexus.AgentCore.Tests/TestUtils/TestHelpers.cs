@@ -10,6 +10,11 @@ using AgentUserMessage = BotNexus.AgentCore.Types.UserMessage;
 
 internal static class TestHelpers
 {
+    private static readonly ApiProviderRegistry SharedApiProviderRegistry = new();
+    private static readonly ModelRegistry SharedModelRegistry = new();
+
+    public static LlmClient CreateLlmClient() => new(SharedApiProviderRegistry, SharedModelRegistry);
+
     public static LlmModel CreateTestModel(string api = "test-api")
     {
         return new LlmModel(
@@ -33,6 +38,7 @@ internal static class TestHelpers
     {
         return new AgentLoopConfig(
             Model: model ?? CreateTestModel(),
+            LlmClient: CreateLlmClient(),
             ConvertToLlm: (messages, _) => Task.FromResult<IReadOnlyList<Message>>(ConvertMessages(messages)),
             TransformContext: (messages, _) => Task.FromResult(messages),
             GetApiKey: (_, _) => Task.FromResult<string?>(null),
@@ -53,6 +59,7 @@ internal static class TestHelpers
         return new AgentOptions(
             InitialState: initialState,
             Model: model ?? CreateTestModel(),
+            LlmClient: CreateLlmClient(),
             ConvertToLlm: (messages, _) => Task.FromResult<IReadOnlyList<Message>>(ConvertMessages(messages)),
             TransformContext: (messages, _) => Task.FromResult(messages),
             GetApiKey: (_, _) => Task.FromResult<string?>(null),
@@ -82,8 +89,8 @@ internal static class TestHelpers
     public static IDisposable RegisterProvider(TestApiProvider provider, string? sourceId = null)
     {
         var resolvedSourceId = sourceId ?? $"tests-{Guid.NewGuid():N}";
-        ApiProviderRegistry.Register(provider, resolvedSourceId);
-        return new ApiProviderScope(resolvedSourceId);
+        SharedApiProviderRegistry.Register(provider, resolvedSourceId);
+        return new ApiProviderScope(SharedApiProviderRegistry, resolvedSourceId);
     }
 
     private static IReadOnlyList<Message> ConvertMessages(IReadOnlyList<AgentMessage> messages)

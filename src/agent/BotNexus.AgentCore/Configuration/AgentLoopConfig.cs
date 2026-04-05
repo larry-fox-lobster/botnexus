@@ -23,6 +23,7 @@ namespace BotNexus.AgentCore.Configuration;
 /// </remarks>
 public record AgentLoopConfig(
     LlmModel Model,
+    LlmClient LlmClient,
     ConvertToLlmDelegate ConvertToLlm,
     TransformContextDelegate TransformContext,
     GetApiKeyDelegate GetApiKey,

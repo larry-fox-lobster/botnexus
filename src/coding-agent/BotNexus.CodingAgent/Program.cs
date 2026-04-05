@@ -6,6 +6,7 @@ using BotNexus.CodingAgent.Extensions;
 using BotNexus.CodingAgent.Session;
 using BotNexus.Providers.Anthropic;
 using BotNexus.Providers.Copilot;
+using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Registry;
 using BotNexus.Providers.OpenAI;
 using BotNexus.Providers.OpenAICompat;
@@ -42,7 +43,8 @@ internal static class Program
         ApplyOverrides(config, command);
 
         // Register all built-in API providers (matching pi-mono's registerBuiltInApiProviders)
-        RegisterBuiltInProviders();
+        var (apiProviderRegistry, modelRegistry) = RegisterBuiltInProviders();
+        var llmClient = new LlmClient(apiProviderRegistry, modelRegistry);
 
         var authManager = new AuthManager(config.ConfigDirectory);
         var extensionTools = new ExtensionLoader().LoadExtensions(config.ExtensionsDirectory);
@@ -63,7 +65,14 @@ internal static class Program
             session = await sessionManager.CreateSessionAsync(workingDirectory, "cli-session").ConfigureAwait(false);
         }
 
-        var agent = await CodingAgent.CreateAsync(config, workingDirectory, authManager, extensionTools, skills).ConfigureAwait(false);
+        var agent = await CodingAgent.CreateAsync(
+            config,
+            workingDirectory,
+            authManager,
+            llmClient,
+            modelRegistry,
+            extensionTools,
+            skills).ConfigureAwait(false);
         if (resumedMessages.Count > 0)
         {
             agent.State.Messages = resumedMessages;
@@ -100,7 +109,16 @@ internal static class Program
         }
 
         var loop = new InteractiveLoop();
-        await loop.RunAsync(agent, config, authManager, sessionManager, session, output, CancellationToken.None).ConfigureAwait(false);
+        await loop.RunAsync(
+            agent,
+            config,
+            llmClient,
+            modelRegistry,
+            authManager,
+            sessionManager,
+            session,
+            output,
+            CancellationToken.None).ConfigureAwait(false);
         return 0;
     }
 
@@ -164,14 +182,17 @@ internal static class Program
     /// Equivalent to pi-mono's registerBuiltInApiProviders() in register-builtins.ts.
     /// Must be called before any LlmClient usage.
     /// </summary>
-    private static void RegisterBuiltInProviders()
+    private static (ApiProviderRegistry ApiProviderRegistry, ModelRegistry ModelRegistry) RegisterBuiltInProviders()
     {
-        BuiltInModels.RegisterAll();
+        var apiProviderRegistry = new ApiProviderRegistry();
+        var modelRegistry = new ModelRegistry();
+        new BuiltInModels().RegisterAll(modelRegistry);
 
         var httpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        ApiProviderRegistry.Register(new CopilotProvider());
-        ApiProviderRegistry.Register(new AnthropicProvider());
-        ApiProviderRegistry.Register(new OpenAICompletionsProvider(httpClient, Microsoft.Extensions.Logging.Abstractions.NullLogger<OpenAICompletionsProvider>.Instance));
-        ApiProviderRegistry.Register(new OpenAICompatProvider());
+        apiProviderRegistry.Register(new CopilotProvider());
+        apiProviderRegistry.Register(new AnthropicProvider());
+        apiProviderRegistry.Register(new OpenAICompletionsProvider(httpClient, Microsoft.Extensions.Logging.Abstractions.NullLogger<OpenAICompletionsProvider>.Instance));
+        apiProviderRegistry.Register(new OpenAICompatProvider());
+        return (apiProviderRegistry, modelRegistry);
     }
 }

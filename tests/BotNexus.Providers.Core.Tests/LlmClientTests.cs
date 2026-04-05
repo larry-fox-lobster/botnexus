@@ -9,15 +9,19 @@ namespace BotNexus.Providers.Core.Tests;
 public class LlmClientTests : IDisposable
 {
     private static readonly long Ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    private readonly ApiProviderRegistry _apiProviderRegistry = new();
+    private readonly ModelRegistry _modelRegistry = new();
+    private readonly LlmClient _llmClient;
 
     public LlmClientTests()
     {
-        ApiProviderRegistry.Clear();
+        _llmClient = new LlmClient(_apiProviderRegistry, _modelRegistry);
     }
 
     public void Dispose()
     {
-        ApiProviderRegistry.Clear();
+        _apiProviderRegistry.Clear();
+        _modelRegistry.Clear();
     }
 
     private static LlmModel MakeModel(string api = "test-api") => new(
@@ -46,9 +50,9 @@ public class LlmClientTests : IDisposable
         var mockProvider = new Mock<IApiProvider>();
         mockProvider.Setup(p => p.Api).Returns("test-api");
         mockProvider.Setup(p => p.Stream(model, context, null)).Returns(expectedStream);
-        ApiProviderRegistry.Register(mockProvider.Object);
+        _apiProviderRegistry.Register(mockProvider.Object);
 
-        var result = LlmClient.Stream(model, context);
+        var result = _llmClient.Stream(model, context);
 
         result.Should().BeSameAs(expectedStream);
     }
@@ -59,7 +63,7 @@ public class LlmClientTests : IDisposable
         var model = MakeModel("unregistered-api");
         var context = MakeContext();
 
-        var act = () => LlmClient.Stream(model, context);
+        var act = () => _llmClient.Stream(model, context);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*unregistered-api*");
@@ -89,9 +93,9 @@ public class LlmClientTests : IDisposable
         var mockProvider = new Mock<IApiProvider>();
         mockProvider.Setup(p => p.Api).Returns("test-api");
         mockProvider.Setup(p => p.Stream(It.IsAny<LlmModel>(), It.IsAny<Context>(), It.IsAny<StreamOptions>())).Returns(stream);
-        ApiProviderRegistry.Register(mockProvider.Object);
+        _apiProviderRegistry.Register(mockProvider.Object);
 
-        var result = await LlmClient.CompleteAsync(model, context);
+        var result = await _llmClient.CompleteAsync(model, context);
 
         result.StopReason.Should().Be(StopReason.Stop);
         result.Content.Should().ContainSingle();

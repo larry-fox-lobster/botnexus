@@ -3,31 +3,31 @@ using System.Collections.Concurrent;
 namespace BotNexus.Providers.Core.Registry;
 
 /// <summary>
-/// Global registry of API providers. Port of pi-mono's api-registry.ts.
+/// Registry of API providers. Port of pi-mono's api-registry.ts.
 /// Thread-safe via ConcurrentDictionary.
 /// </summary>
-public static class ApiProviderRegistry
+public sealed class ApiProviderRegistry
 {
     private sealed record Registration(IApiProvider Provider, string? SourceId);
 
-    private static readonly ConcurrentDictionary<string, Registration> _registry = new();
+    private readonly ConcurrentDictionary<string, Registration> _registry = new();
 
-    public static void Register(IApiProvider provider, string? sourceId = null)
+    public void Register(IApiProvider provider, string? sourceId = null)
     {
         _registry[provider.Api] = new Registration(provider, sourceId);
     }
 
-    public static IApiProvider? Get(string api)
+    public IApiProvider? Get(string api)
     {
         return _registry.TryGetValue(api, out var reg) ? reg.Provider : null;
     }
 
-    public static IReadOnlyList<IApiProvider> GetAll()
+    public IReadOnlyList<IApiProvider> GetAll()
     {
         return _registry.Values.Select(r => r.Provider).ToList();
     }
 
-    public static void Unregister(string sourceId)
+    public void Unregister(string sourceId)
     {
         var toRemove = _registry
             .Where(kvp => kvp.Value.SourceId == sourceId)
@@ -38,7 +38,7 @@ public static class ApiProviderRegistry
             _registry.TryRemove(api, out _);
     }
 
-    public static void Clear()
+    public void Clear()
     {
         _registry.Clear();
     }

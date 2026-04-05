@@ -21,6 +21,8 @@ public static class CodingAgent
         CodingAgentConfig config,
         string workingDirectory,
         AuthManager authManager,
+        LlmClient llmClient,
+        ModelRegistry modelRegistry,
         IReadOnlyList<IAgentTool>? extensionTools = null,
         IReadOnlyList<string>? skills = null)
     {
@@ -49,7 +51,7 @@ public static class CodingAgent
             CustomInstructions: null));
 
         // Resolve initial API key via AuthManager (auto-refreshes saved creds)
-        var model = ResolveModel(config);
+        var model = ResolveModel(config, modelRegistry);
         var capturedAuthManager = authManager;
         var capturedConfig = config;
 
@@ -62,6 +64,7 @@ public static class CodingAgent
                 Model: model,
                 Tools: tools),
             Model: model,
+            LlmClient: llmClient,
             ConvertToLlm: BuildConvertToLlmDelegate(),
             TransformContext: (messages, _) => Task.FromResult(messages),
             GetApiKey: async (provider, ct) =>
@@ -249,7 +252,7 @@ public static class CodingAgent
         return (value[(commaIndex + 1)..], mimeType);
     }
 
-    private static LlmModel ResolveModel(CodingAgentConfig config)
+    private static LlmModel ResolveModel(CodingAgentConfig config, ModelRegistry modelRegistry)
     {
         var provider = config.Provider ?? "github-copilot";
         var modelId = config.Model ?? "gpt-4.1";
@@ -259,7 +262,7 @@ public static class CodingAgent
             provider = "github-copilot";
         }
 
-        var existing = ModelRegistry.GetModel(provider, modelId);
+        var existing = modelRegistry.GetModel(provider, modelId);
         if (existing is not null)
         {
             return existing;

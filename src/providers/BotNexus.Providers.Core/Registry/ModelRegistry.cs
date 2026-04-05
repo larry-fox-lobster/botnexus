@@ -4,20 +4,20 @@ using BotNexus.Providers.Core.Models;
 namespace BotNexus.Providers.Core.Registry;
 
 /// <summary>
-/// Global model registry. Port of pi-mono's models.ts registry.
+/// Model registry. Port of pi-mono's models.ts registry.
 /// Thread-safe via ConcurrentDictionary.
 /// </summary>
-public static class ModelRegistry
+public sealed class ModelRegistry
 {
-    private static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, LlmModel>> _registry = new();
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, LlmModel>> _registry = new();
 
-    public static void Register(string provider, LlmModel model)
+    public void Register(string provider, LlmModel model)
     {
         var models = _registry.GetOrAdd(provider, _ => new ConcurrentDictionary<string, LlmModel>());
         models[model.Id] = model;
     }
 
-    public static LlmModel? GetModel(string provider, string modelId)
+    public LlmModel? GetModel(string provider, string modelId)
     {
         if (_registry.TryGetValue(provider, out var models) &&
             models.TryGetValue(modelId, out var model))
@@ -26,12 +26,12 @@ public static class ModelRegistry
         return null;
     }
 
-    public static IReadOnlyList<string> GetProviders()
+    public IReadOnlyList<string> GetProviders()
     {
         return _registry.Keys.ToList();
     }
 
-    public static IReadOnlyList<LlmModel> GetModels(string provider)
+    public IReadOnlyList<LlmModel> GetModels(string provider)
     {
         return _registry.TryGetValue(provider, out var models)
             ? models.Values.ToList()
@@ -53,7 +53,7 @@ public static class ModelRegistry
         return new UsageCost(input, output, cacheRead, cacheWrite, total);
     }
 
-    public static void Clear()
+    public void Clear()
     {
         _registry.Clear();
     }

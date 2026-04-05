@@ -6,14 +6,16 @@ namespace BotNexus.Providers.Core.Tests.Registry;
 
 public class ModelRegistryTests : IDisposable
 {
+    private readonly ModelRegistry _registry = new();
+
     public ModelRegistryTests()
     {
-        ModelRegistry.Clear();
+        _registry.Clear();
     }
 
     public void Dispose()
     {
-        ModelRegistry.Clear();
+        _registry.Clear();
     }
 
     private static LlmModel MakeModel(string id = "test-model", string provider = "test",
@@ -33,9 +35,9 @@ public class ModelRegistryTests : IDisposable
     public void Register_AndRetrieve_ReturnsModel()
     {
         var model = MakeModel();
-        ModelRegistry.Register("test", model);
+        _registry.Register("test", model);
 
-        var result = ModelRegistry.GetModel("test", "test-model");
+        var result = _registry.GetModel("test", "test-model");
 
         result.Should().NotBeNull();
         result!.Id.Should().Be("test-model");
@@ -44,7 +46,7 @@ public class ModelRegistryTests : IDisposable
     [Fact]
     public void GetModel_UnknownProvider_ReturnsNull()
     {
-        var result = ModelRegistry.GetModel("nonexistent", "test-model");
+        var result = _registry.GetModel("nonexistent", "test-model");
 
         result.Should().BeNull();
     }
@@ -53,9 +55,9 @@ public class ModelRegistryTests : IDisposable
     public void GetModel_UnknownModelId_ReturnsNull()
     {
         var model = MakeModel();
-        ModelRegistry.Register("test", model);
+        _registry.Register("test", model);
 
-        var result = ModelRegistry.GetModel("test", "nonexistent");
+        var result = _registry.GetModel("test", "nonexistent");
 
         result.Should().BeNull();
     }
@@ -63,10 +65,10 @@ public class ModelRegistryTests : IDisposable
     [Fact]
     public void GetProviders_ReturnsRegisteredNames()
     {
-        ModelRegistry.Register("provider-a", MakeModel("m1"));
-        ModelRegistry.Register("provider-b", MakeModel("m2"));
+        _registry.Register("provider-a", MakeModel("m1"));
+        _registry.Register("provider-b", MakeModel("m2"));
 
-        var providers = ModelRegistry.GetProviders();
+        var providers = _registry.GetProviders();
 
         providers.Should().Contain("provider-a");
         providers.Should().Contain("provider-b");
@@ -75,10 +77,10 @@ public class ModelRegistryTests : IDisposable
     [Fact]
     public void GetModels_ReturnsAllModelsForProvider()
     {
-        ModelRegistry.Register("prov", MakeModel("m1"));
-        ModelRegistry.Register("prov", MakeModel("m2"));
+        _registry.Register("prov", MakeModel("m1"));
+        _registry.Register("prov", MakeModel("m2"));
 
-        var models = ModelRegistry.GetModels("prov");
+        var models = _registry.GetModels("prov");
 
         models.Should().HaveCount(2);
     }
@@ -86,7 +88,7 @@ public class ModelRegistryTests : IDisposable
     [Fact]
     public void GetModels_UnknownProvider_ReturnsEmpty()
     {
-        var models = ModelRegistry.GetModels("unknown");
+        var models = _registry.GetModels("unknown");
 
         models.Should().BeEmpty();
     }

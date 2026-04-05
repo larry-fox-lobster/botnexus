@@ -162,7 +162,7 @@ public static class AgentLoopRunner
                     .ConfigureAwait(false);
 
                 var streamOptions = await BuildStreamOptionsAsync(config, cancellationToken).ConfigureAwait(false);
-                var stream = LlmClient.StreamSimple(config.Model, providerContext, streamOptions);
+                var stream = config.LlmClient.StreamSimple(config.Model, providerContext, streamOptions);
                 var assistantMessage = await StreamAccumulator.AccumulateAsync(stream, emit, cancellationToken)
                     .ConfigureAwait(false);
 

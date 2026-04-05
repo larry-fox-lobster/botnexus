@@ -28,6 +28,7 @@ namespace BotNexus.AgentCore.Configuration;
 public record AgentOptions(
     AgentInitialState? InitialState,
     LlmModel Model,
+    LlmClient LlmClient,
     ConvertToLlmDelegate ConvertToLlm,
     TransformContextDelegate TransformContext,
     GetApiKeyDelegate GetApiKey,

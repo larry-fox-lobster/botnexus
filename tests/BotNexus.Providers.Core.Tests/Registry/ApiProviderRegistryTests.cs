@@ -8,14 +8,16 @@ namespace BotNexus.Providers.Core.Tests.Registry;
 
 public class ApiProviderRegistryTests : IDisposable
 {
+    private readonly ApiProviderRegistry _registry = new();
+
     public ApiProviderRegistryTests()
     {
-        ApiProviderRegistry.Clear();
+        _registry.Clear();
     }
 
     public void Dispose()
     {
-        ApiProviderRegistry.Clear();
+        _registry.Clear();
     }
 
     private static Mock<IApiProvider> CreateMockProvider(string api)
@@ -29,9 +31,9 @@ public class ApiProviderRegistryTests : IDisposable
     public void Register_AndRetrieve_ReturnsProvider()
     {
         var mock = CreateMockProvider("test-api");
-        ApiProviderRegistry.Register(mock.Object);
+        _registry.Register(mock.Object);
 
-        var result = ApiProviderRegistry.Get("test-api");
+        var result = _registry.Get("test-api");
 
         result.Should().BeSameAs(mock.Object);
     }
@@ -39,7 +41,7 @@ public class ApiProviderRegistryTests : IDisposable
     [Fact]
     public void Get_UnregisteredApi_ReturnsNull()
     {
-        var result = ApiProviderRegistry.Get("nonexistent");
+        var result = _registry.Get("nonexistent");
 
         result.Should().BeNull();
     }
@@ -48,11 +50,11 @@ public class ApiProviderRegistryTests : IDisposable
     public void Register_WithSourceId_UnregisterBySourceId()
     {
         var mock = CreateMockProvider("test-api");
-        ApiProviderRegistry.Register(mock.Object, "source-1");
+        _registry.Register(mock.Object, "source-1");
 
-        ApiProviderRegistry.Unregister("source-1");
+        _registry.Unregister("source-1");
 
-        ApiProviderRegistry.Get("test-api").Should().BeNull();
+        _registry.Get("test-api").Should().BeNull();
     }
 
     [Fact]
@@ -60,10 +62,10 @@ public class ApiProviderRegistryTests : IDisposable
     {
         var mock1 = CreateMockProvider("api-1");
         var mock2 = CreateMockProvider("api-2");
-        ApiProviderRegistry.Register(mock1.Object);
-        ApiProviderRegistry.Register(mock2.Object);
+        _registry.Register(mock1.Object);
+        _registry.Register(mock2.Object);
 
-        var all = ApiProviderRegistry.GetAll();
+        var all = _registry.GetAll();
 
         all.Should().HaveCount(2);
     }
@@ -72,11 +74,11 @@ public class ApiProviderRegistryTests : IDisposable
     public void Clear_RemovesAllProviders()
     {
         var mock = CreateMockProvider("test-api");
-        ApiProviderRegistry.Register(mock.Object);
+        _registry.Register(mock.Object);
 
-        ApiProviderRegistry.Clear();
+        _registry.Clear();
 
-        ApiProviderRegistry.GetAll().Should().BeEmpty();
+        _registry.GetAll().Should().BeEmpty();
     }
 
     [Fact]
@@ -84,10 +86,10 @@ public class ApiProviderRegistryTests : IDisposable
     {
         var mock1 = CreateMockProvider("same-api");
         var mock2 = CreateMockProvider("same-api");
-        ApiProviderRegistry.Register(mock1.Object);
-        ApiProviderRegistry.Register(mock2.Object);
+        _registry.Register(mock1.Object);
+        _registry.Register(mock2.Object);
 
-        var result = ApiProviderRegistry.Get("same-api");
+        var result = _registry.Get("same-api");
 
         result.Should().BeSameAs(mock2.Object);
     }
