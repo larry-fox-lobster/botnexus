@@ -128,13 +128,21 @@ public sealed class ExtensionLifecycleTests
     [Fact]
     public async Task OnToolCallAsync_WhenExtensionThrows_DoesNotCrashRunner()
     {
+        var calls = 0;
         var throwing = new Mock<IExtension>();
         throwing.SetupGet(item => item.Name).Returns("throwing");
         throwing.Setup(item => item.GetTools()).Returns([]);
         throwing.Setup(item => item.OnToolCallAsync(It.IsAny<ToolCallLifecycleContext>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        var runner = new ExtensionRunner([throwing.Object]);
+        var second = new Mock<IExtension>();
+        second.SetupGet(item => item.Name).Returns("second");
+        second.Setup(item => item.GetTools()).Returns([]);
+        second.Setup(item => item.OnToolCallAsync(It.IsAny<ToolCallLifecycleContext>(), It.IsAny<CancellationToken>()))
+            .Callback(() => calls++)
+            .Returns(ValueTask.FromResult<BeforeToolCallResult?>(null));
+
+        var runner = new ExtensionRunner([throwing.Object, second.Object]);
         var act = () => runner.OnToolCallAsync(new ToolCallLifecycleContext(
             ToolCallLifecycleStage.BeforeExecution,
             "call-1",
@@ -142,6 +150,7 @@ public sealed class ExtensionLifecycleTests
             new Dictionary<string, object?>()));
 
         await act.Should().NotThrowAsync();
+        calls.Should().Be(1);
     }
 
     [Fact]

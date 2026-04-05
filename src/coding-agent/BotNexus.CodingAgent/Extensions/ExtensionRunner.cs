@@ -14,7 +14,17 @@ public sealed class ExtensionRunner(IReadOnlyList<IExtension> extensions)
         BeforeToolCallResult? result = null;
         foreach (var extension in _extensions)
         {
-            var current = await extension.OnToolCallAsync(context, cancellationToken).ConfigureAwait(false);
+            BeforeToolCallResult? current;
+            try
+            {
+                current = await extension.OnToolCallAsync(context, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                LogExtensionError(extension, nameof(OnToolCallAsync), ex);
+                continue;
+            }
+
             if (current?.Block == true)
             {
                 return current;
@@ -36,7 +46,17 @@ public sealed class ExtensionRunner(IReadOnlyList<IExtension> extensions)
         AfterToolCallResult? result = null;
         foreach (var extension in _extensions)
         {
-            var current = await extension.OnToolResultAsync(context, cancellationToken).ConfigureAwait(false);
+            AfterToolCallResult? current;
+            try
+            {
+                current = await extension.OnToolResultAsync(context, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                LogExtensionError(extension, nameof(OnToolResultAsync), ex);
+                continue;
+            }
+
             if (current is not null)
             {
                 result = Merge(result, current);
@@ -49,20 +69,48 @@ public sealed class ExtensionRunner(IReadOnlyList<IExtension> extensions)
     public async Task OnSessionStartAsync(SessionLifecycleContext context, CancellationToken cancellationToken = default)
     {
         foreach (var extension in _extensions)
-            await extension.OnSessionStartAsync(context, cancellationToken).ConfigureAwait(false);
+        {
+            try
+            {
+                await extension.OnSessionStartAsync(context, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                LogExtensionError(extension, nameof(OnSessionStartAsync), ex);
+            }
+        }
     }
 
     public async Task OnSessionEndAsync(SessionLifecycleContext context, CancellationToken cancellationToken = default)
     {
         foreach (var extension in _extensions)
-            await extension.OnSessionEndAsync(context, cancellationToken).ConfigureAwait(false);
+        {
+            try
+            {
+                await extension.OnSessionEndAsync(context, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                LogExtensionError(extension, nameof(OnSessionEndAsync), ex);
+            }
+        }
     }
 
     public async Task<string?> OnCompactionAsync(CompactionLifecycleContext context, CancellationToken cancellationToken = default)
     {
         foreach (var extension in _extensions)
         {
-            var summaryOverride = await extension.OnCompactionAsync(context, cancellationToken).ConfigureAwait(false);
+            string? summaryOverride;
+            try
+            {
+                summaryOverride = await extension.OnCompactionAsync(context, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                LogExtensionError(extension, nameof(OnCompactionAsync), ex);
+                continue;
+            }
+
             if (!string.IsNullOrWhiteSpace(summaryOverride))
                 return summaryOverride;
         }
@@ -78,9 +126,19 @@ public sealed class ExtensionRunner(IReadOnlyList<IExtension> extensions)
         var currentPayload = payload;
         foreach (var extension in _extensions)
         {
-            var overridePayload = await extension
-                .OnModelRequestAsync(new ModelRequestLifecycleContext(currentPayload, model), cancellationToken)
-                .ConfigureAwait(false);
+            object? overridePayload;
+            try
+            {
+                overridePayload = await extension
+                    .OnModelRequestAsync(new ModelRequestLifecycleContext(currentPayload, model), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                LogExtensionError(extension, nameof(OnModelRequestAsync), ex);
+                continue;
+            }
+
             if (overridePayload is not null)
             {
                 currentPayload = overridePayload;
@@ -101,5 +159,10 @@ public sealed class ExtensionRunner(IReadOnlyList<IExtension> extensions)
             Content: next.Content ?? current.Content,
             Details: next.Details ?? current.Details,
             IsError: next.IsError ?? current.IsError);
+    }
+
+    private static void LogExtensionError(IExtension extension, string eventName, Exception ex)
+    {
+        Console.Error.WriteLine($"Extension '{extension.Name}' failed during {eventName}: {ex}");
     }
 }
