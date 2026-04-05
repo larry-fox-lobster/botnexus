@@ -69,15 +69,86 @@ public sealed class ShellToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenOutputExceedsLimit_ReturnsTruncatedTailWithPrefix()
+    public void BuildOutput_WhenOutputExceedsByteLimit_KeepsTailLines()
     {
-        var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?>
+        var lines = Enumerable.Range(1, 1600)
+            .Select(i => (Seq: (long)i, Line: $"line-{i:D4}-{new string('x', 40)}"))
+            .ToList();
+
+        var output = InvokeBuildOutput(lines, includeTruncationNotes: true);
+
+        output.Should().Contain("line-1600");
+        output.Should().NotContain("line-0001");
+    }
+
+    [Fact]
+    public void BuildOutput_WhenTruncated_PlacesNoticeOnFirstLine()
+    {
+        var lines = Enumerable.Range(1, 2500)
+            .Select(i => (Seq: (long)i, Line: $"line-{i:D4}"))
+            .ToList();
+
+        var output = InvokeBuildOutput(lines, includeTruncationNotes: true);
+        var firstLine = output.Split(Environment.NewLine, StringSplitOptions.None)[0];
+
+        firstLine.Should().StartWith("[output truncated — showing last ");
+    }
+
+    [Fact]
+    public void BuildOutput_WhenWithinLimit_ReturnsUnchangedOutput()
+    {
+        var lines = new List<(long Seq, string Line)>
         {
-            ["command"] = "python -c \"print('a' * 52000 + 'TAIL-MARKER')\""
+            (1, "alpha"),
+            (2, "beta"),
+            (3, "gamma")
+        };
+
+        var output = InvokeBuildOutput(lines, includeTruncationNotes: true);
+
+        output.Should().Be($"alpha{Environment.NewLine}beta{Environment.NewLine}gamma");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenNoTimeoutArgument_UsesConfiguredDefaultTimeout()
+    {
+        var tool = new ShellTool(defaultTimeoutSeconds: 1);
+        var result = await tool.ExecuteAsync("test-call", new Dictionary<string, object?>
+        {
+            ["command"] = "python -c \"import time; time.sleep(2)\""
         });
 
-        result.Content[0].Value.Should().Contain("[output truncated — showing last 0 lines of 1]");
-        result.Content[0].Value.Should().NotContain("TAIL-MARKER");
+        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
+        result.Details.As<ShellTool.ShellToolDetails>().TimedOut.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenPerCallTimeoutProvided_OverridesConfiguredTimeout()
+    {
+        var tool = new ShellTool(defaultTimeoutSeconds: 10);
+        var result = await tool.ExecuteAsync("test-call", new Dictionary<string, object?>
+        {
+            ["command"] = "python -c \"import time; time.sleep(2)\"",
+            ["timeout"] = 1
+        });
+
+        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
+        result.Details.As<ShellTool.ShellToolDetails>().TimedOut.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenConfiguredTimeoutIsNull_DoesNotApplyDefaultTimeout()
+    {
+        var tool = new ShellTool(defaultTimeoutSeconds: null);
+        var result = await tool.ExecuteAsync("test-call", new Dictionary<string, object?>
+        {
+            ["command"] = "python -c \"import time; time.sleep(1); print('done')\""
+        });
+
+        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
+        result.Details.As<ShellTool.ShellToolDetails>().TimedOut.Should().BeFalse();
+        result.Details.As<ShellTool.ShellToolDetails>().ExitCode.Should().Be(0);
+        result.Content[0].Value.Should().Contain("done");
     }
 
     [Fact]
@@ -213,5 +284,14 @@ public sealed class ShellToolTests
         {
             return null;
         }
+    }
+
+    private static string InvokeBuildOutput(IReadOnlyList<(long Seq, string Line)> buffer, bool includeTruncationNotes)
+    {
+        var method = typeof(ShellTool).GetMethod("BuildOutput", BindingFlags.NonPublic | BindingFlags.Static);
+        method.Should().NotBeNull();
+
+        return method!.Invoke(null, [buffer, includeTruncationNotes]) as string
+            ?? throw new InvalidOperationException("Failed to invoke ShellTool.BuildOutput.");
     }
 }
