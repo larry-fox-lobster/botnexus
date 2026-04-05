@@ -1562,3 +1562,17 @@ Design review filtered 14 audit findings down to 6 real fixes (5 already impleme
 - **Design review filter rate is improving.** This sprint: 57% of findings filtered (8 of 14). Previous sprint: 18% false-positive rate (3 of 17). The gate is the single most valuable ceremony in the audit pipeline.
 
 - **5-agent parallel execution with zero merge conflicts is repeatable.** Farnsworth, Bender, Hermes, Kif, and Nibbler ran in parallel. Non-overlapping file assignment continues to prevent conflicts across four consecutive sprints now.
+
+## Learnings — Port Audit Phase 5 Retrospective (2026-07-16)
+
+- **The speculative-parallel anti-pattern has now recurred three times.** Phase 3: docs from design decisions (18/22 issues). Phase 4: tests from audit findings (9/30 failures). Phase 5: test from design spec (ShortHash length wrong). The pattern is: any artifact that asserts specific behavior — return types, string lengths, parameter signatures — breaks when authored from plans instead of committed code. This is now a hard rule: concrete assertions must follow committed code. No exceptions.
+
+- **Latent defects surface when refactoring changes object lifecycles.** CompactForOverflow's list aliasing was harmless for years because callers only read the list once. Bender's per-retry restructure changed the lifecycle (clear-and-rebuild per retry), exposing the shared reference. Lesson: any refactoring that changes when objects are created, read, or destroyed should trigger a review of reference semantics at the boundary.
+
+- **Transform and compaction methods must return defensive copies.** Returning the input reference when "no work needed" is an optimization that creates aliasing traps. The cost of a list copy is negligible compared to the debugging cost of a shared-mutation bug. Add this to code review checklist.
+
+- **Global test registries are a parallel-execution time bomb.** Two test classes registering the same provider name worked fine in serial execution for months. The collision only appeared when a timing change widened the parallel window. Test infrastructure must either scope registries per test class or use unique names. Any global mutable state in test setup is suspect.
+
+- **Multi-agent git commits need a coordination protocol.** File locks from testhost processes and concurrent git operations caused failures requiring manual cleanup. Agents committing independently to the same repo is unsustainable beyond 2 parallel agents. Next sprint must implement either a commit queue, worktree-per-agent, or a coordinator-commits-all pattern.
+
+- **Design specs should distinguish assumed vs verified behavior.** The ShortHash spec stated a 9-char trim step that doesn't exist in the reference implementation. Had the spec marked this as "assumed — verify against pi-mono" instead of stating it as fact, the test would have been written differently. Spec templates need an explicit confidence/verification column.
