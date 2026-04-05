@@ -1473,3 +1473,17 @@ Participated in design review ceremony for Phase 3 architecture. All ADs approve
 
 **Next:** Parallel execution tracks. Farnsworth + Bender begin implementation. Kif writes training docs. Nibbler runs consistency review.
 
+## Learnings — Phase 3 Port Audit Retrospective (2026-04-06)
+
+- **Docs written against planned APIs are unreliable.** Kif authored training docs in parallel with code work, using design review decisions as the source of truth for method signatures and behavior. 18 of 22 consistency issues traced directly to this: wrong `ExecuteAsync` signatures, non-existent parameter lists, incorrect algorithm descriptions. The plan is not the code. Docs must be written against final, committed code — or they will be wrong.
+
+- **Parallel doc authoring only works for conceptual content.** Architecture overviews, glossary entries, and design rationale can be written in parallel with code. API examples, code snippets, and interface definitions cannot — they depend on the final implementation. Future sprints will stagger: conceptual docs in parallel, API docs after code lands.
+
+- **Consistency review is valuable but positioned too late.** Nibbler's review caught all 22 issues, but only after the sprint was declared complete. The fix commit (`e7ff6d8`) represents rework. Moving the consistency check before sprint-complete would eliminate the fix-after-ship pattern.
+
+- **The audit ceremony pipeline is proven.** Three phases, same structure each time: audit → design review → AD decisions → parallel sprint → consistency review → retro. The pipeline is repeatable and produces consistent results. 43 commits, 17 ADs, 415 tests across all three phases. This is the model for future feature work, not just audits.
+
+- **YAGNI discipline prevents speculative code.** AD-13 (OpenRouter routing types) was correctly deferred. The team resisted the temptation to build types for a provider that doesn't exist. This saved a commit, avoided dead code, and kept the architecture honest.
+
+- **Test growth tracks feature growth.** 43 new tests in Phase 3 (372 → 415). Tests were written alongside features, not backfilled. This pattern — enforced by the build-before-commit rule — keeps the test suite meaningful rather than ceremonial.
+
