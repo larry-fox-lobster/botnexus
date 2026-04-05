@@ -28,9 +28,11 @@ internal static class StreamAccumulator
     public static async Task<AssistantAgentMessage> AccumulateAsync(
         LlmStream stream,
         Func<AgentEvent, Task> emit,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IList<AgentMessage>? contextMessages = null)
     {
         var _startEmitted = false;
+        var partialAddedToContext = false;
         AssistantAgentMessage? current = null;
         AssistantAgentMessage? final = null;
         var toolCallState = new Dictionary<int, (string? Id, string? Name)>();
@@ -43,12 +45,19 @@ internal static class StreamAccumulator
             {
                 case StartEvent start:
                     current = MessageConverter.ToAgentMessage(start.Partial);
+                    if (contextMessages is not null)
+                    {
+                        contextMessages.Add(current);
+                        partialAddedToContext = true;
+                    }
+
                     await emit(new MessageStartEvent(current, DateTimeOffset.UtcNow)).ConfigureAwait(false);
                     _startEmitted = true;
                     break;
 
                 case TextStartEvent textStart:
                     current = MessageConverter.ToAgentMessage(textStart.Partial);
+                    UpdateContextPartial(contextMessages, current, partialAddedToContext);
                     await emit(new MessageUpdateEvent(
                         Message: current,
                         ContentDelta: null,
@@ -64,6 +73,7 @@ internal static class StreamAccumulator
 
                 case TextDeltaEvent textDelta:
                     current = MessageConverter.ToAgentMessage(textDelta.Partial);
+                    UpdateContextPartial(contextMessages, current, partialAddedToContext);
                     await emit(new MessageUpdateEvent(
                         Message: current,
                         ContentDelta: textDelta.Delta,
@@ -79,6 +89,7 @@ internal static class StreamAccumulator
 
                 case TextEndEvent textEnd:
                     current = MessageConverter.ToAgentMessage(textEnd.Partial);
+                    UpdateContextPartial(contextMessages, current, partialAddedToContext);
                     await emit(new MessageUpdateEvent(
                         Message: current,
                         ContentDelta: null,
@@ -94,6 +105,7 @@ internal static class StreamAccumulator
 
                 case ThinkingStartEvent thinkingStart:
                     current = MessageConverter.ToAgentMessage(thinkingStart.Partial);
+                    UpdateContextPartial(contextMessages, current, partialAddedToContext);
                     await emit(new MessageUpdateEvent(
                         Message: current,
                         ContentDelta: null,
@@ -109,6 +121,7 @@ internal static class StreamAccumulator
 
                 case ThinkingDeltaEvent thinkingDelta:
                     current = MessageConverter.ToAgentMessage(thinkingDelta.Partial);
+                    UpdateContextPartial(contextMessages, current, partialAddedToContext);
                     await emit(new MessageUpdateEvent(
                         Message: current,
                         ContentDelta: thinkingDelta.Delta,
@@ -124,6 +137,7 @@ internal static class StreamAccumulator
 
                 case ThinkingEndEvent thinkingEnd:
                     current = MessageConverter.ToAgentMessage(thinkingEnd.Partial);
+                    UpdateContextPartial(contextMessages, current, partialAddedToContext);
                     await emit(new MessageUpdateEvent(
                         Message: current,
                         ContentDelta: null,
@@ -139,6 +153,7 @@ internal static class StreamAccumulator
 
                 case ToolCallStartEvent toolStart:
                     current = MessageConverter.ToAgentMessage(toolStart.Partial);
+                    UpdateContextPartial(contextMessages, current, partialAddedToContext);
                     toolCallState[toolStart.ContentIndex] = ResolveToolCallIdentity(current, toolStart.ContentIndex);
                     var startedTool = toolCallState[toolStart.ContentIndex];
 
@@ -157,6 +172,7 @@ internal static class StreamAccumulator
 
                 case ToolCallDeltaEvent toolDelta:
                     current = MessageConverter.ToAgentMessage(toolDelta.Partial);
+                    UpdateContextPartial(contextMessages, current, partialAddedToContext);
                     if (!toolCallState.TryGetValue(toolDelta.ContentIndex, out var deltaTool))
                     {
                         deltaTool = ResolveToolCallIdentity(current, toolDelta.ContentIndex);
@@ -178,6 +194,7 @@ internal static class StreamAccumulator
 
                 case ToolCallEndEvent toolEnd:
                     current = MessageConverter.ToAgentMessage(toolEnd.Partial);
+                    UpdateContextPartial(contextMessages, current, partialAddedToContext);
                     toolCallState[toolEnd.ContentIndex] = (toolEnd.ToolCall.Id, toolEnd.ToolCall.Name);
 
                     await emit(new MessageUpdateEvent(
@@ -195,6 +212,7 @@ internal static class StreamAccumulator
 
                 case DoneEvent done:
                     final = MessageConverter.ToAgentMessage(done.Message);
+                    ReplacePartialWithFinal(contextMessages, final, partialAddedToContext);
                     if (!_startEmitted)
                     {
                         await emit(new MessageStartEvent(final, DateTimeOffset.UtcNow)).ConfigureAwait(false);
@@ -206,6 +224,7 @@ internal static class StreamAccumulator
 
                 case ErrorEvent error:
                     final = MessageConverter.ToAgentMessage(error.Error) with { FinishReason = error.Reason };
+                    ReplacePartialWithFinal(contextMessages, final, partialAddedToContext);
                     if (!_startEmitted)
                     {
                         await emit(new MessageStartEvent(final, DateTimeOffset.UtcNow)).ConfigureAwait(false);
@@ -224,6 +243,7 @@ internal static class StreamAccumulator
 
         var result = await stream.GetResultAsync().ConfigureAwait(false);
         final = MessageConverter.ToAgentMessage(result);
+        ReplacePartialWithFinal(contextMessages, final, partialAddedToContext);
 
         if (!_startEmitted)
         {
@@ -232,6 +252,38 @@ internal static class StreamAccumulator
 
         await emit(new MessageEndEvent(final, DateTimeOffset.UtcNow)).ConfigureAwait(false);
         return final;
+    }
+
+    private static void UpdateContextPartial(
+        IList<AgentMessage>? contextMessages,
+        AssistantAgentMessage current,
+        bool partialAddedToContext)
+    {
+        if (contextMessages is null || !partialAddedToContext || contextMessages.Count == 0)
+        {
+            return;
+        }
+
+        contextMessages[contextMessages.Count - 1] = current;
+    }
+
+    private static void ReplacePartialWithFinal(
+        IList<AgentMessage>? contextMessages,
+        AssistantAgentMessage final,
+        bool partialAddedToContext)
+    {
+        if (contextMessages is null)
+        {
+            return;
+        }
+
+        if (partialAddedToContext && contextMessages.Count > 0)
+        {
+            contextMessages[contextMessages.Count - 1] = final;
+            return;
+        }
+
+        contextMessages.Add(final);
     }
 
     private static (string? Id, string? Name) ResolveToolCallIdentity(

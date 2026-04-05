@@ -60,4 +60,43 @@ public class StreamAccumulatorTests
         var result = await StreamAccumulator.AccumulateAsync(stream, _ => Task.CompletedTask, CancellationToken.None);
         result.FinishReason.Should().Be(StopReason.Aborted);
     }
+
+    [Fact]
+    public async Task AccumulateAsync_UpdatesContextMessagesWithStreamingPartial()
+    {
+        var stream = new LlmStream();
+        var start = CreateAssistantMessage("h");
+        var partial = CreateAssistantMessage("hello");
+        var final = CreateAssistantMessage("hello world");
+        var contextMessages = new List<AgentMessage> { new BotNexus.AgentCore.Types.UserMessage("prompt") };
+
+        stream.Push(new StartEvent(start));
+        stream.Push(new TextDeltaEvent(0, "ello", partial));
+        stream.Push(new DoneEvent(StopReason.Stop, final));
+        stream.End(final);
+
+        _ = await StreamAccumulator.AccumulateAsync(
+            stream,
+            _ => Task.CompletedTask,
+            CancellationToken.None,
+            contextMessages);
+
+        contextMessages.Should().HaveCount(2);
+        contextMessages[^1].Should().BeOfType<AssistantAgentMessage>()
+            .Which.Content.Should().Be("hello world");
+    }
+
+    private static AssistantMessage CreateAssistantMessage(string content)
+    {
+        return new AssistantMessage(
+            Content: [new TextContent(content)],
+            Api: "test-api",
+            Provider: "test-provider",
+            ModelId: "test-model",
+            Usage: Usage.Empty(),
+            StopReason: StopReason.Stop,
+            ErrorMessage: null,
+            ResponseId: "resp",
+            Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+    }
 }

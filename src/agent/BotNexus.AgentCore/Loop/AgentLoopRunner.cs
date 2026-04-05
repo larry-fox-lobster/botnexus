@@ -163,6 +163,7 @@ public static class AgentLoopRunner
                 pendingMessages.Clear();
 
                 var streamOptions = await BuildStreamOptionsAsync(config, cancellationToken).ConfigureAwait(false);
+                var messageCountBeforeAssistant = messages.Count;
                 var assistantMessage = await ExecuteWithRetryAsync(
                         messages,
                         currentContext.SystemPrompt,
@@ -173,7 +174,15 @@ public static class AgentLoopRunner
                         cancellationToken)
                     .ConfigureAwait(false);
 
-                messages.Add(assistantMessage);
+                if (messages.Count > messageCountBeforeAssistant)
+                {
+                    messages[messages.Count - 1] = assistantMessage;
+                }
+                else
+                {
+                    messages.Add(assistantMessage);
+                }
+
                 newMessages.Add(assistantMessage);
 
                 if (assistantMessage.FinishReason is StopReason.Error or StopReason.Aborted)
@@ -290,13 +299,15 @@ public static class AgentLoopRunner
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            var messageCountBeforeStream = messages.Count;
             try
             {
                 var stream = config.LlmClient.StreamSimple(config.Model, providerContext, streamOptions);
-                return await StreamAccumulator.AccumulateAsync(stream, emit, cancellationToken).ConfigureAwait(false);
+                return await StreamAccumulator.AccumulateAsync(stream, emit, cancellationToken, messages).ConfigureAwait(false);
             }
             catch (Exception ex) when (ContextOverflowDetector.IsContextOverflow(ex) && !overflowRecovered)
             {
+                RestoreMessagesAfterFailedStream(messages, messageCountBeforeStream);
                 overflowRecovered = true;
                 var compacted = CompactForOverflow(messages);
                 messages.Clear();
@@ -305,6 +316,7 @@ public static class AgentLoopRunner
             }
             catch (Exception ex) when (IsTransientError(ex) && attempt < maxAttempts - 1)
             {
+                RestoreMessagesAfterFailedStream(messages, messageCountBeforeStream);
                 var delayMs = config.MaxRetryDelayMs is > 0
                     ? Math.Min(backoffMs, config.MaxRetryDelayMs.Value)
                     : backoffMs;
@@ -313,7 +325,22 @@ public static class AgentLoopRunner
                 backoffMs *= 2;
                 continue;
             }
+            catch
+            {
+                RestoreMessagesAfterFailedStream(messages, messageCountBeforeStream);
+                throw;
+            }
         }
+    }
+
+    private static void RestoreMessagesAfterFailedStream(List<AgentMessage> messages, int expectedCount)
+    {
+        if (messages.Count <= expectedCount)
+        {
+            return;
+        }
+
+        messages.RemoveRange(expectedCount, messages.Count - expectedCount);
     }
 
     private static IReadOnlyList<AgentMessage> CompactForOverflow(IReadOnlyList<AgentMessage> messages)
