@@ -43,9 +43,21 @@ public class SimpleOptionsHelperTests
         var result = SimpleOptionsHelper.BuildBaseOptions(model, null, "key");
 
         result.Temperature.Should().BeNull();
-        result.MaxTokens.Should().BeNull();
+        result.MaxTokens.Should().Be(16384);
         result.Transport.Should().Be(Transport.Sse);
         result.CacheRetention.Should().Be(CacheRetention.Short);
+    }
+
+    [Theory]
+    [InlineData(16000, 16000)]
+    [InlineData(64000, 32000)]
+    public void BuildBaseOptions_NullOptions_SetsDefaultMaxTokensToMinModelAnd32000(int modelMaxTokens, int expectedMaxTokens)
+    {
+        var model = MakeModel(maxTokens: modelMaxTokens);
+
+        var result = SimpleOptionsHelper.BuildBaseOptions(model, null, "key");
+
+        result.MaxTokens.Should().Be(expectedMaxTokens);
     }
 
     [Fact]
@@ -121,10 +133,24 @@ public class SimpleOptionsHelperTests
     }
 
     [Fact]
-    public void GetBudgetForLevel_NullBudgets_ReturnsNull()
+    public void GetBudgetForLevel_NullBudgets_UsesDefaultMediumBudget()
     {
         var result = SimpleOptionsHelper.GetBudgetForLevel(ThinkingLevel.Medium, null);
 
-        result.Should().BeNull();
+        result.Should().NotBeNull();
+        result!.ThinkingBudget.Should().Be(8192);
+    }
+
+    [Theory]
+    [InlineData(ThinkingLevel.Minimal, 1024)]
+    [InlineData(ThinkingLevel.Low, 2048)]
+    [InlineData(ThinkingLevel.Medium, 8192)]
+    [InlineData(ThinkingLevel.High, 16384)]
+    public void GetBudgetForLevel_NullBudgets_UsesDefaultThinkingLevels(ThinkingLevel level, int expectedBudget)
+    {
+        var result = SimpleOptionsHelper.GetBudgetForLevel(level, null);
+
+        result.Should().NotBeNull();
+        result!.ThinkingBudget.Should().Be(expectedBudget);
     }
 }

@@ -1,3 +1,10 @@
+using System.Net;
+using System.Reflection;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using BotNexus.Providers.Core.Compatibility;
+using BotNexus.Providers.Core.Models;
 using BotNexus.Providers.OpenAI;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -30,5 +37,62 @@ public class OpenAICompletionsProviderTests
         var stream = provider.StreamSimple(model, context);
 
         stream.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ConvertTools_SetsStrictToFalse()
+    {
+        var convertTools = typeof(OpenAICompletionsProvider).GetMethod(
+            "ConvertTools",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        convertTools.Should().NotBeNull();
+
+        var tool = new Tool(
+            "read_file",
+            "Read file",
+            JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"}}}""").RootElement.Clone());
+        var compat = new OpenAICompletionsCompat { SupportsStrictMode = true };
+
+        var converted = convertTools!.Invoke(null, [new List<Tool> { tool }, compat]) as JsonArray;
+
+        converted.Should().NotBeNull();
+        converted![0]!["function"]!["strict"]!.GetValue<bool>().Should().BeFalse();
+    }
+
+    [Fact]
+    public void ConvertMessages_SkipsEmptyAssistantWithoutToolCalls()
+    {
+        var convertMessages = typeof(OpenAICompletionsProvider).GetMethod(
+            "ConvertMessages",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        convertMessages.Should().NotBeNull();
+
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var messages = new Message[]
+        {
+            new UserMessage(new UserMessageContent("start"), timestamp),
+            new AssistantMessage(
+                Content: [],
+                Api: "openai-completions",
+                Provider: "openai",
+                ModelId: "gpt-4o",
+                Usage: Usage.Empty(),
+                StopReason: StopReason.Stop,
+                ErrorMessage: null,
+                ResponseId: null,
+                Timestamp: timestamp),
+            new UserMessage(new UserMessageContent("next"), timestamp)
+        };
+
+        var converted = convertMessages!.Invoke(
+            null,
+            [null, messages, new OpenAICompletionsCompat()]) as JsonArray;
+
+        converted.Should().NotBeNull();
+        converted!
+            .Select(node => node?["role"]?.GetValue<string>())
+            .Where(role => role is not null)
+            .Should()
+            .NotContain("assistant");
     }
 }
