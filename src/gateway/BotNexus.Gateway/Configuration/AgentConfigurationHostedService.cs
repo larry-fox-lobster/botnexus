@@ -30,7 +30,7 @@ internal sealed class AgentConfigurationHostedService(
             IReadOnlyList<AgentDescriptor> descriptors;
             try
             {
-                descriptors = await source.LoadAsync(cancellationToken);
+                descriptors = await source.LoadAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
