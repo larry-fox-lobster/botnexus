@@ -7,6 +7,23 @@
 
 ## Learnings
 
+- Created focused training deep-dive documentation (4 new files, ~2,100 lines total):
+  - `docs/training/providers.md` — IApiProvider contract, LlmClient routing, model registry, streaming event protocol (14 event types), message transformation pipeline, step-by-step new provider guide
+  - `docs/training/agent-events.md` — Agent lifecycle, 10 event types with schemas, subscribe/unsubscribe, BeforeToolCall/AfterToolCall hooks, steering/follow-up queues, error handling, abort flow
+  - `docs/training/tool-security.md` — PathUtils.ResolvePath containment, blocked paths/commands, FileMutationQueue, shell safety (timeout/process tree kill), AuditHooks, custom safety hook guide
+  - `docs/training/building-a-coding-agent.md` — CodingAgent factory, SystemPromptBuilder, IAgentTool, SessionManager (JSONL/DAG branching), IExtension, config hierarchy, minimal agent walkthrough, message flow diagram
+  - Updated `docs/training/README.md` with deep-dive table and reading path
+- Key source code patterns verified:
+  - LlmStream uses System.Threading.Channels (unbounded, single-writer)
+  - Agent enforces single-run concurrency via SemaphoreSlim
+  - ToolExecutor supports Sequential and Parallel modes; parallel preparation is still sequential
+  - PathUtils.ResolvePath uses OrdinalIgnoreCase on Windows, Ordinal on Unix
+  - FileMutationQueue uses ConcurrentDictionary<string, SemaphoreSlim> for per-path locking
+  - SafetyHooks hardcodes 3 blocked patterns; AllowedCommands is prefix-matched whitelist
+  - SessionManager uses JSONL with ParentEntryId DAG for branching
+  - BuiltInModels registers 20+ models all routing through api.individual.githubcopilot.com
+  - SimpleOptionsHelper default thinking budgets: Minimal=1024, Low=2048, Medium=8192, High=16384
+
 - Created `docs/getting-started.md` — comprehensive 13-section guide (706 lines) covering prerequisites through OpenClaw migration. Every code example, config snippet, and API endpoint verified against actual source code.
 - Key accuracy findings from source code audit:
   - Default Gateway port is **18790** (not 5000) — from `GatewayConfig.Port` default and `appsettings.json`

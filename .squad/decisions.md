@@ -7824,3 +7824,297 @@ Phase 4 adds 7 architecture decisions (P0-1 through P0-7). Running total:
 
 
 ---
+
+
+# Design Review: Port Audit Remediation
+
+# Design Review: Port Audit Remediation Plan
+
+**Date:** 2026-07-15  
+**Author:** Leela (Lead)  
+**Status:** Approved  
+**Ceremony:** Design Review — pre-implementation gate  
+**Requested by:** sytone (Jon Bullen)
+
+## Context
+
+Full audit comparing pi-mono TypeScript against BotNexus C# port across three areas:
+- **providers/ai** → BotNexus.Providers.* (63% complete)
+- **agent/agent** → BotNexus.AgentCore (85-90% complete)
+- **coding-agent** → BotNexus.CodingAgent (core tools ported, gaps remain)
+
+This document records design decisions, corrects audit misreadings, and assigns prioritized work.
+
+---
+
+## Audit Corrections
+
+Before prioritizing fixes, three audit findings were **wrong or overstated** after source review:
+
+| Finding | Audit Claim | Actual Code | Verdict |
+|---------|-------------|-------------|---------|
+| ShellTool zombie risk | Uses `Process.Kill()` without child cleanup | Uses `process.Kill(entireProcessTree: true)` — correct tree kill | **No fix needed** |
+| Compaction is count-based | Count-based only | `SessionCompactor` is hybrid: token-based primary + count fallback, with LLM summarization | **No fix needed** |
+| Missing find tool | Replaced by glob with different semantics | `GlobTool` is exposed with tool name `"find"` — semantic alignment already done | **No fix needed** |
+
+---
+
+## Priority 0 — Safety & Correctness (Fix Now)
+
+These are bugs or safety gaps that could crash production agent runs.
+
+### P0-1: Listener Exception Safety in Event Dispatch
+
+**Problem:** `Agent.HandleEventAsync()` iterates listeners with `await listener(event, ct)` but has **no try/catch**. A single misbehaving listener crashes the entire agent run. The catch blocks only exist in abort/error cleanup paths, not the main loop.
+
+**Decision:** Wrap each listener invocation in try/catch. Log via `OnDiagnostic` callback. Never let a subscriber kill the run.
+
+**Pattern:**
+```csharp
+foreach (var listener in listenersSnapshot)
+{
+    try
+    {
+        await listener(@event, cancellationToken).ConfigureAwait(false);
+    }
+    catch (Exception ex) when (ex is not OperationCanceledException)
+    {
+        _options.OnDiagnostic?.Invoke($"Listener threw: {ex.Message}");
+    }
+}
+```
+
+**Scope:** `Agent.cs` — `HandleEventAsync` method  
+**Assign:** Bender  
+**Tests:** Hermes — add test: register throwing listener, verify agent completes run  
+
+---
+
+### P0-2: Hook Exception Safety in ToolExecutor
+
+**Problem:** `BeforeToolCall` and `AfterToolCall` hooks are documented as "must not throw" but have **no actual protection**. A hook exception would propagate and kill tool execution.
+
+**Decision:** Wrap hook invocations in try/catch. On `BeforeToolCall` failure, treat as "block with error reason." On `AfterToolCall` failure, use original result.
+
+**Scope:** `ToolExecutor.cs` — `ExecutePreparedToolCallAsync`  
+**Assign:** Bender  
+**Tests:** Hermes — add test: throwing hook, verify graceful degradation  
+
+---
+
+### P0-3: PathUtils Symlink Resolution
+
+**Problem:** `PathUtils.ResolvePath()` uses `Path.GetFullPath()` which collapses `..` but **does not resolve symlinks**. A symlink inside the working directory could point outside it, bypassing containment validation.
+
+**Decision:** After `Path.GetFullPath()`, check if the target is a symlink. If so, resolve the final target and re-validate containment. Use `FileInfo.LinkTarget` or `Directory.ResolveLinkTarget(returnFinalTarget: true)` (.NET 6+).
+
+**Pattern:**
+```csharp
+var fullPath = Path.GetFullPath(combined);
+// Resolve symlinks to detect escapes
+if (File.Exists(fullPath))
+{
+    var info = new FileInfo(fullPath);
+    if (info.LinkTarget is not null)
+    {
+        var resolved = info.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? fullPath;
+        if (!resolved.StartsWith(root, comparison))
+            throw new UnauthorizedAccessException($"Symlink target escapes working directory: {relativePath}");
+    }
+}
+```
+
+**Scope:** `PathUtils.cs` — `ResolvePath()` and `SanitizePath()`  
+**Assign:** Bender  
+**Tests:** Hermes — add test: symlink pointing outside root, verify rejection  
+
+---
+
+### P0-4: Retry Delay Configuration
+
+**Problem:** `AgentLoopRunner.ExecuteWithRetryAsync` has hardcoded 500ms initial backoff, 4 max attempts, and no configurable cap. pi-mono exposes `maxRetryDelayMs` on `AgentOptions`.
+
+**Decision:** Add `MaxRetryDelayMs` (int?, default null = uncapped) to `AgentOptions` and thread it through to `AgentLoopConfig`. Apply as ceiling in backoff calculation.
+
+**Scope:** `AgentOptions.cs`, `AgentLoopConfig.cs`, `AgentLoopRunner.cs`  
+**Assign:** Bender  
+**Tests:** Hermes — add test: verify backoff respects cap  
+
+---
+
+## Priority 1 — Logic Alignment (This Sprint)
+
+These are divergences from pi-mono behavior that should be resolved for feature parity.
+
+### P1-1: StopReason Extra Values — Keep and Document
+
+**Problem:** pi-mono defines 5 StopReason values: `stop`, `length`, `toolUse`, `error`, `aborted`. BotNexus adds `Refusal` and `Sensitive`.
+
+**Decision:** **Keep both extras.** They map to real API responses:
+- `Refusal` → Anthropic and OpenAI content policy refusal
+- `Sensitive` → Azure AI content filter triggers
+
+These are C# extensions that improve signal fidelity. pi-mono would benefit from adding them too.
+
+**Action:** Add XML doc comments explaining each value's origin and when providers emit it. No code change to enum itself.
+
+**Scope:** `Enums.cs` — `StopReason` enum  
+**Assign:** Farnsworth (doc comments), Kif (training doc section)  
+
+---
+
+### P1-2: Model Registry — Add Direct Provider Models
+
+**Problem:** `BuiltInModels.cs` only registers GitHub Copilot-routed models. When using `AnthropicProvider` or `OpenAICompletionsProvider` directly (not through Copilot), there are no model definitions available.
+
+**Decision:** Add model registration blocks for:
+- **Anthropic direct**: Claude Haiku 4.5, Sonnet 4, Sonnet 4.5, Opus 4.5 (with correct API names and context windows)
+- **OpenAI direct**: GPT-4.1, GPT-4o, o3, o4-mini (with correct API names and pricing)
+
+Each block should be a separate static method: `RegisterCopilotModels()`, `RegisterAnthropicModels()`, `RegisterOpenAIModels()`. Call all three from `RegisterAll()`.
+
+**Pattern:** Break the existing monolith into per-provider registration methods. Each model should have accurate `ContextWindow`, `MaxOutputTokens`, and `Cost` from public pricing pages (not FreeCost).
+
+**Scope:** `BuiltInModels.cs`  
+**Assign:** Farnsworth  
+**Tests:** Hermes — add test: verify model counts per provider, verify key fields non-null  
+
+---
+
+### P1-3: Model Registry Method Cleanup
+
+**Problem:** `ModelRegistry.SupportsExtraHigh()` uses hardcoded model name string matching. Fragile.
+
+**Decision:** Add `SupportsExtraHighThinking` boolean property to `LlmModel` record. Set it during registration. Remove the string-matching hack.
+
+**Scope:** `LlmModel.cs`, `ModelRegistry.cs`, `BuiltInModels.cs`  
+**Assign:** Farnsworth  
+**Tests:** Hermes — update existing model tests  
+
+---
+
+### P1-4: Dual Error Message — Document the Contract
+
+**Problem:** `AgentState.ErrorMessage` and `AssistantAgentMessage.ErrorMessage` appear to be dual sources of truth.
+
+**Decision:** **No code change.** Source review confirms they are kept in sync — `Agent.cs` copies assistant-level errors to state-level on `TurnEndEvent`. This is correct behavior.
+
+**Action:** Add XML doc comments on both properties clarifying the sync contract:
+- `AssistantAgentMessage.ErrorMessage`: The per-message error from the LLM response
+- `AgentState.ErrorMessage`: Aggregated last-error from any source (LLM error, exception, abort)
+
+**Scope:** `AgentState.cs`, `AgentMessage.cs`  
+**Assign:** Farnsworth  
+
+---
+
+## Priority 2 — Deferred (Backlog)
+
+These are real gaps but out of scope for this sprint.
+
+| Item | Reason for Deferral |
+|------|-------------------|
+| **Proxy stream function** | Feature addition, not a fix. Needed when BotNexus routes through a proxy server. No current consumer. |
+| **GrepTool ripgrep adapter** | Performance improvement for large repos. Requires external binary dependency. Current .NET Regex works correctly. |
+| **Tool parameter schema validation** | TypeBox equivalent would need a JSON Schema validator library. Tools currently validate their own inputs. |
+| **System prompt structure alignment** | Current structure is functional. Cosmetic alignment can wait. |
+| **Interactive mode / session tree / RPC** | Features, not fixes. Build after core is solid. |
+| **onPayload callback exposure** | Pattern exists via ToolExecutor update callbacks. API surface adequate for now. |
+
+---
+
+## Contracts and Patterns
+
+All implementing agents **must** follow these patterns:
+
+### Commit Convention
+- Small, atomic commits with conventional commit prefixes
+- Format: `fix(scope): description` or `feat(scope): description`
+- Examples: `fix(agent): wrap listener dispatch in try/catch`, `feat(providers): add direct Anthropic model definitions`
+
+### Code Style
+- Clean, simple, broken-up — cleaner than pi-mono, not just equivalent
+- One concern per method. Extract helpers liberally.
+- XML doc comments on all public APIs
+- No commented-out code
+
+### Testing Contract
+- Every P0/P1 fix must have a corresponding test
+- Tests prove the fix works, not just that code compiles
+- Use existing test project structure (`tests/BotNexus.*.Tests/`)
+
+### Branch Strategy
+- Each P0/P1 item gets its own branch from `dev`
+- Branch naming: `fix/{scope}-{short-description}` or `feat/{scope}-{short-description}`
+
+---
+
+## Action Item Summary
+
+### Farnsworth (Platform Dev)
+| ID | Priority | Task | Files |
+|----|----------|------|-------|
+| P1-1 | P1 | StopReason XML doc comments | `Enums.cs` |
+| P1-2 | P1 | Add Anthropic + OpenAI direct model registrations, break into per-provider methods | `BuiltInModels.cs` |
+| P1-3 | P1 | Add `SupportsExtraHighThinking` to LlmModel, remove string hack | `LlmModel.cs`, `ModelRegistry.cs`, `BuiltInModels.cs` |
+| P1-4 | P1 | Document error message sync contract | `AgentState.cs`, `AgentMessage.cs` |
+
+### Bender (Runtime Dev)
+| ID | Priority | Task | Files |
+|----|----------|------|-------|
+| P0-1 | P0 | Wrap listener dispatch in try/catch | `Agent.cs` |
+| P0-2 | P0 | Wrap hook invocations in try/catch | `ToolExecutor.cs` |
+| P0-3 | P0 | Add symlink resolution to path validation | `PathUtils.cs` |
+| P0-4 | P0 | Add MaxRetryDelayMs configuration | `AgentOptions.cs`, `AgentLoopConfig.cs`, `AgentLoopRunner.cs` |
+
+### Hermes (Tester)
+| ID | Priority | Task | Scope |
+|----|----------|------|-------|
+| T-P0-1 | P0 | Test: throwing listener doesn't crash agent | `BotNexus.AgentCore.Tests` |
+| T-P0-2 | P0 | Test: throwing hook degrades gracefully | `BotNexus.AgentCore.Tests` |
+| T-P0-3 | P0 | Test: symlink outside root is rejected | `BotNexus.CodingAgent.Tests` |
+| T-P0-4 | P0 | Test: retry delay respects MaxRetryDelayMs cap | `BotNexus.AgentCore.Tests` |
+| T-P1-2 | P1 | Test: model registry counts and field validation | `BotNexus.Providers.Core.Tests` |
+
+### Kif (Documentation)
+| ID | Priority | Task | Output |
+|----|----------|------|--------|
+| D-1 | P1 | Training doc: Provider architecture and model registration | `docs/training/providers.md` |
+| D-2 | P1 | Training doc: Agent event system and safety patterns | `docs/training/agent-events.md` |
+| D-3 | P1 | Training doc: CodingAgent tool security model | `docs/training/tool-security.md` |
+| D-4 | P1 | Training doc: StopReason values and when each fires | `docs/training/stop-reasons.md` |
+
+---
+
+## Risks and Edge Cases
+
+| Risk | Mitigation |
+|------|------------|
+| Symlink resolution may break legitimate symlinked project structures (e.g., monorepo symlinks) | Only reject symlinks whose **final target** escapes root. Symlinks within root are fine. |
+| Wrapping listeners in try/catch may silently swallow important errors | Log all caught exceptions via `OnDiagnostic`. Consider adding a `ListenerErrorEvent` type in future. |
+| Adding models with real pricing may cause unexpected cost calculations in existing consumers | Default all new models to `FreeCost` initially; add real costs as a separate follow-up when billing is wired. |
+| MaxRetryDelayMs=0 could disable retries entirely | Validate: null = uncapped, values must be > 0 if set. |
+| Breaking `BuiltInModels.cs` into methods changes the static initialization pattern | Register methods are additive (ConcurrentDictionary). No ordering dependency. Safe to split. |
+
+---
+
+## Execution Order
+
+```
+Phase 1 (P0 — Safety):  Bender ships P0-1 through P0-4, Hermes tests in parallel
+Phase 2 (P1 — Alignment): Farnsworth ships P1-1 through P1-4, Hermes tests
+Phase 3 (Docs):           Kif writes training docs (can start during Phase 1)
+```
+
+All P0 items must merge before P1 work begins on overlapping files.
+
+---
+
+## Sign-off
+
+- [x] Leela (Lead) — Approved
+- [ ] Farnsworth — Acknowledged
+- [ ] Bender — Acknowledged  
+- [ ] Hermes — Acknowledged
+- [ ] Kif — Acknowledged
+
