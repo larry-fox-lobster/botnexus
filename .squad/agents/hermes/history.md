@@ -507,3 +507,9 @@ All Sprints 1-2 foundation work completed by Farnsworth and Bender. Hermes ready
 - AgentCore tests must use unique API names per test when registering providers because TestHelpers uses shared static registries across tests.
 - PathUtils symlink rejection tests should gracefully return when symlink privileges are unavailable; otherwise assert UnauthorizedAccessException for outside-root links.
 - BuiltInModels registry tests now validate Copilot + direct Anthropic/OpenAI catalogs and required model fields (Id/ContextWindow/MaxTokens).
+
+### 2026-04-05 — Gateway test specification bootstrap
+
+- New Gateway test project follows existing test conventions (net10.0, xUnit, FluentAssertions, Moq, nullable enabled) and uses skipped `[Fact]` stubs to document intended coverage before gateway interfaces exist.
+- Gateway planning now separates unit, integration, and E2E boundaries explicitly: protocol/validation logic in unit tests, host pipeline/session persistence in integration tests, and adapter-to-stream full flows in E2E.
+- Early coverage priorities are locked around agent lifecycle, session reconnect semantics, adapter normalization, isolation strategy resolution, REST contracts, and WebSocket protocol lifecycle.

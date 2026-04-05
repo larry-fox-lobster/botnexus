@@ -20,5 +20,6 @@
     <Project Path="tests/BotNexus.Providers.OpenAICompat.Tests/BotNexus.Providers.OpenAICompat.Tests.csproj" />
     <Project Path="tests/BotNexus.Providers.Copilot.Tests/BotNexus.Providers.Copilot.Tests.csproj" />
     <Project Path="tests/BotNexus.CodingAgent.Tests/BotNexus.CodingAgent.Tests.csproj" />
+    <Project Path="tests/BotNexus.Gateway.Tests/BotNexus.Gateway.Tests.csproj" />
   </Folder>
 </Solution>
