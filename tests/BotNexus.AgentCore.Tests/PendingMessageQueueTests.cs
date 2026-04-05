@@ -7,6 +7,12 @@ namespace BotNexus.AgentCore.Tests;
 public class PendingMessageQueueTests
 {
     [Fact]
+    public void QueueMode_Default_IsOneAtATime()
+    {
+        default(QueueMode).Should().Be(QueueMode.OneAtATime);
+    }
+
+    [Fact]
     public void Drain_AllMode_ReturnsAllItems()
     {
         var queue = new PendingMessageQueue(QueueMode.All);

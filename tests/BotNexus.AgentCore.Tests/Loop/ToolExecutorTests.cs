@@ -98,6 +98,36 @@ public class ToolExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ToolLookup_IsCaseSensitive()
+    {
+        var tool = new RecordingTool("ReadFile");
+        var context = new AgentContext(null, [], [tool]);
+        var assistant = CreateAssistantMessage(("t1", "readfile", "first"));
+        var config = TestHelpers.CreateTestConfig();
+
+        var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
+
+        results.Should().ContainSingle();
+        results[0].IsError.Should().BeTrue();
+        results[0].Result.Content[0].Value.Should().Contain("not registered");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ToolLookup_ExactCaseSucceeds()
+    {
+        var tool = new RecordingTool("ReadFile");
+        var context = new AgentContext(null, [], [tool]);
+        var assistant = CreateAssistantMessage(("t1", "ReadFile", "first"));
+        var config = TestHelpers.CreateTestConfig();
+
+        var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
+
+        results.Should().ContainSingle();
+        results[0].IsError.Should().BeFalse();
+        results[0].Result.Content[0].Value.Should().Be("first");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_BeforeToolCallCanBlockExecution()
     {
         var tool = new RecordingTool("echo");

@@ -117,6 +117,26 @@ public class AgentTests
     }
 
     [Fact]
+    public async Task ContinueAsync_WhenSteeringAndFollowUpQueued_DrainsSteeringBeforeFollowUp()
+    {
+        using var provider = RegisterDefaultProvider();
+        var agent = new Agent(TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api")));
+        await agent.PromptAsync("seed");
+
+        agent.Steer(new UserMessage("steer message"));
+        agent.FollowUp(new UserMessage("follow-up message"));
+
+        var firstContinue = await agent.ContinueAsync();
+        firstContinue.OfType<UserMessage>().Select(message => message.Content)
+            .Should().Contain("steer message")
+            .And.NotContain("follow-up message");
+
+        var secondContinue = await agent.ContinueAsync();
+        secondContinue.OfType<UserMessage>().Select(message => message.Content)
+            .Should().ContainSingle(message => message == "follow-up message");
+    }
+
+    [Fact]
     public async Task ClearAllQueues_RemovesPendingMessages()
     {
         using var provider = RegisterDefaultProvider();
