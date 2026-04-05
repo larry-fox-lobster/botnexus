@@ -773,3 +773,10 @@ Participated in design review ceremony for Phase 3 architecture. All ADs approve
 ### 2026-04-05 — Gateway P0 path traversal hardening
 - `FileAgentConfigurationSource.TryLoadSystemPromptFromFileAsync` now fully resolves the config directory and blocks `SystemPromptFile` paths that resolve outside that directory (including traversal and absolute escape paths), logging a dedicated path-traversal warning.
 - Added gateway tests covering traversal (`../../etc/passwd`) rejection, absolute outside-path rejection, and valid in-directory prompt loading to prevent regression.
+
+### 2026-04-06 — Phase 4 P1/P2 runtime resilience fixes
+- `src\gateway\BotNexus.Gateway\Agents\DefaultAgentCommunicator.cs`: Added async-local call-chain tracking for `CallSubAgentAsync` and `CallCrossAgentAsync`; recursive agent targeting now throws immediately instead of looping.
+- `src\gateway\BotNexus.Gateway\Agents\DefaultAgentSupervisor.cs`: Reworked create path so only one creator executes per `{agentId,sessionId}` key while all other callers await the same pending task; avoids duplicate create/log paths and redundant registry pressure.
+- `src\gateway\BotNexus.Gateway.Api\WebSocket\GatewayWebSocketHandler.cs` + `src\BotNexus.WebUI\wwwroot\app.js`: Enforced reconnection guardrails on both sides (server 429 throttling with retry hints; client exponential backoff with max retry cap).
+- `src\gateway\BotNexus.Gateway\Extensions\GatewayServiceCollectionExtensions.cs`: Platform config now loads synchronously via `PlatformConfigLoader.Load(...)` and registers through `AddOptions<PlatformConfig>()`, while `GatewayOptions` continues through options configuration.
+- Team preference reinforced: keep runtime safety guards in-place even when tests are pending/skipped, then harden behavior under build + Gateway test gates before closing the task.
