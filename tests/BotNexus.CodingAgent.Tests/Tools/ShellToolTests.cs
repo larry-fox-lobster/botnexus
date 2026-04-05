@@ -55,7 +55,7 @@ public sealed class ShellToolTests
             ["command"] = "$payload = ('a' * 52000) + 'TAIL-MARKER'; Write-Output $payload"
         });
 
-        result.Content[0].Value.Should().Contain("[Output truncated at 50000 bytes]");
+        result.Content[0].Value.Should().Contain("[Output truncated at 51200 bytes]");
         result.Content[0].Value.Should().NotContain("TAIL-MARKER");
     }
 }

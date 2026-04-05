@@ -14,7 +14,8 @@ namespace BotNexus.CodingAgent.Tools;
 /// </summary>
 public sealed class GrepTool : IAgentTool
 {
-    private const int DefaultMaxResults = 100;
+    private const int DefaultLimit = 100;
+    private const int MaxOutputBytes = 50 * 1024;
     private const int MaxLineLength = 500;
     private const int BinaryProbeBytes = 4096;
     private readonly string _workingDirectory;
@@ -39,10 +40,12 @@ public sealed class GrepTool : IAgentTool
               "properties": {
                 "pattern": { "type": "string", "description": "Search pattern (supports regex)" },
                 "path": { "type": "string", "description": "Directory or file to search (default: working directory)" },
-                "include": { "type": "string", "description": "Glob pattern to include files (e.g., *.cs, *.ts)" },
+                "glob": { "type": "string", "description": "Glob pattern to include files (e.g., *.cs, *.ts)" },
                 "ignore_case": { "type": "boolean", "description": "Perform case-insensitive matching (default: false)" },
+                "ignoreCase": { "type": "boolean", "description": "Case-insensitive matching alias." },
+                "literal": { "type": "boolean", "description": "Treat pattern as literal string (default: false)" },
                 "context": { "type": "integer", "description": "Number of lines to show before and after each match (default: 0)" },
-                "max_results": { "type": "integer", "description": "Maximum results to return (default: 100)" }
+                "limit": { "type": "integer", "description": "Maximum results to return (default: 100)" }
               },
               "required": ["pattern"]
             }
@@ -60,33 +63,49 @@ public sealed class GrepTool : IAgentTool
             throw new ArgumentException("pattern cannot be empty.");
         }
 
+        var prepared = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["pattern"] = pattern
+        };
+
+        var literal = false;
+        if (arguments.TryGetValue("literal", out var literalObj) && literalObj is not null)
+        {
+            literal = ReadBool(literalObj, "literal");
+            prepared["literal"] = literal;
+        }
+
+        var effectivePattern = literal ? Regex.Escape(pattern) : pattern;
         try
         {
-            _ = new Regex(pattern, RegexOptions.Compiled);
+            _ = new Regex(effectivePattern, RegexOptions.Compiled);
         }
         catch (ArgumentException ex)
         {
             throw new ArgumentException($"Invalid regex pattern: {ex.Message}", nameof(arguments), ex);
         }
 
-        var prepared = new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["pattern"] = pattern
-        };
-
         if (arguments.TryGetValue("path", out var pathObj) && pathObj is not null)
         {
             prepared["path"] = ReadString(pathObj, "path");
         }
 
-        if (arguments.TryGetValue("include", out var includeObj) && includeObj is not null)
+        if (arguments.TryGetValue("glob", out var globObj) && globObj is not null)
         {
-            prepared["include"] = ReadString(includeObj, "include");
+            prepared["glob"] = ReadString(globObj, "glob");
+        }
+        else if (arguments.TryGetValue("include", out var includeObj) && includeObj is not null)
+        {
+            prepared["glob"] = ReadString(includeObj, "include");
         }
 
         if (arguments.TryGetValue("ignore_case", out var ignoreCaseObj) && ignoreCaseObj is not null)
         {
             prepared["ignore_case"] = ReadBool(ignoreCaseObj, "ignore_case");
+        }
+        else if (arguments.TryGetValue("ignoreCase", out var ignoreCaseAliasObj) && ignoreCaseAliasObj is not null)
+        {
+            prepared["ignore_case"] = ReadBool(ignoreCaseAliasObj, "ignoreCase");
         }
 
         if (arguments.TryGetValue("context", out var contextObj) && contextObj is not null)
@@ -100,7 +119,17 @@ public sealed class GrepTool : IAgentTool
             prepared["context"] = contextLines;
         }
 
-        if (arguments.TryGetValue("max_results", out var maxResultsObj) && maxResultsObj is not null)
+        if (arguments.TryGetValue("limit", out var limitObj) && limitObj is not null)
+        {
+            var limit = ReadInt(limitObj, "limit");
+            if (limit <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(arguments), "limit must be greater than 0.");
+            }
+
+            prepared["limit"] = limit;
+        }
+        else if (arguments.TryGetValue("max_results", out var maxResultsObj) && maxResultsObj is not null)
         {
             var maxResults = ReadInt(maxResultsObj, "max_results");
             if (maxResults <= 0)
@@ -108,7 +137,7 @@ public sealed class GrepTool : IAgentTool
                 throw new ArgumentOutOfRangeException(nameof(arguments), "max_results must be greater than 0.");
             }
 
-            prepared["max_results"] = maxResults;
+            prepared["limit"] = maxResults;
         }
 
         return Task.FromResult<IReadOnlyDictionary<string, object?>>(prepared);
@@ -124,15 +153,17 @@ public sealed class GrepTool : IAgentTool
 
         var pattern = arguments["pattern"]?.ToString()
                       ?? throw new ArgumentException("Missing required argument: pattern.");
+        var literal = arguments.TryGetValue("literal", out var literalObj) && literalObj is bool parsedLiteral && parsedLiteral;
+        var effectivePattern = literal ? Regex.Escape(pattern) : pattern;
         var ignoreCase = arguments.TryGetValue("ignore_case", out var ignoreCaseObj) && ignoreCaseObj is bool parsedIgnoreCase && parsedIgnoreCase;
-        var regex = new Regex(pattern, ignoreCase ? RegexOptions.Compiled | RegexOptions.IgnoreCase : RegexOptions.Compiled);
+        var regex = new Regex(effectivePattern, ignoreCase ? RegexOptions.Compiled | RegexOptions.IgnoreCase : RegexOptions.Compiled);
         var contextLines = arguments.TryGetValue("context", out var contextObj) && contextObj is int parsedContext
             ? Math.Max(0, parsedContext)
             : 0;
-        var maxResults = arguments.TryGetValue("max_results", out var maxObj) && maxObj is int parsedMax
+        var maxResults = arguments.TryGetValue("limit", out var maxObj) && maxObj is int parsedMax
             ? parsedMax
-            : DefaultMaxResults;
-        var include = arguments.TryGetValue("include", out var includeObj) ? includeObj?.ToString() : null;
+            : DefaultLimit;
+        var include = arguments.TryGetValue("glob", out var includeObj) ? includeObj?.ToString() : null;
 
         var targetPath = arguments.TryGetValue("path", out var pathObj) && pathObj is not null
             ? PathUtils.ResolvePath(pathObj.ToString()!, _workingDirectory)
@@ -148,11 +179,16 @@ public sealed class GrepTool : IAgentTool
         var hadReadErrors = false;
         var matchCount = 0;
 
-        foreach (var file in EnumerateCandidateFiles(targetPath, include))
+        var candidateFiles = EnumerateCandidateFiles(targetPath, include)
+            .Where(file => !IsInsideGitDirectory(file, _workingDirectory))
+            .ToList();
+        var ignoredFiles = PathUtils.GetGitIgnoredPaths(candidateFiles, _workingDirectory);
+
+        foreach (var file in candidateFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (PathUtils.IsGitIgnored(file, _workingDirectory) || IsBinaryFile(file))
+            if (ignoredFiles.Contains(file) || IsBinaryFile(file))
             {
                 continue;
             }
@@ -226,14 +262,29 @@ public sealed class GrepTool : IAgentTool
         }
 
         var builder = new StringBuilder();
+        var outputBytes = 0;
+        var truncatedByBytes = false;
         foreach (var match in matches)
         {
-            builder.AppendLine(match);
+            var line = $"{match}{Environment.NewLine}";
+            var lineBytes = Encoding.UTF8.GetByteCount(line);
+            if (outputBytes + lineBytes > MaxOutputBytes)
+            {
+                truncatedByBytes = true;
+                break;
+            }
+
+            builder.Append(line);
+            outputBytes += lineBytes;
         }
 
         if (matchCount >= maxResults)
         {
             builder.AppendLine($"[warning] Results truncated at {maxResults} matches.");
+        }
+        if (truncatedByBytes)
+        {
+            builder.AppendLine($"[warning] Results truncated at {MaxOutputBytes} bytes.");
         }
 
         if (hadReadErrors)
@@ -299,6 +350,18 @@ public sealed class GrepTool : IAgentTool
         }
 
         return false;
+    }
+
+    private static bool IsInsideGitDirectory(string fullPath, string root)
+    {
+        var relative = Path.GetRelativePath(root, fullPath);
+        if (relative.Equals(".git", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return relative.StartsWith($".git{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) ||
+               relative.Contains($"{Path.DirectorySeparatorChar}.git{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ReadRequiredString(IReadOnlyDictionary<string, object?> arguments, string key)

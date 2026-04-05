@@ -1,3 +1,5 @@
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Text;
 using System.Text.Json;
 using BotNexus.AgentCore.Tools;
@@ -7,29 +9,13 @@ using BotNexus.Providers.Core.Models;
 
 namespace BotNexus.CodingAgent.Tools;
 
-/// <summary>
-/// Reads repository files and directories with deterministic formatting for model consumption.
-/// </summary>
-/// <remarks>
-/// <para>
-/// Contract: every resolved path must stay within the configured working directory. Traversal attempts are
-/// rejected by <see cref="PathUtils.ResolvePath(string, string)"/> before any filesystem access is attempted.
-/// </para>
-/// <para>
-/// For file reads, output uses line-numbered records (<c>N | content</c>) so follow-up edit operations can
-/// reference stable coordinates. To protect token budget and latency, reads are capped at 2000 output lines.
-/// </para>
-/// </remarks>
 public sealed class ReadTool : IAgentTool
 {
     private const int MaxOutputLines = 2000;
-    private const int MaxOutputBytes = 50_000;
+    private const int MaxOutputBytes = 50 * 1024;
+    private const int MaxImageDimension = 2000;
     private readonly string _workingDirectory;
 
-    /// <summary>
-    /// Initializes the read tool.
-    /// </summary>
-    /// <param name="workingDirectory">Repository root used for path resolution and containment checks.</param>
     public ReadTool(string workingDirectory)
     {
         _workingDirectory = string.IsNullOrWhiteSpace(workingDirectory)
@@ -37,16 +23,13 @@ public sealed class ReadTool : IAgentTool
             : Path.GetFullPath(workingDirectory);
     }
 
-    /// <inheritdoc />
     public string Name => "read";
 
-    /// <inheritdoc />
     public string Label => "Read File";
 
-    /// <inheritdoc />
     public Tool Definition => new(
         Name,
-        "Read file content with line numbers or list directory entries.",
+        "Read file content with optional offset/limit, or list directory entries.",
         JsonDocument.Parse("""
             {
               "type": "object",
@@ -55,72 +38,52 @@ public sealed class ReadTool : IAgentTool
                   "type": "string",
                   "description": "File or directory path relative to working directory."
                 },
-                "start_line": {
+                "offset": {
                   "type": "integer",
-                  "description": "Optional 1-based start line for file reads."
+                  "description": "Line number to start reading from (1-indexed)."
                 },
-                "end_line": {
+                "limit": {
                   "type": "integer",
-                  "description": "Optional 1-based inclusive end line for file reads."
+                  "description": "Maximum number of lines to read."
                 }
               },
               "required": ["path"]
             }
             """).RootElement.Clone());
 
-    /// <inheritdoc />
     public Task<IReadOnlyDictionary<string, object?>> PrepareArgumentsAsync(
         IReadOnlyDictionary<string, object?> arguments,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var path = ConvertToString(arguments.TryGetValue("path", out var rawPath) ? rawPath : null, "path");
+        var prepared = new Dictionary<string, object?>(StringComparer.Ordinal) { ["path"] = path };
 
-        if (!arguments.TryGetValue("path", out var rawPath))
+        if (arguments.TryGetValue("offset", out var rawOffset) && rawOffset is not null)
         {
-            throw new ArgumentException("Missing required argument: path.");
-        }
-
-        var path = ConvertToString(rawPath, "path");
-        var prepared = new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["path"] = path
-        };
-
-        if (arguments.TryGetValue("start_line", out var rawStart) && rawStart is not null)
-        {
-            var startLine = ConvertToInt(rawStart, "start_line");
-            if (startLine < 1)
+            var offset = ConvertToInt(rawOffset, "offset");
+            if (offset < 1)
             {
-                throw new ArgumentOutOfRangeException(nameof(arguments), "start_line must be >= 1.");
+                throw new ArgumentOutOfRangeException(nameof(arguments), "offset must be >= 1.");
             }
 
-            prepared["start_line"] = startLine;
+            prepared["offset"] = offset;
         }
 
-        if (arguments.TryGetValue("end_line", out var rawEnd) && rawEnd is not null)
+        if (arguments.TryGetValue("limit", out var rawLimit) && rawLimit is not null)
         {
-            var endLine = ConvertToInt(rawEnd, "end_line");
-            if (endLine < 1)
+            var limit = ConvertToInt(rawLimit, "limit");
+            if (limit < 1)
             {
-                throw new ArgumentOutOfRangeException(nameof(arguments), "end_line must be >= 1.");
+                throw new ArgumentOutOfRangeException(nameof(arguments), "limit must be >= 1.");
             }
 
-            prepared["end_line"] = endLine;
-        }
-
-        if (prepared.TryGetValue("start_line", out var startObj)
-            && prepared.TryGetValue("end_line", out var endObj)
-            && startObj is int start
-            && endObj is int end
-            && end < start)
-        {
-            throw new ArgumentException("end_line must be greater than or equal to start_line.");
+            prepared["limit"] = limit;
         }
 
         return Task.FromResult<IReadOnlyDictionary<string, object?>>(prepared);
     }
 
-    /// <inheritdoc />
     public async Task<AgentToolResult> ExecuteAsync(
         string toolCallId,
         IReadOnlyDictionary<string, object?> arguments,
@@ -135,23 +98,22 @@ public sealed class ReadTool : IAgentTool
 
         if (File.Exists(resolvedPath))
         {
-            if (TryGetImageMimeType(resolvedPath, out var mimeType))
+            var bytes = await File.ReadAllBytesAsync(resolvedPath, cancellationToken).ConfigureAwait(false);
+            if (TryGetImageMimeType(resolvedPath, bytes, out var mimeType))
             {
-                var bytes = await File.ReadAllBytesAsync(resolvedPath, cancellationToken).ConfigureAwait(false);
-                var base64 = Convert.ToBase64String(bytes);
-                var imageValue = $"data:{mimeType};base64,{base64}";
-                var relativeResolvedPath = PathUtils.GetRelativePath(resolvedPath, _workingDirectory);
-                var imageNote = $"Read image file '{relativeResolvedPath}' [{mimeType}] ({bytes.Length} bytes).";
+                var imagePayload = ResizeAndEncodeImage(bytes, mimeType);
+                var imageValue = $"data:{imagePayload.MimeType};base64,{imagePayload.Base64}";
                 return new AgentToolResult(
                 [
-                    new AgentToolContent(AgentToolContentType.Text, imageNote),
+                    new AgentToolContent(AgentToolContentType.Text, $"Read image file [{imagePayload.MimeType}]"),
                     new AgentToolContent(AgentToolContentType.Image, imageValue)
                 ]);
             }
 
-            var startLine = arguments.TryGetValue("start_line", out var startObj) && startObj is int start ? start : 1;
-            var endLine = arguments.TryGetValue("end_line", out var endObj) && endObj is int end ? end : int.MaxValue;
-            var content = await ReadFileAsync(resolvedPath, startLine, endLine, cancellationToken).ConfigureAwait(false);
+            var textContent = Encoding.UTF8.GetString(bytes);
+            var offset = arguments.TryGetValue("offset", out var offsetObj) && offsetObj is int parsedOffset ? parsedOffset : 1;
+            var limit = arguments.TryGetValue("limit", out var limitObj) && limitObj is int parsedLimit ? parsedLimit : (int?)null;
+            var content = ReadText(textContent, relativePath, offset, limit);
             return new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, content)]);
         }
 
@@ -164,111 +126,160 @@ public sealed class ReadTool : IAgentTool
         throw new FileNotFoundException($"Path '{relativePath}' does not exist.", resolvedPath);
     }
 
-    private static async Task<string> ReadFileAsync(
-        string fullPath,
-        int startLine,
-        int endLine,
-        CancellationToken cancellationToken)
+    private static string ReadText(string textContent, string path, int offset, int? limit)
     {
-        var output = new StringBuilder();
-        var absoluteLineNumber = 0;
-        var emittedLines = 0;
-        var emittedBytes = 0;
-        var truncationMessage = string.Empty;
-        var skippedBeforeStart = 0;
-
-        using var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        using var reader = new StreamReader(stream);
-
-        while (true)
+        var allLines = NormalizeLineEndings(textContent).Split('\n');
+        var startLineIndex = Math.Max(0, offset - 1);
+        if (startLineIndex >= allLines.Length)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
-            if (line is null)
-            {
-                break;
-            }
+            throw new InvalidOperationException($"Offset {offset} is beyond end of file ({allLines.Length} lines total).");
+        }
 
-            absoluteLineNumber++;
+        var selectedLines = limit.HasValue
+            ? allLines.Skip(startLineIndex).Take(limit.Value).ToList()
+            : allLines.Skip(startLineIndex).ToList();
 
-            if (absoluteLineNumber < startLine)
-            {
-                skippedBeforeStart++;
-                continue;
-            }
+        if (selectedLines.Count > 0 && Encoding.UTF8.GetByteCount(selectedLines[0]) > MaxOutputBytes)
+        {
+            var firstLineSize = Encoding.UTF8.GetByteCount(selectedLines[0]);
+            return $"[Line {offset} is {firstLineSize} bytes, exceeds {MaxOutputBytes} limit. Use bash to read a partial slice.]";
+        }
 
-            if (absoluteLineNumber > endLine)
-            {
-                break;
-            }
+        var output = new StringBuilder();
+        var emittedBytes = 0;
+        var emittedLines = 0;
+        var totalLines = allLines.Length;
+        var truncatedByLines = false;
+        var truncatedByBytes = false;
 
+        foreach (var line in selectedLines)
+        {
             if (emittedLines >= MaxOutputLines)
             {
-                truncationMessage = $"[Output truncated at {MaxOutputLines} lines. Use start_line={absoluteLineNumber} to continue reading.]";
+                truncatedByLines = true;
                 break;
             }
 
-            var formattedLine = $"{absoluteLineNumber} | {line}";
-            var lineBytes = Encoding.UTF8.GetByteCount($"{formattedLine}{Environment.NewLine}");
+            var text = line + Environment.NewLine;
+            var lineBytes = Encoding.UTF8.GetByteCount(text);
             if (emittedBytes + lineBytes > MaxOutputBytes)
             {
-                truncationMessage = $"[Output truncated at {MaxOutputBytes} bytes. Use start_line={absoluteLineNumber} to continue reading.]";
+                truncatedByBytes = true;
                 break;
             }
 
-            output.AppendLine(formattedLine);
+            output.Append(text);
             emittedLines++;
             emittedBytes += lineBytes;
         }
 
-        if (output.Length == 0 && skippedBeforeStart == 0)
+        var outputText = output.ToString().TrimEnd();
+        if (truncatedByLines || truncatedByBytes)
         {
-            return $"File '{fullPath}' is empty.";
+            var endLine = offset + emittedLines - 1;
+            var nextOffset = endLine + 1;
+            if (truncatedByLines)
+            {
+                outputText += $"{Environment.NewLine}{Environment.NewLine}[Showing lines {offset}-{endLine} of {totalLines}. Use offset={nextOffset} to continue.]";
+            }
+            else
+            {
+                outputText += $"{Environment.NewLine}{Environment.NewLine}[Showing lines {offset}-{endLine} of {totalLines} ({MaxOutputBytes} byte limit). Use offset={nextOffset} to continue.]";
+            }
+        }
+        else if (limit.HasValue && startLineIndex + selectedLines.Count < allLines.Length)
+        {
+            var nextOffset = startLineIndex + selectedLines.Count + 1;
+            var remaining = allLines.Length - (startLineIndex + selectedLines.Count);
+            outputText += $"{Environment.NewLine}{Environment.NewLine}[{remaining} more lines in file. Use offset={nextOffset} to continue.]";
         }
 
-        if (output.Length == 0)
-        {
-            return $"Requested range {startLine}-{endLine} returned no lines.";
-        }
-
-        if (!string.IsNullOrEmpty(truncationMessage))
-        {
-            output.AppendLine(truncationMessage);
-        }
-
-        return output.ToString().TrimEnd();
+        return outputText;
     }
 
-    private static bool TryGetImageMimeType(string fullPath, out string mimeType)
+    private static (string Base64, string MimeType) ResizeAndEncodeImage(byte[] bytes, string mimeType)
+    {
+        try
+        {
+            using var sourceStream = new MemoryStream(bytes);
+            using var image = Image.FromStream(sourceStream, useEmbeddedColorManagement: true, validateImageData: true);
+            if (image.Width <= MaxImageDimension && image.Height <= MaxImageDimension)
+            {
+                return (Convert.ToBase64String(bytes), mimeType);
+            }
+
+            var scale = Math.Min(MaxImageDimension / (double)image.Width, MaxImageDimension / (double)image.Height);
+            var width = Math.Max(1, (int)Math.Round(image.Width * scale));
+            var height = Math.Max(1, (int)Math.Round(image.Height * scale));
+            using var resized = new Bitmap(width, height);
+            using (var graphics = Graphics.FromImage(resized))
+            {
+                graphics.DrawImage(image, 0, 0, width, height);
+            }
+
+            using var outputStream = new MemoryStream();
+            resized.Save(outputStream, SelectImageFormat(mimeType));
+            return (Convert.ToBase64String(outputStream.ToArray()), mimeType);
+        }
+        catch
+        {
+            return (Convert.ToBase64String(bytes), mimeType);
+        }
+    }
+
+    private static ImageFormat SelectImageFormat(string mimeType)
+    {
+        return mimeType switch
+        {
+            "image/png" => ImageFormat.Png,
+            "image/gif" => ImageFormat.Gif,
+            "image/webp" => ImageFormat.Png,
+            _ => ImageFormat.Jpeg
+        };
+    }
+
+    private static bool TryGetImageMimeType(string fullPath, byte[] bytes, out string mimeType)
     {
         mimeType = string.Empty;
-        var extension = Path.GetExtension(fullPath);
-        if (string.IsNullOrWhiteSpace(extension))
+        var extension = Path.GetExtension(fullPath).ToLowerInvariant();
+        if (extension == ".svg")
         {
             return false;
         }
 
-        switch (extension.ToLowerInvariant())
+        if (bytes.Length >= 8 &&
+            bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 &&
+            bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A)
         {
-            case ".jpg":
-            case ".jpeg":
-                mimeType = "image/jpeg";
-                return true;
-            case ".png":
-                mimeType = "image/png";
-                return true;
-            case ".gif":
+            mimeType = "image/png";
+            return true;
+        }
+
+        if (bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
+        {
+            mimeType = "image/jpeg";
+            return true;
+        }
+
+        if (bytes.Length >= 6)
+        {
+            var header = Encoding.ASCII.GetString(bytes, 0, 6);
+            if (header is "GIF87a" or "GIF89a")
+            {
                 mimeType = "image/gif";
                 return true;
-            case ".webp":
-                mimeType = "image/webp";
-                return true;
-            case ".svg":
-                mimeType = "image/svg+xml";
-                return true;
-            default:
-                return false;
+            }
         }
+
+        if (bytes.Length >= 12 &&
+            bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
+            bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50)
+        {
+            mimeType = "image/webp";
+            return true;
+        }
+
+        return false;
     }
 
     private static string ListDirectory(string fullPath)
@@ -285,18 +296,14 @@ public sealed class ReadTool : IAgentTool
             })
             .ToList();
 
-        if (entries.Count == 0)
-        {
-            return $"Directory '{root}' is empty (within depth 2).";
-        }
+        return entries.Count == 0
+            ? $"Directory '{root}' is empty (within depth 2)."
+            : string.Join(Environment.NewLine, entries);
+    }
 
-        var builder = new StringBuilder();
-        foreach (var entry in entries)
-        {
-            builder.AppendLine(entry);
-        }
-
-        return builder.ToString().TrimEnd();
+    private static string NormalizeLineEndings(string value)
+    {
+        return value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
     }
 
     private static int GetDepth(string root, string candidate)
@@ -325,7 +332,6 @@ public sealed class ReadTool : IAgentTool
         {
             int i => i,
             long l when l is >= int.MinValue and <= int.MaxValue => (int)l,
-            double d when Math.Abs(d % 1) < double.Epsilon => checked((int)d),
             JsonElement { ValueKind: JsonValueKind.Number } element when element.TryGetInt32(out var parsedInt) => parsedInt,
             JsonElement { ValueKind: JsonValueKind.String } element when int.TryParse(element.GetString(), out var parsedText) => parsedText,
             string text when int.TryParse(text, out var parsedText) => parsedText,

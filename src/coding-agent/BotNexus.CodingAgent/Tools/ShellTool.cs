@@ -24,7 +24,8 @@ namespace BotNexus.CodingAgent.Tools;
 public sealed class ShellTool : IAgentTool
 {
     private const int DefaultTimeoutSeconds = 120;
-    private const int MaxOutputCharacters = 50000;
+    private const int MaxOutputBytes = 50 * 1024;
+    private const int MaxOutputLines = 2000;
 
     /// <inheritdoc />
     public string Name => "bash";
@@ -111,8 +112,37 @@ public sealed class ShellTool : IAgentTool
             throw new InvalidOperationException("Failed to start shell process.");
         }
 
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        var outputBuffer = new List<(long Seq, string Line)>();
+        var sequence = 0L;
+        void Append(string? text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            lock (outputBuffer)
+            {
+                outputBuffer.Add((Interlocked.Increment(ref sequence), text));
+            }
+        }
+
+        process.OutputDataReceived += (_, eventArgs) =>
+        {
+            if (eventArgs.Data is not null)
+            {
+                Append(eventArgs.Data);
+            }
+        };
+        process.ErrorDataReceived += (_, eventArgs) =>
+        {
+            if (eventArgs.Data is not null)
+            {
+                Append(eventArgs.Data);
+            }
+        };
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
 
         using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
@@ -123,8 +153,14 @@ public sealed class ShellTool : IAgentTool
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
+            var timeoutOutput = BuildOutput(outputBuffer, includeTruncationNotes: true);
             TryKill(process);
-            throw new TimeoutException($"Command timed out after {timeoutSeconds} seconds.");
+            var timeoutMessage = string.IsNullOrWhiteSpace(timeoutOutput)
+                ? $"Command timed out after {timeoutSeconds} seconds."
+                : $"Command timed out after {timeoutSeconds} seconds.{Environment.NewLine}{Environment.NewLine}{timeoutOutput}";
+            return new AgentToolResult(
+                [new AgentToolContent(AgentToolContentType.Text, timeoutMessage)],
+                new ShellToolDetails(-1, TimedOut: true, IsError: true));
         }
         catch
         {
@@ -132,24 +168,15 @@ public sealed class ShellTool : IAgentTool
             throw;
         }
 
-        var stdout = await stdoutTask.ConfigureAwait(false);
-        var stderr = await stderrTask.ConfigureAwait(false);
-
-        var outputBuilder = new StringBuilder()
-            .AppendLine($"Exit Code: {process.ExitCode}")
-            .AppendLine("--- STDOUT ---")
-            .AppendLine(stdout)
-            .AppendLine("--- STDERR ---")
-            .Append(stderr);
-
-        var output = outputBuilder.ToString();
-        if (output.Length > MaxOutputCharacters)
+        var output = BuildOutput(outputBuffer, includeTruncationNotes: true);
+        if (process.ExitCode != 0 && !string.IsNullOrWhiteSpace(output))
         {
-            output =
-                $"[Output truncated — showing last {MaxOutputCharacters} characters]\n{output[^MaxOutputCharacters..]}";
+            output = $"{output}{Environment.NewLine}{Environment.NewLine}[command exited with code {process.ExitCode}]";
         }
 
-        return new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, output)]);
+        return new AgentToolResult(
+            [new AgentToolContent(AgentToolContentType.Text, output)],
+            new ShellToolDetails(process.ExitCode, TimedOut: false, IsError: process.ExitCode != 0));
     }
 
     private static (string FileName, string Args) BuildShellInvocation(string command)
@@ -177,6 +204,50 @@ public sealed class ShellTool : IAgentTool
         {
             // Best-effort process cleanup; propagate original execution exception.
         }
+    }
+
+    private static string BuildOutput(IReadOnlyList<(long Seq, string Line)> outputBuffer, bool includeTruncationNotes)
+    {
+        var ordered = outputBuffer.OrderBy(item => item.Seq).Select(item => item.Line).ToList();
+        if (ordered.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var lineLimitReached = ordered.Count > MaxOutputLines;
+        var lines = lineLimitReached ? ordered.Take(MaxOutputLines).ToList() : ordered;
+
+        var builder = new StringBuilder();
+        var bytes = 0;
+        var bytesLimitReached = false;
+        foreach (var line in lines)
+        {
+            var text = line + Environment.NewLine;
+            var lineBytes = Encoding.UTF8.GetByteCount(text);
+            if (bytes + lineBytes > MaxOutputBytes)
+            {
+                bytesLimitReached = true;
+                break;
+            }
+
+            builder.Append(text);
+            bytes += lineBytes;
+        }
+
+        if (includeTruncationNotes)
+        {
+            if (lineLimitReached)
+            {
+                builder.AppendLine($"[Output truncated at {MaxOutputLines} lines]");
+            }
+
+            if (bytesLimitReached)
+            {
+                builder.AppendLine($"[Output truncated at {MaxOutputBytes} bytes]");
+            }
+        }
+
+        return builder.ToString().TrimEnd();
     }
 
     private static string ReadRequiredString(IReadOnlyDictionary<string, object?> arguments, string key)
@@ -207,4 +278,6 @@ public sealed class ShellTool : IAgentTool
             _ => throw new ArgumentException($"Argument '{key}' must be an integer.")
         };
     }
+
+    public sealed record ShellToolDetails(int ExitCode, bool TimedOut, bool IsError);
 }

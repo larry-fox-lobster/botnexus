@@ -8,7 +8,8 @@ namespace BotNexus.CodingAgent.Tools;
 
 public sealed class ListDirectoryTool : IAgentTool
 {
-    private const int DefaultDepth = 2;
+    private const int DefaultLimit = 500;
+    private const int MaxOutputBytes = 50 * 1024;
     private readonly string _workingDirectory;
 
     public ListDirectoryTool(string workingDirectory)
@@ -18,43 +19,41 @@ public sealed class ListDirectoryTool : IAgentTool
             : Path.GetFullPath(workingDirectory);
     }
 
-    public string Name => "list_directory";
+    public string Name => "ls";
     public string Label => "List Directory";
 
     public Tool Definition => new(
         Name,
-        "List directory entries as a formatted tree with depth control.",
+        "List directory entries in a flat sorted listing.",
         JsonDocument.Parse("""
             {
               "type": "object",
               "properties": {
                 "path": { "type": "string" },
-                "depth": { "type": "integer" },
-                "showHidden": { "type": "boolean" }
-              },
-              "required": ["path"]
+                "limit": { "type": "integer" }
+              }
             }
             """).RootElement.Clone());
 
     public Task<IReadOnlyDictionary<string, object?>> PrepareArgumentsAsync(IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var path = ReadRequiredString(arguments, "path");
-        var prepared = new Dictionary<string, object?>(StringComparer.Ordinal) { ["path"] = path };
-        if (arguments.TryGetValue("depth", out var depthObj) && depthObj is not null)
-        {
-            var depth = ReadInt(depthObj, "depth");
-            if (depth < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(arguments), "depth must be >= 0.");
-            }
+        var prepared = new Dictionary<string, object?>(StringComparer.Ordinal);
 
-            prepared["depth"] = depth;
+        if (arguments.TryGetValue("path", out var pathObj) && pathObj is not null)
+        {
+            prepared["path"] = ReadRequiredString(arguments, "path");
         }
 
-        if (arguments.TryGetValue("showHidden", out var showHiddenObj) && showHiddenObj is not null)
+        if (arguments.TryGetValue("limit", out var limitObj) && limitObj is not null)
         {
-            prepared["showHidden"] = ReadBool(showHiddenObj, "showHidden");
+            var limit = ReadInt(limitObj, "limit");
+            if (limit <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(arguments), "limit must be greater than 0.");
+            }
+
+            prepared["limit"] = limit;
         }
 
         return Task.FromResult<IReadOnlyDictionary<string, object?>>(prepared);
@@ -63,9 +62,12 @@ public sealed class ListDirectoryTool : IAgentTool
     public Task<AgentToolResult> ExecuteAsync(string toolCallId, IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken = default, AgentToolUpdateCallback? onUpdate = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var rawPath = arguments["path"]?.ToString() ?? throw new ArgumentException("Missing required argument: path.");
-        var depth = arguments.TryGetValue("depth", out var depthObj) && depthObj is int parsedDepth ? parsedDepth : DefaultDepth;
-        var showHidden = arguments.TryGetValue("showHidden", out var showHiddenObj) && showHiddenObj is bool parsedShowHidden && parsedShowHidden;
+        var rawPath = arguments.TryGetValue("path", out var pathObj) && pathObj is not null
+            ? pathObj.ToString()!
+            : ".";
+        var limit = arguments.TryGetValue("limit", out var limitObj) && limitObj is int parsedLimit
+            ? parsedLimit
+            : DefaultLimit;
 
         var resolvedPath = PathUtils.ResolvePath(rawPath, _workingDirectory);
         if (!Directory.Exists(resolvedPath))
@@ -73,83 +75,61 @@ public sealed class ListDirectoryTool : IAgentTool
             return Task.FromResult(new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, $"Path '{rawPath}' does not exist or is not a directory.")]));
         }
 
-        var rootDisplay = PathUtils.GetRelativePath(resolvedPath, _workingDirectory);
-        if (string.IsNullOrWhiteSpace(rootDisplay) || rootDisplay == ".")
-        {
-            rootDisplay = ".";
-        }
-
-        var lines = new List<string> { $"{rootDisplay}{Path.DirectorySeparatorChar}" };
-        AppendDirectoryTree(lines, resolvedPath, string.Empty, depth, showHidden, cancellationToken);
-        if (lines.Count == 1)
-        {
-            return Task.FromResult(new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, $"Directory '{rootDisplay}' is empty.")]));
-        }
-
-        return Task.FromResult(new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, string.Join(Environment.NewLine, lines))]));
-    }
-
-    private void AppendDirectoryTree(ICollection<string> lines, string currentDirectory, string prefix, int depthRemaining, bool showHidden, CancellationToken cancellationToken)
-    {
-        if (depthRemaining <= 0)
-        {
-            return;
-        }
-
-        var entries = Directory.EnumerateFileSystemEntries(currentDirectory)
-            .Where(entry => showHidden || !IsHiddenEntry(entry))
-            .Where(entry => !PathUtils.IsGitIgnored(entry, _workingDirectory))
-            .OrderBy(entry => Directory.Exists(entry) ? 0 : 1)
-            .ThenBy(entry => Path.GetFileName(entry), StringComparer.OrdinalIgnoreCase)
+        var entries = Directory.EnumerateFileSystemEntries(resolvedPath, "*", SearchOption.TopDirectoryOnly)
+            .Select(path => Path.GetFileName(path))
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        for (var index = 0; index < entries.Count; index++)
+        if (entries.Count == 0)
+        {
+            return Task.FromResult(new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, "(empty directory)")]));
+        }
+
+        var outputLines = new List<string>();
+        var outputBytes = 0;
+        var entryLimitReached = false;
+        var byteLimitReached = false;
+
+        foreach (var entry in entries)
         {
             cancellationToken.ThrowIfCancellationRequested();
-
-            var entry = entries[index];
-            var isDirectory = Directory.Exists(entry);
-            var isLast = index == entries.Count - 1;
-            var connector = isLast ? "└── " : "├── ";
-            var name = Path.GetFileName(entry);
-
-            if (isDirectory)
+            if (outputLines.Count >= limit)
             {
-                lines.Add($"{prefix}{connector}{name}{Path.DirectorySeparatorChar} [dir]");
-                var nextPrefix = isLast ? $"{prefix}    " : $"{prefix}│   ";
-                AppendDirectoryTree(lines, entry, nextPrefix, depthRemaining - 1, showHidden, cancellationToken);
-                continue;
+                entryLimitReached = true;
+                break;
             }
 
-            var size = 0L;
-            try
+            var fullPath = Path.Combine(resolvedPath, entry);
+            var formatted = Directory.Exists(fullPath) ? $"{entry}/" : entry;
+            var lineBytes = System.Text.Encoding.UTF8.GetByteCount(formatted + Environment.NewLine);
+            if (outputBytes + lineBytes > MaxOutputBytes)
             {
-                size = new FileInfo(entry).Length;
-            }
-            catch
-            {
+                byteLimitReached = true;
+                break;
             }
 
-            lines.Add($"{prefix}{connector}{name} [file, {size} bytes]");
-        }
-    }
-
-    private static bool IsHiddenEntry(string path)
-    {
-        var fileName = Path.GetFileName(path);
-        if (fileName.StartsWith(".", StringComparison.Ordinal))
-        {
-            return true;
+            outputLines.Add(formatted);
+            outputBytes += lineBytes;
         }
 
-        try
+        var output = string.Join(Environment.NewLine, outputLines);
+        var notices = new List<string>();
+        if (entryLimitReached)
         {
-            return (File.GetAttributes(path) & FileAttributes.Hidden) == FileAttributes.Hidden;
+            notices.Add($"{limit} entries limit reached");
         }
-        catch
+
+        if (byteLimitReached)
         {
-            return false;
+            notices.Add($"{MaxOutputBytes} byte limit reached");
         }
+
+        if (notices.Count > 0)
+        {
+            output = $"{output}{Environment.NewLine}{Environment.NewLine}[{string.Join(". ", notices)}]";
+        }
+
+        return Task.FromResult(new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, output)]));
     }
 
     private static string ReadRequiredString(IReadOnlyDictionary<string, object?> arguments, string key)
@@ -180,16 +160,4 @@ public sealed class ListDirectoryTool : IAgentTool
         };
     }
 
-    private static bool ReadBool(object value, string key)
-    {
-        return value switch
-        {
-            bool b => b,
-            JsonElement { ValueKind: JsonValueKind.True } => true,
-            JsonElement { ValueKind: JsonValueKind.False } => false,
-            JsonElement { ValueKind: JsonValueKind.String } element when bool.TryParse(element.GetString(), out var parsedBool) => parsedBool,
-            string text when bool.TryParse(text, out var parsedBool) => parsedBool,
-            _ => throw new ArgumentException($"Argument '{key}' must be a boolean.")
-        };
-    }
 }

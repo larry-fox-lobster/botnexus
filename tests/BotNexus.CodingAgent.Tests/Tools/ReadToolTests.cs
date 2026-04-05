@@ -92,7 +92,7 @@ public sealed class ReadToolTests : IDisposable
 
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "large.txt" });
 
-        result.Content[0].Value.Should().Contain("50000 byte limit");
+        result.Content[0].Value.Should().Contain("51200 byte limit");
         result.Content[0].Value.Should().Contain("Use offset=");
     }
 
