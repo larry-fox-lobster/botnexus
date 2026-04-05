@@ -16,8 +16,12 @@ namespace BotNexus.AgentCore;
 /// </remarks>
 public sealed class Agent
 {
+    private static readonly TransformContextDelegate IdentityTransformContext =
+        (messages, _) => Task.FromResult(messages);
+
     private readonly AgentOptions _options;
     private readonly AgentState _state;
+    private readonly TransformContextDelegate _transformContext;
     private readonly PendingMessageQueue _steeringQueue;
     private readonly PendingMessageQueue _followUpQueue;
     private readonly SemaphoreSlim _runLock = new(1, 1);
@@ -43,6 +47,7 @@ public sealed class Agent
     {
         ArgumentNullException.ThrowIfNull(options);
         _options = options;
+        _transformContext = options.TransformContext ?? IdentityTransformContext;
 
         var initial = options.InitialState;
         _state = new AgentState
@@ -545,7 +550,7 @@ public sealed class Agent
             model,
             _options.LlmClient,
             _options.ConvertToLlm,
-            _options.TransformContext,
+            _transformContext,
             _options.GetApiKey,
             BuildQueueDelegate(_steeringQueue, _options.GetSteeringMessages),
             BuildQueueDelegate(_followUpQueue, _options.GetFollowUpMessages),

@@ -161,7 +161,9 @@ public static class AgentLoopRunner
 
                 pendingMessages.Clear();
 
-                var transformedMessages = await config.TransformContext(messages, cancellationToken).ConfigureAwait(false);
+                var transformedMessages = config.TransformContext is null
+                    ? messages
+                    : await config.TransformContext(messages, cancellationToken).ConfigureAwait(false);
                 var transformedContext = new AgentContext(
                     currentContext.SystemPrompt,
                     transformedMessages,

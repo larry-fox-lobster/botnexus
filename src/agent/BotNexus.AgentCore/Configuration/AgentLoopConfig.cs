@@ -9,7 +9,7 @@ namespace BotNexus.AgentCore.Configuration;
 /// </summary>
 /// <param name="Model">The model definition used for provider calls.</param>
 /// <param name="ConvertToLlm">Converts agent messages to provider chat messages before each LLM call.</param>
-/// <param name="TransformContext">Transforms the agent message context before provider invocation (use for filtering, summarization).</param>
+/// <param name="TransformContext">Optional context transformer before provider invocation (defaults to identity passthrough).</param>
 /// <param name="GetApiKey">Resolves provider API keys on demand (called before each LLM invocation).</param>
 /// <param name="GetSteeringMessages">Provides steering messages when configured (drained at turn boundaries).</param>
 /// <param name="GetFollowUpMessages">Provides follow-up messages when configured (drained after runs complete).</param>
@@ -26,7 +26,7 @@ public record AgentLoopConfig(
     LlmModel Model,
     LlmClient LlmClient,
     ConvertToLlmDelegate ConvertToLlm,
-    TransformContextDelegate TransformContext,
+    TransformContextDelegate? TransformContext,
     GetApiKeyDelegate GetApiKey,
     GetMessagesDelegate? GetSteeringMessages,
     GetMessagesDelegate? GetFollowUpMessages,
