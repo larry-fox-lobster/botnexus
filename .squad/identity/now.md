@@ -1,25 +1,34 @@
 ---
-updated_at: 2026-04-05T21:25:00Z
-focus_area: Gateway Phase 2 — Sprint Complete, P0 Remediation Next
-active_issues: [session history thread safety P0, subscription exception handling P0, WebUI event listener leaks P0, config subsystem tests P1]
-status: phase2_sprint_complete
+updated_at: 2026-04-05T21:44:00Z
+focus_area: Gateway Phase 3 — Complete. Live integration testing next.
+active_issues: [P1 recursion guard in cross-agent, P1 redundant supervisor lookups, P1 reconnection limits, P2 sync-over-async startup, P2 config registration pattern]
+status: phase3_sprint_complete
 ---
 
 # What We're Focused On
 
-**Gateway P1 Remediation + WebUI Sprint complete.** All 9 P1 issues fixed, 1 P0 found and fixed (WebSocket history loss). 3 new projects added (WebUI, Channels.Tui, Channels.Telegram). 18 new tests. Design review A-. Next: integration testing with live Copilot provider, Phase 2 stubs expansion, shared streaming helper extraction.
+**Gateway Phase 3 complete.** 4 P0s fixed (thread safety, subscription exceptions, WebUI leaks, path traversal). 5 architecture features added (cross-agent calling, steering/queuing, isolation stubs, platform config, WebUI error states). 56 new tests (614→670). Design review B+. Consistency review Good. Next: live integration testing with Copilot provider, P1 fixes from design review.
 
 ## Current Status
 
-✅ **Sprint:** Gateway P1 remediation complete  
+✅ **Sprint:** Gateway Phase 3 complete (15 commits)  
 ✅ **Build:** 0 errors, 15 warnings (all pre-existing CodingAgent)  
-✅ **Tests:** 583 passing (155 Core + 70 Anthropic + 49 OpenAI + 29 OpenAICompat + 15 Copilot + 71 AgentCore + 146 CodingAgent + 48 Gateway)  
-✅ **P0s:** 0 open (1 found by design review, fixed same sprint)  
-✅ **P1s:** 0 open (9 fixed this sprint)
-✅ **Gateway Architecture:** A- grade, SOLID 5/5  
-✅ **New Projects:** BotNexus.WebUI, BotNexus.Channels.Tui, BotNexus.Channels.Telegram
+✅ **Tests:** 670 passing (155 Core + 70 Anthropic + 49 OpenAI + 29 OpenAICompat + 15 Copilot + 71 AgentCore + 146 CodingAgent + 135 Gateway)  
+✅ **P0s:** 0 open (4 fixed this sprint)  
+✅ **P1s:** 5 from design review (backlog)
+✅ **Gateway Architecture:** B+ grade, SOLID 5/5  
+✅ **New Features:** Cross-agent calling, steering/queuing, isolation stubs, platform config, WebUI error states
 📋 **Decisions:** 30+ architecture decisions locked  
 📋 **Port audit:** 5 phases complete + remediation
+
+## Completed — Gateway Phase 3 Sprint (P0 Remediation + Architecture Gaps)
+
+- **Bender:** Fixed 4 P0s (thread-safe history, subscription exceptions, path traversal security fix) + implemented cross-agent calling + steering/queuing. 6 commits.
+- **Fry:** Fixed P0 WebUI event listener leaks + added error states, loading indicators, reconnection. 2 commits.
+- **Hermes:** 56 new tests (config subsystem + integration tests for cross-agent, steering, isolation, platform config, thread safety). Gateway 79→135. 2 commits.
+- **Farnsworth:** Isolation strategy stubs (sandbox, container, remote) + platform configuration system. 2 commits.
+- **Leela:** Design review B+. Found 1 P0 (path traversal, fixed same sprint), 5 P1s.
+- **Nibbler:** Consistency review "Good". 2 P1s fixed, 3 P2s logged.
 
 ## Completed — Gateway P1 Remediation + WebUI Sprint
 
@@ -76,91 +85,21 @@ status: phase2_sprint_complete
 - Full CLI flag parity, slash command parity
 
 ## Next Sprint Priorities
-1. **Integration testing** — Live test with Copilot provider, validate WebUI end-to-end
-2. **Shared streaming helper** — Extract duplicated streaming→history logic (GatewayHost + WebSocketHandler)
+1. **Live integration testing** — Test with Copilot provider via `.botnexus-agent/auth.json`, validate WebUI end-to-end
+2. **P1 fixes from design review** — Recursion guard in cross-agent, redundant supervisor lookups, reconnection limits
 3. **ApiKeyGatewayAuthHandler** — Multi-tenant API key support
 4. **decisions.md archival** — Rotate old entries to decisions-archive.md
 5. **Missing providers** — Google, Bedrock, Azure, Mistral, Codex stubs
-
-## Key Architecture Decisions (Locked)
-
-| ID | Decision | Rationale |
-|----|----------|-----------|
-| AD-1 | AgentSession = composition wrapper over Agent + SessionManager | Keep Agent as pure execution engine, no persistence concerns |
-| AD-2 | No IsRunning property — use `Status == Running` | Single source of truth via existing enum |
-| AD-3 | Compaction via Agent.Subscribe on TurnEndEvent | Mode-agnostic; fixes non-interactive compaction gap |
-| AD-4 | detectCompat: dictionary + registration hook | Data-driven, extensible without editing detector |
-| AD-5 | Strict mode: simple value flip | Bug not design gap |
-| AD-6 | Thinking budgets aligned to pi-mono + Opus guard | Quality + safety |
-| AD-7 | Cut-point walks backward to respect tool pairs | Prevents hallucinated tool results |
-| AD-8 | convertToLlm maps SystemAgentMessage | Compaction summaries must survive |
-| AD-9 | DefaultMessageConverter in AgentCore | Centralized message conversion for compaction and cross-model replay |
-| AD-10 | --thinking CLI + runtime management | User-facing thinking level control with session persistence |
-| AD-11 | ListDirectoryTool | Structured directory listing for agent context gathering |
-| AD-12 | ContextFileDiscovery | Automatic discovery of .context.md files for project knowledge |
-| AD-13 | OpenRouter/Vercel routing — DEFERRED | YAGNI: no provider exists yet |
-| AD-14 | Session model/thinking change entries | Metadata tracking for model and thinking level changes |
-| AD-15 | ModelRegistry SupportsExtraHigh + ModelsAreEqual | Identity and capability utilities for model comparison |
-| AD-16 | maxRetryDelayMs — ALREADY PRESENT | Verified existing implementation is sufficient |
-| AD-17 | /thinking slash command | Interactive thinking level control via slash command |
-| P0-1 | EditTool — DiffPlex for unified diff | Proper library vs hand-rolled; fixes token-wasting full-file diffs |
-| P0-2 | ShellTool — Git Bash detection on Windows | Bash semantics parity with TS; PowerShell fallback with warning |
-| P0-3 | Byte limit 50×1024 across all tools | Alignment with TS reference |
-| P0-4 | ModelsAreEqual — Id+Provider only | BaseUrl is transport, not identity |
-| P0-5 | StopReason — map dead values from providers | Wire up Refusal/Sensitive from provider responses |
-| P0-6 | Agent.cs — log swallowed listener exceptions | Diagnostic callback instead of bare catch |
-| P0-7 | MessageStartEvent — defer add to MessageEnd | Prevents partial messages in state during streaming |
-
-## What's Done — Full Context
-
-### Gateway Service Architecture (This Session)
-- 5 projects audited (Abstractions, Gateway, Gateway.Api, Gateway.Sessions, Channels.Core)
-- 11 interfaces verified
-- SOLID compliance: 5/5 pass (SRP, OC, LSP, ISP, DIP)
-- Extension model works (IIsolationStrategy, IChannelAdapter, ISessionStore, IGatewayAuthHandler)
-- Design review: A- grade (1 real bug P1-1)
-- Consistency review: 0 P0, 4 P1, 7 P2 (all actionable)
-- 5 P1 items roadmapped for remediation
-- 30 tests all passing
-
-### Port Audit Phase 5 (15 commits, 5 agents)
-- 153 findings triaged from 3 subsystems (Providers, AgentCore, CodingAgent)
-- 8 P0/P1 fixes implemented (3 P0, 5 P1)
-- 21 new tests added (480 → 501)
-- Architecture grade: **A**
-- Design review gate filtered 2 false positives
-
-### Port Audit Phases 1-4 (58+ commits total)
-- Phase 4: 7 P0s fixed, 16 new tests (422 → 438) — **A** grade
-- Phase 3: 9 ADs implemented, 43 new tests (372 → 415) — **A** grade
-- Phase 2: 15 P0s + 14 P1s fixed, 372 tests, 8 ADs locked — **A** grade
-- Phase 1: 10 P0s fixed, 101 new tests (250 → 350), training docs — **A−** grade
-
-### Previous Milestones
-- ✓ Archive phase (old projects moved)
-- ✓ CodingAgent built (4 sprints, 25 commits)
-- ✓ Skills system implemented
-- ✓ OAuth token resilience + config safety
-- ✓ Full port audit complete (5 phases, ~95 findings resolved)
-
-## Key Artifacts
-
-- `.squad/decisions/inbox/leela-retro-port-audit-phase4.md` — Phase 4 retrospective
-- `.squad/decisions/inbox/leela-design-review-phase4.md` — Phase 4 architecture decisions
-- `.squad/decisions/inbox/leela-retro-port-audit-phase-3.md` — Phase 3 retrospective
-- `.squad/decisions/inbox/leela-retro-port-audit-sprint-2.md` — Phase 2 retrospective
-- `.squad/decisions/inbox/leela-design-review-port-audit-2.md` — Phase 2 architecture decisions
-- `.squad/decisions/inbox/leela-port-audit-sprint-complete.md` — Phase 1 completion
-- `docs/training/` — 10-module training guide with glossary
 
 ## Team Status
 
 | Agent | Role | Current Work | Status |
 |-------|------|--------------|--------|
-| Leela | Lead / Architect | Design reviews, decisions, sprint planning | ✅ Gateway design review complete |
-| Bender | Runtime Dev | Core fixes, retry loops, streaming | ⏸ Ready for P1 fixes (P1-1, P1-2, P1-3, P1-4) |
-| Hermes | Tester | Test authoring, cleanup, coverage | ⏸ Ready for test file renames + sealed modifiers |
-| Farnsworth | Platform Dev | Provider integration, DI setup | ⏸ Ready for Phase 2 stubs if scheduled |
-| Nibbler | Consistency Reviewer | Code review, naming, patterns | ✅ Gateway consistency review complete |
-| Kif | Documentation | Training modules, docs | — |
-| Scribe | Memory Manager | Logs, decisions, orchestration | ✅ Session log + decision merge complete |
+| Leela | Lead / Architect | Design review B+ complete | ✅ Ready for next sprint |
+| Bender | Runtime Dev | P0s fixed, cross-agent + steering done | ✅ Ready for P1 fixes |
+| Hermes | Tester | 56 new tests, Gateway at 135 | ✅ Ready for live integration |
+| Farnsworth | Platform Dev | Isolation stubs + platform config done | ✅ Ready |
+| Fry | Web Dev | WebUI error states + reconnection done | ✅ Ready for live testing |
+| Nibbler | Consistency Reviewer | Phase 3 review complete | ✅ Ready |
+| Kif | Documentation | — | ⏸ Waiting for code stabilization |
+| Scribe | Memory Manager | — | ✅ Ready |
