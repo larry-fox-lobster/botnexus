@@ -176,7 +176,7 @@ public sealed class InteractiveLoopTests : IDisposable
 
         var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{session.Id}.jsonl");
         var lines = await File.ReadAllLinesAsync(sessionPath);
-        lines.Count(line => line.Contains("\"key\":\"leaf\"", StringComparison.Ordinal)).Should().Be(2);
+        lines.Count(line => line.Contains("\"key\":\"leaf\"", StringComparison.Ordinal)).Should().Be(1);
     }
 
     [Fact]

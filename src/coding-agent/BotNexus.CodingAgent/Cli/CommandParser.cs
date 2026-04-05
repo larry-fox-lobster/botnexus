@@ -13,6 +13,7 @@ public sealed class CommandParser
         string? model = null;
         string? provider = null;
         string? resume = null;
+        string? explicitPrompt = null;
         ThinkingLevel? thinkingLevel = null;
         var thinkingSpecified = false;
         var nonInteractive = false;
@@ -32,6 +33,9 @@ public sealed class CommandParser
                     break;
                 case "--resume":
                     resume = ReadValue(args, ref index, "--resume");
+                    break;
+                case "--prompt":
+                    explicitPrompt = ReadValue(args, ref index, "--prompt");
                     break;
                 case "--thinking":
                     thinkingSpecified = true;
@@ -53,9 +57,11 @@ public sealed class CommandParser
             }
         }
 
-        var prompt = positional.Count == 0
-            ? null
-            : string.Join(' ', positional).Trim();
+        var prompt = !string.IsNullOrWhiteSpace(explicitPrompt)
+            ? explicitPrompt.Trim()
+            : positional.Count == 0
+                ? null
+                : string.Join(' ', positional).Trim();
 
         return new CommandOptions(
             Model: model,
@@ -81,6 +87,7 @@ public sealed class CommandParser
                  --model <model>          Override model id
                  --provider <provider>    Override provider id
                  --resume <session-id>    Resume an existing session
+                 --prompt <text>          Prompt text (alternative to positional argument)
                  --thinking <level>       Set reasoning level: off|minimal|low|medium|high|xhigh
                  --non-interactive        Run one prompt and exit
                  --verbose                Enable verbose logs

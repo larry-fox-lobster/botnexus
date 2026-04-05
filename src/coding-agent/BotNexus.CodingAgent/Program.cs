@@ -52,7 +52,8 @@ internal static class Program
         var extensionRunner = new ExtensionRunner(extensionLoadResult.Extensions);
         var skills = new SkillsLoader().LoadSkills(workingDirectory, config);
         var sessionManager = new SessionManager();
-        var output = new OutputFormatter();
+        var nonInteractive = command.NonInteractive || !string.IsNullOrWhiteSpace(initialPrompt);
+        var output = new OutputFormatter(nonInteractive);
 
         SessionInfo session;
         IReadOnlyList<AgentMessage> resumedMessages = [];

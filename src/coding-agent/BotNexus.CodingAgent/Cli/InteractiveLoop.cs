@@ -74,7 +74,6 @@ public sealed class InteractiveLoop
                     await CompactIfNeededAsync(agent, config, llmClient, authManager, extensionRunner, sessionCompactor, eventCt).ConfigureAwait(false);
                     output.WriteTurnSeparator();
                     currentSession = UpdateSessionSnapshot(currentSession, agent);
-                    await sessionManager.SaveSessionAsync(currentSession, agent.State.Messages).ConfigureAwait(false);
                     writeLineBeforePrompt = false;
                     break;
             }

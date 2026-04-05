@@ -16,6 +16,8 @@ public sealed class SessionManager
         WriteIndented = false
     };
 
+    private readonly SemaphoreSlim _fileLock = new(1, 1);
+
     public async Task<SessionInfo> CreateSessionAsync(string workingDir, string? name, string? parentSessionId = null)
     {
         var root = GetSessionsRoot(workingDir);
@@ -56,7 +58,10 @@ public sealed class SessionManager
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(messages);
 
-        var state = await LoadSessionStateAsync(session.Id, session.WorkingDirectory, session.SessionFilePath).ConfigureAwait(false);
+        await _fileLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var state = await LoadSessionStateAsync(session.Id, session.WorkingDirectory, session.SessionFilePath).ConfigureAwait(false);
         var now = DateTimeOffset.UtcNow;
 
         var targetLeaf = session.ActiveLeafId;
@@ -100,6 +105,11 @@ public sealed class SessionManager
         };
 
         await PersistStateAsync(state).ConfigureAwait(false);
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
     }
 
     public async Task<SessionInfo> WriteMetadataAsync(SessionInfo session, string key, string? value)
@@ -110,23 +120,31 @@ public sealed class SessionManager
             throw new ArgumentException("Metadata key cannot be empty.", nameof(key));
         }
 
-        var state = await LoadSessionStateAsync(session.Id, session.WorkingDirectory, session.SessionFilePath).ConfigureAwait(false);
-        var now = DateTimeOffset.UtcNow;
-
-        state.MetadataEntries.Add(new MetadataEntry(
-            Type: "metadata",
-            Timestamp: now,
-            Key: key.Trim(),
-            Value: value));
-
-        state.Header = state.Header with
+        await _fileLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            Name = session.Name,
-            UpdatedAt = now
-        };
+            var state = await LoadSessionStateAsync(session.Id, session.WorkingDirectory, session.SessionFilePath).ConfigureAwait(false);
+            var now = DateTimeOffset.UtcNow;
 
-        await PersistStateAsync(state).ConfigureAwait(false);
-        return session with { UpdatedAt = now };
+            state.MetadataEntries.Add(new MetadataEntry(
+                Type: "metadata",
+                Timestamp: now,
+                Key: key.Trim(),
+                Value: value));
+
+            state.Header = state.Header with
+            {
+                Name = session.Name,
+                UpdatedAt = now
+            };
+
+            await PersistStateAsync(state).ConfigureAwait(false);
+            return session with { UpdatedAt = now };
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
     }
 
     public async Task<(SessionInfo Session, IReadOnlyList<AgentMessage> Messages)> ResumeSessionAsync(string sessionId, string workingDir)
@@ -388,8 +406,16 @@ public sealed class SessionManager
 
     private static async Task<SessionState?> LoadJsonlStateAsync(string filePath)
     {
-        var lines = await File.ReadAllLinesAsync(filePath).ConfigureAwait(false);
-        if (lines.Length == 0)
+        await using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var lines = new List<string>();
+        string? currentLine;
+        while ((currentLine = await reader.ReadLineAsync().ConfigureAwait(false)) is not null)
+        {
+            lines.Add(currentLine);
+        }
+
+        if (lines.Count == 0)
         {
             return null;
         }
@@ -519,7 +545,7 @@ public sealed class SessionManager
             Directory.CreateDirectory(directory);
         }
 
-        await using var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+        await using var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.Read);
         await using var writer = new StreamWriter(stream, new UTF8Encoding(false));
         foreach (var entry in entries)
         {
