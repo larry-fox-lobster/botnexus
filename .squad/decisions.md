@@ -5422,3 +5422,1162 @@ $ botnexus-agent config init
 
 ---
 
+---
+
+## bender-codingagent-audit.md
+
+# CodingAgent Alignment Audit
+
+**Auditor:** Bender (Runtime Dev)
+**Date:** 2025-07-18
+**Scope:** `src/coding-agent/BotNexus.CodingAgent/` vs `@mariozechner/pi-coding-agent` (badlogic/pi-mono)
+
+## Summary
+
+**5/10 areas aligned, 2 partial, 3 gaps found.**
+
+BotNexus has solid coverage of the core coding-agent loop — tools, config, sessions, system prompt, and CLI all exist and function. The major gaps are in the extension API richness (pi-mono has 100+ event types, custom commands, provider registration, UI widgets vs our DLL-based tool-only extensions), the lack of an RPC/JSON streaming mode, and missing session branching/compaction. The built-in tools are functionally equivalent with minor schema differences.
+
+---
+
+## Detailed Findings
+
+### 1. Built-in Tools — ⚠️ Partial
+
+**pi-mono (7 tools):**
+- `read` — Read file (text + image support with auto-resize, offset/limit pagination, syntax highlighting)
+- `write` — Write file (auto-create dirs, abort support, file mutation queue for serialization)
+- `edit` — Multi-edit in one call (`edits[]` array), fuzzy matching fallback (smart-quote normalization, whitespace), overlap detection, BOM handling, line-ending preservation
+- `bash` — Shell execution with streaming output, rolling buffer, temp-file for large output, process-tree kill, abort signal, pluggable `BashOperations` for remote exec (e.g. SSH)
+- `find` — Glob via `fd` binary (auto-downloads), .gitignore respect, hidden files, 1000-result limit
+- `grep` — Regex/literal via `ripgrep` binary (auto-downloads), context lines, JSON output parsing, 100-match limit, 500-char line truncation
+- `ls` — Directory listing with type indicators, hidden files, 500-entry limit
+
+**BotNexus (5 tools):**
+- `ReadTool` — Read file with line numbers or list directory (depth ≤ 2). No image support, no offset/limit pagination.
+- `WriteTool` — Full-file write, auto-create dirs. No mutation queue, no abort support.
+- `EditTool` — Single `old_str`→`new_str` replacement per call. Strict exact match only (no fuzzy). Line-ending preservation. Returns ±120 char context snippet.
+- `ShellTool` — Platform-aware (PowerShell on Windows, bash on Unix). 120s default timeout. Captures stdout/stderr separately. 10,000-char output cap.
+- `GlobTool` — Built-in .NET glob + .gitignore filtering via `git check-ignore`. Returns sorted relative paths.
+
+**Gaps:**
+| Feature | pi-mono | BotNexus | Status |
+|---------|---------|----------|--------|
+| `grep` tool | ✅ ripgrep-backed | ❌ Missing | **Gap** |
+| `ls` tool | ✅ Dedicated | ⚠️ ReadTool handles dirs | Partial |
+| Image reading | ✅ jpg/png/gif/webp with resize | ❌ Text only | **Gap** |
+| Multi-edit per call | ✅ `edits[]` array | ❌ Single replacement | **Gap** |
+| Fuzzy edit matching | ✅ Normalized whitespace/quotes | ❌ Exact only | **Gap** |
+| Edit overlap detection | ✅ Validates non-overlapping | ❌ N/A (single edit) | **Gap** |
+| Streaming shell output | ✅ Rolling buffer + partial updates | ❌ Waits for completion | **Gap** |
+| Shell output to temp file | ✅ Auto-saves when >50KB | ❌ Truncates at 10K chars | **Gap** |
+| File mutation queue | ✅ Serializes per-file writes | ❌ No serialization | Gap |
+| Pluggable operations | ✅ All tools support remote backends | ❌ Local only | Gap |
+| Tool truncation limits | ✅ Configurable (2000 lines/50KB) | ⚠️ Fixed (2000 lines/10K chars) | Partial |
+| `fd`/`rg` binary management | ✅ Auto-downloads | ❌ Uses .NET built-in | N/A (design choice) |
+
+**Action:**
+- P1: Add a `GrepTool` (search file contents by pattern). This is the most impactful missing tool.
+- P1: Support multi-edit per call in `EditTool` (accept `edits[]` array).
+- P2: Add fuzzy matching fallback to `EditTool` (smart-quote, whitespace normalization).
+- P2: Increase shell output cap and consider streaming or temp-file for large output.
+- P3: Add image file reading support to `ReadTool`.
+
+---
+
+### 2. Agent Factory — ✅ Aligned
+
+**pi-mono (`main.ts`):**
+1. Parse CLI args → resolve session (create/resume/fork/no-session)
+2. Create cwd-bound services (settings, model registry, resource loader, extension runner)
+3. Build session options (model, thinking level, tools from CLI/config)
+4. Create `AgentSessionRuntime` wrapping session + services
+5. Resolve app mode (interactive/print/json/rpc)
+6. Prepare initial message from args/stdin/files
+7. Dispatch to mode handler
+
+**BotNexus (`CodingAgent.CreateAsync` + `Program.Main`):**
+1. Parse CLI args via `CommandParser`
+2. Load config, extensions, skills
+3. Create/resume session via `SessionManager`
+4. `CodingAgent.CreateAsync()`:
+   - Validates config & directory
+   - Creates 5 built-in tools + extension tools
+   - Gathers git context (branch, status, package manager)
+   - Builds system prompt via `SystemPromptBuilder`
+   - Resolves model from registry or creates new
+   - Wires hooks (SafetyHooks + AuditHooks)
+   - Returns configured `Agent` with sequential tool execution
+5. Run interactive or single-shot mode
+
+**Gap:** Flow is structurally equivalent. pi-mono has more granular service injection (ModelRegistry, ResourceLoader, ExtensionRunner as separate services). BotNexus wires everything inside the static factory. Both produce a configured agent ready to run.
+
+**Action:** No immediate action needed. Consider extracting services into a DI container if the factory grows.
+
+---
+
+### 3. System Prompt — ⚠️ Partial
+
+**pi-mono (`system-prompt.ts`):**
+- Dynamically assembles from: tool snippets, guidelines (adaptive based on which tools are enabled), documentation links (pi docs, extensions, themes, skills), project context files, skills (XML-formatted `<available_skills>`), working directory + date
+- Supports `customPrompt` (full override) and `appendSystemPrompt` (additive)
+- Guidelines adjust to available tools (e.g., "Prefer grep/find/ls over bash" only when grep/find are enabled)
+- Includes pi self-documentation references
+
+**BotNexus (`SystemPromptBuilder`):**
+- Static markdown template with sections: Environment, Tool Guidelines, Skills, Custom Instructions
+- Includes: OS description, working directory, git branch/status, package manager, tool names
+- Skills injected as raw markdown content
+- Custom instructions from config appended
+- No tool-adaptive guidelines, no context files, no documentation links
+
+**Gap:**
+| Feature | pi-mono | BotNexus | Status |
+|---------|---------|----------|--------|
+| Tool-adaptive guidelines | ✅ Adjusts to enabled tools | ❌ Static guidelines | **Gap** |
+| Context files | ✅ Loaded from project | ❌ None | **Gap** |
+| Custom prompt override | ✅ `customPrompt` | ❌ Only append | **Gap** |
+| Skills formatting | ✅ XML `<available_skills>` | ⚠️ Raw markdown | Partial |
+| Documentation references | ✅ Self-doc links | ❌ None | Gap |
+| Date injection | ✅ Current date | ❌ None | Gap |
+
+**Action:**
+- P2: Add context-file loading (`.botnexus-agent/context/*.md` or similar).
+- P2: Add `customPrompt` override option to config.
+- P3: Format skills as structured XML instead of raw markdown.
+- P3: Add current date to system prompt.
+
+---
+
+### 4. Configuration — ✅ Aligned
+
+**pi-mono (`config.ts`):**
+- Base directory: `~/.pi/agent/` (or `$PI_CODING_AGENT_DIR`)
+- Subdirectories: `models.json`, `auth.json`, `settings.json`, `tools/`, `bin/`, `prompts/`, `skills/`, `sessions/`, themes
+- Runtime detection (Bun binary vs Node.js vs tsx) for package asset resolution
+- Environment variables: `PI_PACKAGE_DIR`, `PI_OFFLINE`, `PI_SKIP_VERSION_CHECK`
+
+**BotNexus (`CodingAgentConfig`):**
+- Base directory: `.botnexus-agent/` (project-local)
+- Global override: `~/.botnexus/coding-agent.json`
+- Local override: `.botnexus-agent/config.json`
+- Subdirectories: `sessions/`, `extensions/`, `skills/`
+- Properties: Model, Provider, ApiKey, MaxToolIterations, MaxContextTokens, AllowedCommands, BlockedPaths, Custom dict
+- `Load()` merges: defaults → global → local
+
+**Gap:** Both have layered config resolution. pi-mono separates auth/models/settings into separate files; BotNexus uses a single config document. pi-mono has more environment variable support. BotNexus has `AllowedCommands` and `BlockedPaths` safety config that pi-mono lacks (safety is handled differently in pi-mono via the bash spawn hook).
+
+**Action:** No blockers. Config structures serve their respective designs well.
+
+---
+
+### 5. Session Management — ⚠️ Partial
+
+**pi-mono (`session-manager.ts` + `agent-session-runtime.ts`):**
+- JSONL format with versioned headers (V1→V2→V3 migrations)
+- Entry types: message, thinking_level_change, model_change, compaction, branch_summary, custom, custom_message, label, session_info
+- **Branching:** Tree structure via `parentId` chains. `fork()` creates branch from any entry.
+- **Compaction:** Summarizes old messages when context exceeds threshold. Records `CompactionEntry` with token counts.
+- **Runtime switching:** `switchSession()`, `newSession()`, `fork()`, `importFromJsonl()`
+- Extension lifecycle events on session operations
+- Session tree reconstruction via `getTree()`, `buildSessionContext()`
+
+**BotNexus (`SessionManager`):**
+- JSONL messages + separate `session.json` metadata
+- Storage: `.botnexus-agent/sessions/{id}/session.json` + `messages.jsonl`
+- CRUD: create, save, resume, list, delete
+- Message serialization via `MessageEnvelope` with type discriminator
+- Session ID: `yyyyMMdd-HHmmss-{hex}`
+
+**Gap:**
+| Feature | pi-mono | BotNexus | Status |
+|---------|---------|----------|--------|
+| Session branching/forking | ✅ Tree structure + fork from entry | ❌ Linear only | **Gap** |
+| Compaction | ✅ Auto-compact on token overflow | ❌ None | **Gap** |
+| Version migration | ✅ V1→V2→V3 schema evolution | ❌ No versioning | Gap |
+| Entry types | ✅ 10+ types (model change, label, etc.) | ⚠️ 4 message types | Partial |
+| Runtime session switching | ✅ Switch/new/fork at runtime | ❌ Single session per run | **Gap** |
+| Extension events on session ops | ✅ before_switch, before_fork, shutdown | ❌ None | Gap |
+
+**Action:**
+- P1: Add compaction (summarize old messages when context grows too large). This is critical for long sessions.
+- P2: Add session branching/forking.
+- P2: Add version header to session format for future migrations.
+- P3: Add session switching at runtime.
+
+---
+
+### 6. Hooks — ✅ Aligned
+
+**pi-mono:**
+- Extension event system with 100+ event types
+- Key hooks: `BashSpawnHook` (modify command/cwd/env before execution), tool-specific events (`BashToolCallEvent`, `ReadToolCallEvent`, etc.), session lifecycle events
+- Hooks are registered via `api.on(event, handler)` — extensible, event-driven
+- No built-in "safety hooks" — safety is handled by bash spawn hook and extension events
+
+**BotNexus:**
+- `SafetyHooks.ValidateAsync()` — before-tool-call validation:
+  - Path blocking (write/edit tools check `BlockedPaths`)
+  - Large write warnings (>1MB)
+  - Shell command allowlisting (`AllowedCommands`) and dangerous-pattern blocking
+- `AuditHooks.AuditAsync()` — after-tool-call logging:
+  - Tool call counting, duration tracking, verbose audit output
+
+**Gap:** Different paradigms. pi-mono uses an event-driven extension system where any extension can hook any event. BotNexus uses purpose-built safety + audit hooks wired directly in the factory. BotNexus's approach is simpler but less extensible. However, BotNexus has **stronger built-in safety** (path blocking, command allowlisting, dangerous pattern detection) that pi-mono delegates entirely to extensions.
+
+**Action:** The current hook system is functionally sound and arguably safer by default. When the extension system is enriched (see §8), hooks should migrate to the event-driven model. No immediate action.
+
+---
+
+### 7. CLI — ⚠️ Partial
+
+**pi-mono (`cli.ts` + `cli/args.ts` + modes):**
+- **Modes:** interactive (full TUI), print (single-shot text), json (event stream JSONL), rpc (JSON-RPC 2.0 on stdin/stdout)
+- **Args:** 30+ flags including `--model`, `--provider`, `--thinking`, `--tools`, `--extensions`, `--skills`, `--system-prompt`, `--append-system-prompt`, `--session`, `--resume`, `--continue`, `--fork`, `--no-session`, `--export`, `--verbose`, `--offline`, `--list-models`
+- **Extension flags:** Unknown `--flag-name` args passed to extensions via `unknownFlags`
+- **File args:** `@filename` syntax to load content from files
+- **Model cycling:** `--models pattern1,pattern2` for multi-model rotation
+- **Package manager CLI:** Install/remove/update extensions, list, config TUI
+
+**BotNexus (`CommandParser` + `InteractiveLoop`):**
+- **Modes:** interactive (readline loop), non-interactive (single prompt)
+- **Args:** `--model`, `--provider`, `--resume`, `--non-interactive`, `--verbose`, `--help`
+- **Interactive commands:** `/quit`, `/exit`, `/clear`, `/session`, `/help`, `/model <name>`
+- **Output formatting:** Colored console output (welcome, tool start/end, errors, separators)
+
+**Gap:**
+| Feature | pi-mono | BotNexus | Status |
+|---------|---------|----------|--------|
+| RPC mode (JSON-RPC 2.0) | ✅ Full protocol | ❌ Missing | **Gap** |
+| JSON event streaming | ✅ JSONL output mode | ❌ Missing | **Gap** |
+| `@file` args | ✅ Load content from files | ❌ Missing | Gap |
+| Thinking level control | ✅ `--thinking` flag + levels | ❌ Not exposed | Gap |
+| Extension flags passthrough | ✅ Unknown flags → extensions | ❌ No extension flags | Gap |
+| `--system-prompt` override | ✅ CLI flag | ❌ Config only | Gap |
+| `--export` session to HTML | ✅ Built-in | ❌ Missing | Gap |
+| Model cycling | ✅ `--models` | ❌ Single model | Gap |
+| Session --continue/--fork | ✅ Multiple resume modes | ❌ `--resume <id>` only | Partial |
+| Full TUI (ink/react) | ✅ Rich terminal UI | ⚠️ Console.ReadLine loop | Design choice |
+| Package manager commands | ✅ Install/remove extensions | ❌ Manual DLL placement | Gap |
+
+**Action:**
+- P1: Add JSON streaming mode (`--json`) for programmatic integration. This unblocks VS Code extension and CI usage.
+- P1: Add RPC mode or equivalent for IDE integration.
+- P2: Add `@file` argument support.
+- P2: Add `--system-prompt` and `--append-system-prompt` CLI flags.
+- P3: Add `--thinking` flag when thinking-level models are supported.
+- P3: Add `--export` for session export.
+
+---
+
+### 8. Extensions — ❌ Major Gap
+
+**pi-mono (full extension framework):**
+- **Discovery:** Project-local (`.pi/extensions/`) → global (`~/.pi/agent/extensions/`) → explicit paths
+- **Loading:** jiti-based TypeScript/JavaScript JIT loading (no compilation needed)
+- **Factory pattern:** `export default async (api: ExtensionAPI) => { ... }`
+- **Registration API:** `registerTool()`, `registerCommand()`, `registerShortcut()`, `registerFlag()`, `registerMessageRenderer()`, `registerProvider()`
+- **Action API:** `sendMessage()`, `sendUserMessage()`, `appendEntry()`, `exec()`, `setModel()`, `setThinkingLevel()`, `setActiveTools()`
+- **Events:** 100+ event types (session, agent, tool, resource, UI lifecycle)
+- **UI API:** Dialogs, status, widgets, editor, theme, terminal input, custom overlays
+- **Provider registration:** Extensions can add custom LLM providers
+- **Virtual modules:** Bundled packages available without filesystem (for Bun binary)
+
+**BotNexus (minimal extension system):**
+- **Discovery:** `.botnexus-agent/extensions/*.dll`
+- **Loading:** .NET assembly reflection (`AssemblyLoadContext.LoadFromAssemblyPath`)
+- **Interface:** `IExtension { Name, GetTools() }` — returns `IReadOnlyList<IAgentTool>`
+- **Capability:** Extensions can only provide additional tools. No commands, no events, no UI, no provider registration.
+
+**Gap:**
+| Capability | pi-mono | BotNexus | Status |
+|------------|---------|----------|--------|
+| Custom tools | ✅ | ✅ | Aligned |
+| Custom commands | ✅ `/command` registration | ❌ | **Gap** |
+| Event subscriptions | ✅ 100+ events | ❌ | **Gap** |
+| Provider registration | ✅ Custom LLM providers | ❌ | **Gap** |
+| Flag registration | ✅ CLI flag passthrough | ❌ | **Gap** |
+| UI widgets | ✅ Full UI API | ❌ | **Gap** |
+| Message rendering | ✅ Custom renderers | ❌ | **Gap** |
+| Session entry injection | ✅ `appendEntry()` | ❌ | **Gap** |
+| Dynamic tool activation | ✅ `setActiveTools()` | ❌ | **Gap** |
+| TS/JS loading (no compile) | ✅ jiti-based | ❌ Requires DLL | Design |
+| Lifecycle events | ✅ Before/after every op | ❌ | **Gap** |
+
+**Action:**
+- P1: Expand `IExtension` interface to support event hooks (before/after tool call, session start/end).
+- P1: Add command registration for extensions (enables `/command` in interactive mode).
+- P2: Add provider registration so extensions can bring custom LLM backends.
+- P2: Design an extension event bus. Doesn't need 100+ events day one — start with: `session_start`, `session_end`, `tool_call`, `tool_result`, `message_start`, `message_end`.
+- P3: Consider a scripting-based extension format (C# scripting or Roslyn) to avoid DLL compilation requirement.
+
+---
+
+### 9. Skills — ✅ Aligned
+
+**pi-mono (`skills.ts`):**
+- **Discovery:** Global (`~/.pi/agent/skills/`) → project-local (`.pi/skills/`) → explicit paths
+- **Format:** `SKILL.md` with YAML frontmatter (`name`, `description`, `disable-model-invocation`)
+- **Validation:** Name (lowercase, hyphens, ≤64 chars), description (required, ≤1024 chars)
+- **Prompt formatting:** XML `<available_skills>` with name/description/location
+- **Ignore rules:** Respects `.gitignore`, `.ignore`, `.fdignore`
+- **Disable flag:** `disable-model-invocation` hides skill from prompt (command-only)
+
+**BotNexus (`SkillsLoader`):**
+- **Discovery:** `{workingDir}/AGENTS.md` → `{workingDir}/.botnexus-agent/AGENTS.md` → `{workingDir}/.botnexus-agent/skills/*.md`
+- **Format:** Plain markdown files (no frontmatter parsing)
+- **Prompt formatting:** Raw markdown content injected into system prompt
+- **No validation:** Files read as-is
+
+**Gap:**
+| Feature | pi-mono | BotNexus | Status |
+|---------|---------|----------|--------|
+| Multi-source loading | ✅ Global + local + explicit | ⚠️ Local only | Partial |
+| YAML frontmatter | ✅ Structured metadata | ❌ Plain markdown | Gap |
+| Name/description validation | ✅ Strict rules | ❌ None | Gap |
+| XML formatting for prompt | ✅ Structured | ❌ Raw markdown | Gap |
+| `disable-model-invocation` | ✅ Command-only skills | ❌ All skills in prompt | Gap |
+| Ignore rules | ✅ .gitignore etc. | ❌ None | Gap |
+
+**Action:**
+- P2: Add global skill loading (`~/.botnexus/skills/`).
+- P3: Add YAML frontmatter parsing for skill metadata.
+- P3: Format skills as structured XML in system prompt.
+
+---
+
+### 10. Missing Features — ❌ Gaps
+
+Major capabilities present in pi-coding-agent with no equivalent in BotNexus CodingAgent:
+
+| # | Feature | pi-mono Implementation | Impact |
+|---|---------|----------------------|--------|
+| 1 | **Session compaction** | Auto-summarize old messages when context grows; `CompactionEntry` with token tracking | **High** — without this, long sessions hit token limits |
+| 2 | **RPC mode** | JSON-RPC 2.0 on stdin/stdout for IDE integration | **High** — needed for VS Code extension |
+| 3 | **JSON streaming mode** | JSONL event stream for programmatic consumers | **High** — needed for CI/CD and tooling |
+| 4 | **Session branching** | Fork from any entry, tree structure with parentId | **Medium** — enables exploratory workflows |
+| 5 | **Thinking level control** | `--thinking off|minimal|low|medium|high|xhigh` | **Medium** — cost/quality tradeoff |
+| 6 | **Model cycling** | `--models pattern1,pattern2` for fallback/rotation | **Low** — reliability feature |
+| 7 | **Session export** | `--export session.html` for sharing | **Low** — nice-to-have |
+| 8 | **Clipboard/image support** | Paste images from clipboard into prompts | **Low** — interactive UX |
+| 9 | **Extension package manager** | Install/remove/update extensions via CLI | **Medium** — developer experience |
+| 10 | **Provider registration** | Extensions can add custom LLM backends | **Medium** — extensibility |
+| 11 | **Grep tool** | Dedicated ripgrep-backed content search | **High** — most-used tool for code exploration |
+| 12 | **Context files** | Auto-load `.pi/context/*.md` into system prompt | **Medium** — project customization |
+
+### Priority Ranking (recommended order):
+
+**P0 — Critical for production use:**
+1. Session compaction (prevents token limit crashes)
+2. Grep tool (fundamental code exploration capability)
+
+**P1 — Required for integration:**
+3. JSON streaming mode (CI/CD, programmatic use)
+4. RPC mode (IDE integration)
+5. Multi-edit support in EditTool
+
+**P2 — Important for parity:**
+6. Extension event system (basic lifecycle hooks)
+7. Context file loading
+8. Fuzzy edit matching
+9. Global skill loading
+
+**P3 — Nice to have:**
+10. Session branching
+11. Thinking level control
+12. Extension package manager
+13. Session export
+
+---
+
+## Architecture Comparison
+
+```
+pi-mono                                    BotNexus
+──────────────────────                     ──────────────────────
+cli.ts → main.ts                           Program.cs → CodingAgent.CreateAsync()
+  ├── cli/args.ts (30+ flags)               ├── Cli/CommandParser.cs (6 flags)
+  ├── config.ts (multi-file config)          ├── CodingAgentConfig.cs (single JSON)
+  ├── core/                                  ├── Tools/ (5 built-in)
+  │   ├── tools/ (7 tools)                   ├── Session/ (linear JSONL)
+  │   ├── session-manager.ts (tree)          ├── Hooks/ (safety + audit)
+  │   ├── agent-session.ts (runtime)         ├── Extensions/ (DLL loading)
+  │   ├── extensions/ (rich API)             ├── SystemPromptBuilder.cs
+  │   ├── skills.ts (frontmatter)            └── Cli/InteractiveLoop.cs
+  │   └── system-prompt.ts (dynamic)
+  ├── modes/
+  │   ├── interactive/ (TUI)
+  │   ├── print-mode.ts
+  │   └── rpc/
+  └── utils/ (git, shell, image, etc.)
+```
+
+## Conclusion
+
+BotNexus CodingAgent has a solid foundation that covers the core agent loop — tool execution, safety hooks, sessions, and interactive CLI all work. The critical gaps are (1) no session compaction for long-running sessions, (2) no grep tool for code search, and (3) no programmatic output modes (JSON/RPC) for integration. The extension system is the largest architectural gap — pi-mono's event-driven extension framework is a different league from our DLL-based tool-provider model. However, the BotNexus safety hooks (path blocking, command allowlisting) are actually *stronger* by default than pi-mono's approach.
+
+Recommended next step: address P0 items (compaction + grep tool), then P1 (JSON mode + multi-edit), then gradually enrich the extension API.
+
+
+---
+
+## farnsworth-agentcore-audit.md
+
+# AgentCore Alignment Audit
+
+**Auditor:** Farnsworth (Platform Dev)
+**Date:** 2025-07-15
+**pi-mono commit:** `1a6a58eb05f7256ecf51cce6c2cae2f9e464d712`
+**BotNexus path:** `src/agent/BotNexus.AgentCore/`
+
+## Summary
+
+**9/11 areas aligned, 2 gaps found.**
+
+The C# port is a faithful, idiomatic translation of pi-agent-core. Core loop logic, event lifecycle, tool execution modes, hook contracts, state management, and queue semantics all match. Two meaningful gaps exist: (1) missing `toolCallId` parameter on `IAgentTool.ExecuteAsync`, and (2) missing `onUpdate` callback for streaming tool progress. A third minor difference is the absence of `proxy.ts` (streamProxy), which is reasonable since BotNexus uses server-side `LlmClient` directly.
+
+---
+
+## Detailed Findings
+
+### 1. AgentMessage Types — ⚠️ Partial
+
+**pi-mono:**
+- `AgentMessage = Message | CustomAgentMessages[keyof CustomAgentMessages]` — a union of LLM messages (`UserMessage`, `AssistantMessage`, `ToolResultMessage`) plus extensible custom messages via declaration merging.
+- `AssistantMessage` has: `role`, `content[]` (text/thinking/toolCall blocks), `api`, `provider`, `model`, `usage` (with full cost breakdown: input/output/cacheRead/cacheWrite/totalTokens/cost), `stopReason`, `errorMessage`, `timestamp`, optionally `responseId`.
+- `UserMessage` has: `role`, `content[]` (text + image blocks), `timestamp`.
+- `ToolResultMessage` has: `role`, `toolCallId`, `toolName`, `content[]`, `details`, `isError`, `timestamp`.
+- Custom messages are extensible via TypeScript declaration merging on `CustomAgentMessages` interface.
+
+**BotNexus:**
+- `AgentMessage(string Role)` — abstract record base. Subtypes: `UserMessage`, `AssistantAgentMessage`, `ToolResultAgentMessage`, `SystemAgentMessage`.
+- `AssistantAgentMessage` has: `Content` (single string), `ToolCalls`, `FinishReason`, `Usage` (InputTokens/OutputTokens only), `ErrorMessage`, `Timestamp`.
+- `UserMessage` has: `Content` (single string), `Images` (list of `AgentImageContent`).
+- `ToolResultAgentMessage` has: `ToolCallId`, `ToolName`, `Result` (AgentToolResult), `IsError`, `Timestamp`.
+- `SystemAgentMessage` exists (no pi-mono equivalent — pi-mono uses `systemPrompt` in context, not a system message type).
+
+**Gap:**
+1. **Usage granularity**: pi-mono has `cacheRead`, `cacheWrite`, `totalTokens`, and full `cost` breakdown. BotNexus only has `InputTokens` and `OutputTokens`. Missing cache and cost metrics.
+2. **Content model flattening**: pi-mono `AssistantMessage.content` is a heterogeneous array (`TextContent | ThinkingContent | ToolCallContent`). BotNexus flattens text into a single `string Content` and separates tool calls into `ToolCalls`. Thinking content is lost during the conversion.
+3. **Custom message extensibility**: pi-mono uses declaration merging for custom message types. BotNexus uses the abstract record pattern, which is extensible via subclassing — functionally equivalent.
+4. **SystemAgentMessage**: BotNexus has an explicit `SystemAgentMessage` subtype. pi-mono uses `systemPrompt` on `AgentContext` instead. Minor structural difference, not a functional gap.
+
+**Action:** Consider adding `CacheReadTokens`, `CacheWriteTokens`, `TotalTokens` to `AgentUsage`. Thinking content loss is acceptable for now since it's not sent back to the LLM.
+
+---
+
+### 2. AgentEvent Types — ✅ Aligned
+
+**pi-mono** (10 event types):
+| Event | Fields |
+|---|---|
+| `agent_start` | (none) |
+| `agent_end` | `messages: AgentMessage[]` |
+| `turn_start` | (none) |
+| `turn_end` | `message: AgentMessage`, `toolResults: ToolResultMessage[]` |
+| `message_start` | `message: AgentMessage` |
+| `message_update` | `message: AgentMessage`, `assistantMessageEvent: AssistantMessageEvent` |
+| `message_end` | `message: AgentMessage` |
+| `tool_execution_start` | `toolCallId`, `toolName`, `args` |
+| `tool_execution_update` | `toolCallId`, `toolName`, `args`, `partialResult` |
+| `tool_execution_end` | `toolCallId`, `toolName`, `result`, `isError` |
+
+**BotNexus** (10 event types via `AgentEventType` enum):
+| Event | Fields |
+|---|---|
+| `AgentStartEvent` | `Timestamp` |
+| `AgentEndEvent` | `Messages`, `Timestamp` |
+| `TurnStartEvent` | `Timestamp` |
+| `TurnEndEvent` | `Message` (AssistantAgentMessage), `ToolResults`, `Timestamp` |
+| `MessageStartEvent` | `Message`, `Timestamp` |
+| `MessageUpdateEvent` | `Message`, `ContentDelta`, `ToolCallId`, `ToolName`, `ArgumentsDelta`, `FinishReason`, `InputTokens`, `OutputTokens`, `Timestamp` |
+| `MessageEndEvent` | `Message`, `Timestamp` |
+| `ToolExecutionStartEvent` | `ToolCallId`, `ToolName`, `Args`, `Timestamp` |
+| `ToolExecutionUpdateEvent` | `ToolCallId`, `ToolName`, `Args`, `PartialResult`, `Timestamp` |
+| `ToolExecutionEndEvent` | `ToolCallId`, `ToolName`, `Result`, `IsError`, `Timestamp` |
+
+**Gap:**
+- pi-mono `message_start`/`message_end` accept any `AgentMessage`. BotNexus `MessageStartEvent`/`MessageEndEvent` use `AssistantAgentMessage`. This means non-assistant messages emitted by the loop (user prompts, tool results) need to be wrapped in `ToDisplayMessage()`, which is a lossy conversion. This is a design choice, not a bug — the C# code wraps them to emit events.
+- pi-mono's `message_update` passes the raw `AssistantMessageEvent` from the stream. BotNexus decomposes it into explicit fields (`ContentDelta`, `ToolCallId`, `ToolName`, `ArgumentsDelta`, `FinishReason`, token counts). This is actually **richer** than pi-mono for consumers.
+- BotNexus adds `Timestamp` to every event. pi-mono events have no timestamp. Minor enhancement.
+
+**Action:** No action required. All 10 events present with semantically equivalent payloads.
+
+---
+
+### 3. AgentState — ✅ Aligned
+
+**pi-mono:**
+- `systemPrompt: string`
+- `model: Model<any>`
+- `thinkingLevel: ThinkingLevel` (default `"off"`)
+- `tools` — getter/setter with array copy
+- `messages` — getter/setter with array copy
+- `readonly isStreaming: boolean`
+- `readonly streamingMessage?: AgentMessage`
+- `readonly pendingToolCalls: ReadonlySet<string>`
+- `readonly errorMessage?: string`
+
+**BotNexus:**
+- `SystemPrompt: string?`
+- `Model: LlmModel` (required)
+- `ThinkingLevel: ThinkingLevel?` (default `null`)
+- `Tools` — getter/setter with list copy ✅
+- `Messages` — getter/setter with list copy ✅
+- `IsStreaming` — computed from `StreamingMessage is not null` ✅
+- `StreamingMessage: AssistantAgentMessage?` — private setter via `SetStreamingMessage()` ✅
+- `PendingToolCalls: IReadOnlySet<string>` — private via `SetPendingToolCalls()` ✅
+- `ErrorMessage: string?` — private setter via `SetErrorMessage()` ✅
+
+**Gap:** pi-mono defaults `thinkingLevel` to `"off"`. BotNexus defaults to `null`. Functionally equivalent since `null` maps to "don't send reasoning param" which is effectively off.
+
+**Action:** None. Fully aligned.
+
+---
+
+### 4. AgentContext — ✅ Aligned
+
+**pi-mono:**
+```typescript
+interface AgentContext {
+  systemPrompt: string;
+  messages: AgentMessage[];
+  tools?: AgentTool<any>[];
+}
+```
+
+**BotNexus:**
+```csharp
+record AgentContext(
+    string? SystemPrompt,
+    IReadOnlyList<AgentMessage> Messages,
+    IReadOnlyList<IAgentTool> Tools);
+```
+
+**Gap:** None. 1:1 match. Both are snapshots passed through the loop.
+
+**Action:** None.
+
+---
+
+### 5. AgentLoopConfig — ✅ Aligned
+
+**pi-mono:**
+- `model`, `convertToLlm`, `transformContext?`, `getApiKey?`, `getSteeringMessages?`, `getFollowUpMessages?`, `toolExecution?`, `beforeToolCall?`, `afterToolCall?`
+- Also extends `SimpleStreamOptions` (inherits `apiKey`, `temperature`, `maxTokens`, `reasoning`, `sessionId`, `onPayload`, `transport`, `thinkingBudgets`, `maxRetryDelayMs`, `signal`).
+
+**BotNexus:**
+- `Model`, `ConvertToLlm`, `TransformContext`, `GetApiKey`, `GetSteeringMessages?`, `GetFollowUpMessages?`, `ToolExecutionMode`, `BeforeToolCall?`, `AfterToolCall?`, `GenerationSettings` (contains all stream options).
+
+**Gap:**
+- pi-mono `AgentLoopConfig extends SimpleStreamOptions` (flat). BotNexus wraps them in `GenerationSettings` (composed). Same data, different structure.
+- All delegate signatures match semantically (CancellationToken vs AbortSignal is the standard C#/TS difference).
+
+**Action:** None. Structurally equivalent.
+
+---
+
+### 6. Agent Class — ✅ Aligned
+
+#### Constructor/Options
+
+**pi-mono:** `new Agent(options?: AgentOptions)` with all-optional fields, defaults for missing values.
+**BotNexus:** `new Agent(AgentOptions options)` with required options record.
+**Match:** ✅ Equivalent. BotNexus is stricter (required param) which is idiomatic C#.
+
+#### prompt() / PromptAsync()
+
+**pi-mono:** `prompt(message | messages | string, images?)` — 3 overloads in one. Throws if already running. Calls `runPromptMessages()`.
+**BotNexus:** `PromptAsync(string)`, `PromptAsync(AgentMessage)`, `PromptAsync(IReadOnlyList<AgentMessage>)` — 3 overloads. Throws if already running. Calls `RunAsync()`.
+**Match:** ✅ Same semantics. BotNexus returns `Task<IReadOnlyList<AgentMessage>>` (the new messages) while pi-mono returns `void` (messages are in state). This is actually an improvement — callers get the result directly.
+
+#### continue() / ContinueAsync()
+
+**pi-mono:** Throws if already running or last message is assistant. Drains steering → followUp queues if last is assistant. Calls `runContinuation()`.
+**BotNexus:** Same behavior. Drains queued messages and calls `PromptAsync` if available. Throws `InvalidOperationException` if last message is assistant.
+**Match:** ✅
+
+#### subscribe() / Subscribe()
+
+**pi-mono:** Returns unsubscribe function `() => void`. Listeners receive `(event, signal)`.
+**BotNexus:** Returns `IDisposable`. Listeners receive `(AgentEvent, CancellationToken)`. Thread-safe via copy-on-write list.
+**Match:** ✅ Idiomatic C# equivalent. Thread-safety is enhanced in BotNexus.
+
+#### steer() / Steer() and followUp() / FollowUp()
+
+**pi-mono:** `steer(message)` and `followUp(message)`.
+**BotNexus:** `Steer(message)` and `FollowUp(message)`.
+**Match:** ✅
+
+#### abort() / AbortAsync()
+
+**pi-mono:** `abort()` — synchronous, calls `abortController.abort()`.
+**BotNexus:** `AbortAsync()` — async, cancels CTS, awaits active run settlement. Swallows `OperationCanceledException`.
+**Match:** ✅ BotNexus version is more robust (awaits settlement).
+
+#### waitForIdle() / WaitForIdleAsync()
+
+**pi-mono:** `waitForIdle()` returns `activeRun?.promise ?? Promise.resolve()`.
+**BotNexus:** `WaitForIdleAsync(ct)` — same semantics with cancellation support.
+**Match:** ✅
+
+#### reset() / Reset()
+
+**pi-mono:** Clears messages, streaming state, pending tool calls, error, and queues.
+**BotNexus:** Same behavior plus cancels CTS and sets status to Idle.
+**Match:** ✅ BotNexus is more thorough.
+
+#### State access / Status / Queues
+
+**pi-mono:** `state` getter. `steeringMode`/`followUpMode` getters/setters. `hasQueuedMessages()`, `clearSteeringQueue()`, `clearFollowUpQueue()`, `clearAllQueues()`. `signal` getter.
+**BotNexus:** `State` property. `Status` property (Idle/Running/Aborting — richer than pi-mono). Queue clearing methods match. No `Signal` getter (internal only). No `steeringMode`/`followUpMode` setters (frozen at construction).
+
+**Gap:** pi-mono allows changing `steeringMode`/`followUpMode` at runtime. BotNexus freezes them at construction. Minor behavioral difference.
+
+**Action:** Consider adding `SteeringMode`/`FollowUpMode` properties if runtime mode switching is needed.
+
+---
+
+### 7. Agent Loop — ✅ Aligned
+
+**pi-mono `runLoop()`:**
+1. Check for steering messages at start
+2. Outer while(true) for follow-ups
+3. Inner while (hasMoreToolCalls || pendingMessages) for turns
+4. firstTurn tracking → emit turn_start
+5. Inject pending messages → emit message_start/end
+6. Stream assistant response
+7. Check stopReason error/aborted → emit turn_end, agent_end, return
+8. Execute tool calls if any
+9. Append tool results to context
+10. Emit turn_end
+11. Poll steering messages
+12. After inner loop: poll follow-ups → continue outer if any
+13. Emit agent_end
+
+**BotNexus `RunLoopAsync()`:**
+1. Poll steering messages at start ✅
+2. Outer while(true) for follow-ups ✅
+3. Inner while (hasMoreToolCalls || pendingMessages) ✅
+4. firstTurn tracking → emit TurnStartEvent ✅
+5. Inject pending → emit MessageStart/End ✅
+6. TransformContext → ConvertToLlm → StreamSimple → Accumulate ✅
+7. Check FinishReason Error/Aborted → emit TurnEnd, AgentEnd, return ✅
+8. Execute tool calls ✅
+9. Append tool results ✅
+10. Emit TurnEndEvent ✅
+11. Poll steering ✅
+12. Poll follow-ups → continue ✅
+13. Emit AgentEndEvent ✅
+
+**Gap:** None. The loop logic is a 1:1 port.
+
+**Action:** None.
+
+---
+
+### 8. Tool Execution — ✅ Aligned
+
+**pi-mono:**
+- Sequential: for-each → emit start → prepare → execute → finalize (afterToolCall) → emit end
+- Parallel: for-each → emit start → prepare (blocking if not). Collect runnables. Map to concurrent execution. Await in order → finalize → emit end.
+- `prepareToolCall()`: find tool → prepareArguments → validateToolArguments → beforeToolCall hook → return prepared or immediate
+- `executePreparedToolCall()`: call tool.execute with onUpdate callback → collect update events → return result
+- `finalizeExecutedToolCall()`: call afterToolCall hook → merge overrides → emit outcome
+
+**BotNexus:**
+- Sequential: for-each → emit start → `ExecuteToolCallCoreAsync` → emit end ✅
+- Parallel: for-each → emit all starts → `Task.WhenAll` → order by index → emit all ends ✅
+- `ExecuteToolCallCoreAsync()`: find tool (case-insensitive) → PrepareArgumentsAsync → beforeToolCall hook → ExecuteAsync → afterToolCall hook ✅
+- afterToolCall merge: `Content ?? result.Content`, `Details ?? result.Details`, `IsError ?? isError` ✅
+
+**Gap:**
+- pi-mono parallel emits `tool_execution_start` interleaved with immediate results during preparation (blocked tools get start+end before runnables). BotNexus emits ALL starts first, then runs all, then emits ALL ends. Slightly different ordering for blocked tools in parallel mode, but functionally equivalent.
+
+**Action:** None. Behavior matches for the common case.
+
+---
+
+### 9. IAgentTool — ⚠️ Partial
+
+**pi-mono `AgentTool<TParameters, TDetails>`:**
+```typescript
+interface AgentTool<TParameters, TDetails> extends Tool<TParameters> {
+  label: string;
+  prepareArguments?: (args: unknown) => Static<TParameters>;
+  execute: (
+    toolCallId: string,
+    params: Static<TParameters>,
+    signal?: AbortSignal,
+    onUpdate?: AgentToolUpdateCallback<TDetails>,
+  ) => Promise<AgentToolResult<TDetails>>;
+}
+```
+
+**BotNexus `IAgentTool`:**
+```csharp
+interface IAgentTool {
+  string Name { get; }
+  string Label { get; }
+  Tool Definition { get; }
+  Task<IReadOnlyDictionary<string, object?>> PrepareArgumentsAsync(args, ct);
+  Task<AgentToolResult> ExecuteAsync(args, ct);
+}
+```
+
+**Gaps:**
+1. **Missing `toolCallId` parameter**: pi-mono passes `toolCallId` as the first parameter to `execute()`. BotNexus `ExecuteAsync` does not receive the tool call ID. Tools that need to correlate with their call ID (e.g., for streaming updates, cancellation scoping) cannot do so.
+2. **Missing `onUpdate` callback**: pi-mono passes `onUpdate?: AgentToolUpdateCallback<TDetails>` so tools can stream partial results. BotNexus has no equivalent — `ToolExecutionUpdateEvent` exists in the event schema but tools have no way to trigger it.
+3. **`prepareArguments` sync vs async**: pi-mono's `prepareArguments` is synchronous. BotNexus `PrepareArgumentsAsync` is async. Not a gap — async is a superset.
+4. **Generic details type**: pi-mono uses `TDetails` generic for type-safe details. BotNexus uses `object?`. Acceptable for a dynamic language port.
+
+**Action:**
+- **Add `toolCallId` parameter** to `ExecuteAsync`: `Task<AgentToolResult> ExecuteAsync(string toolCallId, IReadOnlyDictionary<string, object?> arguments, CancellationToken ct)`.
+- **Add `onUpdate` callback** to `ExecuteAsync`: `Action<AgentToolResult>? onUpdate` parameter, or a dedicated `IProgress<AgentToolResult>` parameter. Wire it through `ToolExecutor` to emit `ToolExecutionUpdateEvent`.
+
+---
+
+### 10. StreamFn / LlmClient.StreamSimple — ✅ Aligned
+
+**pi-mono:**
+- `StreamFn` type = `(...args: Parameters<typeof streamSimple>) => ReturnType<typeof streamSimple>`
+- Agent constructor accepts optional `streamFn` (defaults to `streamSimple`).
+- The loop calls `streamFn(model, context, options)` and iterates the returned `AssistantMessageEventStream`.
+
+**BotNexus:**
+- No `StreamFn` delegate. Instead, calls `LlmClient.StreamSimple(model, context, options)` directly.
+- `StreamAccumulator.AccumulateAsync()` consumes the `LlmStream` and converts provider events to agent events.
+
+**Gap:** pi-mono's `streamFn` is injectable (used by `streamProxy` for server-routed calls). BotNexus hardcodes `LlmClient.StreamSimple`. To support proxy/custom streaming, a similar delegate would be needed.
+
+**Action:** Low priority. If proxy streaming is needed, add a `StreamDelegate` to `AgentOptions`/`AgentLoopConfig` that defaults to `LlmClient.StreamSimple`.
+
+---
+
+### 11. Missing Features — ❌ Two items
+
+#### 11a. `proxy.ts` / streamProxy — ❌ Not ported
+
+**pi-mono:** `proxy.ts` provides `streamProxy()` — a stream function that routes LLM calls through an HTTP proxy server. Handles SSE parsing, partial message reconstruction, bandwidth-optimized event stripping, and auth token injection.
+
+**BotNexus:** No equivalent. BotNexus is server-side C# and calls providers directly, so a client-side proxy isn't needed.
+
+**Action:** Not needed for server-side usage. If BotNexus ever needs to proxy through another service, this would need to be built. No action required now.
+
+#### 11b. `agentLoop()` / `agentLoopContinue()` EventStream wrappers — ❌ Not ported
+
+**pi-mono:** Exposes `agentLoop()` and `agentLoopContinue()` as public APIs that return an `EventStream<AgentEvent, AgentMessage[]>` — a push-based event stream with a terminal value. This enables consuming loop events as an async iterable without using the Agent class.
+
+**BotNexus:** Only exposes `AgentLoopRunner.RunAsync()` and `ContinueAsync()` which use callback-based `emit` and return `Task<IReadOnlyList<AgentMessage>>`. No `IAsyncEnumerable<AgentEvent>` wrapper exists.
+
+**Action:** Consider adding an `IAsyncEnumerable<AgentEvent>` overload for `AgentLoopRunner` if direct loop consumption (without `Agent`) is needed.
+
+---
+
+## Alignment Matrix
+
+| # | Area | Status | Notes |
+|---|---|---|---|
+| 1 | AgentMessage types | ⚠️ Partial | Usage granularity, thinking content loss |
+| 2 | AgentEvent types | ✅ Aligned | All 10 present, MessageUpdate is richer |
+| 3 | AgentState | ✅ Aligned | 1:1 match with copy-on-set semantics |
+| 4 | AgentContext | ✅ Aligned | Identical structure |
+| 5 | AgentLoopConfig | ✅ Aligned | Composed vs flat — same data |
+| 6 | Agent class | ✅ Aligned | All APIs present, C# is stricter/safer |
+| 7 | Agent Loop | ✅ Aligned | 1:1 port of runLoop logic |
+| 8 | Tool Execution | ✅ Aligned | Sequential + parallel modes match |
+| 9 | IAgentTool | ⚠️ Partial | **Missing toolCallId and onUpdate** |
+| 10 | StreamFn | ✅ Aligned | Hardcoded vs injectable — acceptable |
+| 11 | Missing features | ❌ proxy.ts, EventStream API | Not needed for server-side |
+
+## Priority Actions
+
+1. **P1 — Add `toolCallId` to `IAgentTool.ExecuteAsync`** — Required for tool-call-scoped operations (progress, cancellation, correlation). Breaking change to interface.
+2. **P1 — Add `onUpdate` callback to `IAgentTool.ExecuteAsync`** — Required to wire `ToolExecutionUpdateEvent` to actual tool progress. Currently the event type exists but is never emitted by real tools.
+3. **P2 — Enrich `AgentUsage`** — Add cache token counts and cost breakdown to match pi-mono's full usage model.
+4. **P3 — Consider `StreamDelegate` injection** — For future proxy/custom streaming support.
+5. **P3 — Consider `IAsyncEnumerable<AgentEvent>` loop API** — For direct loop consumption without Agent wrapper.
+
+
+---
+
+## leela-providers-audit.md
+
+# Providers.Core Alignment Audit
+
+**Audited:** `src/providers/BotNexus.Providers.Core/` vs `@mariozechner/pi-ai` (`packages/ai/src/`)
+**Date:** 2025-07-15
+**Auditor:** Leela (Lead/Architect)
+**pi-mono commit:** `1a6a58eb05f7256ecf51cce6c2cae2f9e464d712`
+
+## Summary
+
+**10/12 core areas aligned, 2 partial, plus 7 missing feature gaps identified.**
+
+The C# port is a faithful representation of pi-mono's type system. The gaps are primarily:
+routing compat fields on `OpenAICompletionsCompat`, the `details` generic on `ToolResultMessage`,
+`ThinkingBudgets` shape divergence, missing model helper functions, and absent Vertex/Bedrock
+credential detection in `EnvironmentApiKeys`. No pi-mono OAuth or context-overflow utilities are ported.
+
+---
+
+## Detailed Findings
+
+### 1. Models (`LlmModel` vs `Model<TApi>`) — ✅ Aligned
+
+**pi-mono `Model<TApi>`:**
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `name` | `string` |
+| `api` | `TApi extends Api` |
+| `provider` | `Provider` |
+| `baseUrl` | `string` |
+| `reasoning` | `boolean` |
+| `input` | `("text" \| "image")[]` |
+| `cost` | `{ input, output, cacheRead, cacheWrite }` (number, $/M tokens) |
+| `contextWindow` | `number` |
+| `maxTokens` | `number` |
+| `headers?` | `Record<string, string>` |
+| `compat?` | Conditional on TApi |
+
+**BotNexus `LlmModel`:**
+| Field | Type |
+|---|---|
+| `Id` | `string` |
+| `Name` | `string` |
+| `Api` | `string` |
+| `Provider` | `string` |
+| `BaseUrl` | `string` |
+| `Reasoning` | `bool` |
+| `Input` | `IReadOnlyList<string>` |
+| `Cost` | `ModelCost(Input, Output, CacheRead, CacheWrite)` (decimal) |
+| `ContextWindow` | `int` |
+| `MaxTokens` | `int` |
+| `Headers` | `IReadOnlyDictionary<string, string>?` |
+| `Compat` | `OpenAICompletionsCompat?` |
+
+**Gap:** pi-mono's `compat` is conditionally typed per API (`OpenAICompletionsCompat` for `"openai-completions"`, `OpenAIResponsesCompat` for `"openai-responses"`, `never` otherwise). C# uses a single nullable `OpenAICompletionsCompat?` type. `OpenAIResponsesCompat` is empty in pi-mono so this is acceptable today.
+**Action:** None required — the generic type parameter is a TS convenience not needed in C#.
+
+---
+
+### 2. Messages — ⚠️ Partial
+
+**pi-mono:**
+```typescript
+UserMessage      { role: "user",       content: string | (TextContent | ImageContent)[], timestamp }
+AssistantMessage { role: "assistant",  content: (TextContent | ThinkingContent | ToolCall)[], api, provider, model, responseId?, usage, stopReason, errorMessage?, timestamp }
+ToolResultMessage<TDetails> { role: "toolResult", toolCallId, toolName, content: (TextContent | ImageContent)[], details?: TDetails, isError, timestamp }
+```
+
+**BotNexus:**
+```csharp
+UserMessage(UserMessageContent Content, long Timestamp)
+AssistantMessage(IReadOnlyList<ContentBlock> Content, string Api, string Provider, string ModelId, Usage Usage, StopReason StopReason, string? ErrorMessage, string? ResponseId, long Timestamp)
+ToolResultMessage(string ToolCallId, string ToolName, IReadOnlyList<ContentBlock> Content, bool IsError, long Timestamp)
+```
+
+**Gaps:**
+1. **❌ `ToolResultMessage.details`** — pi-mono has a generic `details?: TDetails` field used by tool implementations to attach structured metadata. C# has no equivalent.
+2. **Minor:** pi-mono field is `model: string`, C# uses `ModelId: string` — semantically equivalent, just different naming.
+3. **Minor:** pi-mono `ToolResultMessage.content` is typed `(TextContent | ImageContent)[]` restricting to text/image only. C# uses `IReadOnlyList<ContentBlock>` which is broader (allows thinking/toolcall blocks). Not a problem in practice.
+
+**Action:** Add `object? Details` field to `ToolResultMessage` (or `JsonElement? Details` for type safety).
+
+---
+
+### 3. Content Blocks — ✅ Aligned
+
+**pi-mono:**
+| Type | Fields |
+|---|---|
+| `TextContent` | `type: "text"`, `text`, `textSignature?` |
+| `ThinkingContent` | `type: "thinking"`, `thinking`, `thinkingSignature?`, `redacted?` |
+| `ImageContent` | `type: "image"`, `data` (base64), `mimeType` |
+| `ToolCall` | `type: "toolCall"`, `id`, `name`, `arguments: Record<string, any>`, `thoughtSignature?` |
+
+**BotNexus:**
+| Type | Fields |
+|---|---|
+| `TextContent` | `Text`, `TextSignature?` |
+| `ThinkingContent` | `Thinking`, `ThinkingSignature?`, `Redacted?` |
+| `ImageContent` | `Data`, `MimeType` |
+| `ToolCallContent` | `Id`, `Name`, `Arguments: Dictionary<string, object?>`, `ThoughtSignature?` |
+
+**Gap:** pi-mono defines `TextSignatureV1 { v: 1, id: string, phase?: "commentary" | "final_answer" }` as a structured form of `textSignature`. C# stores it as a plain string (which is how it's serialized anyway).
+**Action:** None — `TextSignatureV1` is just a JSON payload inside the string field.
+
+---
+
+### 4. Streaming Events — ✅ Aligned
+
+**pi-mono `AssistantMessageEvent` (12 variants):**
+`start`, `text_start`, `text_delta`, `text_end`, `thinking_start`, `thinking_delta`, `thinking_end`, `toolcall_start`, `toolcall_delta`, `toolcall_end`, `done`, `error`
+
+**BotNexus (12 records inheriting `AssistantMessageEvent`):**
+`StartEvent`, `TextStartEvent`, `TextDeltaEvent`, `TextEndEvent`, `ThinkingStartEvent`, `ThinkingDeltaEvent`, `ThinkingEndEvent`, `ToolCallStartEvent`, `ToolCallDeltaEvent`, `ToolCallEndEvent`, `DoneEvent`, `ErrorEvent`
+
+Every event type present. Every field (contentIndex, delta, content, partial, reason, message/error) mapped.
+
+**pi-mono `EventStream<T,R>` → BotNexus `LlmStream`:**
+- `push(event)` → `Push(evt)` ✅
+- `end(result?)` → `End(result?)` ✅
+- `[Symbol.asyncIterator]` → `IAsyncEnumerable<AssistantMessageEvent>` ✅
+- `result()` → `GetResultAsync()` ✅
+
+**Gap:** None.
+**Action:** None.
+
+---
+
+### 5. Enums — ✅ Aligned
+
+| pi-mono | BotNexus | Status |
+|---|---|---|
+| `StopReason`: `"stop" \| "length" \| "toolUse" \| "error" \| "aborted"` | `StopReason`: `Stop, Length, ToolUse, Error, Aborted` | ✅ |
+| `ThinkingLevel`: `"minimal" \| "low" \| "medium" \| "high" \| "xhigh"` | `ThinkingLevel`: `Minimal, Low, Medium, High, ExtraHigh` | ✅ |
+| `CacheRetention`: `"none" \| "short" \| "long"` | `CacheRetention`: `None, Short, Long` | ✅ |
+| `Transport`: `"sse" \| "websocket" \| "auto"` | `Transport`: `Sse, WebSocket, Auto` | ✅ |
+
+All serialized with `JsonStringEnumMemberName` matching the camelCase pi-mono values.
+
+**Gap:** None.
+**Action:** None.
+
+---
+
+### 6. Stream Options — ⚠️ Partial
+
+#### StreamOptions — ✅ Aligned
+
+| pi-mono field | BotNexus field | Status |
+|---|---|---|
+| `temperature?` | `Temperature` | ✅ |
+| `maxTokens?` | `MaxTokens` | ✅ |
+| `signal?: AbortSignal` | `CancellationToken` | ✅ (C# equivalent) |
+| `apiKey?` | `ApiKey` | ✅ |
+| `transport?` | `Transport` | ✅ (non-nullable, defaults to Sse) |
+| `cacheRetention?` | `CacheRetention` | ✅ (non-nullable, defaults to Short) |
+| `sessionId?` | `SessionId` | ✅ |
+| `onPayload?` | `OnPayload` | ✅ |
+| `headers?` | `Headers` | ✅ |
+| `maxRetryDelayMs?` | `MaxRetryDelayMs` | ✅ (defaults to 60000) |
+| `metadata?` | `Metadata` | ✅ |
+
+#### SimpleStreamOptions — ✅ Aligned
+Both add `reasoning?: ThinkingLevel` and `thinkingBudgets?: ThinkingBudgets`.
+
+#### ThinkingBudgets — ⚠️ Different Shape
+
+**pi-mono:**
+```typescript
+interface ThinkingBudgets {
+    minimal?: number;   // token count
+    low?: number;
+    medium?: number;
+    high?: number;
+}
+```
+
+**BotNexus:**
+```csharp
+record ThinkingBudgets {
+    ThinkingBudgetLevel? Minimal;  // (ThinkingBudget: int, MaxTokens: int)
+    ThinkingBudgetLevel? Low;
+    ThinkingBudgetLevel? Medium;
+    ThinkingBudgetLevel? High;
+    ThinkingBudgetLevel? ExtraHigh;  // not in pi-mono
+}
+```
+
+**Gaps:**
+1. pi-mono uses plain `number` per level; C# uses `ThinkingBudgetLevel(ThinkingBudget, MaxTokens)` — richer but structurally different.
+2. C# adds `ExtraHigh` level not present in pi-mono.
+3. pi-mono has default budgets inline in `adjustMaxTokensForThinking` (`minimal: 1024, low: 2048, medium: 8192, high: 16384`); C# doesn't embed these defaults.
+
+**Action:** Consider whether the richer `ThinkingBudgetLevel` shape is intentional or should be simplified to match pi-mono's plain `int?` per level.
+
+---
+
+### 7. Tools — ✅ Aligned
+
+**pi-mono:** `Tool<TParameters extends TSchema> { name, description, parameters: TParameters }`
+**BotNexus:** `Tool(string Name, string Description, JsonElement Parameters)`
+
+`JsonElement` is the C# equivalent of TypeBox's `TSchema` for JSON schema representation.
+
+**Gap:** None.
+**Action:** None.
+
+---
+
+### 8. Context — ✅ Aligned
+
+**pi-mono:** `Context { systemPrompt?, messages: Message[], tools?: Tool[] }`
+**BotNexus:** `Context(string? SystemPrompt, IReadOnlyList<Message> Messages, IReadOnlyList<Tool>? Tools)`
+
+**Gap:** None.
+**Action:** None.
+
+---
+
+### 9. Usage / UsageCost — ✅ Aligned
+
+**pi-mono:**
+```typescript
+Usage { input, output, cacheRead, cacheWrite, totalTokens: number,
+        cost: { input, output, cacheRead, cacheWrite, total: number } }
+```
+
+**BotNexus:**
+```csharp
+Usage { Input, Output, CacheRead, CacheWrite, TotalTokens: int,
+        Cost: UsageCost(Input, Output, CacheRead, CacheWrite, Total: decimal) }
+```
+
+**Gap:** None. `decimal` gives better precision for cost calculations than `number`.
+**Action:** None.
+
+---
+
+### 10. Client API (`LlmClient` vs `stream.ts`) — ✅ Aligned
+
+| pi-mono | BotNexus | Status |
+|---|---|---|
+| `stream(model, context, options?)` | `LlmClient.Stream(model, context, options?)` | ✅ |
+| `complete(model, context, options?)` | `LlmClient.CompleteAsync(model, context, options?)` | ✅ |
+| `streamSimple(model, context, options?)` | `LlmClient.StreamSimple(model, context, options?)` | ✅ |
+| `completeSimple(model, context, options?)` | `LlmClient.CompleteSimpleAsync(model, context, options?)` | ✅ |
+
+Both resolve the provider from the registry and delegate. C# uses `Async` suffix per convention.
+
+**Gap:** None.
+**Action:** None.
+
+---
+
+### 11. Provider & Model Registries — ⚠️ Partial
+
+#### ApiProviderRegistry — ✅ Aligned
+
+| pi-mono | BotNexus | Status |
+|---|---|---|
+| `registerApiProvider(provider, sourceId?)` | `ApiProviderRegistry.Register(provider, sourceId?)` | ✅ |
+| `getApiProvider(api)` | `ApiProviderRegistry.Get(api)` | ✅ |
+| `getApiProviders()` | `ApiProviderRegistry.GetAll()` | ✅ |
+| `unregisterApiProviders(sourceId)` | `ApiProviderRegistry.Unregister(sourceId)` | ✅ |
+| `clearApiProviders()` | `ApiProviderRegistry.Clear()` | ✅ |
+
+`IApiProvider { Api, Stream(), StreamSimple() }` maps faithfully to pi-mono's `ApiProvider<TApi, TOptions>`.
+
+#### ModelRegistry — ⚠️ Partial
+
+| pi-mono | BotNexus | Status |
+|---|---|---|
+| `getModel(provider, modelId)` | `ModelRegistry.GetModel(provider, modelId)` | ✅ |
+| `getProviders()` | `ModelRegistry.GetProviders()` | ✅ |
+| `getModels(provider)` | `ModelRegistry.GetModels(provider)` | ✅ |
+| `calculateCost(model, usage)` | `ModelRegistry.CalculateCost(model, usage)` | ✅ |
+| `supportsXhigh(model)` | — | ❌ Missing |
+| `modelsAreEqual(a, b)` | — | ❌ Missing |
+
+**Action:** Add `SupportsXhigh(LlmModel)` and `ModelsAreEqual(LlmModel?, LlmModel?)` to `ModelRegistry`.
+
+---
+
+### 12. Missing Features — Items in pi-ai with No Equivalent
+
+#### 12a. OpenAICompletionsCompat — ⚠️ Partial (3 fields missing)
+
+| pi-mono field | BotNexus | Status |
+|---|---|---|
+| `supportsStore?` | `SupportsStore` | ✅ |
+| `supportsDeveloperRole?` | `SupportsDeveloperRole` | ✅ |
+| `supportsReasoningEffort?` | `SupportsReasoningEffort` | ✅ |
+| `reasoningEffortMap?` | `ReasoningEffortMap` | ✅ |
+| `supportsUsageInStreaming?` | `SupportsUsageInStreaming` | ✅ |
+| `maxTokensField?` | `MaxTokensField` | ✅ |
+| `requiresToolResultName?` | `RequiresToolResultName` | ✅ |
+| `requiresAssistantAfterToolResult?` | `RequiresAssistantAfterToolResult` | ✅ |
+| `requiresThinkingAsText?` | `RequiresThinkingAsText` | ✅ |
+| `thinkingFormat?` | `ThinkingFormat` | ✅ |
+| `supportsStrictMode?` | `SupportsStrictMode` | ✅ |
+| `openRouterRouting?` | — | ❌ Missing |
+| `vercelGatewayRouting?` | — | ❌ Missing |
+| `zaiToolStream?` | — | ❌ Missing |
+
+**Action:** Add `OpenRouterRouting?`, `VercelGatewayRouting?`, and `bool ZaiToolStream` to `OpenAICompletionsCompat`.
+
+#### 12b. EnvironmentApiKeys — ⚠️ Partial
+
+C# `EnvironmentApiKeys` handles: simple env-var map, `github-copilot` multi-var, `anthropic` OAuth-first.
+
+**Missing:**
+- ❌ `google-vertex` ADC credential detection (checks `~/.config/gcloud/application_default_credentials.json`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`)
+- ❌ `amazon-bedrock` multi-credential detection (`AWS_PROFILE`, `AWS_ACCESS_KEY_ID`, `AWS_BEARER_TOKEN_BEDROCK`, ECS/IRSA env vars)
+
+**Action:** Add Vertex and Bedrock credential detection to `EnvironmentApiKeys.GetApiKey()`.
+
+#### 12c. OAuth System — ❌ Not Ported
+
+pi-mono has a complete OAuth subsystem under `utils/oauth/`:
+- `OAuthProvider`, `OAuthCredentials`, `OAuthLoginCallbacks`, `OAuthPrompt` types
+- CLI login flow (`cli.ts`)
+- Provider registration
+
+This is a significant feature in pi-mono used for Anthropic console OAuth and potentially other providers.
+
+**Action:** Not immediately needed if C# consumers use API keys, but flag for future if OAuth provider auth is required.
+
+#### 12d. Utility Gaps
+
+| pi-mono utility | BotNexus equivalent | Status |
+|---|---|---|
+| `utils/event-stream.ts` | `LlmStream` | ✅ |
+| `utils/json-parse.ts` | `StreamingJsonParser` | ✅ |
+| `utils/sanitize-unicode.ts` | `UnicodeSanitizer` | ✅ |
+| `providers/simple-options.ts` | `SimpleOptionsHelper` | ✅ |
+| `providers/transform-messages.ts` | `MessageTransformer` | ✅ |
+| `providers/github-copilot-headers.ts` | `CopilotHeaders` | ✅ |
+| `utils/overflow.ts` | — | ❌ Missing |
+| `utils/validation.ts` | — | ❌ Missing |
+| `utils/hash.ts` | — | ❌ Missing |
+| `utils/typebox-helpers.ts` | — | N/A (TypeBox-specific) |
+| `providers/faux.ts` | — | ❌ Missing |
+
+- **`overflow.ts`**: Context window overflow detection and message truncation. Needed if consumers do long conversations.
+- **`validation.ts`**: Message validation (ensures well-formed conversations). Useful defensive check.
+- **`faux.ts`**: Mock/fake provider for testing. Useful for unit tests.
+
+**Action:** Port `overflow.ts` and `validation.ts` when needed. Port `faux.ts` for test infrastructure.
+
+#### 12e. Type System Gaps
+
+| pi-mono type | BotNexus equivalent | Status |
+|---|---|---|
+| `KnownApi` union type | Plain `string` | N/A (C# pattern) |
+| `KnownProvider` union type | Plain `string` | N/A (C# pattern) |
+| `ProviderStreamOptions` (`StreamOptions & Record<string, unknown>`) | Not typed | N/A (not needed in C#) |
+| `StreamFunction<TApi, TOptions>` type alias | `IApiProvider` interface | ✅ (different pattern, same purpose) |
+| `OpenAIResponsesCompat` | — | ❌ Missing (empty interface, low priority) |
+| `OpenRouterRouting` | — | ❌ Missing |
+| `VercelGatewayRouting` | — | ❌ Missing |
+
+---
+
+## Action Item Summary
+
+| Priority | Item | Location | Effort |
+|---|---|---|---|
+| **P1** | Add `Details` field to `ToolResultMessage` | `Models/Messages.cs` | S |
+| **P1** | Add `OpenRouterRouting`, `VercelGatewayRouting`, `ZaiToolStream` to `OpenAICompletionsCompat` | `Compatibility/OpenAICompletionsCompat.cs` | S |
+| **P2** | Add `SupportsXhigh()` and `ModelsAreEqual()` to `ModelRegistry` | `Registry/ModelRegistry.cs` | S |
+| **P2** | Add Vertex ADC + Bedrock multi-credential detection to `EnvironmentApiKeys` | `EnvironmentApiKeys.cs` | M |
+| **P2** | Reconcile `ThinkingBudgets` shape (plain int vs ThinkingBudgetLevel) | `Models/ThinkingBudgets.cs` | S |
+| **P3** | Port `overflow.ts` (context window overflow) | New: `Utilities/ContextOverflow.cs` | M |
+| **P3** | Port `validation.ts` (message validation) | New: `Utilities/MessageValidator.cs` | S |
+| **P3** | Port `faux.ts` (mock provider for tests) | New test project utility | M |
+| **P4** | Add `OpenRouterRouting` / `VercelGatewayRouting` record types | New: `Compatibility/` | S |
+| **P4** | Consider OAuth system port | New subsystem | L |
+
