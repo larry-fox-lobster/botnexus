@@ -145,6 +145,8 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+- 2026-04-05: Gateway now registers four built-in `IIsolationStrategy` implementations (`in-process`, `sandbox`, `container`, `remote`), and `DefaultAgentSupervisor` resolves by `Name` into a case-insensitive dictionary.
+- 2026-04-05: Platform config support is now centered on `~/.botnexus/config.json` via `PlatformConfigLoader` + `AddPlatformConfiguration`, which can set `GatewayOptions.DefaultAgentId`, switch sessions to `FileSessionStore`, and override agent descriptor directory.
 - 2026-04-06: Added Phase 2 channel stub projects `BotNexus.Channels.Tui` and `BotNexus.Channels.Telegram` with DI registration (`AddBotNexusTuiChannel`, `AddBotNexusTelegramChannel`) and lifecycle-safe `IChannelAdapter` placeholders for future inbound loop/API wiring.
 - 2026-04-06: `ToolExecutor.PrepareToolCallAsync` now validates raw tool-call arguments against `tool.Definition.Parameters` with `ToolCallValidator` before invoking `PrepareArgumentsAsync`, returning a tool-error result on schema failures.
 - Message bus publishing is now async-only; the sync `MessageBusExtensions.Publish()` wrapper was removed to eliminate sync-over-async deadlock risk.
