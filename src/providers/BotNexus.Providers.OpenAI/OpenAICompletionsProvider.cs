@@ -22,6 +22,56 @@ public sealed class OpenAICompletionsProvider(
     ILogger<OpenAICompletionsProvider> logger) : IApiProvider
 {
     private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+    private static readonly IReadOnlyDictionary<string, Action<CompatFlags>> CompatProfiles = new Dictionary<string, Action<CompatFlags>>
+    {
+        ["cerebras"] = flags =>
+        {
+            flags.SupportsStore = false;
+            flags.SupportsStoreParam = false;
+            flags.SupportsDeveloperRole = false;
+            flags.SupportsMetadata = false;
+        },
+        ["xai"] = flags =>
+        {
+            flags.SupportsStore = false;
+            flags.SupportsStoreParam = false;
+            flags.SupportsDeveloperRole = false;
+            flags.SupportsMetadata = false;
+            flags.SupportsReasoningEffort = false;
+        },
+        ["zai"] = flags =>
+        {
+            flags.SupportsStore = false;
+            flags.SupportsStoreParam = false;
+            flags.SupportsDeveloperRole = false;
+            flags.SupportsMetadata = false;
+            flags.SupportsReasoningEffort = false;
+            flags.ThinkingFormat = "zai";
+        },
+        ["deepseek"] = flags =>
+        {
+            flags.SupportsStore = false;
+            flags.SupportsStoreParam = false;
+            flags.SupportsDeveloperRole = false;
+            flags.SupportsMetadata = false;
+        },
+        ["chutes"] = flags =>
+        {
+            flags.SupportsStore = false;
+            flags.SupportsStoreParam = false;
+            flags.SupportsDeveloperRole = false;
+            flags.SupportsMetadata = false;
+            flags.MaxTokensField = "max_tokens";
+        },
+        ["groq"] = flags =>
+        {
+            flags.SupportsStore = false;
+            flags.SupportsStoreParam = false;
+            flags.SupportsDeveloperRole = false;
+            flags.SupportsMetadata = false;
+        },
+        ["openrouter"] = flags => flags.ThinkingFormat = "openrouter"
+    };
 
     public string Api => "openai-completions";
 
@@ -70,7 +120,7 @@ public sealed class OpenAICompletionsProvider(
         };
 
         if (options?.Reasoning is not null && model.Reasoning)
-            completionsOptions.ReasoningEffort = MapThinkingLevel(options.Reasoning.Value, model.Compat);
+            completionsOptions.ReasoningEffort = MapThinkingLevel(options.Reasoning.Value, GetCompat(model));
 
         return Stream(model, context, completionsOptions);
     }
@@ -82,7 +132,7 @@ public sealed class OpenAICompletionsProvider(
         StreamOptions? options,
         CancellationToken ct)
     {
-        var compat = model.Compat ?? new OpenAICompletionsCompat();
+        var compat = GetCompat(model);
         var apiKey = options?.ApiKey ?? EnvironmentApiKeys.GetApiKey(model.Provider) ?? "";
         if (string.IsNullOrWhiteSpace(apiKey))
         {
@@ -162,11 +212,14 @@ public sealed class OpenAICompletionsProvider(
         if (options?.MaxTokens is not null)
             payload[compat.MaxTokensField] = options.MaxTokens.Value;
 
-        if (options?.Temperature is not null)
+        if (compat.SupportsTemperature && options?.Temperature is not null)
             payload["temperature"] = options.Temperature.Value;
 
-        if (compat.SupportsStore)
+        if (compat.SupportsStore && compat.SupportsStoreParam)
             payload["store"] = false;
+
+        if (compat.SupportsMetadata && options?.Metadata is { Count: > 0 })
+            payload["metadata"] = JsonSerializer.SerializeToNode(options.Metadata);
 
         if (compat.SupportsUsageInStreaming)
             payload["stream_options"] = new JsonObject { ["include_usage"] = true };
@@ -724,6 +777,99 @@ public sealed class OpenAICompletionsProvider(
             ThinkingLevel.ExtraHigh => "high",
             _ => "medium"
         };
+    }
+
+    private static OpenAICompletionsCompat GetCompat(LlmModel model)
+    {
+        var detected = DetectCompat(model);
+        var configured = model.Compat;
+        if (configured is null)
+            return detected;
+
+        return detected with
+        {
+            SupportsStoreParam = configured.SupportsStoreParam,
+            SupportsStore = configured.SupportsStore,
+            SupportsDeveloperRole = configured.SupportsDeveloperRole,
+            SupportsTemperature = configured.SupportsTemperature,
+            SupportsMetadata = configured.SupportsMetadata,
+            SupportsReasoningEffort = configured.SupportsReasoningEffort,
+            ReasoningEffortMap = configured.ReasoningEffortMap ?? detected.ReasoningEffortMap,
+            SupportsUsageInStreaming = configured.SupportsUsageInStreaming,
+            MaxTokensField = configured.MaxTokensField,
+            RequiresToolResultName = configured.RequiresToolResultName,
+            RequiresAssistantAfterToolResult = configured.RequiresAssistantAfterToolResult,
+            RequiresThinkingAsText = configured.RequiresThinkingAsText,
+            ThinkingFormat = configured.ThinkingFormat,
+            SupportsStrictMode = configured.SupportsStrictMode
+        };
+    }
+
+    private static OpenAICompletionsCompat DetectCompat(LlmModel model)
+    {
+        var provider = model.Provider.ToLowerInvariant();
+        var baseUrl = model.BaseUrl.ToLowerInvariant();
+        var flags = new CompatFlags();
+
+        var matches = new Dictionary<string, bool>
+        {
+            ["cerebras"] = provider == "cerebras" || baseUrl.Contains("cerebras.ai"),
+            ["xai"] = provider == "xai" || baseUrl.Contains("api.x.ai"),
+            ["zai"] = provider == "zai" || baseUrl.Contains("api.z.ai"),
+            ["deepseek"] = provider == "deepseek" || baseUrl.Contains("deepseek.com"),
+            ["chutes"] = baseUrl.Contains("chutes.ai"),
+            ["groq"] = provider == "groq" || baseUrl.Contains("groq.com"),
+            ["openrouter"] = provider == "openrouter" || baseUrl.Contains("openrouter.ai")
+        };
+
+        foreach (var (key, isMatch) in matches)
+        {
+            if (!isMatch) continue;
+            CompatProfiles[key](flags);
+        }
+
+        if (matches["groq"] && string.Equals(model.Id, "qwen/qwen3-32b", StringComparison.Ordinal))
+        {
+            flags.ReasoningEffortMap = new Dictionary<ThinkingLevel, string>
+            {
+                [ThinkingLevel.Minimal] = "default",
+                [ThinkingLevel.Low] = "default",
+                [ThinkingLevel.Medium] = "default",
+                [ThinkingLevel.High] = "default",
+                [ThinkingLevel.ExtraHigh] = "default"
+            };
+        }
+
+        return new OpenAICompletionsCompat
+        {
+            SupportsStoreParam = flags.SupportsStoreParam,
+            SupportsStore = flags.SupportsStore,
+            SupportsDeveloperRole = flags.SupportsDeveloperRole,
+            SupportsTemperature = flags.SupportsTemperature,
+            SupportsMetadata = flags.SupportsMetadata,
+            SupportsReasoningEffort = flags.SupportsReasoningEffort,
+            ReasoningEffortMap = flags.ReasoningEffortMap,
+            SupportsUsageInStreaming = true,
+            MaxTokensField = flags.MaxTokensField,
+            RequiresToolResultName = false,
+            RequiresAssistantAfterToolResult = false,
+            RequiresThinkingAsText = false,
+            ThinkingFormat = flags.ThinkingFormat,
+            SupportsStrictMode = true
+        };
+    }
+
+    private sealed class CompatFlags
+    {
+        public bool SupportsStoreParam { get; set; } = true;
+        public bool SupportsStore { get; set; } = true;
+        public bool SupportsDeveloperRole { get; set; } = true;
+        public bool SupportsTemperature { get; set; } = true;
+        public bool SupportsMetadata { get; set; } = true;
+        public bool SupportsReasoningEffort { get; set; } = true;
+        public string MaxTokensField { get; set; } = "max_completion_tokens";
+        public string ThinkingFormat { get; set; } = "openai";
+        public Dictionary<ThinkingLevel, string>? ReasoningEffortMap { get; set; }
     }
 
     #endregion
