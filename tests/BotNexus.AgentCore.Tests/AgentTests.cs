@@ -244,7 +244,7 @@ public class AgentTests
     }
 
     [Fact]
-    public async Task PromptAsync_AddsPartialAssistantMessageOnMessageStart()
+    public async Task PromptAsync_DefersAssistantMessageAddUntilMessageEnd()
     {
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var provider = RegisterProviderWithDelayedCompletion(release);
@@ -252,10 +252,11 @@ public class AgentTests
 
         var runTask = agent.PromptAsync("stream");
         SpinWait.SpinUntil(() => agent.State.StreamingMessage is not null, TimeSpan.FromSeconds(2)).Should().BeTrue();
-        agent.State.Messages.Last().Should().BeOfType<AssistantAgentMessage>();
+        agent.State.Messages.Last().Should().BeOfType<UserMessage>();
 
         release.TrySetResult();
         await runTask;
+        agent.State.Messages.Last().Should().BeOfType<AssistantAgentMessage>();
     }
 
     [Fact]
