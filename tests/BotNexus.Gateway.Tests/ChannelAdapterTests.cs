@@ -1,19 +1,44 @@
+using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Api.Controllers;
+using BotNexus.Gateway.Sessions;
+using FluentAssertions;
+using Microsoft.AspNetCore.Mvc;
+
 namespace BotNexus.Gateway.Tests;
 
-public class ChannelAdapterTests
+public class SessionsControllerTests
 {
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void RegisterAdapters_ExposesEnabledTuiTelegramAndWebUiAdapters() { }
+    [Fact]
+    public async Task List_WithExistingSessions_ReturnsSessions()
+    {
+        var store = new InMemorySessionStore();
+        await store.GetOrCreateAsync("s1", "agent-a");
+        var controller = new SessionsController(store);
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void NormalizeInboundMessage_MapsAdapterPayloadToCanonicalRequest() { }
+        var result = await controller.List(null, CancellationToken.None);
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void FormatOutboundMessage_UsesAdapterSpecificContract() { }
+        ((result.Result as OkObjectResult)?.Value as IReadOnlyList<GatewaySession>).Should().HaveCount(1);
+    }
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void AdapterFailure_DoesNotImpactOtherRegisteredAdapters() { }
+    [Fact]
+    public async Task Get_WithUnknownSession_ReturnsNotFound()
+    {
+        var controller = new SessionsController(new InMemorySessionStore());
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void AdapterReconnect_RecoversFromTransientTransportFailure() { }
+        var result = await controller.Get("missing", CancellationToken.None);
+
+        result.Result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task Delete_WithAnySession_ReturnsNoContent()
+    {
+        var store = new InMemorySessionStore();
+        await store.GetOrCreateAsync("s1", "agent-a");
+        var controller = new SessionsController(store);
+
+        var result = await controller.Delete("s1", CancellationToken.None);
+
+        result.Should().BeOfType<NoContentResult>();
+    }
 }

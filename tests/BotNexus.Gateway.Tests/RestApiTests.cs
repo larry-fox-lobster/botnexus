@@ -1,22 +1,65 @@
+using BotNexus.Gateway.Abstractions.Agents;
+using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Agents;
+using BotNexus.Gateway.Api.Controllers;
+using FluentAssertions;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+
 namespace BotNexus.Gateway.Tests;
 
-public class RestApiTests
+public class AgentsControllerTests
 {
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void GetHealth_ReturnsOkWithoutAgentContext() { }
+    [Fact]
+    public void List_WhenAgentsRegistered_ReturnsRegisteredAgents()
+    {
+        var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
+        registry.Register(CreateDescriptor("agent-a"));
+        var controller = new AgentsController(registry, Mock.Of<IAgentSupervisor>());
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void PostAgent_WithValidPayload_CreatesAgent() { }
+        var result = controller.List();
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void PostAgent_WithInvalidPayload_ReturnsProblemDetails() { }
+        ((result.Result as OkObjectResult)?.Value as IReadOnlyList<AgentDescriptor>).Should().HaveCount(1);
+    }
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void GetSession_WithKnownSessionId_ReturnsSessionState() { }
+    [Fact]
+    public void Get_WithUnknownAgent_ReturnsNotFound()
+    {
+        var controller = new AgentsController(new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance), Mock.Of<IAgentSupervisor>());
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void DeleteSession_WithKnownSessionId_ClosesAndRemovesSession() { }
+        var result = controller.Get("missing");
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void RestAndWebSocketState_ReadsReturnConsistentAgentView() { }
+        result.Result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public void Register_WithValidDescriptor_ReturnsCreated()
+    {
+        var controller = new AgentsController(new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance), Mock.Of<IAgentSupervisor>());
+
+        var result = controller.Register(CreateDescriptor("agent-a"));
+
+        result.Should().BeOfType<CreatedAtActionResult>();
+    }
+
+    [Fact]
+    public void Register_WithDuplicateAgent_ReturnsConflict()
+    {
+        var controller = new AgentsController(new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance), Mock.Of<IAgentSupervisor>());
+        _ = controller.Register(CreateDescriptor("agent-a"));
+
+        var result = controller.Register(CreateDescriptor("agent-a"));
+
+        result.Should().BeOfType<ConflictObjectResult>();
+    }
+
+    private static AgentDescriptor CreateDescriptor(string agentId)
+        => new()
+        {
+            AgentId = agentId,
+            DisplayName = $"{agentId}-display",
+            ModelId = "test-model",
+            ApiProvider = "test-provider"
+        };
 }

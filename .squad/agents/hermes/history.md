@@ -105,6 +105,12 @@ Baseline: build is clean, all 124 tests pass. Ready for implementation.
 - `MultiAgentFixture` uses xUnit `ICollectionFixture<>` with `DisableParallelization = true` to share one Gateway instance across all 8 test classes. Each test uses unique chat IDs (`Guid.NewGuid()`) to isolate message routing.
 - Full suite: 192 tests pass (158 unit + 19 integration + 15 E2E). No external service dependencies. Tests complete in ~1 second.
 
+### 2026-04-05 — Gateway unit-test baseline for committed implementations
+
+- `tests/BotNexus.Gateway.Tests` now references `BotNexus.Gateway`, `BotNexus.Gateway.Sessions`, `BotNexus.Gateway.Api`, and `BotNexus.Channels.Core` directly (plus `Microsoft.AspNetCore.App` framework reference) so implementation-level tests compile against the real Gateway stack.
+- Replaced all placeholder Gateway test stubs with real unit tests covering `DefaultAgentRegistry`, `InMemorySessionStore`, `DefaultMessageRouter`, `InMemoryActivityBroadcaster`, `AgentsController`, and `SessionsController`, including concurrency and routing precedence behavior.
+- Verified targeted quality gate: `dotnet build tests\BotNexus.Gateway.Tests\BotNexus.Gateway.Tests.csproj` and `dotnet test tests\BotNexus.Gateway.Tests\ --no-build --verbosity normal` passing with 30/30 tests green.
+
 ## Sprint 2 Summary — 2026-04-01T17:45Z
 
 ✅ **COMPLETE** — (No items assigned; Hermes on standby for Phase 3 test work)

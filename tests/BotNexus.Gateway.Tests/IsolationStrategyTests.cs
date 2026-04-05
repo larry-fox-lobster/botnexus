@@ -1,22 +1,69 @@
+using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Activity;
+using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace BotNexus.Gateway.Tests;
 
-public class IsolationStrategyTests
+public class InMemoryActivityBroadcasterTests
 {
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void ResolveIsolationStrategy_SelectsConfiguredLocalStrategy() { }
+    [Fact]
+    public async Task PublishAsync_WithoutSubscribers_DoesNotThrow()
+    {
+        var broadcaster = new InMemoryActivityBroadcaster(NullLogger<InMemoryActivityBroadcaster>.Instance);
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void ResolveIsolationStrategy_SelectsConfiguredSandboxStrategy() { }
+        var act = () => broadcaster.PublishAsync(CreateActivity()).AsTask();
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void ResolveIsolationStrategy_SelectsConfiguredContainerStrategy() { }
+        await act.Should().NotThrowAsync();
+    }
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void ResolveIsolationStrategy_SelectsConfiguredRemoteStrategy() { }
+    [Fact]
+    public async Task SubscribeAsync_ReceivesPublishedEvents()
+    {
+        var broadcaster = new InMemoryActivityBroadcaster(NullLogger<InMemoryActivityBroadcaster>.Instance);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await using var subscription = broadcaster.SubscribeAsync(cts.Token).GetAsyncEnumerator(cts.Token);
+        var moveNext = subscription.MoveNextAsync().AsTask();
+        await Task.Delay(20, cts.Token);
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void ResolveIsolationStrategy_WithUnknownStrategy_ReturnsValidationError() { }
+        await broadcaster.PublishAsync(CreateActivity(), cts.Token);
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void InitializeIsolationStrategy_WhenBackendUnavailable_ReturnsClearFailure() { }
+        (await moveNext).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SubscribeAsync_WithMultipleSubscribers_DeliversToEachSubscriber()
+    {
+        var broadcaster = new InMemoryActivityBroadcaster(NullLogger<InMemoryActivityBroadcaster>.Instance);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await using var first = broadcaster.SubscribeAsync(cts.Token).GetAsyncEnumerator(cts.Token);
+        await using var second = broadcaster.SubscribeAsync(cts.Token).GetAsyncEnumerator(cts.Token);
+        var firstMoveNext = first.MoveNextAsync().AsTask();
+        var secondMoveNext = second.MoveNextAsync().AsTask();
+        await Task.Delay(20, cts.Token);
+
+        await broadcaster.PublishAsync(CreateActivity(), cts.Token);
+
+        new[] { await firstMoveNext, await secondMoveNext }.Should().OnlyContain(x => x);
+    }
+
+    [Fact]
+    public async Task SubscribeAsync_WhenCancelled_EndsSubscription()
+    {
+        var broadcaster = new InMemoryActivityBroadcaster(NullLogger<InMemoryActivityBroadcaster>.Instance);
+        using var cts = new CancellationTokenSource();
+        await using var subscription = broadcaster.SubscribeAsync(cts.Token).GetAsyncEnumerator(cts.Token);
+        var moveNext = subscription.MoveNextAsync().AsTask();
+
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => moveNext);
+    }
+
+    private static GatewayActivity CreateActivity()
+        => new()
+        {
+            Type = GatewayActivityType.System,
+            Message = "activity"
+        };
 }

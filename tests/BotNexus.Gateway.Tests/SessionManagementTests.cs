@@ -1,22 +1,88 @@
+using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Sessions;
+using FluentAssertions;
+
 namespace BotNexus.Gateway.Tests;
 
-public class SessionManagementTests
+public class InMemorySessionStoreTests
 {
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void CreateSession_InitializesStateAndHistory() { }
+    [Fact]
+    public async Task GetOrCreateAsync_WithUnknownSession_CreatesSession()
+    {
+        var store = new InMemorySessionStore();
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void ReconnectSession_RestoresStateFromStore() { }
+        var session = await store.GetOrCreateAsync("s1", "agent-a");
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void ResumeSession_AfterRestart_PreservesMessageOrdering() { }
+        session.SessionId.Should().Be("s1");
+    }
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void ExpiredSession_IsRejectedAndMarkedClosed() { }
+    [Fact]
+    public async Task GetOrCreateAsync_WithExistingSession_ReturnsExistingSession()
+    {
+        var store = new InMemorySessionStore();
+        var created = await store.GetOrCreateAsync("s1", "agent-a");
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void ConcurrentSessionUpdates_AreSerializedDeterministically() { }
+        var loaded = await store.GetOrCreateAsync("s1", "agent-b");
 
-    [Fact(Skip = "Pending Gateway interfaces and implementation.")]
-    public void SessionHistory_TruncationPolicy_MaintainsRecentContext() { }
+        loaded.Should().BeSameAs(created);
+    }
+
+    [Fact]
+    public async Task SaveAsync_PersistsSessionChanges()
+    {
+        var store = new InMemorySessionStore();
+        var session = await store.GetOrCreateAsync("s1", "agent-a");
+        session.CallerId = "caller-1";
+
+        await store.SaveAsync(session);
+        var loaded = await store.GetAsync("s1");
+
+        loaded!.CallerId.Should().Be("caller-1");
+    }
+
+    [Fact]
+    public async Task DeleteAsync_RemovesSession()
+    {
+        var store = new InMemorySessionStore();
+        await store.GetOrCreateAsync("s1", "agent-a");
+
+        await store.DeleteAsync("s1");
+
+        (await store.GetAsync("s1")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ListAsync_WithoutFilter_ReturnsAllSessions()
+    {
+        var store = new InMemorySessionStore();
+        await store.GetOrCreateAsync("s1", "agent-a");
+        await store.GetOrCreateAsync("s2", "agent-b");
+
+        var sessions = await store.ListAsync();
+
+        sessions.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task ListAsync_WithAgentFilter_ReturnsMatchingSessionsOnly()
+    {
+        var store = new InMemorySessionStore();
+        await store.GetOrCreateAsync("s1", "agent-a");
+        await store.GetOrCreateAsync("s2", "agent-a");
+        await store.GetOrCreateAsync("s3", "agent-b");
+
+        var sessions = await store.ListAsync("agent-a");
+
+        sessions.Should().OnlyContain(s => s.AgentId == "agent-a");
+    }
+
+    [Fact]
+    public async Task GetAsync_WithUnknownSession_ReturnsNull()
+    {
+        var store = new InMemorySessionStore();
+
+        var session = await store.GetAsync("unknown");
+
+        session.Should().BeNull();
+    }
 }

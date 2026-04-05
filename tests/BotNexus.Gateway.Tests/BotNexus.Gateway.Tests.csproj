@@ -17,6 +17,15 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\gateway\BotNexus.Gateway\BotNexus.Gateway.csproj" />
+    <ProjectReference Include="..\..\src\gateway\BotNexus.Gateway.Sessions\BotNexus.Gateway.Sessions.csproj" />
+    <ProjectReference Include="..\..\src\gateway\BotNexus.Gateway.Api\BotNexus.Gateway.Api.csproj" />
+    <ProjectReference Include="..\..\src\channels\BotNexus.Channels.Core\BotNexus.Channels.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>
