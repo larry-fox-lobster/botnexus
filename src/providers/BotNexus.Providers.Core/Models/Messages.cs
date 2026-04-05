@@ -33,5 +33,6 @@ public sealed record ToolResultMessage(
     string ToolName,
     IReadOnlyList<ContentBlock> Content,
     bool IsError,
-    long Timestamp
+    long Timestamp,
+    object? Details = null
 ) : Message(Timestamp);
