@@ -100,4 +100,36 @@ public class ToolCallValidatorTests
         result.IsValid.Should().BeTrue();
         result.Errors.Should().BeEmpty();
     }
+
+    [Fact]
+    public void Validate_WhenSchemaHasNoRules_ReturnsSuccess()
+    {
+        var arguments = JsonDocument.Parse("""{ "foo": 1, "bar": "text" }""").RootElement.Clone();
+        var schema = JsonDocument.Parse("""{ }""").RootElement.Clone();
+
+        var result = ToolCallValidator.Validate(arguments, schema);
+
+        result.IsValid.Should().BeTrue();
+        result.Errors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Validate_WhenAdditionalPropertiesPresent_DoesNotReject()
+    {
+        var arguments = JsonDocument.Parse("""{ "required": "ok", "unexpected": 42 }""").RootElement.Clone();
+        var schema = JsonDocument.Parse("""
+            {
+              "type": "object",
+              "properties": {
+                "required": { "type": "string" }
+              },
+              "required": ["required"]
+            }
+            """).RootElement.Clone();
+
+        var result = ToolCallValidator.Validate(arguments, schema);
+
+        result.IsValid.Should().BeTrue();
+        result.Errors.Should().BeEmpty();
+    }
 }
