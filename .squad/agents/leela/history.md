@@ -1298,6 +1298,33 @@ Sprint closed successfully. 18 commits across 5 agents resolved all 15 P0s and 1
 - Configuration hot-reload with FileSystemWatcher requires careful synchronization between dispose and reload paths — the debounce timer creates a timing window.
 - Test coverage for configuration/validation code is non-negotiable. These classes have complex conditional logic that unit tests catch cheaply.
 
+## 2026-04-05T23:30:00Z — Phase 4 Wave 1 Design Review
+
+**Status:** ✅ Complete  
+**Overall Grade:** A-  
+**Scope:** 12 commits — runtime hardening, config validation, multi-tenant auth  
+
+**Key Findings:**
+
+**Strengths:**
+- Runtime hardening: recursion guard (AsyncLocal<HashSet>), race prevention (TaskCompletionSource), WebSocket reconnection caps (exponential backoff)
+- Multi-tenant auth: O(1) identity map lookup, backward compatible (dev mode + legacy single key + platform config)
+- Error messages: dotted-path notation (e.g., `gateway.apiKeys.tenant-a.apiKey`), deduplicated, sorted
+- Thread safety: textbook async patterns — AsyncLocal scoping, TCS with RunContinuationsAsynchronously, ConcurrentDictionary
+
+**P1 Issues (Requires Fix Next Sprint):**
+1. Config endpoint filesystem probing: `?path=` parameter passes through Path.GetFullPath() with no restriction. Risk: information disclosure. Fix: restrict to config directory or require auth.
+2. Config validation endpoint missing auth: GET /api/config/validate accessible without middleware. Combined with P1-1, unauthenticated filesystem probe. Fix: wire IGatewayAuthHandler or gate to admin-only.
+3. Recursion guard tests skipped: marked [Fact(Skip = "Pending...")]. Implementation exists but unvalidated. Fix: enable tests or adjust assertions.
+
+**P2 Issues (Backlog):**
+- ApplyPlatformConfig property copy fragile (no sync on new PlatformConfig properties)
+- WebSocket handler accumulating connection-limit logic (~100 lines); extract IConnectionRateLimiter
+- No max call-chain depth limit (cycle guard exists, but not depth guard)
+- Dual source-of-truth: root-level listenUrl vs gateway.listenUrl can conflict
+
+**Verdict:** Ship it. Phase 4 Wave 1 well-executed. Config endpoint needs auth gating before production.
+
 ---
 
 ### 2026-04-02 — Incremental Build Performance Fix

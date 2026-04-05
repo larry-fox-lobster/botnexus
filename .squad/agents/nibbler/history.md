@@ -283,6 +283,37 @@ Participated in design review ceremony for Phase 3 architecture. All ADs approve
    - Documentation updated before sprint close
    - Pre-commit bypass usage compliant with exceptions
 
+## 2026-04-05T23:30:00Z — Phase 4 Wave 1 Consistency Review
+
+**Status:** ✅ Complete  
+**Grade:** Good  
+**Build:** 0 errors, 0 warnings | **Tests:** 684 passed, 0 failed, 2 skipped  
+
+**P1s Found & Fixed (2 commits: cc005da, 1b5a0fc):**
+
+1. **ConfigController.cs missing XML docs** — Phase 4 added config validation endpoint without class/method/record XML docs. All other controllers have them. Fixed: added complete XML doc coverage.
+2. **PlatformConfig property-level docs inconsistency** — Phase 4 added ApiKeyConfig, GatewaySettingsConfig, AgentDefinitionConfig, ChannelConfig without property-level docs while pre-existing ProviderConfig had them. Fixed: added property-level docs to all.
+3. **Stale ConfigureAwait comment** — FileSessionStore.cs comment incorrectly called BotNexus.Gateway a "host project" (it's a library) and didn't reflect Phase 4's .ConfigureAwait(false) addition to AgentConfigurationHostedService. Fixed: rewrote comment to correctly describe all three tiers.
+
+**P2 Issues Documented (5 found, not fixed):**
+- GatewayWebSocketOptions hardcoded limits (not configurable via appsettings.json)
+- API reference missing Chat and Config endpoints
+- README project structure stale
+- ConfigureAwait(false) inconsistent within Gateway library (one method vs none elsewhere)
+- Pre-existing XML doc gaps on implementation classes
+
+**What Phase 4 Got Right:**
+- Naming conventions: CancellationToken params, I-prefix interfaces, Method_Condition_Result test pattern
+- sealed modifiers: all implementations properly sealed
+- DI ↔ Controllers: all dependencies registered, multi-tenant auth correctly replaced
+- Interface contracts: all 5 implementations fully satisfy contracts
+- Multi-tenant API keys: end-to-end consistent
+- Config validation: pipeline works correctly
+- Recursion guard: AsyncLocal call chain prevents circular cross-agent calls
+- Duplicate create prevention: TaskCompletionSource handles concurrent waiters correctly
+
+**All Previous P1s Remain Fixed.** Overall consistency Good — improved since last review.
+
 3. **Blockers Found:**
    - None. All agent work internally consistent and well-integrated.
 

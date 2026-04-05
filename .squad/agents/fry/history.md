@@ -353,6 +353,22 @@ See decisions.md "Part 4: Implementation Phases & Work Items" for full roadmap w
    - Active sessions count
    - Memory consolidation state (configured, enabled, last run, success)
 
+## 2026-04-05T23:30:00Z — Phase 4 Wave 1 Delivery
+
+**Status:** ✅ Complete  
+**Commit:** 5202779  
+
+**WebUI Enhancements (Fry):**
+- Thinking blocks display during streaming
+- Tool timers show elapsed time for execution phases
+- Steer mode UX: "🧭 Steer" button + placeholder update when streaming
+- Reconnection banners: user-visible alerts for WebSocket reconnects
+- Proper state reset: clean message state on stream end/error/abort
+
+**Design Review (Leela):** A- Grade. Multi-tenant auth solid, runtime hardening textbook-correct. 3 P1s flagged: config endpoint filesystem probing, missing auth on config validation, skipped recursion tests. 4 P2s documented.
+
+**Consistency Review (Nibbler):** Good grade. 2 P1s fixed (ConfigController XML docs, PlatformConfig property docs). Stale comment updated. 5 P2s documented.
+
 2. **GET /api/doctor** — Diagnostic checkup endpoint:
    - Runs all checkups via `CheckupRunner.RunAndFixAsync` (read-only, no auto-fix)
    - Returns summary (passed/warnings/failed counts) and per-checkup results
@@ -451,3 +467,23 @@ See decisions.md "Part 4: Implementation Phases & Work Items" for full roadmap w
 **Features Delivered:** Connection banner states (connecting/reconnecting/failure/success), 30s response timeout warning, agent error bubbles (`.message-error`), typing indicator + streaming pulse (`.message-streaming`), send button spinner state (`.btn-sending`), and steer flow via `{ type: "steer" }` with queued badge (`.steer-indicator`).
 
 **Pattern Established:** Keep `currentSessionId` stable across reconnects and immediately rehydrate chat from `GET /api/sessions/{sessionId}` after successful reconnect so UI state self-heals after dropped sockets.
+
+### Thinking/Tool Display Enhancement + Steering UX (2026-07-24)
+**Timestamp:** 2026-07-24
+**Status:** ✅ Complete
+**Commit:** 5202779 — feat(webui): enhance thinking/tool display and steering UX
+
+**Features Delivered:**
+1. **Thinking stats** — Live character count in thinking toggle during streaming, final count on completion (e.g., "Thought process (2.3k chars)")
+2. **Tool elapsed time** — Live counter on running tool calls, displayed on completion badges (e.g., "✓ Done 3s")
+3. **Steer mode UX** — Send button changes to "🧭 Steer" with orange styling when agent is streaming; input placeholder updates to guide user
+4. **Reconnection counter** — Banner shows attempt progress (e.g., "attempt 3/10")
+5. **State cleanup** — Tool timers and send button state properly reset on abort/error/finalize
+
+**Gateway verification:** Health endpoint (`/health`), WebUI root (`/`), agents/sessions APIs all confirmed working with live Gateway on localhost:5000.
+
+**Patterns Established:**
+- `formatCharCount()` utility for human-readable character counts (raw under 1k, "Xk" above)
+- `toolStartTimes` map + `setInterval` for live elapsed tracking, cleared on tool_end or abort
+- `updateSendButtonState()` manages send button label/style based on `isStreaming` state
+- CSS `.btn-steer` class for orange steering mode visual feedback
