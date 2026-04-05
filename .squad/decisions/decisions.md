@@ -1,4 +1,6 @@
-# Retrospective — Port Audit Phase 3
+# Decisions Log
+
+## Retrospective — Port Audit Phase 3
 
 **Facilitator:** Leela (Lead/Architect)  
 **Date:** 2026-04-06  
@@ -7,7 +9,7 @@
 
 ---
 
-## 1. What Happened (Facts)
+### 1. What Happened (Facts)
 
 **Scope:** Full audit of pi-mono `packages/ai`, `packages/agent`, `packages/coding-agent` against the BotNexus C# port. 9 architecture decisions proposed (AD-9 through AD-17).
 
@@ -29,44 +31,44 @@
 
 ---
 
-## 2. What Went Well
+### 2. What Went Well
 
-### Parallel execution tracks worked
+#### Parallel execution tracks worked
 Sprint 3a ran Farnsworth and Bender in parallel on independent subsystems (AgentCore/Providers vs CodingAgent). No merge conflicts. No cross-dependency issues. The design review's boundary analysis (AD assignments by subsystem) made this possible.
 
-### YAGNI discipline held
+#### YAGNI discipline held
 AD-13 (OpenRouter routing types) was correctly deferred. No provider exists. Building types for imagined future routing would have added dead code. The team made the right call.
 
-### Design review → sprint pipeline is maturing
+#### Design review → sprint pipeline is maturing
 Phase 3 followed the same ceremony as Phase 2: audit → design review → architecture decisions → parallel sprint → consistency review. The cadence is stable and repeatable.
 
-### Test count growth is healthy
+#### Test count growth is healthy
 43 new tests in one sprint. Total at 415. Test coverage follows code — not bolted on after the fact.
 
-### AD-16 and AD-17 caught existing coverage
+#### AD-16 and AD-17 caught existing coverage
 Two items turned out to be already present in the codebase. The audit correctly identified them rather than duplicating work. AD-17 only needed the `/thinking` slash command addition (the `--thinking` CLI flag already existed).
 
 ---
 
-## 3. What Could Improve
+### 3. What Could Improve
 
-### Documentation was written against planned APIs, not implemented code
+#### Documentation was written against planned APIs, not implemented code
 This is the root cause of 18 of the 22 consistency issues. Kif wrote training docs during the sprint based on design review decisions (planned signatures) rather than waiting for final implementations. Every new training module had at least one wrong API signature.
 
-### No handoff checkpoint between code and docs agents
+#### No handoff checkpoint between code and docs agents
 Bender shipped code. Kif wrote docs. Neither verified against the other's output. There is no process gate that says "docs agent must read final code before authoring examples."
 
-### Consistency review is reactive, not preventive
+#### Consistency review is reactive, not preventive
 Nibbler found 22 issues — but only after the sprint was "complete." The fix commit (`e7ff6d8`) is waste: work that wouldn't exist if the docs had been right the first time. We need to catch this before the sprint ends, not after.
 
-### IAgentTool.ExecuteAsync signature was wrong in 4 separate places
+#### IAgentTool.ExecuteAsync signature was wrong in 4 separate places
 The `toolCallId` parameter was missing from the interface definition AND all examples in `09-tool-development.md`. This suggests Kif was working from an earlier version of the interface, before `toolCallId` was added. The docs agent needs a way to query current code signatures, not rely on its training data.
 
 ---
 
-## 4. Root Cause Analysis — 22 Consistency Issues
+### 4. Root Cause Analysis — 22 Consistency Issues
 
-### Primary Root Cause: Docs authored from design decisions, not from code
+#### Primary Root Cause: Docs authored from design decisions, not from code
 
 **Evidence:** Nibbler's report shows a clear pattern:
 - `07-thinking-levels.md` said `--thinking` didn't exist → it was the primary deliverable of AD-10
@@ -76,17 +78,17 @@ The `toolCallId` parameter was missing from the interface definition AND all exa
 
 All four HIGH-severity issues stem from the same cause: the docs agent wrote against the plan, not the code.
 
-### Contributing Factor: No compilation gate for doc examples
+#### Contributing Factor: No compilation gate for doc examples
 
 Training doc code examples are markdown fenced blocks. They aren't compiled. They aren't tested. A typo in a code example (`string?` vs `IReadOnlyList<string>`) is invisible unless a human (or Nibbler) reads it line by line.
 
-### Contributing Factor: Sprint parallelism without sync point
+#### Contributing Factor: Sprint parallelism without sync point
 
 Kif and Bender ran in parallel. This was intentional (speed). But it means Kif couldn't see Bender's final code — because it didn't exist yet when Kif started writing.
 
 ---
 
-## 5. Action Items for Next Sprint
+### 5. Action Items for Next Sprint
 
 | # | Action | Owner | Priority |
 |---|--------|-------|----------|
@@ -98,9 +100,9 @@ Kif and Bender ran in parallel. This was intentional (speed). But it means Kif c
 
 ---
 
-## 6. Architecture Grade Update
+### 6. Architecture Grade Update
 
-### Grade: **A** (maintained from Phase 2)
+#### Grade: **A** (maintained from Phase 2)
 
 **Justification:**
 - All planned port gaps from pi-mono `packages/ai`, `packages/agent`, and `packages/coding-agent` are either resolved or consciously deferred (YAGNI)
@@ -111,7 +113,7 @@ Kif and Bender ran in parallel. This was intentional (speed). But it means Kif c
 
 **Risk:** The 22-fix consistency commit is a process smell, not an architecture smell. The code is sound. The documentation pipeline needs the gates described above.
 
-### Cumulative Stats (All 3 Phases)
+#### Cumulative Stats (All 3 Phases)
 
 | Metric | Phase 1 | Phase 2 | Phase 3 | Total |
 |--------|---------|---------|---------|-------|
@@ -123,6 +125,61 @@ Kif and Bender ran in parallel. This was intentional (speed). But it means Kif c
 
 ---
 
-## Summary
+### Summary
 
 Phase 3 completed its mission: the pi-mono port audit is done. All three source packages have been scanned. The code quality is high — the issues we found were documentation process failures, not code defects. The single most important process improvement is **staggering doc authoring behind code commits** so examples are written against real implementations. This is the concrete change we're making for the next sprint.
+
+---
+
+## Post-Sprint 3 Consistency Review
+
+**Author:** Nibbler (Consistency Reviewer)  
+**Date:** 2026-04-03  
+**Commit:** e7ff6d8
+
+### Summary
+
+Sprint 3 delivered 7 features (AD-9 through AD-17) with 4 new training docs and multiple API changes. Consistency review found **22 discrepancies** across 7 files — all fixed.
+
+### Pattern Observed
+
+New training docs (06-09) were written based on planned APIs rather than final implementations. Every Sprint 3 training doc had at least one wrong API signature. The most critical gap was 07-thinking-levels.md claiming `--thinking` didn't exist in the CLI — when it was the primary deliverable of AD-10 and AD-17.
+
+### Discrepancies Fixed (by severity)
+
+#### HIGH (7)
+1. **07-thinking-levels.md**: CLI section said "--thinking flag does not exist" — rewrote with actual --thinking, /thinking, and session metadata
+2. **09-tool-development.md**: IAgentTool.ExecuteAsync missing `toolCallId` parameter across interface definition and all 4 examples
+3. **09-tool-development.md**: GetPromptGuidelines return type wrong (`string?` vs `IReadOnlyList<string>`)
+4. **06-context-file-discovery.md**: Truncation algorithm was binary search in docs, char-by-char iteration in code
+5. **08-building-custom-coding-agent.md**: SystemPromptBuilder.Build() called with non-existent parameters
+6. **03-coding-agent.md**: Missing ListDirectoryTool from tool table, code example, and count
+7. **CodingAgent/README.md**: Tool count wrong (6→7), missing --thinking in CLI help
+
+#### MEDIUM (10)
+8. **08-building-custom-coding-agent.md**: Missing `using BotNexus.CodingAgent.Utils` namespace import
+9. **08-building-custom-coding-agent.md**: SystemPromptBuilder used as static method but it's instance-based
+10. **08-building-custom-coding-agent.md**: Cross-ref linked to `08-tool-development.md` instead of `09-tool-development.md`
+11. **09-tool-development.md**: EchoTool example ExecuteAsync wrong signature
+12. **09-tool-development.md**: CalculatorTool example ExecuteAsync wrong signature
+13. **09-tool-development.md**: DatabaseQueryTool example ExecuteAsync wrong signature + wrong callback name
+14. **09-tool-development.md**: Error handling example ExecuteAsync wrong signature
+15. **09-tool-development.md**: Built-in tools list missing ListDirectoryTool
+16. **05-glossary.md**: Duplicate ThinkingLevel entry (lines 432 and 531)
+17. **05-glossary.md**: Cross-reference header missing modules 06-09
+
+#### LOW (5)
+18. **CodingAgent/README.md**: Opening line missing grep and list_directory from tool list
+19. **CodingAgent/README.md**: Missing list_directory tool section
+20. **CodingAgent/README.md**: ReadTool params showed `range` instead of `start_line`/`end_line`
+21. **08-building-custom-coding-agent.md**: DemoTool GetPromptGuidelines returns wrong type
+22. **09-tool-development.md**: DatabaseQueryTool GetPromptGuidelines returns wrong type
+
+### Recommendation
+
+Training docs authored during a sprint should be reviewed against final code BEFORE the sprint is considered complete. The doc-writing agent and the code-writing agent need a handoff checkpoint to catch signature mismatches.
+
+### Validation
+
+- ✅ Build: `dotnet build BotNexus.slnx` — 0 errors, 0 warnings
+- ✅ Tests: 415/415 pass across 7 test projects
