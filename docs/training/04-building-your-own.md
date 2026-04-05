@@ -161,6 +161,7 @@ using System.Text.Json;
 using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
 using BotNexus.Providers.Core.Models;
+using BotNexus.Providers.Core.Validation;  // Phase 5: validation
 
 public sealed class WeatherTool : IAgentTool
 {
@@ -205,6 +206,22 @@ public sealed class WeatherTool : IAgentTool
         CancellationToken cancellationToken = default,
         AgentToolUpdateCallback? onUpdate = null)
     {
+        // Phase 5: Validate arguments before executing
+        using (var doc = JsonDocument.Parse(JsonSerializer.Serialize(arguments)))
+        {
+            var (isValid, errors) = ToolCallValidator.Validate(
+                doc.RootElement,
+                Definition.ParameterSchema);
+
+            if (!isValid)
+            {
+                var errorMsg = string.Join("; ", errors);
+                return new AgentToolResult([
+                    new AgentToolContent(AgentToolContentType.Text, errorMsg)
+                ], new { IsError = true });
+            }
+        }
+
         var location = arguments["location"]!.ToString()!;
         var weather = await FetchWeatherAsync(location, cancellationToken);
 
@@ -237,7 +254,7 @@ public sealed class WeatherTool : IAgentTool
 }
 ```
 
-> **Key takeaway:** `PrepareArgumentsAsync` is your validation gate — throw `ArgumentException` to reject a tool call before it executes. `ExecuteAsync` does the actual work and returns content to the LLM.
+> **Key takeaway:** `PrepareArgumentsAsync` is your first validation gate — throw `ArgumentException` to reject a tool call before it executes (Phase 5: prefer `ToolCallValidator` in `ExecuteAsync` for JSON Schema validation). `ExecuteAsync` does the actual work and returns content to the LLM.
 
 ---
 
