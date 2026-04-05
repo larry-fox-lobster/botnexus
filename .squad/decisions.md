@@ -8196,3 +8196,119 @@ Three of 17 findings were false positives (18% false-positive rate). Root causes
 
 ---
 
+
+---
+
+## Gateway Service Architecture (2026-04-06)
+
+**By:** Leela (Lead/Architect)  
+**Date:** 2026-04-06  
+**Status:** Approved — ready for implementation  
+**Requested by:** Jon Bullen (Copilot)
+
+### Summary
+
+This ADR defines the Gateway Service — BotNexus's central orchestration layer. The Gateway manages agent lifecycles, routes messages between channels and agents, persists sessions, and exposes REST + WebSocket APIs for management and real-time interaction.
+
+### Project Structure (5 new projects)
+
+| Project | Purpose |
+|---------|---------|
+| BotNexus.Gateway.Abstractions | Pure interfaces, zero dependencies. All extension points. |
+| BotNexus.Gateway | Runtime engine — agent management, routing, isolation, orchestration. |
+| BotNexus.Gateway.Api | ASP.NET Core — REST controllers, WebSocket middleware. |
+| BotNexus.Gateway.Sessions | Session store (in-memory, file-backed JSONL). |
+| BotNexus.Channels.Core | Channel adapter base classes for external protocols. |
+
+### Key Interfaces (11 extension points)
+
+**Agent Management:** IAgentRegistry, IAgentSupervisor, IAgentHandle, IAgentCommunicator  
+**Infrastructure:** IIsolationStrategy, IChannelAdapter, IChannelDispatcher, ISessionStore, IMessageRouter, IActivityBroadcaster, IGatewayAuthHandler
+
+### Critical Constraints
+
+- Gateway references AgentCore (which brings Providers.Core). **Does NOT reference specific provider packages** (Anthropic, OpenAI, Copilot).
+- Provider registration at composition root, not in Gateway.
+
+### Design Decisions
+
+1. **Gateway-level session model** — Distinct from AgentCore timeline; high-level conversation history.
+2. **Push-based channel dispatch** — Adapters call IChannelDispatcher instead of publishing to bus.
+3. **IsolationStrategy factory** — Creates IAgentHandle; rest of Gateway unaware of boundary.
+4. **Sub-agent scoping** — Session ID: {parentSessionId}::sub::{childAgentId}
+5. **WebSocket protocol v2** — Message IDs, structured tool events, usage reporting, error codes.
+
+### REST API Surface
+
+- Agent registry: POST/GET/DELETE agents
+- Agent instances: GET status, list, stop
+- Sessions: GET/DELETE sessions, list with history
+- Chat: POST non-streaming chat, GET WebSocket upgrade
+
+### WebSocket Protocol
+
+**Endpoint:** ws://host/ws?agent={agentId}&session={sessionId}
+
+**Client → Server:** message, abort, ping  
+**Server → Client:** connected, message_start, content_delta, tool_start, tool_end, message_end, error, pong
+
+### Integration with Existing Code
+
+- **AgentCore:** InProcessIsolationStrategy creates AgentCore.Agent; InProcessAgentHandle translates events.
+- **Session bridging:** FileSessionStore preserves JSONL pattern with new GatewaySession model.
+- **Provider independence:** Gateway → AgentCore → Providers.Core (no direct provider dependency).
+
+### Sub-Agent Communication
+
+**In-process:** Communicator creates scoped session {parentSessionId}::sub::{childAgentId}; supervisor gets/creates child agent.  
+**Remote (Phase 2):** Interface defined, calls remote Gateway /api/chat endpoint.
+
+### Security Model
+
+- **Authentication:** Pluggable handler (API key, JWT).
+- **Authorization:** Per-caller agent ACL (GatewayCallerIdentity.AllowedAgents).
+- **Tenant isolation:** Sessions scoped by ID; agent instances keyed by {agentId}::{sessionId}.
+- **Phase 1:** API key auth + caller ACL. JWT is Phase 2.
+
+### Implementation Status
+
+**Phase 1 (Complete):**  
+All interfaces, models, DefaultAgentRegistry, DefaultAgentSupervisor, DefaultMessageRouter, InMemoryActivityBroadcaster, InProcessIsolationStrategy + InProcessAgentHandle, GatewayHost, all controllers, GatewayWebSocketHandler, InMemorySessionStore, FileSessionStore, ChannelAdapterBase, DI extensions.
+
+**Phase 2 (Stubbed):**  
+Sandbox/container/remote isolation, cross-agent communication, JWT auth, Telegram/Discord adapters, OpenAPI spec generation.
+
+### Implementation Assignments
+
+- **Farnsworth:** Review/refine interfaces, add XML docs, ensure contracts are airtight.
+- **Bender:** Wire up DI, implement full GatewayHost flow, integration testing.
+- **Fry:** WebUI channel — implement static WebUI + WebSocket client.
+
+### Files Created (40 files, 2869 lines)
+
+**BotNexus.Gateway.Abstractions/**  
+Activity/IActivityBroadcaster.cs, Agents/{IAgentCommunicator, IAgentHandle, IAgentRegistry, IAgentSupervisor}.cs, Channels/{IChannelAdapter, IChannelDispatcher}.cs, Isolation/IIsolationStrategy.cs, Models/{AgentDescriptor, AgentExecution, AgentInstance, GatewayActivity, GatewaySession, Messages}.cs, Routing/IMessageRouter.cs, Security/IGatewayAuthHandler.cs, Sessions/ISessionStore.cs
+
+**BotNexus.Gateway/**  
+GatewayHost.cs, Activity/InMemoryActivityBroadcaster.cs, Agents/{DefaultAgentRegistry, DefaultAgentSupervisor}.cs, Extensions/GatewayServiceCollectionExtensions.cs, Isolation/InProcessIsolationStrategy.cs, Routing/DefaultMessageRouter.cs
+
+**BotNexus.Gateway.Api/**  
+Controllers/{AgentsController, ChatController, SessionsController}.cs, Extensions/GatewayApiServiceCollectionExtensions.cs, WebSocket/GatewayWebSocketHandler.cs
+
+**BotNexus.Gateway.Sessions/**  
+FileSessionStore.cs, InMemorySessionStore.cs
+
+**BotNexus.Channels.Core/**  
+ChannelAdapterBase.cs, ChannelManager.cs
+
+### Decision Rationale
+
+The Gateway must be provider-agnostic and isolation-strategy-agnostic. It orchestrates agents and channels; it doesn't make LLM calls or execute code directly. All extension points are defined as interfaces in Abstractions; implementations are registered at composition root. This design enables:
+- Pluggable isolation strategies (in-process, sandbox, container, remote)
+- Pluggable authentication schemes (API key, JWT, OAuth)
+- Pluggable session stores (in-memory, database, distributed)
+- Pluggable channel adapters (Telegram, Discord, TUI, custom)
+- Clean testing (mock interfaces, no external dependencies)
+
+**Follows:** Squad discipline on dependency direction, clear contracts, separation of concerns.
+
