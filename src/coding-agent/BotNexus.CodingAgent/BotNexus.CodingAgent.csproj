@@ -13,5 +13,8 @@
     <ProjectReference Include="..\..\agent\BotNexus.AgentCore\BotNexus.AgentCore.csproj" />
     <ProjectReference Include="..\..\providers\BotNexus.Providers.Core\BotNexus.Providers.Core.csproj" />
     <ProjectReference Include="..\..\providers\BotNexus.Providers.Copilot\BotNexus.Providers.Copilot.csproj" />
+    <ProjectReference Include="..\..\providers\BotNexus.Providers.Anthropic\BotNexus.Providers.Anthropic.csproj" />
+    <ProjectReference Include="..\..\providers\BotNexus.Providers.OpenAI\BotNexus.Providers.OpenAI.csproj" />
+    <ProjectReference Include="..\..\providers\BotNexus.Providers.OpenAICompat\BotNexus.Providers.OpenAICompat.csproj" />
   </ItemGroup>
 </Project>

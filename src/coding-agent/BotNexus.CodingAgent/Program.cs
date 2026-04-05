@@ -4,6 +4,11 @@ using BotNexus.CodingAgent.Auth;
 using BotNexus.CodingAgent.Cli;
 using BotNexus.CodingAgent.Extensions;
 using BotNexus.CodingAgent.Session;
+using BotNexus.Providers.Anthropic;
+using BotNexus.Providers.Copilot;
+using BotNexus.Providers.Core.Registry;
+using BotNexus.Providers.OpenAI;
+using BotNexus.Providers.OpenAICompat;
 
 namespace BotNexus.CodingAgent;
 
@@ -35,6 +40,9 @@ internal static class Program
         var config = CodingAgentConfig.Load(workingDirectory);
         CodingAgentConfig.EnsureDirectories(workingDirectory);
         ApplyOverrides(config, command);
+
+        // Register all built-in API providers (matching pi-mono's registerBuiltInApiProviders)
+        RegisterBuiltInProviders();
 
         var authManager = new AuthManager(config.ConfigDirectory);
         var extensionTools = new ExtensionLoader().LoadExtensions(config.ExtensionsDirectory);
@@ -149,5 +157,19 @@ internal static class Program
             MessageCount = agent.State.Messages.Count,
             Model = agent.State.Model.Id
         };
+    }
+
+    /// <summary>
+    /// Register all built-in API providers with the global registry.
+    /// Equivalent to pi-mono's registerBuiltInApiProviders() in register-builtins.ts.
+    /// Must be called before any LlmClient usage.
+    /// </summary>
+    private static void RegisterBuiltInProviders()
+    {
+        var httpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+        ApiProviderRegistry.Register(new CopilotProvider());
+        ApiProviderRegistry.Register(new AnthropicProvider());
+        ApiProviderRegistry.Register(new OpenAICompletionsProvider(httpClient, Microsoft.Extensions.Logging.Abstractions.NullLogger<OpenAICompletionsProvider>.Instance));
+        ApiProviderRegistry.Register(new OpenAICompatProvider());
     }
 }
