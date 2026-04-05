@@ -543,3 +543,8 @@ All Sprints 1-2 foundation work completed by Farnsworth and Bender. Hermes ready
 - Added focused tests for FileAgentConfigurationSource covering empty directories, JSON mapping, relative SystemPromptFile loading, malformed JSON and validation skips with warnings, sub-agent ID merge behavior, and file-watch callbacks.
 - Added hosted-service tests for source aggregation, code-based shadowing precedence, config-change re-registration (add/modify/remove), watcher disposal on stop, and empty source handling.
 - Added AgentDescriptorValidator and GatewayOptions unit tests, and exposed Gateway internals to the Gateway test assembly via InternalsVisibleTo for direct validation of internal configuration components.
+### 2026-04-06 — Gateway cross-agent, steering, platform config, and session concurrency coverage
+- Added gateway tests for cross-agent calls to verify `cross::` session scoping, remote endpoint rejection, supervisor handle creation, and propagation of unregistered-agent failures.
+- Added `InProcessAgentHandleTests` to validate `SteerAsync` and `FollowUpAsync` queue behavior (including non-running fire-and-forget steering).
+- Expanded platform config coverage for valid JSON deserialization, targeted ListenUrl/LogLevel validation failures, config directory creation, and model default/null behavior (`PlatformConfig` and `ProviderConfig`).
+- Added thread-safety verification for `GatewaySession` (`AddEntry` concurrency, snapshot consistency under mutation, and atomic batch visibility for `AddEntries`).

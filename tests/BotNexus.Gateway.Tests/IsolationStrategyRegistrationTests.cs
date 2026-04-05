@@ -60,4 +60,20 @@ public sealed class IsolationStrategyRegistrationTests
         await act.Should().ThrowAsync<NotSupportedException>()
             .WithMessage($"*{strategyName}*not yet implemented*");
     }
+
+    [Theory]
+    [InlineData("sandbox")]
+    [InlineData("container")]
+    [InlineData("remote")]
+    public void StubStrategies_Name_ReturnsExpectedValue(string strategyName)
+    {
+        IIsolationStrategy strategy = strategyName switch
+        {
+            "sandbox" => new SandboxIsolationStrategy(),
+            "container" => new ContainerIsolationStrategy(),
+            _ => new RemoteIsolationStrategy()
+        };
+
+        strategy.Name.Should().Be(strategyName);
+    }
 }

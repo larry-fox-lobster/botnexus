@@ -116,4 +116,18 @@ public sealed class DefaultAgentCommunicatorTests
 
         await act.Should().ThrowAsync<KeyNotFoundException>();
     }
+
+    [Fact]
+    public async Task CallCrossAgentAsync_WhenTargetAgentIsUnregistered_PropagatesKeyNotFoundException()
+    {
+        var supervisor = new Mock<IAgentSupervisor>();
+        supervisor
+            .Setup(s => s.GetOrCreateAsync("target-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new KeyNotFoundException("Agent target-agent is not registered."));
+        var communicator = new DefaultAgentCommunicator(supervisor.Object, NullLogger<DefaultAgentCommunicator>.Instance);
+
+        var act = () => communicator.CallCrossAgentAsync("source-agent", string.Empty, "target-agent", "hello");
+
+        await act.Should().ThrowAsync<KeyNotFoundException>();
+    }
 }
