@@ -1242,6 +1242,52 @@ Sprint closed successfully. 18 commits across 5 agents resolved all 15 P0s and 1
 
 ---
 
+## 2026-04-04 — Phase 2 Sprint Design Review (Lead)
+
+**Timestamp:** 2026-04-04  
+**Status:** ✅ Complete  
+**Requested by:** Copilot (Jon Bullen)  
+**Scope:** Full design review of 12-commit sprint (streaming helper, thinking events, WebUI, gateway tests, agent config)
+
+**Overall Grade: B+**
+
+**Key Findings:**
+
+1. **P0 — Session History Thread Safety:** `GatewaySession.History` (List<SessionEntry>) is mutated from GatewayHost, StreamingSessionHelper, and WebSocketHandler without synchronization. Concurrent messages for the same session will corrupt history. Needs session-level locking or concurrent collection.
+
+2. **P0 — Subscription Callback Exceptions:** InProcessAgentHandle's agent event subscription callback has no try-catch. Unhandled exceptions close the channel silently — stream ends with no error to client.
+
+3. **P0 — WebUI Memory Leaks:** Thinking toggle and tool call click listeners accumulate without cleanup. Dozens of duplicate listeners per message over a session.
+
+4. **P1 — Missing Test Coverage:** AgentDescriptorValidator, FileAgentConfigurationSource, AgentConfigurationHostedService have zero tests. 400+ lines of untested production code.
+
+5. **P1 — FileConfigurationWatcher Dispose Race:** `_disposed` flag set without synchronization relative to `ReloadAsync()` semaphore check.
+
+**What Went Well:**
+- StreamingSessionHelper extraction is architecturally clean — single shared helper for both GatewayHost and WebSocket
+- Thinking events properly threaded end-to-end with intentional transience (not persisted)
+- IAgentConfigurationSource is a well-designed, ISP-compliant extension point
+- Gateway test growth (48→79) with behavioral tests, not implementation tests
+- WebSocket protocol well-documented and consistent
+- Modern .NET usage throughout (Lock, Channel<T>, IAsyncEnumerable, sealed records)
+- No Product Isolation Rule violations
+
+**Assignments:**
+- Bender: Fix session history thread safety + subscription callback (P0-1, P0-2)
+- Hermes: Add tests for config subsystem (P1-1)
+- Fry: Fix WebUI memory leaks + accessibility (P0-3, P0-4, P1-7, P1-8)
+- Farnsworth: Fix watcher race + validator completeness (P1-2, P1-3, P1-4)
+
+**Decision Document:** `.squad/decisions/inbox/leela-phase2-design-review.md`
+
+**Learnings:**
+- Session models shared across async pipelines must enforce thread safety at the model level, not rely on callers to synchronize. This is a recurring pattern in gateway architectures.
+- WebUI event listener management needs architectural discipline (event delegation or explicit lifecycle) when streaming creates many DOM updates per message.
+- Configuration hot-reload with FileSystemWatcher requires careful synchronization between dispose and reload paths — the debounce timer creates a timing window.
+- Test coverage for configuration/validation code is non-negotiable. These classes have complex conditional logic that unit tests catch cheaply.
+
+---
+
 ### 2026-04-02 — Incremental Build Performance Fix
 
 **Problem:** dev-loop.ps1 triggered full rebuilds (~10s) every time even when only one file changed. Jon wanted incremental builds to speed up the inner dev loop.

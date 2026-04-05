@@ -8395,3 +8395,148 @@ The Gateway must be provider-agnostic and isolation-strategy-agnostic. It orches
 **Follow-up for Full Implementation:**
 - TUI: add background stdin reader loop and dispatch via `IChannelDispatcher`.
 - Telegram: add long-polling/webhook receiver, map updates to `InboundMessage`, call Bot API endpoints.
+
+---
+
+## Phase 2 Sprint Reviews (2026-04-06)
+
+### Leela: Phase 2 Design Review (2026-04-06T20:40Z)
+
+**By:** Leela (Lead/Architect)  
+**Date:** 2026-04-06  
+**Scope:** 12 commits — streaming helper, thinking events, WebUI enrichment, gateway tests, agent config  
+**Grade:** B+ (Strong architecture; thread safety gaps; missing test coverage)
+
+#### Overall Assessment
+
+Phase 2 sprint delivered sound architecture with clean abstractions and proper SOLID compliance. Streaming extraction and thinking event integration are well-designed. Agent configuration from files is a solid extensibility win. However, thread safety gaps in session history, missing test coverage for three new classes, and WebUI memory leaks must be addressed before production load.
+
+#### Findings by Severity
+
+**P0 — Critical (Must Fix)**
+1. Session History Concurrent Mutation — `GatewaySession.History` is `List<SessionEntry>` mutated from multiple concurrent paths without synchronization (GatewayHost.cs:124,174; StreamingSessionHelper.cs:72-74; GatewayWebSocketHandler.cs:151). Risk: interleaved entries, lost data, IndexOutOfRangeException. **Assign: Bender**
+2. InProcessAgentHandle Subscription Callback Unhandled Exceptions — Exceptions in callback propagate unhandled, closing channel prematurely with no error event (InProcessIsolationStrategy.cs:118-158). **Assign: Bender**
+3. WebUI Thinking Toggle Event Listener Memory Leak — Every `thinking_delta` adds redundant `click` listener (app.js:291-296); accumulates 50-100 listeners per thinking block. **Assign: Fry**
+4. WebUI Tool Call Click Listener Accumulation — `updateToolCallStatus()` adds duplicate listeners on start/end (app.js:363). **Assign: Fry**
+
+**P1 — Should Fix (8 items)**
+- Missing tests for AgentDescriptorValidator, FileAgentConfigurationSource, AgentConfigurationHostedService (400+ untested lines). **Assign: Hermes**
+- FileConfigurationWatcher dispose/reload race condition (FileAgentConfigurationSource.cs:248-269). **Assign: Farnsworth**
+- AgentConfigurationHostedService._codeBasedAgentIds initialization race (AgentConfigurationHostedService.cs:20-26). **Assign: Farnsworth**
+- AgentDescriptorValidator incomplete validation (missing enum, format, range checks). **Assign: Farnsworth**
+- WebSocket whitespace-only message not rejected (GatewayWebSocketHandler.cs:129). **Assign: Bender**
+- WebSocket abort logic race (GatewayWebSocketHandler.cs:133-138). **Assign: Bender**
+- WebUI fetch request timeout missing (app.js). **Assign: Fry**
+- WebUI missing `prefers-reduced-motion` support (styles.css). **Assign: Fry**
+
+**P2 — Nice to Have (9 items)**
+- GatewayHost hard-coded streaming check; WebSocket event-to-JSON mapping not extensible; WebUI color contrast below WCAG AA; section headers not keyboard accessible; missing beforeunload cleanup; activity monitor event classification brittle; protocol field naming inconsistency; shared test helpers duplicated; DI auto-registration may surprise.
+
+#### Area Grades
+
+| Area | Grade |
+|------|-------|
+| Streaming Helper | A- |
+| Thinking Events | A |
+| Gateway Abstractions | A |
+| Agent Config | B |
+| WebUI | B- |
+| Thread Safety | B- |
+| SOLID Compliance | A- |
+
+#### What Went Well
+
+- StreamingSessionHelper extraction eliminates duplication; ensures consistent history recording.
+- Thinking events properly threaded through entire stack; intentionally transient (not persisted).
+- IAgentConfigurationSource is well-designed extension point; small, focused, supports one-shot and hot-reload.
+- Gateway test growth (48→79 tests) with behavioral tests verifying outcomes, not implementation.
+- Modern .NET usage (System.Threading.Lock, Channel<T>, IAsyncEnumerable, sealed records, nullable references).
+- No Product Isolation Rule violations — all code uses generic agent IDs.
+
+---
+
+### Nibbler: Phase 2 Consistency Review (2026-04-06T20:40Z)
+
+**By:** Nibbler (Consistency Reviewer)  
+**Date:** 2026-04-06  
+**Sprint scope:** Gateway core, abstractions, API, config, WebUI, 31 new tests  
+**Build:** ✅ 0 errors, 0 warnings  
+**Tests:** ✅ 77/77 pass (gateway test suite)  
+**Grade:** Good (0 P0, 0 P1, 6 P2)
+
+#### Validation Summary
+
+| Check Area | Result |
+|---|---|
+| Naming Conventions | ✅ Pass |
+| XML Doc Comments | ✅ Pass |
+| Null Handling | ✅ Pass |
+| CancellationToken Threading | ✅ Pass |
+| ConfigureAwait(false) | ✅ Pass |
+| WebSocket Protocol | ✅ Pass |
+| WebUI Code Style | ✅ Pass |
+| Test Naming | ✅ Pass |
+
+#### P2 Findings
+
+1. Dead `TaskCompletionSource` in `InProcessAgentHandle.StreamAsync` (InProcessIsolationStrategy.cs:115) — vestigial code, no runtime impact
+2. Duplicate test helpers — `ToAsyncEnumerable`, `RecordingActivityBroadcaster` across 3 test files
+3. Field naming inconsistency — `ContentDelta` vs. `ThinkingContent` (asymmetric pair; both descriptive)
+4. WebSocket `error` `code` field inconsistency — stream-originated vs. exception-originated (stream omits code)
+5. `tool_end` omits `isError` field — clients can't distinguish successful tool calls from failed ones
+6. Stale doc path reference (pre-existing) — `docs/integration-verification-provider-architecture.md:74` references old path
+
+#### Pattern Alignment
+
+✅ `FileAgentConfigurationSource` follows `FileSessionStore` patterns (file I/O, error handling, logging)  
+✅ `AgentConfigurationHostedService` follows standard `IHostedService` pattern  
+✅ No new stale references introduced this sprint
+
+---
+
+### Farnsworth: Phase 2 Agent Config Implementation (AD-20) (2026-04-06T20:40Z)
+
+**By:** Farnsworth (Platform Dev, gpt-5.3-codex)  
+**Task:** Agent configuration from JSON files  
+**Status:** ✅ Complete  
+**Commits:** e2706f7, 63dcf4c, c657389, 6503ff2 (4 commits)  
+**Build:** ✅ Full solution builds (0 errors, 0 warnings)  
+**Tests:** ✅ 31 new tests, all passing
+
+#### Deliverables
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| AgentDescriptor model | Abstractions/Models/ | ✅ Complete |
+| IAgentConfigurationSource interface | Abstractions/ | ✅ Complete |
+| FileAgentConfigurationSource | Configuration/Sources/ | ✅ Complete |
+| AgentConfigurationHostedService | Configuration/ | ✅ Complete |
+| AgentDescriptorValidator | Configuration/ | ✅ Complete |
+| FileConfigurationWatcher | Configuration/ | ✅ Complete |
+| DI Extensions | Extensions/ | ✅ Complete |
+| Integration Tests | Tests/ | ✅ Complete |
+
+#### Architecture Notes
+
+- **Extensibility:** `IAgentConfigurationSource` allows in-memory, database, or remote config sources
+- **Merge Strategy:** Code-based agents override file-based agents at startup (allows production overrides)
+- **Hot-Reload:** Optional `Watch()` method triggers `OnChanged` callback for runtime updates
+- **Isolation Strategy Options:** Dictionary-based approach supports future expansion without schema changes
+
+#### Known Issues (per Leela Design Review)
+
+| Issue | Severity | Follow-up |
+|-------|----------|-----------|
+| Dispose/reload race condition | P1 | Fix in next cycle |
+| `_codeBasedAgentIds` initialization race | P1 | Fix in next cycle |
+| Incomplete validation | P1 | Fix in next cycle |
+| Missing tests | P1 | Hermes to add |
+| Auto-registration may surprise | P2 | Document/make opt-in |
+
+#### Test Coverage
+
+✅ Validator: happy path + all error conditions  
+✅ File source: valid/invalid/missing JSON  
+✅ Hosted service: startup merge with code + file agents  
+✅ Hot-reload: callback behavior on file changes  
+✅ Integration: DI registration + service resolution
