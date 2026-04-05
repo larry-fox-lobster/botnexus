@@ -318,6 +318,13 @@ All Sprints 1-2 foundation work completed by Farnsworth and Bender. Hermes ready
 
 **Decisions Merged:**
 1. Cron service as independent first-class scheduler
+
+### 2026-04-05 — Gateway orchestration and streaming coverage expansion
+
+- Added high-priority `GatewayHostTests` for dispatch routing, no-route behavior, activity broadcast events, concurrent dispatch execution, agent error handling, streaming accumulation, and first-message session creation.
+- Added `StreamingPipelineTests` to validate end-to-end stream event handling (content deltas, tool lifecycle events, mixed streams, cancellation cleanup, and empty-stream history behavior).
+- Filled critical coverage gaps with tests for `DefaultAgentSupervisor` concurrency, `ApiKeyGatewayAuthHandler` auth modes, `ChannelManager` lookup/empty behavior, `FileSessionStore` large/special/concurrent scenarios, and `DefaultAgentCommunicator` sub-session scoping.
+- Added `tests/BotNexus.Gateway.Tests/Integration/CopilotIntegrationTests.cs` infrastructure with `[Trait("Category", "Integration")]`, auth.json loading, and real Copilot prompt/stream checks gated by `BOTNEXUS_RUN_COPILOT_INTEGRATION=1`.
 2. Live environment protection (~/.botnexus/ isolation)
 
 **Next Steps:** Production deployment readiness, Sprint 7 planning for P2 items.
