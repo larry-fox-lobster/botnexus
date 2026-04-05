@@ -13,8 +13,10 @@ namespace BotNexus.Gateway.Isolation;
 /// </remarks>
 public sealed class RemoteIsolationStrategy : IIsolationStrategy
 {
+    /// <inheritdoc />
     public string Name => "remote";
 
+    /// <inheritdoc />
     public Task<IAgentHandle> CreateAsync(AgentDescriptor descriptor, AgentExecutionContext context, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException(

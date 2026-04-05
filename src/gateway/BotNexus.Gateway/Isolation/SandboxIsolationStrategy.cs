@@ -13,8 +13,10 @@ namespace BotNexus.Gateway.Isolation;
 /// </remarks>
 public sealed class SandboxIsolationStrategy : IIsolationStrategy
 {
+    /// <inheritdoc />
     public string Name => "sandbox";
 
+    /// <inheritdoc />
     public Task<IAgentHandle> CreateAsync(AgentDescriptor descriptor, AgentExecutionContext context, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException(

@@ -1676,3 +1676,21 @@ Design review filtered 14 audit findings down to 6 real fixes (5 already impleme
 
 ### Key File Paths
 - Review: .squad/decisions/inbox/leela-design-review-p1-sprint.md
+## Learnings — Phase 3 Sprint Design Review (2026-04-07)
+
+### Review Findings
+1. **Overall grade: B+** — Strong sprint delivering thread safety, isolation stubs, cross-agent calling, steering/follow-up, and platform config. One P0 (path traversal) prevents A grade.
+2. **P0: Path traversal in SystemPromptFile** — FileAgentConfigurationSource.cs:110 resolves systemPromptFile relative to configDirectory without bounds checking. Could read arbitrary files via `../../../etc/passwd`.
+3. **P1: No cross-agent recursion guard** — DefaultAgentCommunicator allows infinite A→B→A cycles via nested session IDs.
+4. **P1: Redundant GetInstance/GetOrCreateAsync pattern** — ChatController and WebSocketHandler do two lookups where one suffices, with a TOCTOU race between them.
+5. **P1: WebUI event delegation incomplete** — Session/agent lists still use per-element listeners despite delegation being added for chat messages.
+6. **Thread safety implementation verified correct** — Lock usage, no async in locks, defensive copy, all production callers migrated. Zero remaining .History.Add/.History.AddRange in src/.
+
+### Key Patterns Observed
+- **Isolation strategy multicast DI pattern** (AddSingleton<IIsolationStrategy, TImpl> ×4) is clean and extensible. Stubs consistently throw NotSupportedException.
+- **Cross-agent session scoping** (parent::sub::child, cross::source::target::guid) provides good audit trails but needs lifecycle cleanup.
+- **PlatformConfigLoader validation-then-fail-fast** in DI setup is the correct pattern for config errors.
+- **IAgentHandle.SteerAsync/FollowUpAsync** cleanly extends the existing interface without breaking changes. InProcessAgentHandle delegates directly to AgentCore methods.
+
+### Key File Paths
+- Review: .squad/decisions/inbox/leela-design-review-phase3.md
