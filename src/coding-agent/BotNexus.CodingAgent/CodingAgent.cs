@@ -39,7 +39,7 @@ public static class CodingAgent
         var root = Path.GetFullPath(workingDirectory);
         CodingAgentConfig.EnsureDirectories(root);
 
-        var tools = CreateTools(root, extensionTools);
+        var tools = CreateTools(root, config, extensionTools);
         var gitBranch = await GitUtils.GetBranchAsync(root).ConfigureAwait(false);
         var gitStatus = await GitUtils.GetStatusAsync(root).ConfigureAwait(false);
         var packageManager = PackageManagerDetector.Detect(root);
@@ -240,7 +240,7 @@ public static class CodingAgent
             IsError: second.IsError ?? first.IsError);
     }
 
-    private static IReadOnlyList<IAgentTool> CreateTools(string workingDirectory, IReadOnlyList<IAgentTool>? extensionTools)
+    private static IReadOnlyList<IAgentTool> CreateTools(string workingDirectory, CodingAgentConfig config, IReadOnlyList<IAgentTool>? extensionTools)
     {
         var tools = new List<IAgentTool>
         {
@@ -248,7 +248,7 @@ public static class CodingAgent
             new ListDirectoryTool(workingDirectory),
             new WriteTool(workingDirectory),
             new EditTool(workingDirectory),
-            new ShellTool(),
+            new ShellTool(config.DefaultShellTimeoutSeconds),
             new GlobTool(workingDirectory),
             new GrepTool(workingDirectory)
         };

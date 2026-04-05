@@ -216,7 +216,7 @@ new_str: public int Value { get; set; } = 0;
 
 **Parameters**:
 - `command` (string, required): Shell command text to execute
-- `timeout` (integer, optional): Timeout in seconds (default: 120)
+- `timeout` (integer, optional): Timeout in seconds (defaults to `DefaultShellTimeoutSeconds`, 600 by default)
 
 **Output**:
 - stdout/stderr combined up to 50,000 bytes

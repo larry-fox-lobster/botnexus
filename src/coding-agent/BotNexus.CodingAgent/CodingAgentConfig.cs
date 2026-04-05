@@ -22,6 +22,12 @@ public sealed class CodingAgentConfig
     public string? ApiKey { get; set; }
     public int MaxToolIterations { get; set; } = 40;
     public int MaxContextTokens { get; set; } = 100000;
+    /// <summary>
+    /// Default timeout in seconds for shell command execution.
+    /// Tools can override per-call via the 'timeout' argument.
+    /// Null means no timeout (process runs until complete or cancelled).
+    /// </summary>
+    public int? DefaultShellTimeoutSeconds { get; init; } = 600;
     public List<string> AllowedCommands { get; set; } = [];
     public List<string> BlockedPaths { get; set; } = [];
     public Dictionary<string, object?> Custom { get; set; } = new(StringComparer.OrdinalIgnoreCase);
@@ -76,6 +82,7 @@ public sealed class CodingAgentConfig
             ApiKey = null,
             MaxToolIterations = 40,
             MaxContextTokens = 100000,
+            DefaultShellTimeoutSeconds = 600,
             AllowedCommands = [],
             BlockedPaths = [],
             Custom = new Dictionary<string, object?>()
@@ -104,6 +111,7 @@ public sealed class CodingAgentConfig
             ApiKey = null,
             MaxToolIterations = 40,
             MaxContextTokens = 100000,
+            DefaultShellTimeoutSeconds = 600,
             AllowedCommands = [],
             BlockedPaths = [],
             Custom = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
@@ -144,6 +152,7 @@ public sealed class CodingAgentConfig
             ApiKey = Coalesce(overrides.ApiKey, source.ApiKey),
             MaxToolIterations = overrides.MaxToolIterations ?? source.MaxToolIterations,
             MaxContextTokens = overrides.MaxContextTokens ?? source.MaxContextTokens,
+            DefaultShellTimeoutSeconds = overrides.DefaultShellTimeoutSeconds ?? source.DefaultShellTimeoutSeconds,
             AllowedCommands = overrides.AllowedCommands is { Count: > 0 }
                 ? [.. overrides.AllowedCommands]
                 : [.. source.AllowedCommands],
@@ -168,6 +177,7 @@ public sealed class CodingAgentConfig
         public string? ApiKey { get; init; }
         public int? MaxToolIterations { get; init; }
         public int? MaxContextTokens { get; init; }
+        public int? DefaultShellTimeoutSeconds { get; init; }
         public List<string>? AllowedCommands { get; init; }
         public List<string>? BlockedPaths { get; init; }
         public Dictionary<string, object?>? Custom { get; init; }

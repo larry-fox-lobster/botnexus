@@ -23,10 +23,20 @@ namespace BotNexus.CodingAgent.Tools;
 /// </remarks>
 public sealed class ShellTool : IAgentTool
 {
-    private const int DefaultTimeoutSeconds = 120;
     private const int MaxOutputBytes = 50 * 1024;
     private const int MaxOutputLines = 2000;
     private static readonly Lazy<string?> WindowsBashPath = new(FindBashExecutable);
+    private readonly int? _defaultTimeoutSeconds;
+
+    public ShellTool(int? defaultTimeoutSeconds = 600)
+    {
+        if (defaultTimeoutSeconds is < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(defaultTimeoutSeconds), "defaultTimeoutSeconds must be >= 1 second when set.");
+        }
+
+        _defaultTimeoutSeconds = defaultTimeoutSeconds;
+    }
 
     /// <inheritdoc />
     public string Name => "bash";
@@ -48,7 +58,7 @@ public sealed class ShellTool : IAgentTool
                 },
                 "timeout": {
                   "type": "integer",
-                  "description": "Optional timeout in seconds. Defaults to 120."
+                  "description": "Optional timeout in seconds. Defaults to configured shell timeout."
                 }
               },
               "required": ["command"]
@@ -63,15 +73,12 @@ public sealed class ShellTool : IAgentTool
         cancellationToken.ThrowIfCancellationRequested();
 
         var command = ReadRequiredString(arguments, "command");
-        var timeoutSeconds = DefaultTimeoutSeconds;
+        int? timeoutSeconds = _defaultTimeoutSeconds;
 
         if (arguments.TryGetValue("timeout", out var rawTimeout) && rawTimeout is not null)
         {
             timeoutSeconds = ReadInt(rawTimeout, "timeout");
-            if (timeoutSeconds < 1)
-            {
-                throw new ArgumentOutOfRangeException(nameof(arguments), "timeout must be >= 1 second.");
-            }
+            ValidateTimeoutSeconds(timeoutSeconds, nameof(arguments));
         }
 
         IReadOnlyDictionary<string, object?> prepared = new Dictionary<string, object?>(StringComparer.Ordinal)
@@ -92,9 +99,16 @@ public sealed class ShellTool : IAgentTool
     {
         var command = arguments["command"]?.ToString()
                       ?? throw new ArgumentException("Missing required argument: command.");
-        var timeoutSeconds = arguments.TryGetValue("timeout", out var timeoutObj) && timeoutObj is int timeout
-            ? timeout
-            : DefaultTimeoutSeconds;
+        int? timeoutSeconds = null;
+        if (arguments.TryGetValue("timeout", out var timeoutObj) && timeoutObj is not null)
+        {
+            timeoutSeconds = ReadInt(timeoutObj, "timeout");
+            ValidateTimeoutSeconds(timeoutSeconds, nameof(arguments));
+        }
+        else
+        {
+            timeoutSeconds = _defaultTimeoutSeconds;
+        }
 
         var invocation = BuildShellInvocation(command);
         var startInfo = new ProcessStartInfo
@@ -145,14 +159,18 @@ public sealed class ShellTool : IAgentTool
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
-        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        using var timeoutCts = timeoutSeconds.HasValue
+            ? new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds.Value))
+            : null;
+        using var linkedCts = timeoutCts is null
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+            : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
             await process.WaitForExitAsync(linkedCts.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (!timeoutCts.IsCancellationRequested)
+        catch (OperationCanceledException) when (timeoutCts?.IsCancellationRequested != true)
         {
             var cancelledOutput = BuildOutput(outputBuffer, includeTruncationNotes: true);
             cancelledOutput = PrependWarning(cancelledOutput, invocation.WarningPrefix);
@@ -164,7 +182,7 @@ public sealed class ShellTool : IAgentTool
                 [new AgentToolContent(AgentToolContentType.Text, cancelledMessage)],
                 new ShellToolDetails(-1, TimedOut: false, IsError: true));
         }
-        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (timeoutCts?.IsCancellationRequested == true && !cancellationToken.IsCancellationRequested)
         {
             var timeoutOutput = BuildOutput(outputBuffer, includeTruncationNotes: true);
             timeoutOutput = PrependWarning(timeoutOutput, invocation.WarningPrefix);
@@ -375,6 +393,14 @@ public sealed class ShellTool : IAgentTool
             string text when int.TryParse(text, out var parsed) => parsed,
             _ => throw new ArgumentException($"Argument '{key}' must be an integer.")
         };
+    }
+
+    private static void ValidateTimeoutSeconds(int? timeoutSeconds, string parameterName)
+    {
+        if (timeoutSeconds is < 1)
+        {
+            throw new ArgumentOutOfRangeException(parameterName, "timeout must be >= 1 second.");
+        }
     }
 
     public sealed record ShellToolDetails(int ExitCode, bool TimedOut, bool IsError);
