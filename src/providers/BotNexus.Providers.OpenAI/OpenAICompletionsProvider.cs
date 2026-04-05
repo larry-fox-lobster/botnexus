@@ -276,7 +276,9 @@ public sealed class OpenAICompletionsProvider(
                     break;
 
                 case AssistantMessage assistant:
-                    result.Add(ConvertAssistantMessage(assistant, compat));
+                    var assistantMessage = ConvertAssistantMessage(assistant, compat);
+                    if (assistantMessage is not null)
+                        result.Add(assistantMessage);
                     break;
 
                 case ToolResultMessage toolResult:
@@ -324,7 +326,7 @@ public sealed class OpenAICompletionsProvider(
         return new JsonObject { ["role"] = "user", ["content"] = contentArray };
     }
 
-    private static JsonObject ConvertAssistantMessage(AssistantMessage assistant, OpenAICompletionsCompat compat)
+    private static JsonObject? ConvertAssistantMessage(AssistantMessage assistant, OpenAICompletionsCompat compat)
     {
         var msg = new JsonObject { ["role"] = "assistant" };
         var textParts = new List<string>();
@@ -357,7 +359,11 @@ public sealed class OpenAICompletionsProvider(
             }
         }
 
-        msg["content"] = textParts.Count > 0 ? (JsonNode?)JsonValue.Create(string.Join("", textParts)) : null;
+        var textContent = textParts.Count > 0 ? string.Join("", textParts) : null;
+        if (string.IsNullOrWhiteSpace(textContent) && toolCalls.Count == 0)
+            return null;
+
+        msg["content"] = string.IsNullOrWhiteSpace(textContent) ? null : JsonValue.Create(textContent);
 
         if (toolCalls.Count > 0)
             msg["tool_calls"] = toolCalls;

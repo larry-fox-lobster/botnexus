@@ -25,7 +25,7 @@ public static class SimpleOptionsHelper
         return new StreamOptions
         {
             Temperature = options?.Temperature,
-            MaxTokens = options?.MaxTokens,
+            MaxTokens = options?.MaxTokens ?? Math.Min(model.MaxTokens, 32000),
             CancellationToken = options?.CancellationToken ?? CancellationToken.None,
             ApiKey = apiKey,
             Transport = options?.Transport ?? Transport.Sse,

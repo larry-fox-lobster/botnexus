@@ -527,6 +527,17 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
             }).ToList();
         }
 
+        if (options?.Metadata is { } metadata &&
+            metadata.TryGetValue("user_id", out var rawUserId) &&
+            rawUserId is string userId &&
+            !string.IsNullOrWhiteSpace(userId))
+        {
+            body["metadata"] = new Dictionary<string, object?>
+            {
+                ["user_id"] = userId
+            };
+        }
+
         // Tool choice
         if (anthropicOpts?.ToolChoice is { } toolChoice)
         {
@@ -985,7 +996,7 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
         if (retention == CacheRetention.Long &&
             baseUrl.Contains("api.anthropic.com", StringComparison.OrdinalIgnoreCase))
         {
-            cacheControl["ttl"] = 3600;
+            cacheControl["ttl"] = "1h";
         }
 
         return cacheControl;
