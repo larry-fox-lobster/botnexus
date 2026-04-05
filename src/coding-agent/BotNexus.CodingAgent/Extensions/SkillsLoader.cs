@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace BotNexus.CodingAgent.Extensions;
 
 /// <summary>
@@ -6,6 +8,7 @@ namespace BotNexus.CodingAgent.Extensions;
 public sealed class SkillsLoader
 {
     private const int MaxSkillNameLength = 64;
+    private static readonly string[] DefaultIgnoredDirectories = ["node_modules", "bin", "obj", ".git", "build", "dist"];
 
     public IReadOnlyList<string> LoadSkills(string workingDirectory, CodingAgentConfig config)
     {
@@ -22,12 +25,22 @@ public sealed class SkillsLoader
         TryAddFile(Path.Combine(root, "AGENTS.md"), skillDocuments);
         TryAddFile(Path.Combine(root, ".botnexus-agent", "AGENTS.md"), skillDocuments);
 
-        var skillsDirectory = Path.Combine(root, ".botnexus-agent", "skills");
-        if (Directory.Exists(skillsDirectory))
+        foreach (var skillsDirectory in ResolveSkillDirectories(root, config))
         {
+            if (!Directory.Exists(skillsDirectory))
+            {
+                continue;
+            }
+
+            var ignoreFilter = SkillIgnoreFilter.Create(skillsDirectory);
             foreach (var skillPath in Directory.EnumerateFiles(skillsDirectory, "SKILL.md", SearchOption.AllDirectories)
                          .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
             {
+                if (ignoreFilter.IsIgnored(skillPath))
+                {
+                    continue;
+                }
+
                 TryAddSkill(skillPath, skillDocuments, knownSkillNames);
             }
         }
@@ -162,4 +175,150 @@ public sealed class SkillsLoader
     }
 
     private sealed record ParsedSkill(string Name, string Description, bool DisableModelInvocation, string Body);
+
+    private static IReadOnlyList<string> ResolveSkillDirectories(string root, CodingAgentConfig config)
+    {
+        var directories = new List<string>
+        {
+            Path.Combine(root, ".botnexus-agent", "skills")
+        };
+
+        if (!string.IsNullOrWhiteSpace(config.SkillsDirectory))
+        {
+            directories.Add(Path.GetFullPath(config.SkillsDirectory));
+        }
+
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrWhiteSpace(userProfile))
+        {
+            directories.Add(Path.Combine(userProfile, ".botnexus", "skills"));
+        }
+
+        return directories
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private sealed class SkillIgnoreFilter
+    {
+        private readonly string _basePath;
+        private readonly IReadOnlyList<GitIgnoreRule> _rules;
+
+        private SkillIgnoreFilter(string basePath, IReadOnlyList<GitIgnoreRule> rules)
+        {
+            _basePath = basePath;
+            _rules = rules;
+        }
+
+        public static SkillIgnoreFilter Create(string basePath)
+        {
+            var rules = new List<GitIgnoreRule>();
+            var gitIgnorePath = Path.Combine(basePath, ".gitignore");
+            if (File.Exists(gitIgnorePath))
+            {
+                foreach (var line in File.ReadAllLines(gitIgnorePath))
+                {
+                    var parsed = ParseRule(line);
+                    if (parsed is not null)
+                    {
+                        rules.Add(parsed);
+                    }
+                }
+            }
+
+            return new SkillIgnoreFilter(basePath, rules);
+        }
+
+        public bool IsIgnored(string fullPath)
+        {
+            var relative = Path.GetRelativePath(_basePath, fullPath).Replace('\\', '/');
+            if (relative.StartsWith("../", StringComparison.Ordinal) || relative.Equals("..", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (ContainsDefaultIgnoredDirectory(relative))
+            {
+                return true;
+            }
+
+            var ignored = false;
+            foreach (var rule in _rules)
+            {
+                if (rule.Pattern.IsMatch(relative))
+                {
+                    ignored = !rule.Negated;
+                }
+            }
+
+            return ignored;
+        }
+
+        private static bool ContainsDefaultIgnoredDirectory(string relativePath)
+        {
+            foreach (var ignoredDirectory in DefaultIgnoredDirectories)
+            {
+                if (relativePath.Equals(ignoredDirectory, StringComparison.OrdinalIgnoreCase) ||
+                    relativePath.StartsWith($"{ignoredDirectory}/", StringComparison.OrdinalIgnoreCase) ||
+                    relativePath.Contains($"/{ignoredDirectory}/", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
+    private static GitIgnoreRule? ParseRule(string line)
+    {
+        var trimmed = line.Trim();
+        if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#'))
+        {
+            return null;
+        }
+
+        var negated = trimmed.StartsWith('!');
+        var pattern = negated ? trimmed[1..].Trim() : trimmed;
+        if (string.IsNullOrEmpty(pattern))
+        {
+            return null;
+        }
+
+        var anchored = pattern.StartsWith('/');
+        if (anchored)
+        {
+            pattern = pattern[1..];
+        }
+
+        var directoryOnly = pattern.EndsWith('/');
+        if (directoryOnly)
+        {
+            pattern = pattern.TrimEnd('/');
+        }
+
+        if (string.IsNullOrEmpty(pattern))
+        {
+            return null;
+        }
+
+        var hasSlash = pattern.Contains('/');
+        var regex = BuildGitIgnoreRegex(pattern, anchored, hasSlash, directoryOnly);
+        return new GitIgnoreRule(regex, negated);
+    }
+
+    private static Regex BuildGitIgnoreRegex(string pattern, bool anchored, bool hasSlash, bool directoryOnly)
+    {
+        var escaped = Regex.Escape(pattern)
+            .Replace(@"\*\*", "<<<DOUBLE_STAR>>>", StringComparison.Ordinal)
+            .Replace(@"\*", @"[^/]*", StringComparison.Ordinal)
+            .Replace(@"\?", @"[^/]", StringComparison.Ordinal)
+            .Replace("<<<DOUBLE_STAR>>>", ".*", StringComparison.Ordinal);
+
+        var prefix = anchored ? "^" : @"(^|.*/)";
+        var suffix = directoryOnly ? @"(?:/.*)?$" : "$";
+        return new Regex($"{prefix}{escaped}{suffix}", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    }
+
+    private sealed record GitIgnoreRule(Regex Pattern, bool Negated);
 }
