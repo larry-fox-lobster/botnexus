@@ -26,6 +26,7 @@ public sealed class ShellTool : IAgentTool
     private const int DefaultTimeoutSeconds = 120;
     private const int MaxOutputBytes = 50 * 1024;
     private const int MaxOutputLines = 2000;
+    private static readonly Lazy<string?> WindowsBashPath = new(FindBashExecutable);
 
     /// <inheritdoc />
     public string Name => "bash";
@@ -95,11 +96,11 @@ public sealed class ShellTool : IAgentTool
             ? timeout
             : DefaultTimeoutSeconds;
 
-        var (fileName, shellArgs) = BuildShellInvocation(command);
+        var invocation = BuildShellInvocation(command);
         var startInfo = new ProcessStartInfo
         {
-            FileName = fileName,
-            Arguments = shellArgs,
+            FileName = invocation.FileName,
+            Arguments = invocation.Args,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -154,6 +155,7 @@ public sealed class ShellTool : IAgentTool
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
             var timeoutOutput = BuildOutput(outputBuffer, includeTruncationNotes: true);
+            timeoutOutput = PrependWarning(timeoutOutput, invocation.WarningPrefix);
             TryKill(process);
             var timeoutMessage = string.IsNullOrWhiteSpace(timeoutOutput)
                 ? $"Command timed out after {timeoutSeconds} seconds."
@@ -169,6 +171,7 @@ public sealed class ShellTool : IAgentTool
         }
 
         var output = BuildOutput(outputBuffer, includeTruncationNotes: true);
+        output = PrependWarning(output, invocation.WarningPrefix);
         if (process.ExitCode != 0 && !string.IsNullOrWhiteSpace(output))
         {
             output = $"{output}{Environment.NewLine}{Environment.NewLine}[command exited with code {process.ExitCode}]";
@@ -179,16 +182,83 @@ public sealed class ShellTool : IAgentTool
             new ShellToolDetails(process.ExitCode, TimedOut: false, IsError: process.ExitCode != 0));
     }
 
-    private static (string FileName, string Args) BuildShellInvocation(string command)
+    private static ShellInvocation BuildShellInvocation(string command)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
+            var bashPath = WindowsBashPath.Value;
+            if (!string.IsNullOrWhiteSpace(bashPath))
+            {
+                var bashEscaped = command.Replace("'", "'\"'\"'", StringComparison.Ordinal);
+                return new ShellInvocation(bashPath, $"-lc '{bashEscaped}'", null);
+            }
+
             var escaped = command.Replace("\"", "`\"", StringComparison.Ordinal);
-            return ("powershell", $"-NoLogo -NoProfile -NonInteractive -Command \"{escaped}\"");
+            return new ShellInvocation(
+                "powershell",
+                $"-NoLogo -NoProfile -NonInteractive -Command \"{escaped}\"",
+                "[warning: bash not found, using PowerShell — install Git for Windows for best compatibility]\n");
         }
 
         var bashEscaped = command.Replace("'", "'\"'\"'", StringComparison.Ordinal);
-        return ("/bin/bash", $"-lc '{bashEscaped}'");
+        return new ShellInvocation("/bin/bash", $"-lc '{bashEscaped}'", null);
+    }
+
+    private static string? FindBashExecutable()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return null;
+        }
+
+        var candidates = new[]
+        {
+            @"C:\Program Files\Git\bin\bash.exe",
+            @"C:\Program Files (x86)\Git\bin\bash.exe"
+        };
+        foreach (var candidate in candidates)
+        {
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        try
+        {
+            var whereStartInfo = new ProcessStartInfo
+            {
+                FileName = "where.exe",
+                Arguments = "bash",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var process = Process.Start(whereStartInfo);
+            if (process is null)
+            {
+                return null;
+            }
+
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit(2000);
+            if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(output))
+            {
+                return null;
+            }
+
+            var firstPath = output
+                .Split([Environment.NewLine], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .FirstOrDefault();
+            return !string.IsNullOrWhiteSpace(firstPath) && File.Exists(firstPath)
+                ? firstPath
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static void TryKill(Process process)
@@ -250,6 +320,18 @@ public sealed class ShellTool : IAgentTool
         return builder.ToString().TrimEnd();
     }
 
+    private static string PrependWarning(string output, string? warningPrefix)
+    {
+        if (string.IsNullOrWhiteSpace(warningPrefix))
+        {
+            return output;
+        }
+
+        return string.IsNullOrWhiteSpace(output)
+            ? warningPrefix.TrimEnd()
+            : $"{warningPrefix}{output}";
+    }
+
     private static string ReadRequiredString(IReadOnlyDictionary<string, object?> arguments, string key)
     {
         if (!arguments.TryGetValue(key, out var value) || value is null)
@@ -280,4 +362,6 @@ public sealed class ShellTool : IAgentTool
     }
 
     public sealed record ShellToolDetails(int ExitCode, bool TimedOut, bool IsError);
+
+    private sealed record ShellInvocation(string FileName, string Args, string? WarningPrefix);
 }

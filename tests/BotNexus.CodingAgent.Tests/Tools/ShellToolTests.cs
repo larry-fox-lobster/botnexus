@@ -12,7 +12,7 @@ public sealed class ShellToolTests
     {
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?>
         {
-            ["command"] = "Write-Output hello-shell"
+            ["command"] = "echo hello-shell"
         });
 
         result.Content.Should().ContainSingle();
@@ -38,7 +38,7 @@ public sealed class ShellToolTests
     {
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?>
         {
-            ["command"] = "Start-Sleep -Seconds 2",
+            ["command"] = "python -c \"import time; time.sleep(2)\"",
             ["timeout"] = 1
         });
 
@@ -52,7 +52,7 @@ public sealed class ShellToolTests
     {
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?>
         {
-            ["command"] = "$payload = ('a' * 52000) + 'TAIL-MARKER'; Write-Output $payload"
+            ["command"] = "python -c \"print('a' * 52000 + 'TAIL-MARKER')\""
         });
 
         result.Content[0].Value.Should().Contain("[Output truncated at 51200 bytes]");
