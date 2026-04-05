@@ -1,19 +1,21 @@
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
+using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Routing;
 using BotNexus.Gateway.Sessions;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace BotNexus.Gateway.Tests;
 
-public class DefaultMessageRouterTests
+public sealed class DefaultMessageRouterTests
 {
     [Fact]
     public async Task ResolveAsync_WithExplicitTarget_RoutesToTargetAgent()
     {
         var registry = CreateRegistryWithAgents("agent-a", "agent-b");
-        var router = new DefaultMessageRouter(registry, new InMemorySessionStore(), NullLogger<DefaultMessageRouter>.Instance);
+        var router = CreateRouter(registry, new InMemorySessionStore());
 
         var route = await router.ResolveAsync(CreateMessage(targetAgentId: "agent-b"));
 
@@ -26,7 +28,7 @@ public class DefaultMessageRouterTests
         var registry = CreateRegistryWithAgents("agent-a", "agent-b");
         var sessions = new InMemorySessionStore();
         await sessions.GetOrCreateAsync("s1", "agent-b");
-        var router = new DefaultMessageRouter(registry, sessions, NullLogger<DefaultMessageRouter>.Instance);
+        var router = CreateRouter(registry, sessions);
 
         var route = await router.ResolveAsync(CreateMessage(sessionId: "s1"));
 
@@ -37,8 +39,7 @@ public class DefaultMessageRouterTests
     public async Task ResolveAsync_WithoutExplicitOrSession_FallsBackToDefaultAgent()
     {
         var registry = CreateRegistryWithAgents("agent-a");
-        var router = new DefaultMessageRouter(registry, new InMemorySessionStore(), NullLogger<DefaultMessageRouter>.Instance);
-        router.SetDefaultAgent("agent-a");
+        var router = CreateRouter(registry, new InMemorySessionStore(), "agent-a");
 
         var route = await router.ResolveAsync(CreateMessage());
 
@@ -48,7 +49,7 @@ public class DefaultMessageRouterTests
     [Fact]
     public async Task ResolveAsync_WhenNoAgentFound_ReturnsEmpty()
     {
-        var router = new DefaultMessageRouter(CreateRegistryWithAgents(), new InMemorySessionStore(), NullLogger<DefaultMessageRouter>.Instance);
+        var router = CreateRouter(CreateRegistryWithAgents(), new InMemorySessionStore());
 
         var route = await router.ResolveAsync(CreateMessage());
 
@@ -59,8 +60,7 @@ public class DefaultMessageRouterTests
     public async Task ResolveAsync_WithUnknownExplicitTarget_ReturnsEmpty()
     {
         var registry = CreateRegistryWithAgents("agent-a");
-        var router = new DefaultMessageRouter(registry, new InMemorySessionStore(), NullLogger<DefaultMessageRouter>.Instance);
-        router.SetDefaultAgent("agent-a");
+        var router = CreateRouter(registry, new InMemorySessionStore(), "agent-a");
 
         var route = await router.ResolveAsync(CreateMessage(targetAgentId: "missing"));
 
@@ -74,6 +74,15 @@ public class DefaultMessageRouterTests
             registry.Register(CreateDescriptor(agentId));
 
         return registry;
+    }
+
+    private static DefaultMessageRouter CreateRouter(
+        DefaultAgentRegistry registry,
+        InMemorySessionStore sessions,
+        string? defaultAgentId = null)
+    {
+        var options = Options.Create(new GatewayOptions { DefaultAgentId = defaultAgentId });
+        return new DefaultMessageRouter(registry, sessions, NullLogger<DefaultMessageRouter>.Instance, options);
     }
 
     private static AgentDescriptor CreateDescriptor(string agentId)

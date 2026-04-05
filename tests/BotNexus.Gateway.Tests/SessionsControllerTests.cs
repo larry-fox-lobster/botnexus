@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BotNexus.Gateway.Tests;
 
-public class SessionsControllerTests
+public sealed class SessionsControllerTests
 {
     [Fact]
     public async Task List_WithExistingSessions_ReturnsSessions()

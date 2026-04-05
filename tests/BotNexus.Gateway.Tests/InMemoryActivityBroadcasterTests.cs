@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BotNexus.Gateway.Tests;
 
-public class InMemoryActivityBroadcasterTests
+public sealed class InMemoryActivityBroadcasterTests
 {
     [Fact]
     public async Task PublishAsync_WithoutSubscribers_DoesNotThrow()

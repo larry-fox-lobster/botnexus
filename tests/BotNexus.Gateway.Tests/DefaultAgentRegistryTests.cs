@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BotNexus.Gateway.Tests;
 
-public class DefaultAgentRegistryTests
+public sealed class DefaultAgentRegistryTests
 {
     [Fact]
     public void Register_WithValidDescriptor_AddsAgent()

@@ -9,7 +9,7 @@ using Moq;
 
 namespace BotNexus.Gateway.Tests;
 
-public class AgentsControllerTests
+public sealed class AgentsControllerTests
 {
     [Fact]
     public void List_WhenAgentsRegistered_ReturnsRegisteredAgents()

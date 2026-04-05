@@ -519,3 +519,8 @@ All Sprints 1-2 foundation work completed by Farnsworth and Bender. Hermes ready
 - New Gateway test project follows existing test conventions (net10.0, xUnit, FluentAssertions, Moq, nullable enabled) and uses skipped `[Fact]` stubs to document intended coverage before gateway interfaces exist.
 - Gateway planning now separates unit, integration, and E2E boundaries explicitly: protocol/validation logic in unit tests, host pipeline/session persistence in integration tests, and adapter-to-stream full flows in E2E.
 - Early coverage priorities are locked around agent lifecycle, session reconnect semantics, adapter normalization, isolation strategy resolution, REST contracts, and WebSocket protocol lifecycle.
+### 2026-04-05 — Gateway test naming/sealing consistency pass
+
+- For Gateway unit tests, file names must exactly match the contained test class names to keep review and navigation friction low.
+- Test classes in `tests/BotNexus.Gateway.Tests` should be declared `sealed` for consistency with team test-style rules and audit expectations.
+- Verified quality gate after structural refactors: `dotnet build tests\BotNexus.Gateway.Tests\` and `dotnet test tests\BotNexus.Gateway.Tests\ --no-build` remained green (30/30).

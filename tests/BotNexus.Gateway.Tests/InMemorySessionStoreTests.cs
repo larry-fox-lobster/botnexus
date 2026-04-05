@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests;
 
-public class InMemorySessionStoreTests
+public sealed class InMemorySessionStoreTests
 {
     [Fact]
     public async Task GetOrCreateAsync_WithUnknownSession_CreatesSession()
