@@ -219,6 +219,22 @@ public sealed class ListDirectoryTool : IAgentTool
                 {
                     return entries;
                 }
+
+                var grandchildDirectoryPath = Path.Combine(directoryPath, childDirectory);
+                var grandchildFiles = Directory.EnumerateFiles(grandchildDirectoryPath, "*", SearchOption.TopDirectoryOnly)
+                    .Select(Path.GetFileName)
+                    .Where(name => !string.IsNullOrEmpty(name))
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                foreach (var grandchildFile in grandchildFiles)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!TryAdd(entries, $"{directory}/{childDirectory}/{grandchildFile}", limit, ref entryLimitReached))
+                    {
+                        return entries;
+                    }
+                }
             }
 
             foreach (var childFile in childFiles)
