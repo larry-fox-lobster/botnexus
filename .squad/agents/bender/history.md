@@ -651,3 +651,5 @@ _logger.LogInformation("Agent {AgentName} configured with model={ConfiguredModel
 - Kif: 7 training guides (~2500 lines) — 1 commit, docs ✓
 
 **All systems green. Ready for integration.**
+
+- [2026-04-05T02:23:26Z] Added list_directory tool and context file discovery for CodingAgent; validated full solution build/tests after runtime tool additions.
