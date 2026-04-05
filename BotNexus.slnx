@@ -1,4 +1,5 @@
 <Solution>
+  <Folder Name="/src/" />
   <Folder Name="/src/agent/">
     <Project Path="src/agent/BotNexus.AgentCore/BotNexus.AgentCore.csproj" />
   </Folder>
@@ -17,6 +18,8 @@
   </Folder>
   <Folder Name="/src/channels/">
     <Project Path="src/channels/BotNexus.Channels.Core/BotNexus.Channels.Core.csproj" />
+    <Project Path="src/channels/BotNexus.Channels.Telegram/BotNexus.Channels.Telegram.csproj" />
+    <Project Path="src/channels/BotNexus.Channels.Tui/BotNexus.Channels.Tui.csproj" />
   </Folder>
   <Folder Name="/src/coding-agent/">
     <Project Path="src/coding-agent/BotNexus.CodingAgent/BotNexus.CodingAgent.csproj" />

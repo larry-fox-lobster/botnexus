@@ -145,6 +145,7 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+- 2026-04-06: Added Phase 2 channel stub projects `BotNexus.Channels.Tui` and `BotNexus.Channels.Telegram` with DI registration (`AddBotNexusTuiChannel`, `AddBotNexusTelegramChannel`) and lifecycle-safe `IChannelAdapter` placeholders for future inbound loop/API wiring.
 - 2026-04-06: `ToolExecutor.PrepareToolCallAsync` now validates raw tool-call arguments against `tool.Definition.Parameters` with `ToolCallValidator` before invoking `PrepareArgumentsAsync`, returning a tool-error result on schema failures.
 - Message bus publishing is now async-only; the sync `MessageBusExtensions.Publish()` wrapper was removed to eliminate sync-over-async deadlock risk.
 - 2026-04-01: BotNexus CLI now includes `backup create|restore|list` in `src/BotNexus.Cli/Program.cs`, with zip backup of home data excluding `backups/` and `logs/`, plus pre-restore safety backups.
