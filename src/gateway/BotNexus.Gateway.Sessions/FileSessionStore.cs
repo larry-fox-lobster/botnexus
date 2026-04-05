@@ -5,8 +5,10 @@ using Microsoft.Extensions.Logging;
 
 namespace BotNexus.Gateway.Sessions;
 
-// Gateway library code uses ConfigureAwait(false) on awaited tasks to avoid deadlocks
-// in synchronization-context-bound callers.
+// Gateway.Sessions library code uses ConfigureAwait(false) on awaited tasks to avoid
+// deadlocks in synchronization-context-bound callers. The Gateway host project
+// (BotNexus.Gateway) omits ConfigureAwait(false) because it runs on the generic host
+// thread pool without a synchronization context.
 
 /// <summary>
 /// File-backed session store using JSONL format (one entry per line) with a JSON metadata sidecar.
