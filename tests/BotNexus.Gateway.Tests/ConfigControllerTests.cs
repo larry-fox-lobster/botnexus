@@ -17,7 +17,8 @@ public sealed class ConfigControllerTests
         var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = ok.Value.Should().BeOfType<ConfigValidationResponse>().Subject;
         payload.IsValid.Should().BeFalse();
-        payload.Errors.Should().ContainSingle(e => e.Contains("Config file not found", StringComparison.Ordinal));
+        payload.Errors.Should().Contain(e => e.Contains("Config file not found", StringComparison.Ordinal));
+        payload.Errors.Should().Contain(e => e.Contains("Create ~/.botnexus/config.json", StringComparison.Ordinal));
     }
 
     [Fact]

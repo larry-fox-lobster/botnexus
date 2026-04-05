@@ -20,7 +20,11 @@ public sealed class ConfigController : ControllerBase
             return Ok(new ConfigValidationResponse(
                 IsValid: false,
                 ConfigPath: resolvedPath,
-                Errors: [$"Config file not found at '{resolvedPath}'. Create it under ~/.botnexus/config.json."]));
+                Errors:
+                [
+                    $"Config file not found at '{resolvedPath}'.",
+                    "Create ~/.botnexus/config.json (or pass ?path=...) and include gateway/providers/channels/agents sections."
+                ]));
         }
 
         try
@@ -30,7 +34,12 @@ public sealed class ConfigController : ControllerBase
         }
         catch (OptionsValidationException ex)
         {
-            return Ok(new ConfigValidationResponse(false, resolvedPath, ex.Failures.ToArray()));
+            var errors = ex.Failures
+                .Where(error => !string.IsNullOrWhiteSpace(error))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(error => error, StringComparer.Ordinal)
+                .ToArray();
+            return Ok(new ConfigValidationResponse(false, resolvedPath, errors));
         }
     }
 }
