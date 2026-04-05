@@ -1,0 +1,178 @@
+using System.Reflection;
+using BotNexus.AgentCore;
+using BotNexus.AgentCore.Configuration;
+using BotNexus.AgentCore.Hooks;
+using BotNexus.AgentCore.Tools;
+using BotNexus.AgentCore.Types;
+using BotNexus.CodingAgent.Hooks;
+using BotNexus.CodingAgent.Tools;
+using BotNexus.CodingAgent.Utils;
+using BotNexus.Providers.Core;
+using BotNexus.Providers.Core.Models;
+using BotNexus.Providers.Core.Registry;
+
+namespace BotNexus.CodingAgent;
+
+public static class CodingAgent
+{
+    public static async Task<Agent> CreateAsync(CodingAgentConfig config, string workingDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        if (string.IsNullOrWhiteSpace(workingDirectory))
+        {
+            throw new ArgumentException("Working directory cannot be empty.", nameof(workingDirectory));
+        }
+
+        var root = Path.GetFullPath(workingDirectory);
+        CodingAgentConfig.EnsureDirectories(root);
+
+        var tools = CreateTools(root);
+        var gitBranch = await GitUtils.GetBranchAsync(root).ConfigureAwait(false);
+        var gitStatus = await GitUtils.GetStatusAsync(root).ConfigureAwait(false);
+        var packageManager = PackageManagerDetector.Detect(root);
+        var skills = LoadSkills(config, root);
+
+        var promptBuilder = new SystemPromptBuilder();
+        var systemPrompt = promptBuilder.Build(new SystemPromptContext(
+            WorkingDirectory: root,
+            GitBranch: gitBranch,
+            GitStatus: gitStatus,
+            PackageManager: packageManager,
+            ToolNames: tools.Select(tool => tool.Name).ToList(),
+            Skills: skills,
+            CustomInstructions: null));
+
+        var model = ResolveModel(config);
+        var auditHooks = new AuditHooks(verbose: true);
+        var safetyHooks = new SafetyHooks();
+
+        var options = new AgentOptions(
+            InitialState: new AgentInitialState(
+                SystemPrompt: systemPrompt,
+                Model: model,
+                Tools: tools),
+            Model: model,
+            ConvertToLlm: BuildConvertToLlmDelegate(),
+            TransformContext: (messages, _) => Task.FromResult(messages),
+            GetApiKey: (_, _) => Task.FromResult(ResolveApiKey(config, model.Provider)),
+            GetSteeringMessages: null,
+            GetFollowUpMessages: null,
+            ToolExecutionMode: ToolExecutionMode.Sequential,
+            BeforeToolCall: (context, _) => ExecuteBeforeHookAsync(context, safetyHooks, auditHooks, config),
+            AfterToolCall: (context, _) => auditHooks.AuditAsync(context),
+            GenerationSettings: new SimpleStreamOptions
+            {
+                MaxTokens = model.MaxTokens
+            },
+            SteeringMode: QueueMode.OneAtATime,
+            FollowUpMode: QueueMode.OneAtATime,
+            SessionId: null);
+
+        return new Agent(options);
+    }
+
+    private static Task<BeforeToolCallResult?> ExecuteBeforeHookAsync(
+        BeforeToolCallContext context,
+        SafetyHooks safetyHooks,
+        AuditHooks auditHooks,
+        CodingAgentConfig config)
+    {
+        auditHooks.RegisterToolCallStart(context.ToolCallRequest.Id);
+        return safetyHooks.ValidateAsync(context, config);
+    }
+
+    private static IReadOnlyList<IAgentTool> CreateTools(string workingDirectory)
+    {
+        return
+        [
+            new ReadTool(workingDirectory),
+            new WriteTool(workingDirectory),
+            new EditTool(workingDirectory),
+            new ShellTool(),
+            new GlobTool(workingDirectory)
+        ];
+    }
+
+    private static ConvertToLlmDelegate BuildConvertToLlmDelegate()
+    {
+        var method = Type.GetType("BotNexus.AgentCore.Loop.MessageConverter, BotNexus.AgentCore")
+            ?.GetMethod("ToProviderMessages", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        if (method is null)
+        {
+            throw new InvalidOperationException("MessageConverter.ToProviderMessages was not found.");
+        }
+
+        return (messages, _) =>
+        {
+            var converted = method.Invoke(null, [messages]) as IReadOnlyList<Message>;
+            if (converted is null)
+            {
+                throw new InvalidOperationException("Message conversion returned null.");
+            }
+
+            return Task.FromResult(converted);
+        };
+    }
+
+    private static string? ResolveApiKey(CodingAgentConfig config, string provider)
+    {
+        if (!string.IsNullOrWhiteSpace(config.ApiKey))
+        {
+            return config.ApiKey;
+        }
+
+        var providerKey = Environment.GetEnvironmentVariable($"{provider.ToUpperInvariant()}_API_KEY");
+        if (!string.IsNullOrWhiteSpace(providerKey))
+        {
+            return providerKey;
+        }
+
+        return Environment.GetEnvironmentVariable("OPENAI_API_KEY")
+               ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
+               ?? Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+    }
+
+    private static LlmModel ResolveModel(CodingAgentConfig config)
+    {
+        var provider = config.Provider ?? "copilot";
+        var modelId = config.Model ?? "gpt-4.1";
+
+        var existing = ModelRegistry.GetModel(provider, modelId);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        return new LlmModel(
+            Id: modelId,
+            Name: modelId,
+            Api: provider,
+            Provider: provider,
+            BaseUrl: string.Empty,
+            Reasoning: false,
+            Input: ["text"],
+            Cost: new ModelCost(0, 0, 0, 0),
+            ContextWindow: config.MaxContextTokens,
+            MaxTokens: Math.Min(8192, config.MaxContextTokens));
+    }
+
+    private static IReadOnlyList<string> LoadSkills(CodingAgentConfig config, string workingDirectory)
+    {
+        var skills = new List<string>();
+        var workspaceAgentsPath = Path.Combine(workingDirectory, "AGENTS.md");
+        if (File.Exists(workspaceAgentsPath))
+        {
+            skills.Add(File.ReadAllText(workspaceAgentsPath));
+        }
+
+        if (Directory.Exists(config.SkillsDirectory))
+        {
+            foreach (var path in Directory.EnumerateFiles(config.SkillsDirectory, "*.md", SearchOption.AllDirectories))
+            {
+                skills.Add(File.ReadAllText(path));
+            }
+        }
+
+        return skills;
+    }
+}
