@@ -418,6 +418,6 @@ public sealed class GrepTool : IAgentTool
             return line;
         }
 
-        return $"{line[..MaxLineLength]}...";
+        return $"{line[..MaxLineLength]}... [truncated]";
     }
 }

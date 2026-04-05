@@ -128,7 +128,7 @@ public sealed class GrepToolTests : IDisposable
             ["pattern"] = "x+"
         });
 
-        result.Content[0].Value.Should().Contain($"{new string('x', 500)}...");
+        result.Content[0].Value.Should().Contain($"{new string('x', 500)}... [truncated]");
         result.Content[0].Value.Should().NotContain(longLine);
     }
 
