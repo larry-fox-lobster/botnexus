@@ -114,6 +114,88 @@ public class OpenAIResponsesProviderTests
         body.RootElement.GetProperty("reasoning").GetProperty("effort").GetString().Should().Be("high");
     }
 
+    [Fact]
+    public async Task Stream_SystemPromptUsesRoleContentShorthand()
+    {
+        var handler = new RecordingHandler();
+        var provider = new OpenAIResponsesProvider(
+            new HttpClient(handler), NullLogger<OpenAIResponsesProvider>.Instance);
+
+        var model = TestHelpers.MakeModel(id: "gpt-5.4", api: "openai-responses", reasoning: true);
+        var context = TestHelpers.MakeContext(systemPrompt: "sys prompt");
+
+        var stream = provider.Stream(model, context, new OpenAIResponsesOptions { ApiKey = "test-key" });
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.LastRequestBody!);
+        var firstInput = body.RootElement.GetProperty("input")[0];
+        firstInput.GetProperty("role").GetString().Should().Be("developer");
+        firstInput.GetProperty("content").GetString().Should().Be("sys prompt");
+        firstInput.TryGetProperty("type", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Stream_DoesNotSendPreviousResponseId()
+    {
+        var handler = new RecordingHandler();
+        var provider = new OpenAIResponsesProvider(
+            new HttpClient(handler), NullLogger<OpenAIResponsesProvider>.Instance);
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var model = TestHelpers.MakeModel(id: "gpt-5.4", api: "openai-responses", reasoning: true);
+        var context = new BotNexus.Providers.Core.Models.Context(
+            "system",
+            [
+                new BotNexus.Providers.Core.Models.UserMessage(new BotNexus.Providers.Core.Models.UserMessageContent("hello"), timestamp),
+                new BotNexus.Providers.Core.Models.AssistantMessage(
+                    Content: [new BotNexus.Providers.Core.Models.TextContent("hi")],
+                    Api: model.Api,
+                    Provider: model.Provider,
+                    ModelId: model.Id,
+                    Usage: BotNexus.Providers.Core.Models.Usage.Empty(),
+                    StopReason: BotNexus.Providers.Core.Models.StopReason.Stop,
+                    ErrorMessage: null,
+                    ResponseId: "resp_prev",
+                    Timestamp: timestamp)
+            ]);
+
+        var stream = provider.Stream(model, context, new OpenAIResponsesOptions
+        {
+            ApiKey = "test-key",
+            PreviousResponseId = "explicit_prev"
+        });
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.LastRequestBody!);
+        body.RootElement.TryGetProperty("previous_response_id", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Stream_CopilotHeadersCanBeOverriddenByOptionsHeaders()
+    {
+        var handler = new RecordingHandler();
+        var provider = new OpenAIResponsesProvider(
+            new HttpClient(handler), NullLogger<OpenAIResponsesProvider>.Instance);
+
+        var model = TestHelpers.MakeModel(
+            id: "gpt-4o",
+            api: "openai-responses",
+            provider: "github-copilot",
+            reasoning: true);
+        var context = TestHelpers.MakeContext();
+        var stream = provider.Stream(model, context, new OpenAIResponsesOptions
+        {
+            ApiKey = "test-key",
+            Headers = new Dictionary<string, string>
+            {
+                ["Openai-Intent"] = "custom-intent"
+            }
+        });
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        handler.LastRequestHeaders.Should().ContainKey("Openai-Intent");
+        handler.LastRequestHeaders["Openai-Intent"].Should().Contain("custom-intent");
+    }
+
     private static HttpResponseMessage SseResponse(string payload) =>
         new(HttpStatusCode.OK)
         {
@@ -123,10 +205,15 @@ public class OpenAIResponsesProviderTests
     private sealed class RecordingHandler : HttpMessageHandler
     {
         public string? LastRequestBody { get; private set; }
+        public Dictionary<string, string> LastRequestHeaders { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             LastRequestBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
+            LastRequestHeaders = request.Headers.ToDictionary(
+                h => h.Key,
+                h => string.Join(",", h.Value),
+                StringComparer.OrdinalIgnoreCase);
             return SseResponse("""
                 data: {"type":"response.completed","response":{"id":"resp_1","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}}
                 data: [DONE]

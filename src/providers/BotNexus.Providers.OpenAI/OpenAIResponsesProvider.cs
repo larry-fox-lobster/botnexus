@@ -108,16 +108,16 @@ public sealed class OpenAIResponsesProvider(
                 request.Headers.TryAddWithoutValidation(key, value);
         }
 
-        if (options?.Headers is not null)
+        if (string.Equals(model.Provider, "github-copilot", StringComparison.OrdinalIgnoreCase))
         {
-            foreach (var (key, value) in options.Headers)
+            var hasImages = CopilotHeaders.HasVisionInput(context.Messages);
+            foreach (var (key, value) in CopilotHeaders.BuildDynamicHeaders(context.Messages, hasImages))
                 request.Headers.TryAddWithoutValidation(key, value);
         }
 
-        if (string.Equals(model.Provider, "github-copilot", StringComparison.OrdinalIgnoreCase))
+        if (options?.Headers is not null)
         {
-            var hasImages = CopilotHeaders.HasVisionInput(messages);
-            foreach (var (key, value) in CopilotHeaders.BuildDynamicHeaders(messages, hasImages))
+            foreach (var (key, value) in options.Headers)
                 request.Headers.TryAddWithoutValidation(key, value);
         }
 
@@ -145,16 +145,8 @@ public sealed class OpenAIResponsesProvider(
         {
             input.Insert(0, new JsonObject
             {
-                ["type"] = "message",
                 ["role"] = model.Reasoning ? "developer" : "system",
-                ["content"] = new JsonArray
-                {
-                    new JsonObject
-                    {
-                        ["type"] = "input_text",
-                        ["text"] = UnicodeSanitizer.SanitizeSurrogates(systemPrompt)
-                    }
-                }
+                ["content"] = UnicodeSanitizer.SanitizeSurrogates(systemPrompt)
             });
         }
 
@@ -183,12 +175,6 @@ public sealed class OpenAIResponsesProvider(
 
         if (tools is { Count: > 0 })
             payload["tools"] = ConvertTools(tools);
-
-        var previousResponseId = options is OpenAIResponsesOptions { PreviousResponseId: not null } rspOptions
-            ? rspOptions.PreviousResponseId
-            : messages.OfType<AssistantMessage>().Reverse().FirstOrDefault(m => !string.IsNullOrWhiteSpace(m.ResponseId))?.ResponseId;
-        if (!string.IsNullOrWhiteSpace(previousResponseId))
-            payload["previous_response_id"] = previousResponseId;
 
         if (model.Reasoning)
         {
