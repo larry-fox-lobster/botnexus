@@ -501,3 +501,9 @@ All Sprints 1-2 foundation work completed by Farnsworth and Bender. Hermes ready
 - All systems build clean
 
 **Next Phase:** Ready for production E2E validation.
+### 2026-04-05 — Design Review P0/P1 Regression Tests
+
+- Added focused AgentCore regression suites for listener exception safety, hook exception safety, and retry-delay cap behavior.
+- AgentCore tests must use unique API names per test when registering providers because TestHelpers uses shared static registries across tests.
+- PathUtils symlink rejection tests should gracefully return when symlink privileges are unavailable; otherwise assert UnauthorizedAccessException for outside-root links.
+- BuiltInModels registry tests now validate Copilot + direct Anthropic/OpenAI catalogs and required model fields (Id/ContextWindow/MaxTokens).
