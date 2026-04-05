@@ -180,10 +180,15 @@ public sealed class ReadTool : IAgentTool
         using var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var reader = new StreamReader(stream);
 
-        while (!reader.EndOfStream)
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) ?? string.Empty;
+            var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            if (line is null)
+            {
+                break;
+            }
+
             absoluteLineNumber++;
 
             if (absoluteLineNumber < startLine)

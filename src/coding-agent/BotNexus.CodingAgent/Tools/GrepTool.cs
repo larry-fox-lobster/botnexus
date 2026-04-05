@@ -162,10 +162,15 @@ public sealed class GrepTool : IAgentTool
                 using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 using var reader = new StreamReader(stream);
                 var allLines = new List<string>();
-                while (!reader.EndOfStream)
+                while (true)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) ?? string.Empty;
+                    var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+                    if (line is null)
+                    {
+                        break;
+                    }
+
                     allLines.Add(line);
                 }
 
