@@ -135,15 +135,44 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
                 if (_channelMap.TryGetValue(message.ChannelType, out var channel) && channel.SupportsStreaming)
                 {
                     var streamedContent = new StringBuilder();
+                    var streamedHistory = new List<SessionEntry>();
                     await foreach (var evt in handle.StreamAsync(message.Content, cancellationToken))
                     {
-                        if (evt.Type == AgentStreamEventType.ContentDelta && evt.ContentDelta is not null)
+                        switch (evt.Type)
                         {
-                            streamedContent.Append(evt.ContentDelta);
-                            await channel.SendStreamDeltaAsync(message.ConversationId, evt.ContentDelta, cancellationToken);
+                            case AgentStreamEventType.ContentDelta when evt.ContentDelta is not null:
+                                streamedContent.Append(evt.ContentDelta);
+                                await channel.SendStreamDeltaAsync(message.ConversationId, evt.ContentDelta, cancellationToken);
+                                break;
+                            case AgentStreamEventType.ToolStart when evt.ToolCallId is not null || evt.ToolName is not null:
+                                streamedHistory.Add(new SessionEntry
+                                {
+                                    Role = "tool",
+                                    Content = $"Tool '{evt.ToolName ?? "unknown"}' started.",
+                                    ToolName = evt.ToolName,
+                                    ToolCallId = evt.ToolCallId
+                                });
+                                break;
+                            case AgentStreamEventType.ToolEnd when evt.ToolCallId is not null || evt.ToolName is not null:
+                                streamedHistory.Add(new SessionEntry
+                                {
+                                    Role = "tool",
+                                    Content = evt.ToolResult ?? (evt.ToolIsError == true ? "Tool execution failed." : "Tool execution completed."),
+                                    ToolName = evt.ToolName,
+                                    ToolCallId = evt.ToolCallId
+                                });
+                                break;
+                            case AgentStreamEventType.Error when !string.IsNullOrWhiteSpace(evt.ErrorMessage):
+                                streamedHistory.Add(new SessionEntry
+                                {
+                                    Role = "system",
+                                    Content = $"Agent stream error: {evt.ErrorMessage}"
+                                });
+                                break;
                         }
                     }
 
+                    session.History.AddRange(streamedHistory);
                     session.History.Add(new SessionEntry { Role = "assistant", Content = streamedContent.ToString() });
                 }
                 else
