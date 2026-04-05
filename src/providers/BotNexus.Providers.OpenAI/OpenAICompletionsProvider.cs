@@ -325,7 +325,7 @@ public sealed partial class OpenAICompletionsProvider(
         return false;
     }
 
-    private static string NormalizeToolCallId(string id, LlmModel model)
+    private static string NormalizeToolCallId(string id, LlmModel sourceModel, string targetProviderId)
     {
         if (id.Contains('|'))
         {
@@ -333,7 +333,7 @@ public sealed partial class OpenAICompletionsProvider(
             return NormalizeToolCallIdPart(callId, 40);
         }
 
-        if (string.Equals(model.Provider, "openai", StringComparison.OrdinalIgnoreCase) && id.Length > 40)
+        if (string.Equals(targetProviderId, "openai", StringComparison.OrdinalIgnoreCase) && id.Length > 40)
             return id[..40];
 
         return id;
@@ -400,7 +400,10 @@ public sealed partial class OpenAICompletionsProvider(
         OpenAICompletionsCompat compat)
     {
         var result = new JsonArray();
-        var transformedMessages = MessageTransformer.TransformMessages(messages, model, id => NormalizeToolCallId(id, model));
+        var transformedMessages = MessageTransformer.TransformMessages(
+            messages,
+            model,
+            (id, sourceModel, targetProviderId) => NormalizeToolCallId(id, sourceModel, targetProviderId));
         string? lastRole = null;
 
         if (systemPrompt is not null)
@@ -579,7 +582,7 @@ public sealed partial class OpenAICompletionsProvider(
                     }
                     toolCalls.Add(new JsonObject
                     {
-                        ["id"] = NormalizeToolCallId(tc.Id, model),
+                        ["id"] = NormalizeToolCallId(tc.Id, model, model.Provider),
                         ["type"] = "function",
                         ["function"] = new JsonObject
                         {

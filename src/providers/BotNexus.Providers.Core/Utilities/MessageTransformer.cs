@@ -15,10 +15,16 @@ public static class MessageTransformer
     /// - Inserts synthetic tool results for orphaned tool calls
     /// - Skips errored/aborted assistant messages
     /// </summary>
+    /// <param name="messages">Input messages to transform.</param>
+    /// <param name="targetModel">Target model receiving the transformed messages.</param>
+    /// <param name="normalizeToolCallId">
+    /// Optional callback used to normalize tool-call IDs as:
+    /// (callId, sourceModel, targetProviderId) => normalizedId.
+    /// </param>
     public static List<Message> TransformMessages(
         IReadOnlyList<Message> messages,
         LlmModel targetModel,
-        Func<string, string>? normalizeToolCallId = null)
+        Func<string, LlmModel, string, string>? normalizeToolCallId = null)
     {
         var transformed = new List<Message>(messages.Count);
         var toolCallIdMap = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -109,13 +115,20 @@ public static class MessageTransformer
     private static AssistantMessage TransformAssistantMessage(
         AssistantMessage assistant,
         LlmModel targetModel,
-        Func<string, string>? normalizeToolCallId,
+        Func<string, LlmModel, string, string>? normalizeToolCallId,
         Dictionary<string, string> toolCallIdMap)
     {
         var isSameModel =
             string.Equals(assistant.Provider, targetModel.Provider, StringComparison.Ordinal) &&
             string.Equals(assistant.Api, targetModel.Api, StringComparison.Ordinal) &&
             string.Equals(assistant.ModelId, targetModel.Id, StringComparison.Ordinal);
+        var sourceModel = targetModel with
+        {
+            Id = assistant.ModelId,
+            Name = assistant.ModelId,
+            Api = assistant.Api,
+            Provider = assistant.Provider
+        };
 
         var transformedContent = new List<ContentBlock>(assistant.Content.Count);
 
@@ -168,7 +181,7 @@ public static class MessageTransformer
 
                     if (!isSameModel && normalizeToolCallId is not null)
                     {
-                        var normalizedId = normalizeToolCallId(toolCall.Id);
+                        var normalizedId = normalizeToolCallId(toolCall.Id, sourceModel, targetModel.Provider);
                         if (!string.Equals(normalizedId, toolCall.Id, StringComparison.Ordinal))
                         {
                             toolCallIdMap[toolCall.Id] = normalizedId;

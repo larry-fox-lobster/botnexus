@@ -96,7 +96,7 @@ public class MessageTransformerTests
         var model = MakeModel("anthropic", "anthropic-messages") with { Id = "different-model" };
 
         var result = MessageTransformer.TransformMessages(messages, model,
-            id => "normalized-" + id);
+            (id, _, _) => "normalized-" + id);
 
         var assistantResult = result[0] as AssistantMessage;
         var normalizedTc = assistantResult!.Content[0] as ToolCallContent;
@@ -160,7 +160,7 @@ public class MessageTransformerTests
         var model = MakeModel("anthropic", "anthropic-messages") with { Id = "different-model" };
 
         var result = MessageTransformer.TransformMessages(messages, model,
-            id => id.Replace("!", "").Replace("@", "").Replace("#", ""));
+            (id, _, _) => id.Replace("!", "").Replace("@", "").Replace("#", ""));
 
         var trMsg = result[1] as ToolResultMessage;
         trMsg!.ToolCallId.Should().Be("abc");

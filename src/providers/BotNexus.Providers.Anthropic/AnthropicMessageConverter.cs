@@ -385,7 +385,7 @@ internal static partial class AnthropicMessageConverter
     [GeneratedRegex("[^a-zA-Z0-9_-]")]
     private static partial Regex NonAlphanumericRegex();
 
-    internal static string NormalizeToolCallId(string id)
+    internal static string NormalizeToolCallId(string id, LlmModel sourceModel, string targetProviderId)
     {
         var normalized = NonAlphanumericRegex().Replace(id, "_");
         if (normalized.Length > 64)

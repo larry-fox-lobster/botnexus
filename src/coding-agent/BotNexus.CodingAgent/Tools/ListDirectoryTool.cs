@@ -8,7 +8,8 @@ namespace BotNexus.CodingAgent.Tools;
 
 public sealed class ListDirectoryTool : IAgentTool
 {
-    private const int DefaultLimit = 500;
+    private const int MaxEntries = 500;
+    private const int DefaultLimit = MaxEntries;
     private const int MaxOutputBytes = 50 * 1024;
     private readonly string _workingDirectory;
 
@@ -24,7 +25,7 @@ public sealed class ListDirectoryTool : IAgentTool
 
     public Tool Definition => new(
         Name,
-        "List directory entries in a flat sorted listing.",
+        "List directory entries up to 2 levels deep in a sorted listing.",
         JsonDocument.Parse("""
             {
               "type": "object",
@@ -65,9 +66,10 @@ public sealed class ListDirectoryTool : IAgentTool
         var rawPath = arguments.TryGetValue("path", out var pathObj) && pathObj is not null
             ? pathObj.ToString()!
             : ".";
-        var limit = arguments.TryGetValue("limit", out var limitObj) && limitObj is int parsedLimit
+        var requestedLimit = arguments.TryGetValue("limit", out var limitObj) && limitObj is int parsedLimit
             ? parsedLimit
             : DefaultLimit;
+        var limit = Math.Min(requestedLimit, MaxEntries);
 
         var resolvedPath = PathUtils.ResolvePath(rawPath, _workingDirectory);
         if (!Directory.Exists(resolvedPath))
@@ -75,10 +77,7 @@ public sealed class ListDirectoryTool : IAgentTool
             return Task.FromResult(new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, $"Path '{rawPath}' does not exist or is not a directory.")]));
         }
 
-        var entries = Directory.EnumerateFileSystemEntries(resolvedPath, "*", SearchOption.TopDirectoryOnly)
-            .Select(path => Path.GetFileName(path))
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var entries = EnumerateEntries(resolvedPath, limit, cancellationToken, out var entryLimitReached);
 
         if (entries.Count == 0)
         {
@@ -87,28 +86,19 @@ public sealed class ListDirectoryTool : IAgentTool
 
         var outputLines = new List<string>();
         var outputBytes = 0;
-        var entryLimitReached = false;
         var byteLimitReached = false;
 
         foreach (var entry in entries)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (outputLines.Count >= limit)
-            {
-                entryLimitReached = true;
-                break;
-            }
-
-            var fullPath = Path.Combine(resolvedPath, entry);
-            var formatted = Directory.Exists(fullPath) ? $"{entry}/" : entry;
-            var lineBytes = System.Text.Encoding.UTF8.GetByteCount(formatted + Environment.NewLine);
+            var lineBytes = System.Text.Encoding.UTF8.GetByteCount(entry + Environment.NewLine);
             if (outputBytes + lineBytes > MaxOutputBytes)
             {
                 byteLimitReached = true;
                 break;
             }
 
-            outputLines.Add(formatted);
+            outputLines.Add(entry);
             outputBytes += lineBytes;
         }
 
@@ -158,6 +148,109 @@ public sealed class ListDirectoryTool : IAgentTool
             string text when int.TryParse(text, out var parsedText) => parsedText,
             _ => throw new ArgumentException($"Argument '{key}' must be an integer.")
         };
+    }
+
+    private static List<string> EnumerateEntries(string resolvedPath, int limit, CancellationToken cancellationToken, out bool entryLimitReached)
+    {
+        var entries = new List<string>(Math.Min(limit, MaxEntries));
+        entryLimitReached = false;
+
+        var topDirectories = new List<string>();
+        var topFiles = new List<string>();
+
+        foreach (var entryPath in Directory.EnumerateFileSystemEntries(resolvedPath, "*", SearchOption.TopDirectoryOnly))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var entryName = Path.GetFileName(entryPath);
+            if (string.IsNullOrEmpty(entryName))
+            {
+                continue;
+            }
+
+            if (Directory.Exists(entryPath))
+            {
+                topDirectories.Add(entryName);
+            }
+            else
+            {
+                topFiles.Add(entryName);
+            }
+        }
+
+        topDirectories.Sort(StringComparer.OrdinalIgnoreCase);
+        topFiles.Sort(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var directory in topDirectories)
+        {
+            if (!TryAdd(entries, $"{directory}/", limit, ref entryLimitReached))
+            {
+                return entries;
+            }
+
+            var childDirectories = new List<string>();
+            var childFiles = new List<string>();
+            var directoryPath = Path.Combine(resolvedPath, directory);
+
+            foreach (var childPath in Directory.EnumerateFileSystemEntries(directoryPath, "*", SearchOption.TopDirectoryOnly))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var childName = Path.GetFileName(childPath);
+                if (string.IsNullOrEmpty(childName))
+                {
+                    continue;
+                }
+
+                if (Directory.Exists(childPath))
+                {
+                    childDirectories.Add(childName);
+                }
+                else
+                {
+                    childFiles.Add(childName);
+                }
+            }
+
+            childDirectories.Sort(StringComparer.OrdinalIgnoreCase);
+            childFiles.Sort(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var childDirectory in childDirectories)
+            {
+                if (!TryAdd(entries, $"{directory}/{childDirectory}/", limit, ref entryLimitReached))
+                {
+                    return entries;
+                }
+            }
+
+            foreach (var childFile in childFiles)
+            {
+                if (!TryAdd(entries, $"{directory}/{childFile}", limit, ref entryLimitReached))
+                {
+                    return entries;
+                }
+            }
+        }
+
+        foreach (var file in topFiles)
+        {
+            if (!TryAdd(entries, file, limit, ref entryLimitReached))
+            {
+                return entries;
+            }
+        }
+
+        return entries;
+    }
+
+    private static bool TryAdd(List<string> entries, string value, int limit, ref bool limitReached)
+    {
+        if (entries.Count >= limit)
+        {
+            limitReached = true;
+            return false;
+        }
+
+        entries.Add(value);
+        return true;
     }
 
 }
