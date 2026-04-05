@@ -742,3 +742,10 @@ Participated in design review ceremony for Phase 3 architecture. All ADs approve
 - Streaming responses in `GatewayHost` must always persist assistant content into `session.History`; streaming-only delta forwarding causes history drift.
 - Router defaults should be configured via `GatewayOptions.DefaultAgentId` and `IOptions<GatewayOptions>` to avoid leaking concrete router APIs through DI.
 - `AddBotNexusGateway()` should `TryAddSingleton<ISessionStore, InMemorySessionStore>` so the runtime has a safe default while still allowing consumer overrides.
+
+### 2026-04-05 — Gateway P1 fixes implemented
+- `src\gateway\BotNexus.Gateway\GatewayHost.cs`: streaming now records tool start/end and stream errors into `GatewaySession.History`, then appends assistant content.
+- `src\gateway\BotNexus.Gateway\Routing\DefaultMessageRouter.cs`: switched to `IOptionsMonitor<GatewayOptions>` so default-agent routing follows runtime option updates.
+- `src\gateway\BotNexus.Gateway\Extensions\GatewayServiceCollectionExtensions.cs`: added `SetDefaultAgent(IServiceCollection, string)` helper, registered `ChannelManager`, and documented `ISessionStore` default behavior.
+- `src\channels\BotNexus.Channels.Core\ChannelManager.cs` is now the single adapter registry used by GatewayHost for startup, shutdown, and dispatch lookup.
+- `src\gateway\BotNexus.Gateway.Sessions\FileSessionStore.cs`: documented ConfigureAwait policy and applied `ConfigureAwait(false)` consistently across awaits.
