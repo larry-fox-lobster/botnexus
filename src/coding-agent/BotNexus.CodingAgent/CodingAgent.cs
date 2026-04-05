@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using BotNexus.AgentCore;
 using BotNexus.AgentCore.Configuration;
 using BotNexus.AgentCore.Hooks;
@@ -15,7 +16,11 @@ namespace BotNexus.CodingAgent;
 
 public static class CodingAgent
 {
-    public static async Task<Agent> CreateAsync(CodingAgentConfig config, string workingDirectory)
+    public static async Task<Agent> CreateAsync(
+        CodingAgentConfig config,
+        string workingDirectory,
+        IReadOnlyList<IAgentTool>? extensionTools = null,
+        IReadOnlyList<string>? skills = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         if (string.IsNullOrWhiteSpace(workingDirectory))
@@ -26,11 +31,10 @@ public static class CodingAgent
         var root = Path.GetFullPath(workingDirectory);
         CodingAgentConfig.EnsureDirectories(root);
 
-        var tools = CreateTools(root);
+        var tools = CreateTools(root, extensionTools);
         var gitBranch = await GitUtils.GetBranchAsync(root).ConfigureAwait(false);
         var gitStatus = await GitUtils.GetStatusAsync(root).ConfigureAwait(false);
         var packageManager = PackageManagerDetector.Detect(root);
-        var skills = LoadSkills(config, root);
 
         var promptBuilder = new SystemPromptBuilder();
         var systemPrompt = promptBuilder.Build(new SystemPromptContext(
@@ -39,11 +43,11 @@ public static class CodingAgent
             GitStatus: gitStatus,
             PackageManager: packageManager,
             ToolNames: tools.Select(tool => tool.Name).ToList(),
-            Skills: skills,
+            Skills: skills ?? [],
             CustomInstructions: null));
 
         var model = ResolveModel(config);
-        var auditHooks = new AuditHooks(verbose: true);
+        var auditHooks = new AuditHooks(verbose: ResolveVerbose(config));
         var safetyHooks = new SafetyHooks();
 
         var options = new AgentOptions(
@@ -81,16 +85,23 @@ public static class CodingAgent
         return safetyHooks.ValidateAsync(context, config);
     }
 
-    private static IReadOnlyList<IAgentTool> CreateTools(string workingDirectory)
+    private static IReadOnlyList<IAgentTool> CreateTools(string workingDirectory, IReadOnlyList<IAgentTool>? extensionTools)
     {
-        return
-        [
+        var tools = new List<IAgentTool>
+        {
             new ReadTool(workingDirectory),
             new WriteTool(workingDirectory),
             new EditTool(workingDirectory),
             new ShellTool(),
             new GlobTool(workingDirectory)
-        ];
+        };
+
+        if (extensionTools is { Count: > 0 })
+        {
+            tools.AddRange(extensionTools);
+        }
+
+        return tools;
     }
 
     private static ConvertToLlmDelegate BuildConvertToLlmDelegate()
@@ -156,23 +167,20 @@ public static class CodingAgent
             MaxTokens: Math.Min(8192, config.MaxContextTokens));
     }
 
-    private static IReadOnlyList<string> LoadSkills(CodingAgentConfig config, string workingDirectory)
+    private static bool ResolveVerbose(CodingAgentConfig config)
     {
-        var skills = new List<string>();
-        var workspaceAgentsPath = Path.Combine(workingDirectory, "AGENTS.md");
-        if (File.Exists(workspaceAgentsPath))
+        if (!config.Custom.TryGetValue("verbose", out var value) || value is null)
         {
-            skills.Add(File.ReadAllText(workspaceAgentsPath));
+            return false;
         }
 
-        if (Directory.Exists(config.SkillsDirectory))
+        return value switch
         {
-            foreach (var path in Directory.EnumerateFiles(config.SkillsDirectory, "*.md", SearchOption.AllDirectories))
-            {
-                skills.Add(File.ReadAllText(path));
-            }
-        }
-
-        return skills;
+            bool flag => flag,
+            JsonElement { ValueKind: JsonValueKind.True } => true,
+            JsonElement { ValueKind: JsonValueKind.False } => false,
+            string text when bool.TryParse(text, out var parsed) => parsed,
+            _ => false
+        };
     }
 }

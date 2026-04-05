@@ -176,7 +176,8 @@ public sealed class InteractiveLoop
 
             var provider = config.Provider ?? agent.State.Model.Provider;
             agent.State.Model = ResolveModel(provider, modelId, config.MaxContextTokens);
-            output.WriteSessionInfo(UpdateSessionSnapshot(session, agent));
+            session = UpdateSessionSnapshot(session, agent);
+            output.WriteSessionInfo(session);
             return true;
         }
 
