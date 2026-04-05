@@ -91,4 +91,23 @@ public sealed class SystemPromptBuilderTests
         prompt.Should().Contain("### .botnexus-agent/context/runtime.md");
         prompt.Should().Contain("Runtime details");
     }
+
+    [Fact]
+    public void Build_WithEmptyOptionalSections_OmitsSectionHeadings()
+    {
+        var context = new SystemPromptContext(
+            WorkingDirectory: @"C:\repo",
+            GitBranch: "main",
+            GitStatus: "clean",
+            PackageManager: "dotnet",
+            ToolNames: ["read"],
+            Skills: [],
+            CustomInstructions: "   ",
+            ToolContributions: [new ToolPromptContribution("read", null, ["  "])],
+            ContextFiles: [new PromptContextFile("context.md", "   ")]);
+
+        var prompt = _builder.Build(context);
+
+        prompt.Should().NotContain("## Skills");
+    }
 }
