@@ -108,13 +108,24 @@ public sealed class SessionCompactor
             return messages;
         }
 
-        var oldMessages = messages.Take(cutIndex).ToList();
+        var splitTurnStart = FindTurnStartIndex(messages, cutIndex);
+        var isSplitTurn = splitTurnStart >= 0 && splitTurnStart < cutIndex;
+        var summaryCutIndex = isSplitTurn ? splitTurnStart : cutIndex;
+        var oldMessages = messages.Take(summaryCutIndex).ToList();
+        var splitTurnPrefix = isSplitTurn
+            ? messages.Skip(splitTurnStart).Take(cutIndex - splitTurnStart).ToList()
+            : [];
         var recentMessages = messages.Skip(cutIndex).ToList();
         var fileOps = ExtractFileOperations(oldMessages);
         var llmSummary = await TryGenerateSummaryAsync(oldMessages, options, cancellationToken).ConfigureAwait(false);
         var summaryText = string.IsNullOrWhiteSpace(llmSummary)
             ? BuildFallbackSummary(oldMessages)
             : llmSummary.Trim();
+
+        if (isSplitTurn && splitTurnPrefix.Count > 0)
+        {
+            summaryText = $"{summaryText}{Environment.NewLine}{Environment.NewLine}---{Environment.NewLine}{Environment.NewLine}**Turn Context (split turn):**{Environment.NewLine}{Environment.NewLine}{BuildTurnPrefixSummary(splitTurnPrefix)}";
+        }
 
         summaryText = AppendFileOperations(summaryText, fileOps.ReadFiles, fileOps.ModifiedFiles);
 
@@ -157,6 +168,29 @@ public sealed class SessionCompactor
         }
 
         return minCut;
+    }
+
+    private static int FindTurnStartIndex(IReadOnlyList<AgentMessage> messages, int cutIndex)
+    {
+        if (cutIndex < 0 || cutIndex >= messages.Count)
+        {
+            return -1;
+        }
+
+        if (messages[cutIndex] is AgentUserMessage)
+        {
+            return -1;
+        }
+
+        for (var index = cutIndex - 1; index >= 0; index--)
+        {
+            if (messages[index] is AgentUserMessage)
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private static int EstimateTokens(AgentMessage message)
@@ -237,6 +271,43 @@ public sealed class SessionCompactor
         }
 
         return builder.ToString();
+    }
+
+    private static string BuildTurnPrefixSummary(IReadOnlyList<AgentMessage> turnPrefixMessages)
+    {
+        var originalRequest = turnPrefixMessages
+            .OfType<AgentUserMessage>()
+            .Select(message => message.Content)
+            .FirstOrDefault(text => !string.IsNullOrWhiteSpace(text))
+            ?? "(request unavailable)";
+
+        var progress = turnPrefixMessages
+            .OfType<AssistantAgentMessage>()
+            .Select(message => message.Content)
+            .Where(text => !string.IsNullOrWhiteSpace(text))
+            .Take(2)
+            .ToList();
+        var toolCalls = turnPrefixMessages
+            .OfType<AssistantAgentMessage>()
+            .SelectMany(message => message.ToolCalls ?? [])
+            .Select(call => $"{call.Name}({string.Join(", ", call.Arguments.Keys)})")
+            .Take(3)
+            .ToList();
+
+        if (toolCalls.Count > 0)
+        {
+            progress.Add($"Tool calls: {string.Join("; ", toolCalls)}");
+        }
+
+        if (progress.Count == 0)
+        {
+            progress.Add("(none)");
+        }
+
+        return
+            $"## Original Request{Environment.NewLine}{originalRequest}{Environment.NewLine}{Environment.NewLine}" +
+            $"## Early Progress{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", progress)}{Environment.NewLine}{Environment.NewLine}" +
+            $"## Context for Suffix{Environment.NewLine}- Use this request context to interpret retained tool results and assistant follow-ups.";
     }
 
     private async Task<string?> TryGenerateSummaryAsync(

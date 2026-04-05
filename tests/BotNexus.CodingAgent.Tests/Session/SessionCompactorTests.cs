@@ -218,4 +218,50 @@ public sealed class SessionCompactorTests
 
         compacted[0].As<SystemAgentMessage>().Content.Should().Contain("## Goal");
     }
+
+    [Fact]
+    public async Task CompactAsync_WhenCutFallsMidTurn_AppendsTurnPrefixSummary()
+    {
+        var compactor = new SessionCompactor();
+        var messages = new AgentMessage[]
+        {
+            new AgentUserMessage(new string('u', 300)),
+            new AssistantAgentMessage("Starting task",
+            [
+                new ToolCallContent("1", "read", new Dictionary<string, object?> { ["path"] = "src/file.cs" })
+            ]),
+            new ToolResultAgentMessage("1", "read", new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, "file contents")])),
+            new AssistantAgentMessage("Continuing with edits"),
+            new AgentUserMessage("keep this recent")
+        };
+
+        var options = new SessionCompactor.SessionCompactionOptions(
+            MaxContextTokens: 20,
+            ReserveTokens: 1,
+            KeepRecentTokens: 5,
+            KeepRecentCount: 1,
+            LlmClient: MakeClientReturningSummary("## Goal\nCompacted"),
+            Model: MakeModel());
+
+        var compacted = await compactor.CompactAsync(messages, options);
+        var summary = compacted[0].As<SystemAgentMessage>().Content;
+
+        summary.Should().Contain("Turn Context (split turn)");
+        summary.Should().Contain("## Original Request");
+        compacted[1].Should().Be(messages[2]);
+    }
+
+    [Fact]
+    public void EstimateTokens_AssistantUsagePresent_UsesUsageTokenCounts()
+    {
+        var compactor = new SessionCompactor();
+        var messages = new AgentMessage[]
+        {
+            new AssistantAgentMessage(
+                Content: new string('x', 4000),
+                Usage: new BotNexus.AgentCore.Types.AgentUsage(InputTokens: 7, OutputTokens: 11))
+        };
+
+        compactor.EstimateTokens(messages).Should().Be(18);
+    }
 }
