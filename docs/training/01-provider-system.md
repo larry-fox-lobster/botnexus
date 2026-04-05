@@ -23,14 +23,16 @@ public interface IApiProvider
 }
 ```
 
-Each provider handles a specific API format:
+Each provider handles a specific API format. All providers accept an `HttpClient` via constructor injection:
 
-| Provider | `Api` Value | Handles |
-|----------|-------------|---------|
-| `AnthropicProvider` | `"anthropic-messages"` | Anthropic Messages API |
-| `OpenAICompletionsProvider` | `"openai-completions"` | OpenAI Chat Completions API |
-| `CopilotProvider` | `"openai-completions"` | GitHub Copilot (uses OpenAI format) |
-| `OpenAICompatProvider` | `"openai-compat"` | Any OpenAI-compatible endpoint |
+| Provider | `Api` Value | Constructor | Handles |
+|----------|-------------|-------------|---------|
+| `AnthropicProvider` | `"anthropic-messages"` | `(HttpClient)` | Anthropic Messages API |
+| `OpenAICompletionsProvider` | `"openai-completions"` | `(HttpClient, ILogger)` | OpenAI Chat Completions API |
+| `OpenAICompatProvider` | `"openai-compat"` | `(HttpClient)` | Any OpenAI-compatible endpoint |
+| `CopilotProvider` | *(static utility)* | — | Helper for GitHub Copilot auth and headers |
+
+> **Note:** `CopilotProvider` is no longer an `IApiProvider` implementation. It is a static utility class that provides `ResolveApiKey()` and `ApplyDynamicHeaders()` helpers. Copilot requests are routed through the standard `OpenAICompletionsProvider` (or `AnthropicProvider` for Claude models on Copilot), which call into `CopilotProvider` for auth header injection.
 
 ### LlmModel — Model Definitions
 
@@ -58,70 +60,82 @@ The `Api` field is the routing key — it determines which `IApiProvider` handle
 
 ### ModelRegistry — Where Models Live
 
-`ModelRegistry` is a thread-safe `ConcurrentDictionary<provider, ConcurrentDictionary<modelId, LlmModel>>`:
+`ModelRegistry` is an **instance-based**, thread-safe registry backed by `ConcurrentDictionary<provider, ConcurrentDictionary<modelId, LlmModel>>`:
 
 ```csharp
+// Create an instance (typically one per application)
+var modelRegistry = new ModelRegistry();
+
 // Register a model
-ModelRegistry.Register("github-copilot", myModel);
+modelRegistry.Register("github-copilot", myModel);
 
 // Look up a model
-LlmModel? model = ModelRegistry.GetModel("github-copilot", "gpt-4.1");
+LlmModel? model = modelRegistry.GetModel("github-copilot", "gpt-4.1");
 
 // List all providers
-IReadOnlyList<string> providers = ModelRegistry.GetProviders();
+IReadOnlyList<string> providers = modelRegistry.GetProviders();
 
 // List all models for a provider
-IReadOnlyList<LlmModel> models = ModelRegistry.GetModels("github-copilot");
+IReadOnlyList<LlmModel> models = modelRegistry.GetModels("github-copilot");
 ```
 
 Models are registered at startup. Built-in models are defined in `BuiltInModels.cs`, and extensions can register additional models at runtime.
 
 ### ApiProviderRegistry — Provider Registration
 
-`ApiProviderRegistry` maps API format strings to `IApiProvider` instances:
+`ApiProviderRegistry` is an **instance-based** registry mapping API format strings to `IApiProvider` instances:
 
 ```csharp
-// Register a provider
-ApiProviderRegistry.Register(new AnthropicProvider(), sourceId: "built-in");
+// Create an instance (typically one per application)
+var apiProviderRegistry = new ApiProviderRegistry();
+
+// Register a provider (HttpClient is constructor-injected into providers)
+var httpClient = new HttpClient();
+apiProviderRegistry.Register(new AnthropicProvider(httpClient), sourceId: "built-in");
 
 // Look up a provider
-IApiProvider? provider = ApiProviderRegistry.Get("anthropic-messages");
+IApiProvider? provider = apiProviderRegistry.Get("anthropic-messages");
 
 // Unregister all providers from a source
-ApiProviderRegistry.Unregister("my-extension");
+apiProviderRegistry.Unregister("my-extension");
 ```
 
 The `sourceId` parameter supports extension cleanup — when an extension is unloaded, all its providers can be removed in one call.
 
 ## LlmClient — The Entry Point
 
-`LlmClient` is the static entry point that ties registries together:
+`LlmClient` is an **instance-based** entry point that ties the registries together. It takes `ApiProviderRegistry` and `ModelRegistry` as constructor dependencies:
 
 ```csharp
-public static class LlmClient
+public sealed class LlmClient
 {
+    public ApiProviderRegistry ApiProviders { get; }
+    public ModelRegistry Models { get; }
+
+    public LlmClient(ApiProviderRegistry apiProviderRegistry, ModelRegistry modelRegistry);
+
     // Streaming with full options
-    public static LlmStream Stream(LlmModel model, Context context, StreamOptions? options = null);
+    public LlmStream Stream(LlmModel model, Context context, StreamOptions? options = null);
 
     // Non-streaming convenience (awaits the full response)
-    public static async Task<AssistantMessage> CompleteAsync(
+    public async Task<AssistantMessage> CompleteAsync(
         LlmModel model, Context context, StreamOptions? options = null);
 
     // Streaming with SimpleStreamOptions (supports reasoning)
-    public static LlmStream StreamSimple(LlmModel model, Context context, SimpleStreamOptions? options = null);
+    public LlmStream StreamSimple(LlmModel model, Context context, SimpleStreamOptions? options = null);
 
     // Non-streaming with SimpleStreamOptions
-    public static async Task<AssistantMessage> CompleteSimpleAsync(
+    public async Task<AssistantMessage> CompleteSimpleAsync(
         LlmModel model, Context context, SimpleStreamOptions? options = null);
 }
 ```
 
-Internally, `LlmClient` resolves the provider from `model.Api`:
+Internally, `LlmClient` resolves the provider from `model.Api` via its injected registry:
 
 ```csharp
-private static IApiProvider ResolveProvider(string api)
+private IApiProvider ResolveProvider(string api)
 {
-    return ApiProviderRegistry.Get(api)
+    return ApiProviders.Get(api)
            ?? throw new InvalidOperationException($"No API provider registered for api: {api}");
 }
 ```
@@ -172,30 +186,32 @@ public delegate Task<string?> GetApiKeyDelegate(string provider, CancellationTok
 
 ## Stream Options
 
-Two option classes control generation behavior:
+Two option records control generation behavior. Both use `init`-only properties for immutability:
 
 ```csharp
-public class StreamOptions
+public record class StreamOptions
 {
-    public float? Temperature { get; set; }
-    public int? MaxTokens { get; set; }
-    public CancellationToken CancellationToken { get; set; }
-    public string? ApiKey { get; set; }
-    public Transport Transport { get; set; } = Transport.Sse;
-    public CacheRetention CacheRetention { get; set; } = CacheRetention.Short;
-    public string? SessionId { get; set; }
-    public Dictionary<string, string>? Headers { get; set; }
-    public int MaxRetryDelayMs { get; set; } = 60000;
+    public float? Temperature { get; init; }
+    public int? MaxTokens { get; init; }
+    public CancellationToken CancellationToken { get; init; }
+    public string? ApiKey { get; init; }
+    public Transport Transport { get; init; } = Transport.Sse;
+    public CacheRetention CacheRetention { get; init; } = CacheRetention.Short;
+    public string? SessionId { get; init; }
+    public Func<object, LlmModel, Task<object?>>? OnPayload { get; init; }
+    public Dictionary<string, string>? Headers { get; init; }
+    public int MaxRetryDelayMs { get; init; } = 60000;
+    public Dictionary<string, object>? Metadata { get; init; }
 }
 
-public class SimpleStreamOptions : StreamOptions
+public record class SimpleStreamOptions : StreamOptions
 {
-    public ThinkingLevel? Reasoning { get; set; }
-    public ThinkingBudgets? ThinkingBudgets { get; set; }
+    public ThinkingLevel? Reasoning { get; init; }
+    public ThinkingBudgets? ThinkingBudgets { get; init; }
 }
 ```
 
-The agent loop uses `SimpleStreamOptions` to support reasoning/thinking models.
+The `OnPayload` hook lets extensions intercept and transform the raw API payload before it's sent. The agent loop uses `SimpleStreamOptions` to support reasoning/thinking models.
 
 ## Full Request Flow
 
@@ -216,7 +232,7 @@ sequenceDiagram
     CC-->>ALR: Context (system prompt, messages, tools)
     ALR->>ALR: BuildStreamOptions (resolve API key)
     ALR->>LC: StreamSimple(model, context, options)
-    LC->>APR: Get(model.Api)
+    LC->>APR: Get(model.Api) [instance method]
     APR-->>LC: IApiProvider
     LC->>Provider: StreamSimple(model, context, options)
     Provider->>API: HTTP POST (SSE)
@@ -246,39 +262,47 @@ classDiagram
     }
 
     class AnthropicProvider {
+        -HttpClient httpClient
         +Api = "anthropic-messages"
         +Stream()
         +StreamSimple()
     }
 
     class OpenAICompletionsProvider {
-        +Api = "openai-completions"
-        +Stream()
-        +StreamSimple()
-    }
-
-    class CopilotProvider {
+        -HttpClient httpClient
+        -ILogger logger
         +Api = "openai-completions"
         +Stream()
         +StreamSimple()
     }
 
     class OpenAICompatProvider {
+        -HttpClient httpClient
         +Api = "openai-compat"
         +Stream()
         +StreamSimple()
     }
 
+    class CopilotProvider {
+        <<static>>
+        +ResolveApiKey(configuredApiKey?)$ string?
+        +ApplyDynamicHeaders(headers, messages)$
+    }
+
     IApiProvider <|.. AnthropicProvider
     IApiProvider <|.. OpenAICompletionsProvider
-    IApiProvider <|.. CopilotProvider
     IApiProvider <|.. OpenAICompatProvider
+    AnthropicProvider ..> CopilotProvider : uses for Copilot auth
+    OpenAICompletionsProvider ..> CopilotProvider : uses for Copilot auth
 
     class LlmClient {
-        +Stream(model, context, options)$: LlmStream
-        +CompleteAsync(model, context, options)$: Task~AssistantMessage~
-        +StreamSimple(model, context, options)$: LlmStream
-        +CompleteSimpleAsync(model, context, options)$: Task~AssistantMessage~
+        +ApiProviders: ApiProviderRegistry
+        +Models: ModelRegistry
+        +LlmClient(apiProviders, models)
+        +Stream(model, context, options): LlmStream
+        +CompleteAsync(model, context, options): Task~AssistantMessage~
+        +StreamSimple(model, context, options): LlmStream
+        +CompleteSimpleAsync(model, context, options): Task~AssistantMessage~
     }
 
     class ApiProviderRegistry {
@@ -296,7 +320,8 @@ classDiagram
         +CalculateCost(model, usage)$: UsageCost
     }
 
-    LlmClient ..> ApiProviderRegistry : resolves via
+    LlmClient --> ApiProviderRegistry : owns
+    LlmClient --> ModelRegistry : owns
     LlmClient ..> IApiProvider : delegates to
     ModelRegistry ..> LlmModel : stores
 ```

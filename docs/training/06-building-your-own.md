@@ -10,7 +10,7 @@ Use this decision tree to figure out what you need:
 flowchart TD
     Start([What are you building?]) --> Q1{Using an existing<br/>LLM provider?}
     Q1 -->|Yes| Q2{Need custom tools?}
-    Q1 -->|No| ImplProvider[Implement IApiProvider<br/>Register in ApiProviderRegistry]
+    Q1 -->|No| ImplProvider[Implement IApiProvider<br/>Register in ApiProviderRegistry instance]
     ImplProvider --> Q2
 
     Q2 -->|Yes| ImplTools[Implement IAgentTool<br/>for each tool]
@@ -32,23 +32,38 @@ flowchart TD
 
 ## Step 1: Choose Your Provider and Model
 
-First, decide which LLM to use. BotNexus ships with four providers:
+First, decide which LLM to use. BotNexus ships with three provider implementations plus a Copilot utility:
 
 | Provider | Best For |
 |----------|----------|
-| GitHub Copilot | Default — uses OAuth, no API key needed |
+| GitHub Copilot | Default — uses OAuth, routed through OpenAI/Anthropic providers with `CopilotProvider` auth helpers |
 | OpenAI | Direct OpenAI API access |
 | Anthropic | Claude models |
 | OpenAI-Compatible | Groq, xAI, local models, any OpenAI-compatible endpoint |
 
 ### Option A: Use a Built-in Provider
 
+All registries are now instance-based. Create them, register providers, and wire into `LlmClient`:
+
 ```csharp
+using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
 using BotNexus.Providers.Core.Registry;
 
+// Create instance-based registries
+var apiProviderRegistry = new ApiProviderRegistry();
+var modelRegistry = new ModelRegistry();
+
+// Register providers (HttpClient is constructor-injected)
+var httpClient = new HttpClient();
+apiProviderRegistry.Register(new OpenAICompletionsProvider(httpClient, logger));
+apiProviderRegistry.Register(new AnthropicProvider(httpClient));
+
+// Create LlmClient with the registries
+var llmClient = new LlmClient(apiProviderRegistry, modelRegistry);
+
 // Look up a registered model
-var model = ModelRegistry.GetModel("github-copilot", "gpt-4.1");
+var model = modelRegistry.GetModel("github-copilot", "gpt-4.1");
 
 // Or define one directly
 var model = new LlmModel(
@@ -108,8 +123,8 @@ public class MyProvider : IApiProvider
     }
 }
 
-// Register it
-ApiProviderRegistry.Register(new MyProvider());
+// Register it on the instance-based registry
+apiProviderRegistry.Register(new MyProvider());
 ```
 
 ## Step 2: Define Custom Tools
@@ -176,7 +191,7 @@ public sealed class WeatherTool : IAgentTool
 
 ## Step 3: Wire AgentOptions
 
-Now assemble everything into `AgentOptions`:
+Now assemble everything into `AgentOptions`. Note that `LlmClient` is now a required parameter:
 
 ```csharp
 using BotNexus.AgentCore;
@@ -184,6 +199,7 @@ using BotNexus.AgentCore.Configuration;
 using BotNexus.AgentCore.Types;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
+using BotNexus.Providers.Core.Registry;
 
 // Your tools
 var tools = new List<IAgentTool>
@@ -251,6 +267,13 @@ ConvertToLlmDelegate convertToLlm = (messages, ct) =>
     return Task.FromResult<IReadOnlyList<Message>>(result);
 };
 
+// Create instance-based registries and client
+var apiProviderRegistry = new ApiProviderRegistry();
+var modelRegistry = new ModelRegistry();
+var httpClient = new HttpClient();
+apiProviderRegistry.Register(new OpenAICompletionsProvider(httpClient, logger));
+var llmClient = new LlmClient(apiProviderRegistry, modelRegistry);
+
 // Build agent options
 var options = new AgentOptions(
     InitialState: new AgentInitialState(
@@ -258,6 +281,7 @@ var options = new AgentOptions(
         Model: model,
         Tools: tools),
     Model: model,
+    LlmClient: llmClient,
     ConvertToLlm: convertToLlm,
     TransformContext: (messages, ct) => Task.FromResult(messages),
     GetApiKey: (provider, ct) =>
@@ -380,6 +404,7 @@ using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
+using BotNexus.Providers.Core.Registry;
 
 // --- Define tool ---
 var calcTool = new CalculatorTool();
@@ -393,6 +418,13 @@ var model = new LlmModel(
     Cost: new ModelCost(2.0m, 8.0m, 0.5m, 0),
     ContextWindow: 1_000_000, MaxTokens: 32768);
 
+// --- Create instance-based registries and client ---
+var apiProviderRegistry = new ApiProviderRegistry();
+var modelRegistry = new ModelRegistry();
+var httpClient = new HttpClient();
+apiProviderRegistry.Register(new OpenAICompletionsProvider(httpClient, logger));
+var llmClient = new LlmClient(apiProviderRegistry, modelRegistry);
+
 // --- Build agent ---
 var agent = new Agent(new AgentOptions(
     InitialState: new AgentInitialState(
@@ -400,6 +432,7 @@ var agent = new Agent(new AgentOptions(
         Model: model,
         Tools: [calcTool]),
     Model: model,
+    LlmClient: llmClient,
     ConvertToLlm: MyConvertToLlm,
     TransformContext: (msgs, ct) => Task.FromResult(msgs),
     GetApiKey: (provider, ct) => Task.FromResult(EnvironmentApiKeys.GetApiKey(provider)),
@@ -429,12 +462,13 @@ Console.WriteLine();
 
 To build your own agent on BotNexus:
 
-1. **Pick a provider** — use a built-in one or implement `IApiProvider`
-2. **Define your tools** — implement `IAgentTool` for each capability
-3. **Write a system prompt** — tell the model what it is and what tools it has
-4. **Implement `ConvertToLlm`** — map `AgentMessage` types to provider `Message` types
-5. **Assemble `AgentOptions`** — wire everything together
-6. **Create an `Agent`** and call `PromptAsync`
+1. **Create registries** — instantiate `ApiProviderRegistry`, `ModelRegistry`, and `LlmClient`
+2. **Pick a provider** — use a built-in one (with `HttpClient` injection) or implement `IApiProvider`
+3. **Define your tools** — implement `IAgentTool` for each capability
+4. **Write a system prompt** — tell the model what it is and what tools it has
+5. **Implement `ConvertToLlm`** — map `AgentMessage` types to provider `Message` types
+6. **Assemble `AgentOptions`** — wire everything together (including `LlmClient` instance)
+7. **Create an `Agent`** and call `PromptAsync`
 
 The agent loop handles everything else: streaming, tool execution, error handling, and turn management.
 

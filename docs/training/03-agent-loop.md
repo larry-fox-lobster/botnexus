@@ -88,6 +88,7 @@ The agent is configured at construction time via `AgentOptions`:
 public record AgentOptions(
     AgentInitialState? InitialState,       // Seed state (prompt, model, tools, messages)
     LlmModel Model,                        // Default model
+    LlmClient LlmClient,                  // Instance-based LLM client (owns registries)
     ConvertToLlmDelegate ConvertToLlm,     // AgentMessage[] → provider Message[]
     TransformContextDelegate TransformContext,  // Pre-LLM message filtering
     GetApiKeyDelegate GetApiKey,           // Runtime API key resolution

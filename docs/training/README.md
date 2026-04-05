@@ -14,8 +14,8 @@ Developers who want to understand BotNexus internals — the provider system, ag
 | 1 | [Provider System](01-provider-system.md) | IApiProvider, model registry, API key resolution, request flow |
 | 2 | [Streaming](02-streaming.md) | LlmStream, SSE parsing, event types, StreamAccumulator |
 | 3 | [Agent Loop](03-agent-loop.md) | Agent lifecycle, AgentLoopRunner, turn mechanics, steering |
-| 4 | [Tool Execution](04-tool-execution.md) | IAgentTool, sequential vs parallel, hooks, custom tools |
-| 5 | [CodingAgent Layer](05-coding-agent.md) | Built-in tools, system prompts, sessions, extensions |
+| 4 | [Tool Execution](04-tool-execution.md) | IAgentTool, sequential vs parallel, hooks, custom tools, extension lifecycle |
+| 5 | [CodingAgent Layer](05-coding-agent.md) | Built-in tools, system prompts, sessions, extensions, session tree model |
 | 6 | [Building Your Own](06-building-your-own.md) | Step-by-step guide to creating a custom agent |
 
 ## Suggested Reading Order

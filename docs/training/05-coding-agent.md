@@ -13,6 +13,9 @@ public static class CodingAgent
         CodingAgentConfig config,
         string workingDirectory,
         AuthManager authManager,
+        LlmClient llmClient,
+        ModelRegistry modelRegistry,
+        ExtensionRunner? extensionRunner = null,
         IReadOnlyList<IAgentTool>? extensionTools = null,
         IReadOnlyList<string>? skills = null);
 }
@@ -23,10 +26,10 @@ Internally, `CreateAsync` does this:
 1. **Resolves the working directory** and creates the `.botnexus-agent/` directory structure
 2. **Creates built-in tools** scoped to the working directory
 3. **Detects environment** — git branch, git status, package manager
-4. **Builds the system prompt** via `SystemPromptBuilder`
-5. **Resolves the model** from config or ModelRegistry
-6. **Creates hooks** — `SafetyHooks` and `AuditHooks`
-7. **Assembles `AgentOptions`** with all delegates wired up
+4. **Builds the system prompt** via `SystemPromptBuilder` (section-based with tool contributions)
+5. **Resolves the model** from config or the injected `ModelRegistry` instance
+6. **Creates hooks** — `SafetyHooks`, `AuditHooks`, and extension hooks via `ExtensionRunner`
+7. **Assembles `AgentOptions`** with all delegates wired up (including `LlmClient` instance)
 8. **Returns a configured `Agent`**
 
 ## CodingAgent Composition
@@ -37,6 +40,9 @@ graph TB
         Config[CodingAgentConfig]
         WD[Working Directory]
         AuthMgr[AuthManager]
+        LLC[LlmClient instance]
+        MR[ModelRegistry instance]
+        ExtRunner[ExtensionRunner]
         ExtTools[Extension Tools]
         Skills[Skills]
     end
@@ -44,10 +50,10 @@ graph TB
     subgraph Factory["CodingAgent.CreateAsync"]
         ResolveModel[ResolveModel<br/>ModelRegistry lookup<br/>or fallback]
         CreateTools[CreateTools<br/>Read, Write, Edit,<br/>Shell, Glob, Grep<br/>+ extensions]
-        BuildPrompt[SystemPromptBuilder<br/>OS, git, tools, skills]
-        CreateHooks[SafetyHooks +<br/>AuditHooks]
+        BuildPrompt[SystemPromptBuilder<br/>sections, tool contributions,<br/>context files]
+        CreateHooks[SafetyHooks +<br/>AuditHooks +<br/>ExtensionRunner hooks]
         BuildConvert[ConvertToLlm<br/>delegate builder]
-        AssembleOpts[Build AgentOptions]
+        AssembleOpts[Build AgentOptions<br/>with LlmClient instance]
     end
 
     subgraph Output["Result"]
@@ -59,8 +65,11 @@ graph TB
     WD --> CreateTools
     WD --> BuildPrompt
     ExtTools --> CreateTools
+    ExtRunner --> CreateHooks
     Skills --> BuildPrompt
     AuthMgr --> AssembleOpts
+    LLC --> AssembleOpts
+    MR --> ResolveModel
 
     ResolveModel --> AssembleOpts
     CreateTools --> AssembleOpts
@@ -111,9 +120,18 @@ private static IReadOnlyList<IAgentTool> CreateTools(
 
 ## System Prompt Construction
 
-`SystemPromptBuilder` generates a context-aware system prompt:
+`SystemPromptBuilder` uses a **section-based** architecture with tool contributions. Tools can now contribute their own prompt snippets and guidelines:
 
 ```csharp
+public sealed record ToolPromptContribution(
+    string Name,
+    string? Snippet = null,
+    IReadOnlyList<string>? Guidelines = null);
+
+public sealed record PromptContextFile(
+    string Path,
+    string Content);
+
 public sealed record SystemPromptContext(
     string WorkingDirectory,
     string? GitBranch,
@@ -121,15 +139,19 @@ public sealed record SystemPromptContext(
     string PackageManager,
     IReadOnlyList<string> ToolNames,
     IReadOnlyList<string> Skills,
-    string? CustomInstructions);
+    string? CustomInstructions,
+    IReadOnlyList<ToolPromptContribution>? ToolContributions = null,
+    IReadOnlyList<PromptContextFile>? ContextFiles = null);
 ```
 
-The generated prompt includes:
-- Role definition ("You are a coding assistant with access to tools...")
-- Environment section (OS, working directory, git branch, package manager, tools)
-- Tool guidelines (use tools proactively, read before edit, verify changes)
-- Skills section (if any skills are provided)
-- Custom instructions (if configured)
+The generated prompt is composed of ordered sections:
+1. **Role definition** — "You are a coding assistant with access to tools..."
+2. **Environment** — OS, working directory, git branch, package manager
+3. **Available Tools** — tool names with optional snippets from `ToolPromptContribution`
+4. **Tool Guidelines** — merged set from built-in defaults + tool-contributed guidelines
+5. **Project Context** — content from `PromptContextFile` entries (e.g., README, CONTRIBUTING)
+6. **Skills** — parsed skill files with frontmatter
+7. **Custom Instructions** — user-configured instructions
 
 ## Configuration
 
@@ -176,25 +198,75 @@ public sealed class SafetyHooks
 
 The CodingAgent includes session support via `SessionManager`, `SessionInfo`, and `SessionCompactor`:
 
-- Sessions track conversation history across runs
-- The compactor manages context window limits by summarizing older messages
-- Session data is stored in `.botnexus-agent/sessions/`
+- Sessions track conversation history across runs using a **JSONL tree model** (see below)
+- The compactor manages context window limits with two modes:
+  - **Legacy `Compact`** — count-based, keeps N recent messages and heuristically summarizes older ones
+  - **Token-aware `CompactAsync`** — estimates token usage, uses LLM-driven summarization when thresholds are exceeded, and falls back to heuristic summaries
+- Session data is stored in `.botnexus-agent/sessions/` as `.jsonl` files
+
+### Token-Aware Compaction
+
+`SessionCompactor.CompactAsync` uses structured options to control compaction behavior:
+
+```csharp
+public sealed record SessionCompactionOptions(
+    int MaxContextTokens = 100000,    // Total context budget
+    int ReserveTokens = 16384,        // Reserved for system prompt + response
+    int KeepRecentTokens = 20000,     // Minimum recent tokens to preserve
+    int KeepRecentCount = 10,         // Minimum recent messages to keep
+    LlmClient? LlmClient = null,     // For LLM-driven summarization
+    LlmModel? Model = null,          // Summary model
+    string? ApiKey = null,
+    IReadOnlyDictionary<string, string>? Headers = null,
+    string? CustomInstructions = null,
+    Func<CompactionHookContext, CancellationToken, Task<string?>>? OnCompactionAsync = null);
+```
+
+When `CompactAsync` runs:
+1. Estimates total token usage across all messages
+2. If under threshold — returns messages unchanged
+3. Finds a cut point based on `KeepRecentTokens` and `KeepRecentCount`
+4. Attempts LLM-driven summarization of older messages (structured format: Goal, Progress, Key Decisions, etc.)
+5. Falls back to heuristic extraction if LLM is unavailable
+6. Appends file operation metadata (read/modified files) to the summary
+7. Calls `OnCompactionAsync` hook for extension override
+8. Returns `[SystemAgentMessage(summary), ...recentMessages]`
 
 ## Extension System
 
-The `ExtensionLoader` and `SkillsLoader` provide dynamic capability loading:
+The `ExtensionLoader`, `ExtensionRunner`, and `SkillsLoader` provide dynamic capability loading.
 
-### IExtension
+### IExtension — Full Lifecycle Contract
 
 ```csharp
 public interface IExtension
 {
     string Name { get; }
     IReadOnlyList<IAgentTool> GetTools();
+
+    // Tool lifecycle hooks
+    ValueTask<BeforeToolCallResult?> OnToolCallAsync(ToolCallLifecycleContext context, CancellationToken ct);
+    ValueTask<AfterToolCallResult?> OnToolResultAsync(ToolResultLifecycleContext context, CancellationToken ct);
+
+    // Session lifecycle hooks
+    ValueTask OnSessionStartAsync(SessionLifecycleContext context, CancellationToken ct);
+    ValueTask OnSessionEndAsync(SessionLifecycleContext context, CancellationToken ct);
+
+    // Context compaction hook
+    ValueTask<string?> OnCompactionAsync(CompactionLifecycleContext context, CancellationToken ct);
+
+    // Model request interception
+    ValueTask<object?> OnModelRequestAsync(ModelRequestLifecycleContext context, CancellationToken ct);
 }
 ```
 
-Extensions are loaded from assemblies in the `.botnexus-agent/extensions/` directory. Each extension can contribute additional tools.
+Extensions are loaded from assemblies in the `.botnexus-agent/extensions/` directory. Each extension can contribute additional tools and hook into the full agent lifecycle. All lifecycle methods have default implementations, so extensions only override what they need.
+
+### ExtensionRunner — Lifecycle Coordination
+
+`ExtensionRunner` is a coordinator class that iterates through all loaded extensions for each lifecycle event. `CodingAgent.CreateAsync` accepts an optional `ExtensionRunner` and wires its hooks into both the `BeforeToolCall`/`AfterToolCall` delegates and the `OnPayload` generation hook.
+
+> **Deep dive:** See [Tool Execution → Extension Lifecycle Hooks](04-tool-execution.md#extension-lifecycle-hooks) for the full hook reference.
 
 ### Skills
 
@@ -218,10 +290,10 @@ The conversion handles:
 
 ## Model Resolution
 
-The model is resolved from config with intelligent fallbacks:
+The model is resolved from config using the injected `ModelRegistry` instance with intelligent fallbacks:
 
 ```csharp
-private static LlmModel ResolveModel(CodingAgentConfig config)
+private static LlmModel ResolveModel(CodingAgentConfig config, ModelRegistry modelRegistry)
 {
     var provider = config.Provider ?? "github-copilot";
     var modelId = config.Model ?? "gpt-4.1";
@@ -231,18 +303,18 @@ private static LlmModel ResolveModel(CodingAgentConfig config)
         provider = "github-copilot";
 
     // Try registry first
-    var existing = ModelRegistry.GetModel(provider, modelId);
+    var existing = modelRegistry.GetModel(provider, modelId);
     if (existing is not null)
         return existing;
 
-    // Fallback: construct a model definition
+    // Fallback: construct a model definition with Copilot headers
     return new LlmModel(
         Id: modelId,
         Name: modelId,
         Api: "openai-completions",
         Provider: provider,
         BaseUrl: "https://api.individual.githubcopilot.com",
-        // ... defaults
+        // ... defaults with Copilot-specific headers
     );
 }
 ```
@@ -253,19 +325,30 @@ private static LlmModel ResolveModel(CodingAgentConfig config)
 using BotNexus.AgentCore;
 using BotNexus.CodingAgent;
 using BotNexus.CodingAgent.Auth;
+using BotNexus.Providers.Core;
+using BotNexus.Providers.Core.Registry;
 
 // Load config from working directory
 var workingDir = Environment.CurrentDirectory;
 var config = CodingAgentConfig.Load(workingDir);
 
+// Create the registries and LlmClient (instance-based)
+var apiProviderRegistry = new ApiProviderRegistry();
+var modelRegistry = new ModelRegistry();
+var httpClient = new HttpClient();
+apiProviderRegistry.Register(new OpenAICompletionsProvider(httpClient, logger));
+var llmClient = new LlmClient(apiProviderRegistry, modelRegistry);
+
 // Create auth manager
 var authManager = new AuthManager();
 
-// Create the agent
+// Create the agent (LlmClient and ModelRegistry are now required)
 var agent = await CodingAgent.CreateAsync(
     config,
     workingDir,
-    authManager);
+    authManager,
+    llmClient,
+    modelRegistry);
 
 // Subscribe to streaming output
 using var sub = agent.Subscribe(async (evt, ct) =>
@@ -285,6 +368,104 @@ if (result[^1] is AssistantAgentMessage final)
     Console.WriteLine(final.Content);
 }
 ```
+
+## Session Tree Model
+
+Sessions are stored as **JSONL files** (one JSON object per line) with a tree structure that supports branching. This replaces the older flat message list model.
+
+### JSONL Entry Types
+
+Each line in a session `.jsonl` file is one of these entry types:
+
+| Entry Type | Purpose | Key Fields |
+|------------|---------|------------|
+| `session_header` | Session metadata | Version, SessionId, Name, WorkingDirectory, CreatedAt, ParentSessionId |
+| `message` | User or assistant message | EntryId, ParentEntryId, Role, Content, ToolCalls, Timestamp |
+| `tool_result` | Tool execution result | EntryId, ParentEntryId, ToolCallId, ToolName, Content, IsError |
+| `compaction_summary` | Context compaction checkpoint | EntryId, ParentEntryId, Summary |
+| `metadata` | Key-value state (e.g., active leaf) | Key, Value, Timestamp |
+
+### Tree Structure
+
+Every entry has an `EntryId` and an optional `ParentEntryId`, forming a tree:
+
+```mermaid
+graph TD
+    Root([Session Header]) --> E1[Entry 1<br/>User: Fix auth.cs]
+    E1 --> E2[Entry 2<br/>Assistant: reads file]
+    E2 --> E3[Entry 3<br/>Tool Result: file contents]
+    E3 --> E4[Entry 4<br/>Assistant: applies fix]
+
+    E3 --> E5[Entry 5<br/>Branch: different approach]
+    E5 --> E6[Entry 6<br/>Assistant: alternative fix]
+
+    E4 --> E7[Entry 7<br/>User: now fix tests]
+    E7 --> E8[Entry 8<br/>Compaction Summary]
+    E8 --> E9[Entry 9<br/>Assistant: fixes tests]
+
+    style E4 fill:#afa,stroke:#333
+    style E6 fill:#ffa,stroke:#333
+    style E9 fill:#afa,stroke:#333
+
+    classDef leaf fill:#afa,stroke:#333
+    classDef altleaf fill:#ffa,stroke:#333
+```
+
+Key concepts:
+- **Leaf entries** — entries with no children. Each leaf represents the tip of a conversation branch
+- **Active leaf** — tracked via `metadata` entries with `key: "leaf"`. Determines which branch is current
+- **Branch path** — the linear path from root to a specific leaf (resolved by walking `ParentEntryId` chains)
+- **Branch names** — stored as metadata entries with `key: "branch_name:{leafId}"`
+
+### SessionManager API
+
+```csharp
+public sealed class SessionManager
+{
+    // Create a new session (writes JSONL header)
+    Task<SessionInfo> CreateSessionAsync(string workingDir, string? name, string? parentSessionId = null);
+
+    // Save messages (appends new entries, detects branching via common prefix)
+    Task SaveSessionAsync(SessionInfo session, IReadOnlyList<AgentMessage> messages);
+
+    // Resume from the active branch
+    Task<(SessionInfo Session, IReadOnlyList<AgentMessage> Messages)> ResumeSessionAsync(
+        string sessionId, string workingDir);
+
+    // List all branches in a session
+    Task<IReadOnlyList<SessionBranchInfo>> ListBranchesAsync(string sessionId, string workingDir);
+
+    // Switch the active branch
+    Task<SessionInfo> SwitchBranchAsync(string sessionId, string workingDir, string leafEntryId, string? branchName = null);
+
+    // Delete a session
+    Task DeleteSessionAsync(string sessionId, string workingDir);
+}
+```
+
+### Branching Behavior
+
+When `SaveSessionAsync` is called with messages that diverge from the current branch:
+
+1. The manager finds the **common prefix length** between existing and new messages
+2. New entries are appended with `ParentEntryId` pointing to the last shared entry
+3. This naturally creates a fork in the tree without modifying existing entries
+4. The active leaf is updated to point to the new branch tip
+
+### SessionBranchInfo
+
+```csharp
+public sealed record SessionBranchInfo(
+    string LeafEntryId,    // Entry ID at the branch tip
+    string Name,           // Branch name (explicit or auto-generated)
+    bool IsActive,         // Whether this is the currently active branch
+    int MessageCount,      // Number of messages in this branch path
+    DateTimeOffset UpdatedAt);
+```
+
+### Legacy Compatibility
+
+The `SessionManager` automatically migrates legacy sessions (directory-based with `session.json` + `messages.jsonl`) to the new JSONL tree format when they are loaded.
 
 ## Next Steps
 

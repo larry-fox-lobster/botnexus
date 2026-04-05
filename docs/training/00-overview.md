@@ -22,10 +22,11 @@ The source is organized into three layers, each a separate .NET project:
 graph TB
     subgraph CodingAgent["CodingAgent Layer"]
         CA[CodingAgent]
-        SPB[SystemPromptBuilder]
+        SPB[SystemPromptBuilder<br/>section-based, tool contributions]
         Tools[Built-in Tools<br/>read, write, edit,<br/>shell, glob, grep]
+        ER[ExtensionRunner<br/>lifecycle hooks]
         Ext[ExtensionLoader]
-        Session[SessionManager]
+        Session[SessionManager<br/>JSONL tree model]
         Safety[SafetyHooks]
         Audit[AuditHooks]
         Auth[AuthManager]
@@ -41,22 +42,23 @@ graph TB
     end
 
     subgraph Providers["Provider Layer"]
-        LC[LlmClient]
-        APR[ApiProviderRegistry]
-        MR[ModelRegistry]
+        LC[LlmClient<br/>instance-based]
+        APR[ApiProviderRegistry<br/>instance-based]
+        MR[ModelRegistry<br/>instance-based]
         LS[LlmStream]
 
         subgraph Implementations["Provider Implementations"]
-            Anthropic[AnthropicProvider]
-            OpenAI[OpenAICompletionsProvider]
-            Copilot[CopilotProvider]
-            Compat[OpenAICompatProvider]
+            Anthropic[AnthropicProvider<br/>HttpClient injected]
+            OpenAI[OpenAICompletionsProvider<br/>HttpClient injected]
+            CopilotUtil[CopilotProvider<br/>static utility]
+            Compat[OpenAICompatProvider<br/>HttpClient injected]
         end
     end
 
     CA --> Agent
     CA --> SPB
     CA --> Tools
+    CA --> ER
     CA --> Ext
     CA --> Auth
     CA --> Safety
@@ -70,12 +72,12 @@ graph TB
     LC --> APR
     APR --> Anthropic
     APR --> OpenAI
-    APR --> Copilot
     APR --> Compat
     Anthropic --> LS
     OpenAI --> LS
-    Copilot --> LS
     Compat --> LS
+    CopilotUtil -.-> Anthropic
+    CopilotUtil -.-> OpenAI
     CA --> MR
 ```
 
@@ -86,12 +88,12 @@ graph TB
 The provider layer handles all communication with LLM APIs. It defines:
 
 - **`IApiProvider`** — the contract every provider implements (`Stream`, `StreamSimple`)
-- **`ApiProviderRegistry`** — thread-safe registry mapping API format names to provider instances
-- **`ModelRegistry`** — maps `(provider, modelId)` pairs to `LlmModel` definitions
-- **`LlmClient`** — static entry point that resolves a provider and delegates streaming
+- **`ApiProviderRegistry`** — instance-based, thread-safe registry mapping API format names to provider instances
+- **`ModelRegistry`** — instance-based registry mapping `(provider, modelId)` pairs to `LlmModel` definitions
+- **`LlmClient`** — instance-based entry point (takes registries via constructor) that resolves a provider and delegates streaming
 - **`LlmStream`** — channel-based `IAsyncEnumerable<AssistantMessageEvent>` primitive
 
-Each provider (Anthropic, OpenAI, Copilot, OpenAICompat) translates the common `Context` model into its API format, makes HTTP requests, parses SSE responses, and pushes events into an `LlmStream`.
+Each provider (Anthropic, OpenAI, OpenAICompat) translates the common `Context` model into its API format, makes HTTP requests, parses SSE responses, and pushes events into an `LlmStream`. Providers accept `HttpClient` via constructor injection. `CopilotProvider` is a static utility class that provides auth helpers for Copilot routing through the standard providers.
 
 > **Deep dive:** [Provider System](01-provider-system.md) · [Streaming](02-streaming.md)
 
@@ -113,9 +115,10 @@ The coding agent layer assembles a working coding assistant:
 
 - **`CodingAgent.CreateAsync`** — wires providers, tools, hooks, auth, and system prompt into an `Agent`
 - **Built-in tools** — `ReadTool`, `WriteTool`, `EditTool`, `ShellTool`, `GlobTool`, `GrepTool`
-- **`SystemPromptBuilder`** — generates context-aware system prompts from environment state
+- **`SystemPromptBuilder`** — section-based prompt builder with tool contributions and context files
 - **`SafetyHooks`** / `AuditHooks` — enforce path blocking, command restrictions, and audit logging
-- **`ExtensionLoader`** / `SkillsLoader` — dynamic tool loading from assemblies and skill files
+- **`ExtensionLoader`** / `ExtensionRunner` — dynamic tool loading and extension lifecycle management (session/tool/compaction/model hooks)
+- **`SessionManager`** — JSONL-based session persistence with tree branching support
 
 > **Deep dive:** [CodingAgent Layer](05-coding-agent.md) · [Building Your Own](06-building-your-own.md)
 

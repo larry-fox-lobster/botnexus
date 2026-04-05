@@ -311,6 +311,101 @@ var options = new AgentOptions(
 var agent = new Agent(options);
 ```
 
+## Extension Lifecycle Hooks
+
+Beyond the `BeforeToolCall`/`AfterToolCall` delegates on `AgentOptions`, the CodingAgent layer provides a richer extension lifecycle through the `IExtension` interface and `ExtensionRunner`. Extensions can hook into multiple stages of agent execution:
+
+### IExtension — The Full Extension Contract
+
+```csharp
+public interface IExtension
+{
+    string Name { get; }
+
+    IReadOnlyList<IAgentTool> GetTools();
+
+    // Tool lifecycle — intercept before and after tool execution
+    ValueTask<BeforeToolCallResult?> OnToolCallAsync(
+        ToolCallLifecycleContext context, CancellationToken ct = default);
+
+    ValueTask<AfterToolCallResult?> OnToolResultAsync(
+        ToolResultLifecycleContext context, CancellationToken ct = default);
+
+    // Session lifecycle — startup and teardown
+    ValueTask OnSessionStartAsync(SessionLifecycleContext context, CancellationToken ct = default);
+    ValueTask OnSessionEndAsync(SessionLifecycleContext context, CancellationToken ct = default);
+
+    // Context compaction — contribute to or override summaries
+    ValueTask<string?> OnCompactionAsync(
+        CompactionLifecycleContext context, CancellationToken ct = default);
+
+    // Model request interception — transform API payloads
+    ValueTask<object?> OnModelRequestAsync(
+        ModelRequestLifecycleContext context, CancellationToken ct = default);
+}
+```
+
+All lifecycle methods have default implementations returning `null`/completed, so extensions only override what they need.
+
+### Lifecycle Context Records
+
+Each hook receives a typed context record:
+
+| Hook | Context | Key Data |
+|------|---------|----------|
+| `OnToolCallAsync` | `ToolCallLifecycleContext` | Stage (Before/After), ToolCallId, ToolName, Arguments, IsError |
+| `OnToolResultAsync` | `ToolResultLifecycleContext` | ToolCallId, ToolName, Arguments, Result, IsError |
+| `OnSessionStartAsync` | `SessionLifecycleContext` | SessionInfo, WorkingDirectory, ModelId |
+| `OnSessionEndAsync` | `SessionLifecycleContext` | SessionInfo, WorkingDirectory, ModelId |
+| `OnCompactionAsync` | `CompactionLifecycleContext` | MessagesToSummarize, RecentMessages, ReadFiles, ModifiedFiles, Summary |
+| `OnModelRequestAsync` | `ModelRequestLifecycleContext` | Payload (raw API object), Model |
+
+### ExtensionRunner — Coordinating Multiple Extensions
+
+`ExtensionRunner` iterates through all loaded extensions for each lifecycle event:
+
+```mermaid
+flowchart TD
+    Event([Lifecycle Event]) --> Runner[ExtensionRunner]
+    Runner --> Ext1[Extension 1]
+    Ext1 --> Ext2[Extension 2]
+    Ext2 --> Ext3[Extension N]
+    Ext3 --> Result([Merged Result])
+
+    style Runner fill:#f9f,stroke:#333
+```
+
+Key behaviors:
+- **OnToolCallAsync**: If any extension returns `Block=true`, execution stops immediately
+- **OnToolResultAsync**: Results from multiple extensions are merged (last non-null wins per field)
+- **OnCompactionAsync**: First extension that returns a non-empty string wins
+- **OnModelRequestAsync**: Each extension transforms the payload in sequence (pipeline)
+
+### Example: Implementing a Logging Extension
+
+```csharp
+public sealed class LoggingExtension : IExtension
+{
+    public string Name => "logging";
+
+    public IReadOnlyList<IAgentTool> GetTools() => [];
+
+    public ValueTask OnSessionStartAsync(SessionLifecycleContext context, CancellationToken ct)
+    {
+        Console.WriteLine($"Session {context.Session.Id} started in {context.WorkingDirectory}");
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask<BeforeToolCallResult?> OnToolCallAsync(
+        ToolCallLifecycleContext context, CancellationToken ct)
+    {
+        if (context.Stage == ToolCallLifecycleStage.BeforeExecution)
+            Console.WriteLine($"  → {context.ToolName}({string.Join(", ", context.Arguments.Keys)})");
+        return ValueTask.FromResult<BeforeToolCallResult?>(null);
+    }
+}
+```
+
 ## Next Steps
 
 - [CodingAgent Layer →](05-coding-agent.md) — see the built-in tools in action
