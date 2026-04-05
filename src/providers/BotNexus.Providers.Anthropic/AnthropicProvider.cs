@@ -116,7 +116,9 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
             if (IsAdaptiveThinkingModel(model.Id))
             {
                 anthropicOpts.ThinkingEnabled = true;
-                anthropicOpts.Effort = clamped switch
+                // Use original reasoning (not clamped) for effort mapping —
+                // adaptive models handle ExtraHigh natively via "max" effort.
+                anthropicOpts.Effort = reasoning switch
                 {
                     ThinkingLevel.Minimal => "low",
                     ThinkingLevel.Low => "low",

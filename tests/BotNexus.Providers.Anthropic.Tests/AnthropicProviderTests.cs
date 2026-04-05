@@ -95,7 +95,8 @@ public class AnthropicProviderTests
     {
         var handler = new RecordingHandler();
         var provider = new AnthropicProvider(new HttpClient(handler));
-        var model = TestHelpers.MakeModel(id: modelId, reasoning: true);
+        // Use high maxTokens so thinking budget isn't clamped by model limits
+        var model = TestHelpers.MakeModel(id: modelId, reasoning: true, maxTokens: 200000);
         var context = TestHelpers.MakeContext();
 
         var stream = provider.StreamSimple(model, context, new Core.SimpleStreamOptions

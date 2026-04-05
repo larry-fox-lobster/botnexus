@@ -133,12 +133,11 @@ public class SimpleOptionsHelperTests
     }
 
     [Fact]
-    public void GetBudgetForLevel_NullBudgets_UsesDefaultMediumBudget()
+    public void GetBudgetForLevel_NullBudgets_ReturnsNull()
     {
         var result = SimpleOptionsHelper.GetBudgetForLevel(ThinkingLevel.Medium, null);
 
-        result.Should().NotBeNull();
-        result!.ThinkingBudget.Should().Be(8192);
+        result.Should().BeNull();
     }
 
     [Theory]
@@ -146,11 +145,10 @@ public class SimpleOptionsHelperTests
     [InlineData(ThinkingLevel.Low, 2048)]
     [InlineData(ThinkingLevel.Medium, 8192)]
     [InlineData(ThinkingLevel.High, 16384)]
-    public void GetBudgetForLevel_NullBudgets_UsesDefaultThinkingLevels(ThinkingLevel level, int expectedBudget)
+    public void GetDefaultThinkingBudget_ReturnsCorrectDefaults(ThinkingLevel level, int expectedBudget)
     {
-        var result = SimpleOptionsHelper.GetBudgetForLevel(level, null);
+        var result = SimpleOptionsHelper.GetDefaultThinkingBudget(level);
 
-        result.Should().NotBeNull();
-        result!.ThinkingBudget.Should().Be(expectedBudget);
+        result.Should().Be(expectedBudget);
     }
 }
