@@ -73,7 +73,7 @@ public sealed partial class AnthropicProvider : IApiProvider
 
     public LlmStream StreamSimple(LlmModel model, Context context, SimpleStreamOptions? options = null)
     {
-        var apiKey = options?.ApiKey ?? EnvironmentApiKeys.GetApiKey("anthropic") ?? "";
+        var apiKey = options?.ApiKey ?? EnvironmentApiKeys.GetApiKey(model.Provider) ?? "";
         var baseOptions = SimpleOptionsHelper.BuildBaseOptions(model, options, apiKey);
 
         var anthropicOpts = new AnthropicOptions
@@ -155,7 +155,7 @@ public sealed partial class AnthropicProvider : IApiProvider
         CancellationToken ct)
     {
         var anthropicOpts = options as AnthropicOptions;
-        var apiKey = options?.ApiKey ?? "";
+        var apiKey = options?.ApiKey ?? EnvironmentApiKeys.GetApiKey(model.Provider) ?? "";
         var baseUrl = model.BaseUrl.TrimEnd('/');
         var authMode = DetectAuthMode(apiKey, model);
 
@@ -173,6 +173,13 @@ public sealed partial class AnthropicProvider : IApiProvider
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/messages");
         httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
         ConfigureRequestHeaders(httpRequest, apiKey, authMode, anthropicOpts, model);
+        if (authMode == AuthMode.Copilot)
+        {
+            var transformedMessages = MessageTransformer.TransformMessages(context.Messages, model, NormalizeToolCallId);
+            var hasImages = CopilotHeaders.HasVisionInput(transformedMessages);
+            foreach (var (key, value) in CopilotHeaders.BuildDynamicHeaders(transformedMessages, hasImages))
+                httpRequest.Headers.TryAddWithoutValidation(key, value);
+        }
 
         using var response = await SharedHttpClient.SendAsync(
             httpRequest, HttpCompletionOption.ResponseHeadersRead, ct);

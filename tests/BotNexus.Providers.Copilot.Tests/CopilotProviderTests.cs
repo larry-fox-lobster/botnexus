@@ -6,19 +6,15 @@ namespace BotNexus.Providers.Copilot.Tests;
 public class CopilotProviderTests
 {
     [Fact]
-    public void Api_ReturnsGithubCopilot()
+    public void ProviderId_ReturnsGithubCopilot()
     {
-        var provider = new CopilotProvider();
-
-        provider.Api.Should().Be("github-copilot");
+        CopilotProvider.ProviderId.Should().Be("github-copilot");
     }
 
     [Fact]
-    public void CanConstructProviderInstance()
+    public void ResolveApiKey_PrefersConfiguredValue()
     {
-        var provider = new CopilotProvider();
-
-        provider.Should().NotBeNull();
-        provider.Should().BeAssignableTo<Core.Registry.IApiProvider>();
+        var apiKey = CopilotProvider.ResolveApiKey("configured-token");
+        apiKey.Should().Be("configured-token");
     }
 }

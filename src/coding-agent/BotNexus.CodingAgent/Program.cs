@@ -5,7 +5,6 @@ using BotNexus.CodingAgent.Cli;
 using BotNexus.CodingAgent.Extensions;
 using BotNexus.CodingAgent.Session;
 using BotNexus.Providers.Anthropic;
-using BotNexus.Providers.Copilot;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Registry;
 using BotNexus.Providers.OpenAI;
@@ -47,7 +46,7 @@ internal static class Program
         var llmClient = new LlmClient(apiProviderRegistry, modelRegistry);
 
         var authManager = new AuthManager(config.ConfigDirectory);
-        var extensionTools = new ExtensionLoader().LoadExtensions(config.ExtensionsDirectory);
+        var extensionLoadResult = new ExtensionLoader().LoadExtensions(config.ExtensionsDirectory);
         var skills = new SkillsLoader().LoadSkills(workingDirectory, config);
         var sessionManager = new SessionManager();
         var output = new OutputFormatter();
@@ -71,7 +70,7 @@ internal static class Program
             authManager,
             llmClient,
             modelRegistry,
-            extensionTools,
+            extensionLoadResult.Tools,
             skills).ConfigureAwait(false);
         if (resumedMessages.Count > 0)
         {
@@ -189,7 +188,6 @@ internal static class Program
         new BuiltInModels().RegisterAll(modelRegistry);
 
         var httpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        apiProviderRegistry.Register(new CopilotProvider());
         apiProviderRegistry.Register(new AnthropicProvider());
         apiProviderRegistry.Register(new OpenAICompletionsProvider(httpClient, Microsoft.Extensions.Logging.Abstractions.NullLogger<OpenAICompletionsProvider>.Instance));
         apiProviderRegistry.Register(new OpenAICompatProvider());
