@@ -11,7 +11,11 @@ using ProviderUserMessage = BotNexus.Providers.Core.Models.UserMessage;
 /// </summary>
 public static class DefaultMessageConverter
 {
-    public static ConvertToLlmDelegate Create() => (messages, _) =>
+    public static ConvertToLlmDelegate Create() => ConvertToLlm;
+
+    public static Task<IReadOnlyList<Message>> ConvertToLlm(
+        IReadOnlyList<AgentMessage> messages,
+        CancellationToken cancellationToken)
     {
         if (messages is null || messages.Count == 0)
             return Task.FromResult<IReadOnlyList<Message>>([]);
@@ -26,7 +30,7 @@ public static class DefaultMessageConverter
             .ToList();
 
         return Task.FromResult<IReadOnlyList<Message>>(converted);
-    };
+    }
 
     private static Message? ToProviderMessage(AgentMessage message)
     {

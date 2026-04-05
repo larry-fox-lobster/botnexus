@@ -20,6 +20,7 @@ public sealed class Agent
         (messages, _) => Task.FromResult(messages);
 
     private readonly AgentOptions _options;
+    private readonly ConvertToLlmDelegate _convertToLlm;
     private readonly AgentState _state;
     private readonly TransformContextDelegate _transformContext;
     private readonly PendingMessageQueue _steeringQueue;
@@ -47,6 +48,7 @@ public sealed class Agent
     {
         ArgumentNullException.ThrowIfNull(options);
         _options = options;
+        _convertToLlm = options.ConvertToLlm ?? DefaultMessageConverter.ConvertToLlm;
         _transformContext = options.TransformContext ?? IdentityTransformContext;
 
         var initial = options.InitialState;
@@ -549,7 +551,7 @@ public sealed class Agent
         return new AgentLoopConfig(
             model,
             _options.LlmClient,
-            _options.ConvertToLlm,
+            _convertToLlm,
             _transformContext,
             _options.GetApiKey,
             BuildQueueDelegate(_steeringQueue, _options.GetSteeringMessages),

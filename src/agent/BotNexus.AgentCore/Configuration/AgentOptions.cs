@@ -9,7 +9,7 @@ namespace BotNexus.AgentCore.Configuration;
 /// </summary>
 /// <param name="InitialState">The optional initial mutable state seed (system prompt, model, tools, messages).</param>
 /// <param name="Model">The model definition used for provider calls (can be overridden in InitialState).</param>
-/// <param name="ConvertToLlm">Converts agent messages to provider chat messages before each LLM call.</param>
+/// <param name="ConvertToLlm">Optional converter for agent messages to provider chat messages before each LLM call.</param>
 /// <param name="TransformContext">Optional context transformer before provider invocation (defaults to identity passthrough).</param>
 /// <param name="GetApiKey">Resolves provider API keys on demand.</param>
 /// <param name="GetSteeringMessages">Provides steering messages when configured (combined with Agent.Steer queues).</param>
@@ -30,7 +30,7 @@ public record AgentOptions(
     AgentInitialState? InitialState,
     LlmModel Model,
     LlmClient LlmClient,
-    ConvertToLlmDelegate ConvertToLlm,
+    ConvertToLlmDelegate? ConvertToLlm,
     TransformContextDelegate? TransformContext,
     GetApiKeyDelegate GetApiKey,
     GetMessagesDelegate? GetSteeringMessages,
