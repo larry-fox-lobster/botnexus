@@ -167,6 +167,43 @@ public class MessageTransformerTests
     }
 
     [Fact]
+    public void ToolCallIds_NormalizerReceivesModelAndSource()
+    {
+        var tc = new ToolCallContent("tc-original", "tool", new Dictionary<string, object?>());
+        var assistant = MakeAssistant([tc], provider: "openai", api: "openai-completions");
+        var targetModel = MakeModel("anthropic", "anthropic-messages");
+        LlmModel? seenModel = null;
+        string? seenSource = null;
+
+        _ = MessageTransformer.TransformMessages([assistant], targetModel, (id, model, source) =>
+        {
+            seenModel = model;
+            seenSource = source;
+            return id;
+        });
+
+        seenModel.Should().NotBeNull();
+        seenModel!.Provider.Should().Be("openai");
+        seenModel.Api.Should().Be("openai-completions");
+        seenSource.Should().Be("anthropic");
+    }
+
+    [Fact]
+    public void TransformMessages_WhenNormalizerNull_PreservesDefaultBehavior()
+    {
+        var tc = new ToolCallContent("tc-1", "tool", new Dictionary<string, object?>());
+        var assistant = MakeAssistant([tc], provider: "openai", api: "openai-completions");
+        var toolResult = new ToolResultMessage("tc-1", "tool", [new TextContent("ok")], false, Ts);
+        var messages = new Message[] { assistant, toolResult };
+        var targetModel = MakeModel("anthropic", "anthropic-messages");
+
+        var baseline = MessageTransformer.TransformMessages(messages, targetModel);
+        var withNullNormalizer = MessageTransformer.TransformMessages(messages, targetModel, null);
+
+        withNullNormalizer.Should().BeEquivalentTo(baseline);
+    }
+
+    [Fact]
     public void RedactedThinking_Dropped_WhenSwitchingProviders()
     {
         var assistant = MakeAssistant(
