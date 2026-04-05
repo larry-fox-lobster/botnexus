@@ -244,7 +244,19 @@ internal static class ToolExecutor
         if (config.BeforeToolCall is not null)
         {
             var beforeContext = new BeforeToolCallContext(assistantMessage, toolCall, validatedArgs, context);
-            var beforeResult = await config.BeforeToolCall(beforeContext, cancellationToken).ConfigureAwait(false);
+            BeforeToolCallResult? beforeResult;
+            try
+            {
+                beforeResult = await config.BeforeToolCall(beforeContext, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return new ToolPreparation(
+                    null,
+                    BuildErrorResult($"BeforeToolCall hook failed: {ex.Message}"),
+                    true);
+            }
+
             if (beforeResult?.Block == true)
             {
                 var reason = string.IsNullOrWhiteSpace(beforeResult.Reason)
@@ -316,7 +328,16 @@ internal static class ToolExecutor
                 isError,
                 context);
 
-            var afterResult = await config.AfterToolCall(afterContext, cancellationToken).ConfigureAwait(false);
+            AfterToolCallResult? afterResult;
+            try
+            {
+                afterResult = await config.AfterToolCall(afterContext, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return (result, isError);
+            }
+
             if (afterResult is not null)
             {
                 var content = afterResult.Content ?? result.Content;

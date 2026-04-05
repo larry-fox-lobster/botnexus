@@ -145,6 +145,23 @@ public class ToolExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WhenBeforeToolCallHookThrows_BlocksToolCallWithoutCrashing()
+    {
+        var tool = new RecordingTool("echo");
+        var context = new AgentContext(null, [], [tool]);
+        var assistant = CreateAssistantMessage(("t1", "echo", "first"));
+        var config = TestHelpers.CreateTestConfig(
+            beforeToolCall: (_, _) => throw new InvalidOperationException("before hook exploded"));
+
+        var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
+
+        results.Should().ContainSingle();
+        results[0].IsError.Should().BeTrue();
+        results[0].Result.Content[0].Value.Should().Contain("BeforeToolCall hook failed: before hook exploded");
+        tool.ExecuteCount.Should().Be(0);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_AfterToolCallCanModifyResult()
     {
         var tool = new RecordingTool("echo");
@@ -159,6 +176,22 @@ public class ToolExecutorTests
         results.Should().ContainSingle();
         results[0].IsError.Should().BeFalse();
         results[0].Result.Content.Should().ContainSingle().Which.Value.Should().Be("modified");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenAfterToolCallHookThrows_ReturnsOriginalToolResult()
+    {
+        var tool = new RecordingTool("echo");
+        var context = new AgentContext(null, [], [tool]);
+        var assistant = CreateAssistantMessage(("t1", "echo", "first"));
+        var config = TestHelpers.CreateTestConfig(
+            afterToolCall: (_, _) => throw new InvalidOperationException("after hook exploded"));
+
+        var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
+
+        results.Should().ContainSingle();
+        results[0].IsError.Should().BeFalse();
+        results[0].Result.Content[0].Value.Should().Be("first");
     }
 
     [Fact]
