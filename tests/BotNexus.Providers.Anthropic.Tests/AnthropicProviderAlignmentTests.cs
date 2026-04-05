@@ -300,6 +300,104 @@ public class AnthropicProviderAlignmentTests
     }
 
     [Fact]
+    public async Task StreamSimple_WhenReasoningNotRequested_DisablesThinkingForReasoningModel()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel(reasoning: true);
+        var context = TestHelpers.MakeContext();
+
+        var stream = provider.StreamSimple(model, context, new SimpleStreamOptions { ApiKey = "test-key" });
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        body.RootElement.GetProperty("thinking").GetProperty("type").GetString().Should().Be("disabled");
+    }
+
+    [Fact]
+    public async Task Stream_AdaptiveModelWithBudgetWithoutEffort_UsesAdaptiveThinking()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel(id: "claude-sonnet-4.6", reasoning: true);
+        var context = TestHelpers.MakeContext();
+        var options = new AnthropicOptions
+        {
+            ApiKey = "test-key",
+            ThinkingEnabled = true,
+            ThinkingBudgetTokens = 2048
+        };
+
+        var stream = provider.Stream(model, context, options);
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        body.RootElement.GetProperty("thinking").GetProperty("type").GetString().Should().Be("adaptive");
+    }
+
+    [Fact]
+    public async Task Stream_ThinkingEnabled_SuppressesTemperature()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel(reasoning: false);
+        var context = TestHelpers.MakeContext();
+        var options = new AnthropicOptions
+        {
+            ApiKey = "test-key",
+            ThinkingEnabled = true,
+            Temperature = 0.7f
+        };
+
+        var stream = provider.Stream(model, context, options);
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        body.RootElement.TryGetProperty("temperature", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Stream_SetsAcceptAndDangerousDirectBrowserHeaders()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var context = TestHelpers.MakeContext();
+
+        var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        handler.RequestHeaders.Should().ContainKey("accept");
+        handler.RequestHeaders["accept"].Should().Contain("application/json");
+        handler.RequestHeaders.Should().ContainKey("anthropic-dangerous-direct-browser-access");
+        handler.RequestHeaders["anthropic-dangerous-direct-browser-access"].Should().Contain("true");
+    }
+
+    [Fact]
     public async Task Stream_StringToolChoice_MapsToAnthropicObject()
     {
         var handler = new RecordingHandler(_ => SseResponse("""
@@ -634,11 +732,16 @@ public class AnthropicProviderAlignmentTests
         public int RequestCount { get; private set; }
         public string? RequestBody { get; private set; }
         public Uri? LastRequestUri { get; private set; }
+        public Dictionary<string, string> RequestHeaders { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             RequestCount++;
             LastRequestUri = request.RequestUri;
+            RequestHeaders = request.Headers.ToDictionary(
+                header => header.Key,
+                header => string.Join(",", header.Value),
+                StringComparer.OrdinalIgnoreCase);
             RequestBody = request.Content is null
                 ? null
                 : await request.Content.ReadAsStringAsync(cancellationToken);

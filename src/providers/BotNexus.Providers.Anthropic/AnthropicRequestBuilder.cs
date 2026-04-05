@@ -107,10 +107,11 @@ internal static class AnthropicRequestBuilder
 
         if (model.Reasoning && anthropicOpts?.ThinkingEnabled == true)
         {
-            if (anthropicOpts.Effort is not null && isAdaptiveThinkingModel(model.Id))
+            if (isAdaptiveThinkingModel(model.Id))
             {
                 body["thinking"] = ToNode(new Dictionary<string, object?> { ["type"] = "adaptive" });
-                body["output_config"] = ToNode(new Dictionary<string, object?> { ["effort"] = anthropicOpts.Effort });
+                if (anthropicOpts.Effort is not null)
+                    body["output_config"] = ToNode(new Dictionary<string, object?> { ["effort"] = anthropicOpts.Effort });
             }
             else if (anthropicOpts.ThinkingBudgetTokens is { } budget)
             {
@@ -119,10 +120,6 @@ internal static class AnthropicRequestBuilder
                     ["type"] = "enabled",
                     ["budget_tokens"] = budget
                 });
-            }
-            else if (isAdaptiveThinkingModel(model.Id))
-            {
-                body["thinking"] = ToNode(new Dictionary<string, object?> { ["type"] = "adaptive" });
             }
             else
             {
@@ -136,13 +133,10 @@ internal static class AnthropicRequestBuilder
         else if (model.Reasoning && anthropicOpts?.ThinkingEnabled == false)
         {
             body["thinking"] = ToNode(new Dictionary<string, object?> { ["type"] = "disabled" });
-            if (options?.Temperature.HasValue == true)
-                body["temperature"] = options.Temperature.Value;
         }
-        else if (options?.Temperature.HasValue == true)
-        {
+
+        if (options?.Temperature.HasValue == true && anthropicOpts?.ThinkingEnabled != true)
             body["temperature"] = options.Temperature.Value;
-        }
 
         return body;
     }

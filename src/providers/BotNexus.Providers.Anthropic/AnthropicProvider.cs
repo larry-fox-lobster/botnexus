@@ -121,6 +121,10 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
                 };
             }
         }
+        else if (model.Reasoning)
+        {
+            anthropicOpts.ThinkingEnabled = false;
+        }
 
         return Stream(model, context, anthropicOpts);
     }
@@ -167,9 +171,8 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
 
         if (authMode == AuthMode.Copilot)
         {
-            var transformedMessages = MessageTransformer.TransformMessages(context.Messages, model, AnthropicMessageConverter.NormalizeToolCallId);
-            var hasImages = CopilotHeaders.HasVisionInput(transformedMessages);
-            foreach (var (key, value) in CopilotHeaders.BuildDynamicHeaders(transformedMessages, hasImages))
+            var hasImages = CopilotHeaders.HasVisionInput(context.Messages);
+            foreach (var (key, value) in CopilotHeaders.BuildDynamicHeaders(context.Messages, hasImages))
                 httpRequest.Headers.TryAddWithoutValidation(key, value);
         }
 
@@ -219,6 +222,8 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
         AnthropicOptions? opts, LlmModel model)
     {
         request.Headers.Add("anthropic-version", ApiVersion);
+        request.Headers.TryAddWithoutValidation("accept", "application/json");
+        request.Headers.TryAddWithoutValidation("anthropic-dangerous-direct-browser-access", "true");
 
         if (model.Headers is not null)
         {
