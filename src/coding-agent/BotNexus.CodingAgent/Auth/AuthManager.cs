@@ -67,7 +67,8 @@ public sealed class AuthManager
             Type = "oauth",
             Refresh = refreshed.RefreshToken,
             Access = refreshed.AccessToken,
-            Expires = refreshed.ExpiresAt * 1000
+            Expires = refreshed.ExpiresAt * 1000,
+            Endpoint = refreshed.ApiEndpoint
         };
         Save();
 
@@ -109,7 +110,7 @@ public sealed class AuthManager
         if (_entries.TryGetValue(provider, out var entry))
         {
             var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            if (nowMs >= entry.Expires - 60_000)
+            if (nowMs >= entry.Expires - 60_000 || entry.Endpoint is null)
             {
                 try
                 {
@@ -137,9 +138,18 @@ public sealed class AuthManager
     public bool HasCredentials(string provider = DefaultProvider)
         => _entries.ContainsKey(provider);
 
+    /// <summary>
+    /// Get the API endpoint for the given provider, if stored from token exchange.
+    /// Enterprise Copilot accounts use a different endpoint than individual accounts.
+    /// </summary>
+    public string? GetApiEndpoint(string provider = DefaultProvider)
+    {
+        return _entries.TryGetValue(provider, out var entry) ? entry.Endpoint : null;
+    }
+
     private async Task<AuthEntry> RefreshEntryAsync(AuthEntry entry, CancellationToken ct)
     {
-        var credentials = new OAuthCredentials(entry.Access, entry.Refresh, entry.Expires / 1000);
+        var credentials = new OAuthCredentials(entry.Access, entry.Refresh, entry.Expires / 1000, entry.Endpoint);
         var refreshed = await CopilotOAuth.RefreshAsync(credentials, ct);
 
         return new AuthEntry
@@ -147,7 +157,8 @@ public sealed class AuthManager
             Type = entry.Type,
             Refresh = refreshed.RefreshToken,
             Access = refreshed.AccessToken,
-            Expires = refreshed.ExpiresAt * 1000
+            Expires = refreshed.ExpiresAt * 1000,
+            Endpoint = refreshed.ApiEndpoint ?? entry.Endpoint
         };
     }
 
@@ -191,7 +202,7 @@ public sealed class AuthManager
     /// <summary>
     /// Auth entry as persisted in auth.json:
     /// <code>
-    /// { "github-copilot": { "type": "oauth", "refresh": "ghu_...", "access": "tid=...", "expires": 1775329821000 } }
+    /// { "github-copilot": { "type": "oauth", "refresh": "ghu_...", "access": "tid=...", "expires": 1775329821000, "endpoint": "https://proxy.enterprise.githubcopilot.com" } }
     /// </code>
     /// Expires is Unix milliseconds.
     /// </summary>
@@ -208,5 +219,8 @@ public sealed class AuthManager
 
         [JsonPropertyName("expires")]
         public long Expires { get; set; }
+
+        [JsonPropertyName("endpoint")]
+        public string? Endpoint { get; set; }
     }
 }

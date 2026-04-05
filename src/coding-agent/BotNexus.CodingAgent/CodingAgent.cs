@@ -61,6 +61,14 @@ public static class CodingAgent
 
         // Resolve initial API key via AuthManager (auto-refreshes saved creds)
         var model = ResolveModel(config, modelRegistry);
+
+        // Enterprise Copilot accounts use a different API endpoint
+        var apiEndpoint = authManager.GetApiEndpoint(model.Provider);
+        if (!string.IsNullOrWhiteSpace(apiEndpoint))
+        {
+            model = model with { BaseUrl = apiEndpoint };
+        }
+
         var capturedAuthManager = authManager;
         var capturedConfig = config;
 

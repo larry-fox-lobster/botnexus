@@ -8,8 +8,9 @@ namespace BotNexus.Providers.Copilot;
 /// AccessToken holds the current usable token (Copilot session token after exchange).
 /// RefreshToken holds the long-lived GitHub OAuth token for re-exchange.
 /// ExpiresAt is Unix epoch seconds.
+/// ApiEndpoint is the Copilot API base URL (enterprise vs individual).
 /// </summary>
-public record OAuthCredentials(string AccessToken, string RefreshToken, long ExpiresAt);
+public record OAuthCredentials(string AccessToken, string RefreshToken, long ExpiresAt, string? ApiEndpoint = null);
 
 /// <summary>
 /// GitHub Copilot OAuth device code flow and token management.
@@ -116,8 +117,8 @@ public static class CopilotOAuth
             ? credentials.RefreshToken
             : credentials.AccessToken;
 
-        var (copilotToken, expiresAt, _) = await ExchangeForCopilotTokenAsync(githubToken, ct);
-        return new OAuthCredentials(copilotToken, githubToken, expiresAt);
+        var (copilotToken, expiresAt, apiEndpoint) = await ExchangeForCopilotTokenAsync(githubToken, ct);
+        return new OAuthCredentials(copilotToken, githubToken, expiresAt, apiEndpoint);
     }
 
     /// <summary>

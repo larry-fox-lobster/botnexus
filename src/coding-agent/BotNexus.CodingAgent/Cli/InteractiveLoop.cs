@@ -273,6 +273,17 @@ public sealed class InteractiveLoop
             var provider = config.Provider ?? agent.State.Model.Provider;
             var previousModel = agent.State.Model.Id;
             agent.State.Model = ResolveModel(provider, modelId, config.MaxContextTokens, modelRegistry);
+
+            // Enterprise Copilot accounts use a different API endpoint
+            if (agent.State.Model.Provider.Equals("github-copilot", StringComparison.OrdinalIgnoreCase))
+            {
+                var apiEndpoint = authManager.GetApiEndpoint(agent.State.Model.Provider);
+                if (!string.IsNullOrWhiteSpace(apiEndpoint))
+                {
+                    agent.State.Model = agent.State.Model with { BaseUrl = apiEndpoint };
+                }
+            }
+
             var updated = UpdateSessionSnapshot(session, agent);
             if (!string.Equals(previousModel, agent.State.Model.Id, StringComparison.Ordinal))
             {
