@@ -9,18 +9,15 @@ namespace BotNexus.AgentCore.Configuration;
 public enum QueueMode
 {
     /// <summary>
-    /// Consume all available queued messages in a single drain operation.
-    /// </summary>
-    /// <remarks>
-    /// Default behavior. All pending messages are injected at the next turn boundary.
-    /// </remarks>
-    All,
-
-    /// <summary>
     /// Consume one queued message per loop iteration.
     /// </summary>
     /// <remarks>
     /// Spreads messages across turns. Useful for rate-limiting or progressive injection.
     /// </remarks>
     OneAtATime,
+
+    /// <summary>
+    /// Consume all available queued messages in a single drain operation.
+    /// </summary>
+    All,
 }

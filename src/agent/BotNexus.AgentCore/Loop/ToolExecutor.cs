@@ -210,7 +210,7 @@ internal static class ToolExecutor
         cancellationToken.ThrowIfCancellationRequested();
 
         var tool = context.Tools.FirstOrDefault(candidate =>
-            string.Equals(candidate.Name, toolCall.Name, StringComparison.OrdinalIgnoreCase));
+            string.Equals(candidate.Name, toolCall.Name, StringComparison.Ordinal));
 
         if (tool is null)
         {
