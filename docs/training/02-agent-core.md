@@ -223,7 +223,25 @@ FOLLOW-UP LOOP:
 
 **Step 1 — Drain steering:** Any messages queued via `Agent.Steer()` or `GetSteeringMessages` are pulled from the queue and appended to the timeline. This happens at the top of every turn, so steering messages are visible to the LLM on the next call.
 
-**Step 2 — Transform context:** The `TransformContextDelegate` runs over the full message list. This is where context window compaction happens — old messages can be summarized, trimmed, or removed entirely.
+**Step 2 — Transform context (Phase 5):** The `TransformContextDelegate` runs **per retry attempt**. This is where context window compaction happens — old messages can be summarized, trimmed, or removed entirely. Running per-attempt ensures that overflow compaction is visible to the transform function.
+
+**Context transform flow (Phase 5):**
+```
+Attempt 1:
+  → Transform context (sees full message timeline)
+  → Convert to LLM format
+  → Call LLM
+  ✓ Success → use result
+
+Attempt N (after ContextOverflow):
+  → Compact messages (keep tail)
+  → Transform context (sees compacted timeline)
+  → Convert to LLM format
+  → Call LLM
+  ✓ Success → use result
+```
+
+Before Phase 5, the transform ran once and wasn't re-triggered on overflow recovery. Now it runs for each attempt, so custom transforms can observe context compaction if it occurs.
 
 **Step 3 — Convert to LLM format:** `ConvertToLlmDelegate` maps `AgentMessage` instances to provider-level `Message` objects. Each provider has its own message format, and this delegate handles the translation.
 
