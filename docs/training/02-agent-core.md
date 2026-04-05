@@ -280,7 +280,7 @@ The accumulator maintains a running snapshot of the `AssistantAgentMessage` as d
 ### Pipeline stages
 
 ```
-Tool Lookup (case-sensitive by Name)
+Tool Lookup (case-insensitive by Name)
     → PrepareArgumentsAsync (validate/transform arguments)
         → BeforeToolCall hook (can block execution)
             → ExecuteAsync (run the tool)
@@ -304,7 +304,7 @@ public static async Task<IReadOnlyList<ToolResultAgentMessage>> ExecuteAsync(
 Tools execute one at a time in the order they appear in the assistant message. For each tool:
 
 1. Emit `ToolExecutionStartEvent` (with raw arguments)
-2. Look up tool by name (case-sensitive)
+2. Look up tool by name (case-insensitive)
 3. Call `PrepareArgumentsAsync` — validate and transform raw arguments
 4. Call `BeforeToolCall` hook — if it returns `Block = true`, skip execution and produce an error result
 5. Call `ExecuteAsync` — run the tool
