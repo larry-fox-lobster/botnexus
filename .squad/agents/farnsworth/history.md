@@ -145,6 +145,9 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+- 2026-04-06: `BotNexus.Gateway.Api` is now a runnable ASP.NET Core host (`Program.cs`) that wires `AddBotNexusGateway`, `AddPlatformConfiguration`, `AddBotNexusGatewayApi`, WebSocket `/ws`, static WebUI assets, and `/health`.
+- 2026-04-06: Gateway auth now supports multi-tenant API keys from platform config (`gateway.apiKeys` or root `apiKeys`), mapping each key to tenant ID, permissions, allowed agents, and caller identity.
+- 2026-04-06: Gateway exposes `GET /api/config/validate` to validate `~/.botnexus/config.json` (or explicit path), returning actionable field-level errors for missing required config values.
 - 2026-04-05: Gateway now registers four built-in `IIsolationStrategy` implementations (`in-process`, `sandbox`, `container`, `remote`), and `DefaultAgentSupervisor` resolves by `Name` into a case-insensitive dictionary.
 - 2026-04-05: Platform config support is now centered on `~/.botnexus/config.json` via `PlatformConfigLoader` + `AddPlatformConfiguration`, which can set `GatewayOptions.DefaultAgentId`, switch sessions to `FileSessionStore`, and override agent descriptor directory.
 - 2026-04-06: Added Phase 2 channel stub projects `BotNexus.Channels.Tui` and `BotNexus.Channels.Telegram` with DI registration (`AddBotNexusTuiChannel`, `AddBotNexusTelegramChannel`) and lifecycle-safe `IChannelAdapter` placeholders for future inbound loop/API wiring.
