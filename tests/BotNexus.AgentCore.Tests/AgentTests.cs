@@ -265,6 +265,35 @@ public class AgentTests
     }
 
     [Fact]
+    public async Task ContinueAsync_WhenFollowUpQueued_DoesNotSkipInitialSteeringPoll()
+    {
+        using var provider = RegisterDefaultProvider();
+        var steeringPollCount = 0;
+        var options = TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api")) with
+        {
+            GetSteeringMessages = _ => Task.FromResult<IReadOnlyList<AgentMessage>>(
+                Interlocked.Increment(ref steeringPollCount) == 1
+                    ? [new UserMessage("steer from delegate")]
+                    : [])
+        };
+        var agent = new Agent(options);
+        agent.State.Messages =
+        [
+            new AssistantAgentMessage(
+                Content: "seed assistant",
+                FinishReason: BotNexus.Providers.Core.Models.StopReason.Stop,
+                Timestamp: DateTimeOffset.UtcNow)
+        ];
+        agent.FollowUp(new UserMessage("follow-up message"));
+
+        var continued = await agent.ContinueAsync();
+
+        continued.OfType<UserMessage>().Select(message => message.Content)
+            .Should().Contain(["follow-up message", "steer from delegate"]);
+        continued.OfType<AssistantAgentMessage>().Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task IsRunning_IsTrueForEntireRunLifecycle()
     {
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
