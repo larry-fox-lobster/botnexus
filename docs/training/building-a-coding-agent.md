@@ -206,10 +206,10 @@ public interface IAgentTool
 | Tool | Name | Purpose |
 |---|---|---|
 | `ReadTool` | `read` | Read files/directories (2000 line limit, image support) |
-| `ListDirectoryTool` | `ls` | List directory contents (500 entries, flat listing) |
+| `ListDirectoryTool` | `ls` | List directory contents (500 entries, 2 levels deep) |
 | `WriteTool` | `write` | Write complete files (creates parent dirs) |
 | `EditTool` | `edit` | Surgical edits with exact + fuzzy matching |
-| `ShellTool` | `bash` | Execute shell commands (120s timeout, process tree kill) |
+| `ShellTool` | `bash` | Execute shell commands (configurable timeout, default 600s, process tree kill) |
 | `GlobTool` | `find` | Glob pattern file matching (1000 results) |
 | `GrepTool` | `grep` | Regex search with context lines (100 matches) |
 

@@ -230,7 +230,8 @@
    │    c. Call ILlmProvider.ChatAsync                    │
    │    d. Record metrics                                 │
    │    e. Add response to session history                │
-   │    f. If tool calls: execute via ToolRegistry        │
+   │    f. If tool calls: validate args (ToolCallValidator),│
+   │       then execute via ToolRegistry                   │
    │    g. Add tool results to history                    │
    │    h. Continue loop if more tools needed             │
    │ 6. Save session to disk                              │

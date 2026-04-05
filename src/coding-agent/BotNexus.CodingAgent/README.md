@@ -145,14 +145,14 @@ range: 1-50
 
 ### ls
 
-**Purpose**: List directory entries in a flat sorted listing.
+**Purpose**: List directory entries up to 2 levels deep in a sorted listing.
 
 **Parameters**:
 - `path` (string, optional): Directory path relative to working directory
 - `limit` (integer, optional): Maximum number of entries to return (default: 500)
 
 **Output**:
-- Flat sorted directory listing with file names and sizes
+- Sorted directory listing up to 2 levels deep with file names and sizes
 - Respects `.gitignore` patterns
 
 **Example**:

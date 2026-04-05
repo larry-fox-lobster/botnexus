@@ -94,7 +94,7 @@ The CodingAgent ships with seven tools. Six of them are scoped to the working di
 | Tool name | Class | Registered as | Purpose |
 |-----------|-------|---------------|---------|
 | read | `ReadTool` | `"read"` | Read files and directories with line numbers |
-| ls | `ListDirectoryTool` | `"ls"` | List directory entries in a flat sorted listing |
+| ls | `ListDirectoryTool` | `"ls"` | List directory entries up to 2 levels deep |
 | write | `WriteTool` | `"write"` | Write complete files (full replacement) |
 | edit | `EditTool` | `"edit"` | Surgical find-and-replace edits with fuzzy matching |
 | bash | `ShellTool` | `"bash"` | Shell command execution (Windows: PowerShell, Unix: bash) |
@@ -113,7 +113,7 @@ private static IReadOnlyList<IAgentTool> CreateTools(
         new ListDirectoryTool(workingDirectory),
         new WriteTool(workingDirectory),
         new EditTool(workingDirectory),
-        new ShellTool(),
+        new ShellTool(_defaultTimeoutSeconds),  // Phase 5: pass configured timeout
         new GlobTool(workingDirectory),
         new GrepTool(workingDirectory)
     };
@@ -125,7 +125,7 @@ private static IReadOnlyList<IAgentTool> CreateTools(
 }
 ```
 
-> Note: `ShellTool()` takes **no** `workingDirectory` parameter. All other tools (`ReadTool`, `ListDirectoryTool`, `WriteTool`, `EditTool`, `GlobTool`, `GrepTool`) receive it for path containment.
+> Note: `ShellTool(defaultTimeoutSeconds?)` now accepts an optional timeout parameter (Phase 5). All other tools receive `workingDirectory` for path containment.
 
 ### `read` — Read files and directories
 
@@ -169,24 +169,41 @@ private static IReadOnlyList<IAgentTool> CreateTools(
 
 ### `bash` — Shell command execution
 
-**Parameters:** `command` (required), `timeout` (optional, default 120s)
+**Parameters (Phase 5):** `command` (required), `timeout` (optional, overrides default)
 
 **Platform behavior (Phase 4):**
 - **Windows:** Prefers Git Bash if available; falls back to PowerShell only if Git Bash is not found (`FindBashExecutable` detects `bash.exe` in PATH)
 - **Unix:** Executes via `/bin/bash -lc`
 
-**Output format:**
+**Output format (Phase 5):**
 ```
-Exit Code: 0
---- STDOUT ---
-Hello world
---- STDERR ---
-
+[output truncated — showing last 100 lines of 5000]
+... (last 100 lines of output) ...
 ```
 
-**Limits:** Output capped at 50 * 1024 bytes (51,200 bytes, aligned with TypeScript implementation). Process tree killed on timeout. Truncation appends `[Output truncated at N bytes]` or `[Output truncated at N lines]` suffix.
+**Output behavior — Phase 5 changes:**
+- **TAIL truncation:** Output is truncated at the **tail** (keeps last lines instead of first). This preserves errors and results which are typically at the end.
+- **Truncation notice:** Appears at the top of output as `[output truncated — showing last N lines of TOTAL]`
+- **Limits:** Capped at 50 * 1024 bytes (51,200 bytes, aligned with TypeScript implementation) or 2,000 lines, whichever hits first.
 
-**Cancellation handling:** `ShellTool` distinguishes explicit cancellation from timeout. When the caller's `CancellationToken` fires (e.g., user presses Ctrl+C), the running process is killed and the result returns `"Command cancelled."` with any partial output collected so far. Timeout expiry is reported separately as `"Command timed out after N seconds."` — both paths capture partial output and set `IsError: true`.
+**Timeout configuration — Phase 5:**
+
+Default timeout is configured via `CodingAgentConfig.DefaultShellTimeoutSeconds` (defaults to 600 seconds):
+
+```csharp
+// In config.json or via CodingAgentConfig
+{
+  "defaultShellTimeoutSeconds": 600
+}
+
+// Per-call override via tool argument
+{
+  "command": "npm run build",
+  "timeout": 1800  // 30 minutes for this command
+}
+```
+
+**Cancellation handling:** `ShellTool` distinguishes explicit cancellation from timeout. When the caller's `CancellationToken` fires (e.g., user presses Ctrl+C), the running process is killed and the result returns `"Command cancelled."` with any partial output collected so far. Timeout expiry is reported separately as `"Command timed out after N seconds."` — both paths capture partial output (last lines) and set `IsError: true`.
 
 ### `grep` — Regex search
 
@@ -199,6 +216,76 @@ Hello world
 **Parameters:** `pattern` (glob, required), `path` (base directory), `limit` (max results, default 1000)
 
 **Features:** Uses `Microsoft.Extensions.FileSystemGlobbing`. Filters through `.gitignore` rules. Returns sorted relative paths.
+
+## ListDirectory — 2 levels deep (Phase 5)
+
+**Parameters:** `path` (optional, default `.`), `limit` (optional, default 500)
+
+**Output format (Phase 5):**
+```
+directory/
+├── file1.txt
+├── file2.txt
+├── subdir/
+│   ├── nested1.txt
+│   └── nested2.txt
+│── another/
+│   ├── file3.txt
+│   └── deeper/
+│       └── (not shown — max 2 levels)
+```
+
+**Depth:** Shows children (level 1) and grandchildren (level 2). Stops at level 2 to avoid overwhelming output. Directories at level 2 are marked but their contents are not shown.
+
+**Byte limit (Phase 5):** Output is capped at 50 * 1024 bytes (51,200 bytes). If the limit is reached, a truncation notice is appended.
+
+**Why Phase 5:** One level of nesting is insufficient for understanding directory structure (you see files but not substructure). Two levels provides enough context without becoming unwieldy.
+
+> **Key takeaway:** `ListDirectoryTool` now shows better structure at a glance. Use it to explore project layout before diving into specific files.
+
+## Context file discovery — ancestor walk (Phase 5)
+
+`ContextFileDiscovery` walks from the current working directory up to the git root (or filesystem root) looking for agent context files.
+
+**Discovery order:**
+1. Check `{directory}/.github/copilot-instructions.md`
+2. Check `{directory}/AGENTS.md`
+3. Move to parent directory
+4. Repeat until git root or filesystem root
+
+**Files discovered:**
+- `.github/copilot-instructions.md` — Copilot-specific instructions (takes precedence)
+- `AGENTS.md` — Project-level agent instructions
+
+**Example — monorepo structure:**
+
+```
+project/                                    (git root)
+├── .git/
+├── .github/
+│   └── copilot-instructions.md             (org-level)
+├── AGENTS.md                               (org-level)
+└── services/
+    └── api/
+        ├── .github/
+        │   └── copilot-instructions.md     (project-level ← found first)
+        ├── AGENTS.md                       (project-level ← found first)
+        └── src/
+```
+
+When running from `services/api/src/`:
+1. Check `services/api/src/.github/copilot-instructions.md` — not found
+2. Check `services/api/src/AGENTS.md` — not found
+3. Move to `services/api/`
+4. Check `services/api/.github/copilot-instructions.md` — **found!** ← returned
+5. Check `services/api/AGENTS.md` — **found!** ← returned
+6. Stop (both kinds found)
+
+**Budget:** Discovery is limited to 16 KB total content (across all found files). If budget is exhausted, remaining files are skipped. Truncated content appends `[truncated]` marker.
+
+**Why Phase 5:** Monorepos have project-level and org-level context. Walking the hierarchy ensures agents get the most relevant and specific context first.
+
+> **Key takeaway:** Place `AGENTS.md` and `.github/copilot-instructions.md` at your project level (or org root) for automatic discovery. Hierarchy is respected — closest to cwd wins.
 
 > **Key takeaway:** Tools implement `IAgentTool` and contribute to the system prompt via `GetPromptSnippet()` and `GetPromptGuidelines()`. The `ShellTool` is intentionally directory-agnostic — shell commands control their own working directory.
 

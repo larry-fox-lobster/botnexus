@@ -1,23 +1,25 @@
 # Context File Discovery
 
-Project context files — README, copilot-instructions, and docs — help the LLM understand the codebase before writing code. BotNexus discovers and injects these automatically into the system prompt. This document explains the discovery process, prioritization order, and token budget management.
+Project context files — copilot-instructions, AGENTS.md, and project-specific guidance — help the LLM understand the codebase before writing code. BotNexus discovers and injects these automatically into the system prompt. This document explains the discovery process, ancestor walk, and token budget management.
 
 ## Overview
 
-When you create a coding agent, the `SystemPromptBuilder` asks: *"What files in this project should the agent know about?"* The answer comes from `ContextFileDiscovery` — an automatic, non-interactive process that scans the working directory, extracts relevant files, and fits them into a token budget.
+When you create a coding agent, the `SystemPromptBuilder` asks: *"What files in this project should the agent know about?"* The answer comes from `ContextFileDiscovery` — an automatic, non-interactive process that walks from the working directory up to the git root, discovers context files at each level, and fits them into a token budget.
 
 ```
-Working Directory
+Working Directory (cwd)
         │
-        ├── .github/copilot-instructions.md  ◄─── Priority 1 (highest)
-        ├── README.md                          ◄─── Priority 2
-        └── docs/
-             ├── *.md (up to 5 files)           ◄─── Priority 3+
-             └── other files (ignored)
+        ├── .github/copilot-instructions.md  ◄─── Check at each level
+        ├── AGENTS.md                          ◄─── Check at each level
+        ├── .botnexus-agent/AGENTS.md          ◄─── Check at each level
+        │
+        ▲ Walk upward to parent directories
+        │
+Git Root (stop here)
               ↓
         ContextFileDiscovery.DiscoverAsync()
               ↓
-        [Scan for files, fit to budget, truncate if needed]
+        [Walk ancestors, collect files, fit to budget]
               ↓
         IReadOnlyList<PromptContextFile>
               ↓
@@ -25,6 +27,8 @@ Working Directory
               ↓
         Agent system prompt sent to LLM
 ```
+
+**Phase 5 change:** Discovery now walks ancestor directories from `cwd` upward to the git root, checking for context files at each level. Closest (most specific) files win when the same kind is found at multiple levels.
 
 ## Discovery process
 
@@ -51,34 +55,47 @@ public static async Task<IReadOnlyList<PromptContextFile>> DiscoverAsync(
 - Working directory must exist on disk (returns empty list if not)
 - Non-existent files are skipped silently during iteration
 
-### Step 2: Build prioritized file list
+### Step 2: Ancestor walk and context file collection
 
-The discovery process looks for files in this order:
+The discovery process walks from the working directory upward to the git root, checking for context files at each level. The closest (most specific) file of each kind wins.
 
-1. `.github/copilot-instructions.md` — **Highest priority.** User-authored project-specific guidance.
-2. `README.md` — **High priority.** Foundational project documentation.
-3. `docs/*.md` — **Medium priority.** Up to 5 markdown files from the `docs/` directory, sorted alphabetically by filename.
+**Context file kinds checked at each directory level:**
+
+1. `.github/copilot-instructions.md` — User-authored project-specific guidance.
+2. `AGENTS.md` — Agent-specific instructions (Phase 5).
+3. `.botnexus-agent/AGENTS.md` — BotNexus-specific agent instructions (Phase 5).
 
 ```csharp
-var prioritizedFiles = new List<string>
+// EnumerateDiscoveryDirectories: walks cwd → parent → ... → git root
+private static IEnumerable<string> EnumerateDiscoveryDirectories(string cwd)
 {
-    Path.Combine(root, ".github", "copilot-instructions.md"),
-    Path.Combine(root, "README.md")
-};
+    var gitRoot = FindGitRoot(cwd);
+    var current = cwd;
+    while (true)
+    {
+        yield return current;
+        if (string.Equals(current, gitRoot ?? cwd, StringComparison.OrdinalIgnoreCase))
+            yield break;
+        var parent = Directory.GetParent(current)?.FullName;
+        if (string.IsNullOrWhiteSpace(parent) || string.Equals(parent, current, ...))
+            yield break;
+        current = parent;
+    }
+}
 
-var docsDirectory = Path.Combine(root, "docs");
-if (Directory.Exists(docsDirectory))
+// GetContextCandidates: files checked at each level
+private static IEnumerable<(string Kind, string Path)> GetContextCandidates(string directory)
 {
-    prioritizedFiles.AddRange(
-        Directory.EnumerateFiles(docsDirectory, "*.md", SearchOption.TopDirectoryOnly)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .Take(MaxDocsFiles));  // MaxDocsFiles = 5
+    yield return ("copilot-instructions", Path.Combine(directory, ".github", "copilot-instructions.md"));
+    yield return ("agents", Path.Combine(directory, "AGENTS.md"));
+    yield return ("botnexus-agent", Path.Combine(directory, ".botnexus-agent", "AGENTS.md"));
 }
 ```
 
 **Key points:**
-- Only `.md` files from `docs/` are considered (no subdirectories)
-- Files are sorted alphabetically, then limited to 5
+- Walks upward from `cwd` to git root (stops at `.git` boundary)
+- If no `.git` found, only checks `cwd`
+- Uses `seenFileKinds` to deduplicate — closest directory wins for each kind
 - If a file doesn't exist, it's skipped (no error)
 - If a file is empty or whitespace-only, it's skipped
 

@@ -283,11 +283,11 @@ On Windows, the tool checks for Git Bash at `C:\Program Files\Git\bin\bash.exe`.
 
 ### Timeout enforcement
 
-Every command has a configurable timeout (default: 120 seconds):
+Every command has a configurable timeout (default: 600 seconds):
 
 ```csharp
 // Tool parameters include:
-// "timeout" (optional, int) — seconds, default: 120
+// "timeout" (optional, int) — seconds, default: 600
 ```
 
 When a command exceeds its timeout:

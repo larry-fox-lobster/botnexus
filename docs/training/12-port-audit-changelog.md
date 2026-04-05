@@ -520,25 +520,29 @@ private const int MaxOutputBytes = 50 * 1024;  // 51,200 bytes
 **Example:**
 
 ```csharp
-// Phase 4 limits
+// Phase 4 limits (still apply in Phase 5)
 const int MaxOutputBytes = 50 * 1024;      // 51,200 bytes
 const int MaxOutputLines = 2000;            // lines (whichever hits first)
 
-// Line truncation suffix
-"[Output truncated at 51200 bytes]"  // marks where output was cut (bytes)
-"[Output truncated at 2000 lines]"   // marks where output was cut (lines)
+// Phase 4 truncation suffix (superseded in Phase 5)
+"[Output truncated at 51200 bytes]"  // Phase 4 format
+"[Output truncated at 2000 lines]"   // Phase 4 format
+
+// Phase 5 truncation notice (TAIL-based, appears at top of output)
+"[output truncated — showing last 100 lines of 5000]"
 ```
 
 **Your code — if you parse ShellTool output:**
 
 ```csharp
 // Output now consistently capped at 51,200 bytes
-// Truncated output includes "[Output truncated at ...]" suffix
+// Phase 5: truncation keeps TAIL (last lines), notice at top
+// Truncation notice format: "[output truncated — showing last N lines of TOTAL]"
 
 var output = shellResult.Content[0].Value;
-if (output.Contains("[Output truncated at"))
+if (output.Contains("[output truncated"))
 {
-    Console.WriteLine("Output was truncated");
+    Console.WriteLine("Output was truncated (showing tail)");
 }
 
 // No code changes needed — limits are transparent to consumers

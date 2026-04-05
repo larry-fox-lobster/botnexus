@@ -807,6 +807,30 @@ Optional OpenAI-compatible REST API (for external clients).
 
 ---
 
+### CodingAgent: CodingAgentConfig
+
+Configuration for the CodingAgent component (used when running BotNexus as a coding assistant). These settings are loaded from project-local `.botnexus-agent/config.json` or the global user config.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `DefaultShellTimeoutSeconds` | int? | 600 | Default timeout in seconds for shell command execution. Per-call `timeout` argument overrides this. Set to `null` for no timeout. |
+| `AllowedCommands` | list | `[]` | Allowlist of shell commands (empty = all allowed) |
+| `BlockedPaths` | list | `[]` | Paths the agent cannot read/write |
+
+**Shell timeout example:**
+
+```json
+{
+  "defaultShellTimeoutSeconds": 300,
+  "allowedCommands": [],
+  "blockedPaths": []
+}
+```
+
+**Note:** The `DefaultShellTimeoutSeconds` controls the CodingAgent's `bash` tool timeout. This is separate from `Tools.Exec.Timeout` which controls the Gateway's built-in shell tool. Set to `null` to allow unlimited execution time (process runs until the agent cancels it).
+
+---
+
 ## Hot Reload
 
 BotNexus monitors `~/.botnexus/config.json` for changes and applies most configuration updates **live** — no Gateway restart required. The `ConfigReloadOrchestrator` (a background service) uses `IOptionsMonitor` to detect changes, debounces rapid edits (500 ms), and applies updates to the appropriate subsystems.
