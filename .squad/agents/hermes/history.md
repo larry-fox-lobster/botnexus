@@ -538,3 +538,8 @@ All Sprints 1-2 foundation work completed by Farnsworth and Bender. Hermes ready
 - Added coverage for previously untested components with new suites: `InProcessIsolationStrategyTests`, `FileSessionStoreTests`, `DefaultAgentCommunicatorTests`, and `GatewayWebSocketHandlerTests`.
 - File-session persistence assertions now validate `.jsonl` and `.meta.json` behavior, filtering/listing contracts, and concurrent save/list integrity using isolated per-test store directories.
 - Quality gate after expansion: `dotnet build tests\BotNexus.Gateway.Tests\` and `dotnet test tests\BotNexus.Gateway.Tests\` passed (48/48).
+
+### 2026-04-05 — Gateway configuration subsystem test coverage
+- Added focused tests for FileAgentConfigurationSource covering empty directories, JSON mapping, relative SystemPromptFile loading, malformed JSON and validation skips with warnings, sub-agent ID merge behavior, and file-watch callbacks.
+- Added hosted-service tests for source aggregation, code-based shadowing precedence, config-change re-registration (add/modify/remove), watcher disposal on stop, and empty source handling.
+- Added AgentDescriptorValidator and GatewayOptions unit tests, and exposed Gateway internals to the Gateway test assembly via InternalsVisibleTo for direct validation of internal configuration components.
