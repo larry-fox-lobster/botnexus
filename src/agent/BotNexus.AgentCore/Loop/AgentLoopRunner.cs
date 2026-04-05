@@ -2,6 +2,7 @@ using BotNexus.AgentCore.Configuration;
 using BotNexus.AgentCore.Types;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
+using BotNexus.Providers.Core.Utilities;
 
 namespace BotNexus.AgentCore.Loop;
 
@@ -129,7 +130,10 @@ public static class AgentLoopRunner
         {
             var pendingMessages = followUpSeed.Count > 0
                 ? followUpSeed.ToList()
-                : (await GetMessagesAsync(config.GetSteeringMessages, cancellationToken).ConfigureAwait(false)).ToList();
+                : (config.SkipInitialSteeringPoll
+                    ? []
+                    : (await GetMessagesAsync(config.GetSteeringMessages, cancellationToken).ConfigureAwait(false)).ToList());
+            config = config with { SkipInitialSteeringPoll = false };
             followUpSeed = [];
 
             var hasMoreToolCalls = true;
@@ -170,14 +174,19 @@ public static class AgentLoopRunner
                     .ConfigureAwait(false);
 
                 var streamOptions = await BuildStreamOptionsAsync(config, cancellationToken).ConfigureAwait(false);
-                var stream = config.LlmClient.StreamSimple(config.Model, providerContext, streamOptions);
-                var assistantMessage = await StreamAccumulator.AccumulateAsync(stream, emit, cancellationToken)
+                var assistantMessage = await ExecuteWithRetryAsync(
+                        messages,
+                        config,
+                        providerContext,
+                        streamOptions,
+                        emit,
+                        cancellationToken)
                     .ConfigureAwait(false);
 
                 messages.Add(assistantMessage);
                 newMessages.Add(assistantMessage);
 
-                if (assistantMessage.FinishReason is StopReason.Error or StopReason.Aborted or StopReason.Refusal or StopReason.Sensitive)
+                if (assistantMessage.FinishReason is StopReason.Error or StopReason.Aborted)
                 {
                     await emit(new TurnEndEvent(assistantMessage, [], DateTimeOffset.UtcNow)).ConfigureAwait(false);
                     await emit(new AgentEndEvent(messages.Skip(runStartIndex).ToList(), DateTimeOffset.UtcNow)).ConfigureAwait(false);
@@ -260,5 +269,78 @@ public static class AgentLoopRunner
         }
 
         return await getMessages(cancellationToken).ConfigureAwait(false) ?? [];
+    }
+
+    private static async Task<AssistantAgentMessage> ExecuteWithRetryAsync(
+        List<AgentMessage> messages,
+        AgentLoopConfig config,
+        Context providerContext,
+        SimpleStreamOptions streamOptions,
+        Func<AgentEvent, Task> emit,
+        CancellationToken cancellationToken)
+    {
+        const int maxAttempts = 4;
+        var attempt = 0;
+        var backoffMs = 500;
+        var overflowRecovered = false;
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var stream = config.LlmClient.StreamSimple(config.Model, providerContext, streamOptions);
+                return await StreamAccumulator.AccumulateAsync(stream, emit, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ContextOverflowDetector.IsContextOverflow(ex) && !overflowRecovered)
+            {
+                overflowRecovered = true;
+                var compacted = CompactForOverflow(messages);
+                messages.Clear();
+                messages.AddRange(compacted);
+                var compactedProviderMessages = providerContext.Messages.Count <= 12
+                    ? providerContext.Messages
+                    : providerContext.Messages.Skip(providerContext.Messages.Count - Math.Max(8, providerContext.Messages.Count / 3)).ToList();
+                providerContext = providerContext with { Messages = compactedProviderMessages };
+                continue;
+            }
+            catch (Exception ex) when (IsTransientError(ex) && attempt < maxAttempts - 1)
+            {
+                await Task.Delay(backoffMs, cancellationToken).ConfigureAwait(false);
+                attempt++;
+                backoffMs *= 2;
+                continue;
+            }
+        }
+    }
+
+    private static IReadOnlyList<AgentMessage> CompactForOverflow(IReadOnlyList<AgentMessage> messages)
+    {
+        if (messages.Count <= 12)
+        {
+            return messages;
+        }
+
+        var keep = Math.Max(8, messages.Count / 3);
+        return messages.Skip(messages.Count - keep).ToList();
+    }
+
+    private static bool IsTransientError(Exception exception)
+    {
+        var message = exception.Message;
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        return message.Contains("rate limit", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("too many requests", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("temporarily unavailable", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("service unavailable", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("429", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("502", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("503", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("504", StringComparison.OrdinalIgnoreCase);
     }
 }

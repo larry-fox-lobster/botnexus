@@ -2,7 +2,6 @@ using BotNexus.AgentCore.Configuration;
 using BotNexus.AgentCore.Loop;
 using BotNexus.AgentCore.Types;
 using BotNexus.Providers.Core;
-using System.Runtime.ExceptionServices;
 
 namespace BotNexus.AgentCore;
 
@@ -30,7 +29,7 @@ public sealed class Agent
     private CancellationTokenSource? _cts;
     private TaskCompletionSource? _activeRun;
     private AgentStatus _status = AgentStatus.Idle;
-    private bool _suppressFollowUpDrainForNextRun;
+    private bool _skipInitialSteeringPollForNextRun;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Agent"/> class.
@@ -215,18 +214,23 @@ public sealed class Agent
     /// </remarks>
     public Task<IReadOnlyList<AgentMessage>> ContinueAsync(CancellationToken cancellationToken = default)
     {
-        var queued = DrainQueuedMessages();
-        if (queued.Count > 0)
-        {
-            return PromptAsync(queued, cancellationToken);
-        }
+        bool shouldDrainQueues;
 
         lock (_stateLock)
         {
-            if (_state.Messages.Count > 0 && _state.Messages[^1] is AssistantAgentMessage)
+            shouldDrainQueues = _state.Messages.Count > 0 && _state.Messages[^1] is AssistantAgentMessage;
+        }
+
+        if (shouldDrainQueues)
+        {
+            var queued = DrainQueuedMessages();
+            if (queued.Count > 0)
             {
-                throw new InvalidOperationException("Cannot continue when the last message is from the assistant.");
+                _skipInitialSteeringPollForNextRun = true;
+                return PromptAsync(queued, cancellationToken);
             }
+
+            throw new InvalidOperationException("Cannot continue when the last message is from the assistant.");
         }
 
         return RunAsync(
@@ -360,14 +364,6 @@ public sealed class Agent
     /// </remarks>
     public void Reset()
     {
-        CancellationTokenSource? cts;
-        lock (_lifecycleLock)
-        {
-            cts = _cts;
-            _status = AgentStatus.Idle;
-        }
-
-        cts?.Cancel();
         ClearAllQueues();
 
         lock (_stateLock)
@@ -424,11 +420,35 @@ public sealed class Agent
         }
         catch (OperationCanceledException) when (linkedCts.IsCancellationRequested)
         {
-            throw;
+            var abortedMessage = new AssistantAgentMessage(
+                Content: string.Empty,
+                FinishReason: BotNexus.Providers.Core.Models.StopReason.Aborted,
+                ErrorMessage: "Operation aborted",
+                Timestamp: DateTimeOffset.UtcNow);
+
+            lock (_stateLock)
+            {
+                _state.SetErrorMessage(abortedMessage.ErrorMessage);
+                var messages = _state.Messages.ToList();
+                messages.Add(abortedMessage);
+                _state.Messages = messages;
+            }
+
+            try
+            {
+                await HandleEventAsync(
+                        new AgentEndEvent([abortedMessage], DateTimeOffset.UtcNow),
+                        CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+            }
+
+            return [abortedMessage];
         }
         catch (Exception ex)
         {
-            var captured = ExceptionDispatchInfo.Capture(ex);
             var failureMessage = new AssistantAgentMessage(
                 Content: string.Empty,
                 FinishReason: BotNexus.Providers.Core.Models.StopReason.Error,
@@ -452,15 +472,17 @@ public sealed class Agent
             }
             catch
             {
-                // Preserve original exception semantics for callers.
             }
 
-            captured.Throw();
-            throw;
+            return [failureMessage];
         }
         finally
         {
             linkedCts.Dispose();
+            lock (_stateLock)
+            {
+                _state.SetIsRunning(false);
+            }
 
             lock (_lifecycleLock)
             {
@@ -488,8 +510,8 @@ public sealed class Agent
     {
         BotNexus.Providers.Core.Models.LlmModel model;
         BotNexus.Providers.Core.Models.ThinkingLevel? thinkingLevel;
-        var suppressFollowUpDrain = _suppressFollowUpDrainForNextRun;
-        _suppressFollowUpDrainForNextRun = false;
+        var skipInitialSteeringPoll = _skipInitialSteeringPollForNextRun;
+        _skipInitialSteeringPollForNextRun = false;
         lock (_stateLock)
         {
             model = _state.Model;
@@ -510,13 +532,12 @@ public sealed class Agent
             _options.TransformContext,
             _options.GetApiKey,
             BuildQueueDelegate(_steeringQueue, _options.GetSteeringMessages),
-            suppressFollowUpDrain
-                ? static _ => Task.FromResult<IReadOnlyList<AgentMessage>>([])
-                : BuildQueueDelegate(_followUpQueue, _options.GetFollowUpMessages),
+            BuildQueueDelegate(_followUpQueue, _options.GetFollowUpMessages),
             _options.ToolExecutionMode,
             _options.BeforeToolCall,
             _options.AfterToolCall,
-            generationSettings);
+            generationSettings,
+            skipInitialSteeringPoll);
     }
 
     private static SimpleStreamOptions CloneGenerationSettings(SimpleStreamOptions source)
@@ -553,11 +574,9 @@ public sealed class Agent
         var steering = _steeringQueue.Drain().ToList();
         if (steering.Count > 0)
         {
-            _suppressFollowUpDrainForNextRun = true;
             return steering;
         }
 
-        _suppressFollowUpDrainForNextRun = false;
         return _followUpQueue.Drain().ToList();
     }
 
@@ -587,16 +606,32 @@ public sealed class Agent
                     if (messageStart.Message is AssistantAgentMessage startingAssistant)
                     {
                         _state.SetStreamingMessage(startingAssistant);
+                        var startedMessages = _state.Messages.ToList();
+                        startedMessages.Add(startingAssistant);
+                        _state.Messages = startedMessages;
                     }
                     break;
                 case MessageUpdateEvent messageUpdate:
                     _state.SetStreamingMessage(messageUpdate.Message);
+                    if (_state.Messages.Count > 0 && _state.Messages[^1] is AssistantAgentMessage)
+                    {
+                        var updatedMessages = _state.Messages.ToList();
+                        updatedMessages[^1] = messageUpdate.Message;
+                        _state.Messages = updatedMessages;
+                    }
                     break;
                 case MessageEndEvent messageEnd:
                 {
                     if (messageEnd.Message is AssistantAgentMessage)
                     {
                         _state.SetStreamingMessage(null);
+                        if (_state.Messages.Count > 0 && _state.Messages[^1] is AssistantAgentMessage)
+                        {
+                            var finalizedMessages = _state.Messages.ToList();
+                            finalizedMessages[^1] = messageEnd.Message;
+                            _state.Messages = finalizedMessages;
+                            break;
+                        }
                     }
                     var messages = _state.Messages.ToList();
                     messages.Add(messageEnd.Message);
@@ -622,6 +657,10 @@ public sealed class Agent
                     break;
                 case AgentEndEvent:
                     _state.SetStreamingMessage(null);
+                    _state.SetIsRunning(false);
+                    break;
+                case AgentStartEvent:
+                    _state.SetIsRunning(true);
                     break;
             }
         }

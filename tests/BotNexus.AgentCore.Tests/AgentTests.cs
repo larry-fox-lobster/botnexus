@@ -117,7 +117,7 @@ public class AgentTests
     }
 
     [Fact]
-    public async Task ContinueAsync_WhenSteeringAndFollowUpQueued_DrainsSteeringBeforeFollowUp()
+    public async Task ContinueAsync_WhenSteeringAndFollowUpQueued_DrainsBothInSameRun()
     {
         using var provider = RegisterDefaultProvider();
         var agent = new Agent(TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api")));
@@ -129,11 +129,7 @@ public class AgentTests
         var firstContinue = await agent.ContinueAsync();
         firstContinue.OfType<UserMessage>().Select(message => message.Content)
             .Should().Contain("steer message")
-            .And.NotContain("follow-up message");
-
-        var secondContinue = await agent.ContinueAsync();
-        secondContinue.OfType<UserMessage>().Select(message => message.Content)
-            .Should().ContainSingle(message => message == "follow-up message");
+            .And.Contain("follow-up message");
     }
 
     [Fact]
@@ -170,19 +166,113 @@ public class AgentTests
             return Task.CompletedTask;
         });
 
-        var action = () => agent.PromptAsync("boom");
-        await action.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("provider exploded");
+        var runResult = await agent.PromptAsync("boom");
 
         var failure = agent.State.Messages.Last().Should().BeOfType<AssistantAgentMessage>().Subject;
         failure.Content.Should().BeEmpty();
         failure.FinishReason.Should().Be(BotNexus.Providers.Core.Models.StopReason.Error);
         failure.ErrorMessage.Should().Be("provider exploded");
+        runResult.Should().ContainSingle().Which.Should().BeEquivalentTo(failure);
         agent.State.ErrorMessage.Should().Be("provider exploded");
         agentEnd.Should().NotBeNull();
         agentEnd!.Messages.Should().ContainSingle()
             .Which.Should().BeOfType<AssistantAgentMessage>()
             .Which.ErrorMessage.Should().Be("provider exploded");
+    }
+
+    [Fact]
+    public async Task PromptAsync_WhenCancelled_EmitsAbortedAgentEndAndDoesNotThrow()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var provider = RegisterBlockingProvider(release);
+        var agent = new Agent(TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api")));
+        AgentEndEvent? agentEnd = null;
+        using var _ = agent.Subscribe((@event, _) =>
+        {
+            if (@event is AgentEndEvent endEvent)
+            {
+                agentEnd = endEvent;
+            }
+
+            return Task.CompletedTask;
+        });
+
+        var runTask = agent.PromptAsync("cancel me");
+        SpinWait.SpinUntil(() => agent.Status == AgentStatus.Running, TimeSpan.FromSeconds(2)).Should().BeTrue();
+        await agent.AbortAsync();
+        release.TrySetResult();
+
+        var result = await runTask;
+        result.Should().ContainSingle();
+        var aborted = result[0].Should().BeOfType<AssistantAgentMessage>().Subject;
+        aborted.FinishReason.Should().Be(BotNexus.Providers.Core.Models.StopReason.Aborted);
+        agentEnd.Should().NotBeNull();
+        agentEnd!.Messages.Should().ContainSingle().Which.Should().BeOfType<AssistantAgentMessage>()
+            .Which.FinishReason.Should().Be(BotNexus.Providers.Core.Models.StopReason.Aborted);
+    }
+
+    [Fact]
+    public async Task ContinueAsync_WhenLastMessageIsNotAssistant_DoesNotDrainQueuesBeforeRun()
+    {
+        using var provider = RegisterDefaultProvider();
+        var agent = new Agent(TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api")));
+        await agent.PromptAsync("seed");
+
+        agent.State.Messages = [new UserMessage("manual user")];
+        agent.Steer(new UserMessage("steer message"));
+        agent.FollowUp(new UserMessage("follow-up message"));
+
+        var continued = await agent.ContinueAsync();
+        continued.OfType<UserMessage>().Select(message => message.Content)
+            .Should().Contain("steer message");
+    }
+
+    [Fact]
+    public async Task IsRunning_IsTrueForEntireRunLifecycle()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var provider = RegisterBlockingProvider(release);
+        var agent = new Agent(TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api")));
+
+        var runTask = agent.PromptAsync("run");
+        SpinWait.SpinUntil(() => agent.State.IsRunning, TimeSpan.FromSeconds(2)).Should().BeTrue();
+        agent.State.IsStreaming.Should().BeFalse();
+
+        release.TrySetResult();
+        await runTask;
+        agent.State.IsRunning.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PromptAsync_AddsPartialAssistantMessageOnMessageStart()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var provider = RegisterProviderWithDelayedCompletion(release);
+        var agent = new Agent(TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api")));
+
+        var runTask = agent.PromptAsync("stream");
+        SpinWait.SpinUntil(() => agent.State.StreamingMessage is not null, TimeSpan.FromSeconds(2)).Should().BeTrue();
+        agent.State.Messages.Last().Should().BeOfType<AssistantAgentMessage>();
+
+        release.TrySetResult();
+        await runTask;
+    }
+
+    [Fact]
+    public async Task Reset_DoesNotCancelActiveRun()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var provider = RegisterBlockingProvider(release);
+        var agent = new Agent(TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api")));
+
+        var runTask = agent.PromptAsync("running");
+        SpinWait.SpinUntil(() => agent.Status == AgentStatus.Running, TimeSpan.FromSeconds(2)).Should().BeTrue();
+
+        agent.Reset();
+        runTask.IsCompleted.Should().BeFalse();
+
+        release.TrySetResult();
+        await runTask;
     }
 
     private static IDisposable RegisterDefaultProvider()
@@ -211,6 +301,38 @@ public class AgentTests
 
                     stream.End(await completion.GetResultAsync().ConfigureAwait(false));
                 });
+                return stream;
+            });
+
+        return TestHelpers.RegisterProvider(provider);
+    }
+
+    private static IDisposable RegisterProviderWithDelayedCompletion(TaskCompletionSource release)
+    {
+        var provider = new TestApiProvider(
+            "test-api",
+            simpleStreamFactory: (_, _, _) =>
+            {
+                var stream = new LlmStream();
+                var message = new BotNexus.Providers.Core.Models.AssistantMessage(
+                    Content: [new BotNexus.Providers.Core.Models.TextContent("assistant")],
+                    Api: "test-api",
+                    Provider: "test-provider",
+                    ModelId: "test-model",
+                    Usage: BotNexus.Providers.Core.Models.Usage.Empty(),
+                    StopReason: BotNexus.Providers.Core.Models.StopReason.Stop,
+                    ErrorMessage: null,
+                    ResponseId: "resp-start",
+                    Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+
+                _ = Task.Run(async () =>
+                {
+                    stream.Push(new StartEvent(message));
+                    await release.Task.ConfigureAwait(false);
+                    stream.Push(new DoneEvent(BotNexus.Providers.Core.Models.StopReason.Stop, message));
+                    stream.End(message);
+                });
+
                 return stream;
             });
 

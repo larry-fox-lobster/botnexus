@@ -83,6 +83,11 @@ public class AgentState
     }
 
     /// <summary>
+    /// Gets a value indicating whether an agent run is currently active.
+    /// </summary>
+    public bool IsRunning { get; private set; }
+
+    /// <summary>
     /// Gets a value indicating whether streaming is currently active.
     /// </summary>
     /// <remarks>
@@ -116,6 +121,12 @@ public class AgentState
     /// Cleared at the start of each new run.
     /// </remarks>
     public string? ErrorMessage { get; private set; }
+
+    /// <summary>
+    /// Sets whether an agent run is currently active.
+    /// </summary>
+    /// <param name="isRunning">True when a run is active.</param>
+    public void SetIsRunning(bool isRunning) => IsRunning = isRunning;
 
     /// <summary>
     /// Sets the current streaming message.
