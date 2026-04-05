@@ -138,4 +138,40 @@ public sealed class SystemPromptBuilderTests
         prompt.Should().Contain("Appended prompt");
         prompt.Should().NotContain("## Environment");
     }
+
+    [Fact]
+    public void Build_WithOnlyBashTool_AddsBashFileOperationsGuideline()
+    {
+        var context = new SystemPromptContext(
+            WorkingDirectory: @"C:\repo",
+            GitBranch: "main",
+            GitStatus: "clean",
+            PackageManager: "dotnet",
+            ToolNames: ["bash"],
+            Skills: [],
+            CustomInstructions: null,
+            CurrentDateTime: new DateTimeOffset(2026, 4, 6, 10, 30, 0, TimeSpan.Zero));
+
+        var prompt = _builder.Build(context);
+
+        prompt.Should().Contain("Use bash for file operations like ls, rg, find.");
+    }
+
+    [Fact]
+    public void Build_WithBashAndDiscoveryTools_PrefersDedicatedToolsGuideline()
+    {
+        var context = new SystemPromptContext(
+            WorkingDirectory: @"C:\repo",
+            GitBranch: "main",
+            GitStatus: "clean",
+            PackageManager: "dotnet",
+            ToolNames: ["bash", "grep", "glob"],
+            Skills: [],
+            CustomInstructions: null,
+            CurrentDateTime: new DateTimeOffset(2026, 4, 6, 10, 30, 0, TimeSpan.Zero));
+
+        var prompt = _builder.Build(context);
+
+        prompt.Should().Contain("Prefer grep/find/ls tools over bash for file exploration (faster, respects .gitignore).");
+    }
 }

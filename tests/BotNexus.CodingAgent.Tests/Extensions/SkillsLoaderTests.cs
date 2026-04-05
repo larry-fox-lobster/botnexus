@@ -65,6 +65,62 @@ public sealed class SkillsLoaderTests : IDisposable
     }
 
     [Fact]
+    public void LoadSkills_WhenNameDoesNotMatchParentDirectory_SkipsSkill()
+    {
+        var skillDirectory = Path.Combine(_tempDirectory, ".botnexus-agent", "skills", "actual-name");
+        Directory.CreateDirectory(skillDirectory);
+        File.WriteAllText(Path.Combine(skillDirectory, "SKILL.md"), """
+            ---
+            name: different-name
+            description: Invalid
+            ---
+            Body
+            """);
+
+        var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
+
+        skills.Should().NotContain(skill => skill.Contains("name: different-name", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LoadSkills_WhenNameExceedsMaxLength_SkipsSkill()
+    {
+        var longName = new string('a', 65);
+        var skillDirectory = Path.Combine(_tempDirectory, ".botnexus-agent", "skills", longName);
+        Directory.CreateDirectory(skillDirectory);
+        File.WriteAllText(Path.Combine(skillDirectory, "SKILL.md"), $"""
+            ---
+            name: {longName}
+            description: Too long
+            ---
+            Body
+            """);
+
+        var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
+
+        skills.Should().NotContain(skill => skill.Contains($"name: {longName}", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LoadSkills_WhenDescriptionExceedsMaxLength_SkipsSkill()
+    {
+        var skillDirectory = Path.Combine(_tempDirectory, ".botnexus-agent", "skills", "long-description");
+        Directory.CreateDirectory(skillDirectory);
+        var longDescription = new string('d', 1025);
+        File.WriteAllText(Path.Combine(skillDirectory, "SKILL.md"), $"""
+            ---
+            name: long-description
+            description: {longDescription}
+            ---
+            Body
+            """);
+
+        var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
+
+        skills.Should().NotContain(skill => skill.Contains("name: long-description", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void LoadSkills_WhenDuplicateNamesExist_KeepsFirstOccurrence()
     {
         var firstDirectory = Path.Combine(_tempDirectory, ".botnexus-agent", "skills", "duplicate-skill");
