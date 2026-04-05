@@ -230,13 +230,16 @@ internal static partial class AnthropicMessageConverter
                     break;
 
                 case ToolCallContent toolCall:
-                    blocks.Add(new Dictionary<string, object?>
+                    var toolUseBlock = new Dictionary<string, object?>
                     {
                         ["type"] = "tool_use",
                         ["id"] = toolCall.Id,
                         ["name"] = isOAuthToken ? ToClaudeCodeName(toolCall.Name) : toolCall.Name,
                         ["input"] = toolCall.Arguments
-                    });
+                    };
+                    if (toolCall.ThoughtSignature is not null)
+                        toolUseBlock["signature"] = toolCall.ThoughtSignature;
+                    blocks.Add(toolUseBlock);
                     break;
             }
         }

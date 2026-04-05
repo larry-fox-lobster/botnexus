@@ -235,6 +235,45 @@ public class AnthropicProviderAlignmentTests
     }
 
     [Fact]
+    public async Task Stream_ToolUseBlock_IncludesThoughtSignatureWhenPresent()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var assistant = new AssistantMessage(
+            Content:
+            [
+                new ToolCallContent("toolu_01", "search", new Dictionary<string, object?> { ["query"] = "hello" }, "sig-tool")
+            ],
+            Api: model.Api,
+            Provider: model.Provider,
+            ModelId: model.Id,
+            Usage: Usage.Empty(),
+            StopReason: StopReason.ToolUse,
+            ErrorMessage: null,
+            ResponseId: "resp_1",
+            Timestamp: timestamp);
+        var context = new Context(
+            SystemPrompt: "system",
+            Messages: [new UserMessage(new UserMessageContent("hello"), timestamp), assistant]);
+
+        var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        var toolUse = body.RootElement.GetProperty("messages")[1].GetProperty("content")[0];
+        toolUse.GetProperty("type").GetString().Should().Be("tool_use");
+        toolUse.GetProperty("signature").GetString().Should().Be("sig-tool");
+    }
+
+    [Fact]
     public async Task Stream_ReasoningModelWithThinkingDisabled_SendsDisabledThinkingConfig()
     {
         var handler = new RecordingHandler(_ => SseResponse("""
