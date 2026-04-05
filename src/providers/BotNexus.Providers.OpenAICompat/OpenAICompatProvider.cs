@@ -266,13 +266,7 @@ public sealed class OpenAICompatProvider(HttpClient httpClient) : IApiProvider
         }
 
         // Determine stop reason
-        var stopReason = finishReason switch
-        {
-            "stop" => StopReason.Stop,
-            "length" => StopReason.Length,
-            "tool_calls" => StopReason.ToolUse,
-            _ => toolCallBuilders.Count > 0 ? StopReason.ToolUse : StopReason.Stop,
-        };
+        var mappedStop = MapStopReason(finishReason, toolCallBuilders.Count > 0);
 
         // Build final message
         var finalContent = BuildFinalContent(contentBuilder, toolCallBuilders);
@@ -282,13 +276,13 @@ public sealed class OpenAICompatProvider(HttpClient httpClient) : IApiProvider
             Provider: model.Provider,
             ModelId: model.Id,
             Usage: output.Usage,
-            StopReason: stopReason,
-            ErrorMessage: null,
+            StopReason: mappedStop.StopReason,
+            ErrorMessage: mappedStop.ErrorMessage,
             ResponseId: responseId,
             Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
         );
 
-        stream.Push(new DoneEvent(stopReason, finalMessage));
+        stream.Push(new DoneEvent(mappedStop.StopReason, finalMessage));
         stream.End(finalMessage);
     }
 
@@ -351,8 +345,29 @@ public sealed class OpenAICompatProvider(HttpClient httpClient) : IApiProvider
             }
             body["tools"] = ToNode(tools);
         }
+        else if (HasToolHistory(context.Messages))
+        {
+            body["tools"] = ToNode(Array.Empty<object>());
+        }
 
         return body;
+    }
+
+    private static bool HasToolHistory(IReadOnlyList<Message> messages)
+    {
+        foreach (var message in messages)
+        {
+            if (message is ToolResultMessage)
+                return true;
+
+            if (message is AssistantMessage assistant &&
+                assistant.Content.Any(block => block is ToolCallContent))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static JsonNode? ToNode<T>(T value)
@@ -360,6 +375,20 @@ public sealed class OpenAICompatProvider(HttpClient httpClient) : IApiProvider
         var element = JsonSerializer.SerializeToElement(value);
         return JsonNode.Parse(element.GetRawText());
     }
+
+    private static (StopReason StopReason, string? ErrorMessage) MapStopReason(string? reason, bool hasToolCalls)
+        => reason switch
+        {
+            "stop" => (StopReason.Stop, null),
+            "end" => (StopReason.Stop, null),
+            "length" => (StopReason.Length, null),
+            "function_call" => (StopReason.ToolUse, null),
+            "tool_calls" => (StopReason.ToolUse, null),
+            "content_filter" => (StopReason.Error, "Provider finish_reason: content_filter"),
+            "network_error" => (StopReason.Error, "Provider finish_reason: network_error"),
+            null => hasToolCalls ? (StopReason.ToolUse, null) : (StopReason.Stop, null),
+            _ => (StopReason.Error, $"Provider finish_reason: {reason}")
+        };
 
     private static List<Dictionary<string, object?>> BuildMessages(
         Context context, OpenAICompletionsCompat compat, LlmModel model)
