@@ -17,6 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace BotNexus.Gateway.Extensions;
 
@@ -69,6 +70,57 @@ public static class GatewayServiceCollectionExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Loads platform configuration from <c>~/.botnexus/config.json</c> and maps supported settings
+    /// into Gateway service registration.
+    /// </summary>
+    /// <param name="services">Service collection.</param>
+    /// <param name="configPath">Optional explicit path to platform config.</param>
+    public static IServiceCollection AddPlatformConfiguration(this IServiceCollection services, string? configPath = null)
+    {
+        var resolvedConfigPath = string.IsNullOrWhiteSpace(configPath)
+            ? PlatformConfigLoader.DefaultConfigPath
+            : Path.GetFullPath(configPath);
+        var configDirectory = Path.GetDirectoryName(resolvedConfigPath) ?? PlatformConfigLoader.DefaultConfigDirectory;
+
+        PlatformConfigLoader.EnsureConfigDirectory(configDirectory);
+        var config = PlatformConfigLoader.LoadAsync(resolvedConfigPath).GetAwaiter().GetResult();
+        var errors = PlatformConfigLoader.Validate(config);
+        if (errors.Count > 0)
+            throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), errors);
+
+        services.AddSingleton(config);
+
+        if (!string.IsNullOrWhiteSpace(config.DefaultAgentId))
+        {
+            services.PostConfigure<GatewayOptions>(options => options.DefaultAgentId = config.DefaultAgentId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(config.SessionsDirectory))
+        {
+            var sessionsPath = ResolveConfiguredPath(configDirectory, config.SessionsDirectory);
+            Directory.CreateDirectory(sessionsPath);
+            services.Replace(ServiceDescriptor.Singleton<ISessionStore>(serviceProvider =>
+                new FileSessionStore(
+                    sessionsPath,
+                    serviceProvider.GetRequiredService<ILogger<FileSessionStore>>())));
+        }
+
+        if (!string.IsNullOrWhiteSpace(config.AgentsDirectory))
+        {
+            var agentsPath = ResolveConfiguredPath(configDirectory, config.AgentsDirectory);
+            services.RemoveAll<IAgentConfigurationSource>();
+            services.AddFileAgentConfiguration(agentsPath);
+        }
+
+        return services;
+    }
+
+    private static string ResolveConfiguredPath(string configDirectory, string configuredPath)
+        => Path.IsPathRooted(configuredPath)
+            ? Path.GetFullPath(configuredPath)
+            : Path.GetFullPath(Path.Combine(configDirectory, configuredPath));
 
     /// <summary>
     /// Sets the default routed agent through options configuration.
