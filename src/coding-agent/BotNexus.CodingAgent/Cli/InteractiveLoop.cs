@@ -6,6 +6,7 @@ using BotNexus.CodingAgent.Extensions;
 using BotNexus.CodingAgent.Session;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Registry;
+using ThinkingLevel = BotNexus.Providers.Core.Models.ThinkingLevel;
 
 namespace BotNexus.CodingAgent.Cli;
 
@@ -254,6 +255,7 @@ public sealed class InteractiveLoop
             Console.WriteLine("  /login        Authenticate with GitHub Copilot (OAuth device flow)");
             Console.WriteLine("  /logout       Remove saved credentials");
             Console.WriteLine("  /model <name> Switch model");
+            Console.WriteLine("  /thinking [level] Show or set thinking level (off|minimal|low|medium|high|xhigh)");
             Console.WriteLine("  /session      Show session info");
             Console.WriteLine("  /clear        Reset conversation");
             Console.WriteLine("  /quit         Exit");
@@ -283,6 +285,37 @@ public sealed class InteractiveLoop
             }
 
             output.WriteSessionInfo(updated);
+            return updated;
+        }
+
+        if (input.Equals("/thinking", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"Thinking level: {FormatThinkingLevel(agent.State.ThinkingLevel)}");
+            return session;
+        }
+
+        if (input.StartsWith("/thinking ", StringComparison.OrdinalIgnoreCase))
+        {
+            var rawLevel = input[10..].Trim();
+            if (!TryParseThinkingLevel(rawLevel, out var thinkingLevel))
+            {
+                output.WriteError("Invalid thinking level. Valid values: off, minimal, low, medium, high, xhigh.");
+                return session;
+            }
+
+            var previousLevel = agent.State.ThinkingLevel;
+            agent.State.ThinkingLevel = thinkingLevel;
+            var updated = UpdateSessionSnapshot(session, agent);
+            if (previousLevel != thinkingLevel)
+            {
+                updated = await sessionManager.WriteMetadataAsync(
+                        updated,
+                        "thinking_level_change",
+                        $"{FormatThinkingLevel(previousLevel)} → {FormatThinkingLevel(thinkingLevel)}")
+                    .ConfigureAwait(false);
+            }
+
+            Console.WriteLine($"Thinking level set to {FormatThinkingLevel(thinkingLevel)}.");
             return updated;
         }
 
@@ -334,6 +367,48 @@ public sealed class InteractiveLoop
                 ["Editor-Plugin-Version"] = "copilot-chat/0.35.0",
                 ["Copilot-Integration-Id"] = "vscode-chat"
             });
+    }
+
+    private static bool TryParseThinkingLevel(string value, out ThinkingLevel? thinkingLevel)
+    {
+        switch (value.Trim().ToLowerInvariant())
+        {
+            case "off":
+                thinkingLevel = null;
+                return true;
+            case "minimal":
+                thinkingLevel = ThinkingLevel.Minimal;
+                return true;
+            case "low":
+                thinkingLevel = ThinkingLevel.Low;
+                return true;
+            case "medium":
+                thinkingLevel = ThinkingLevel.Medium;
+                return true;
+            case "high":
+                thinkingLevel = ThinkingLevel.High;
+                return true;
+            case "xhigh":
+                thinkingLevel = ThinkingLevel.ExtraHigh;
+                return true;
+            default:
+                thinkingLevel = null;
+                return false;
+        }
+    }
+
+    private static string FormatThinkingLevel(ThinkingLevel? level)
+    {
+        return level switch
+        {
+            null => "off",
+            ThinkingLevel.Minimal => "minimal",
+            ThinkingLevel.Low => "low",
+            ThinkingLevel.Medium => "medium",
+            ThinkingLevel.High => "high",
+            ThinkingLevel.ExtraHigh => "xhigh",
+            _ => "off"
+        };
     }
 
 }

@@ -33,6 +33,61 @@ public sealed class InteractiveLoopTests : IDisposable
     }
 
     [Fact]
+    public async Task HandleCommandAsync_ThinkingWithoutLevel_ShowsCurrentLevel()
+    {
+        var agent = CreateAgent();
+        agent.State.ThinkingLevel = ThinkingLevel.Medium;
+        var session = await _sessionManager.CreateSessionAsync(_workingDirectory, "thinking-current");
+
+        var text = await CaptureConsoleAsync(async () =>
+            await InvokeHandleCommandAsync("/thinking", agent, session));
+
+        text.Should().Contain("Thinking level: medium");
+    }
+
+    [Fact]
+    public async Task HandleCommandAsync_ThinkingWithValidLevel_ChangesLevelAndWritesMetadata()
+    {
+        var agent = CreateAgent();
+        var session = await _sessionManager.CreateSessionAsync(_workingDirectory, "thinking-change");
+
+        var updated = await InvokeHandleCommandAsync("/thinking high", agent, session);
+
+        agent.State.ThinkingLevel.Should().Be(ThinkingLevel.High);
+        updated.Should().NotBeNull();
+
+        var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{session.Id}.jsonl");
+        var fileContent = await File.ReadAllTextAsync(sessionPath);
+        fileContent.Should().Contain("\"key\":\"thinking_level_change\"");
+        fileContent.Should().Contain("\"value\":\"off \\u2192 high\"");
+    }
+
+    [Fact]
+    public async Task HandleCommandAsync_ThinkingWithInvalidLevel_ShowsError()
+    {
+        var agent = CreateAgent();
+        var session = await _sessionManager.CreateSessionAsync(_workingDirectory, "thinking-invalid");
+
+        var text = await CaptureConsoleAsync(async () =>
+            await InvokeHandleCommandAsync("/thinking turbo", agent, session));
+
+        text.Should().Contain("Invalid thinking level");
+        agent.State.ThinkingLevel.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task HandleCommandAsync_Help_IncludesThinkingCommand()
+    {
+        var agent = CreateAgent();
+        var session = await _sessionManager.CreateSessionAsync(_workingDirectory, "help");
+
+        var text = await CaptureConsoleAsync(async () =>
+            await InvokeHandleCommandAsync("/help", agent, session));
+
+        text.Should().Contain("/thinking [level]");
+    }
+
+    [Fact]
     public async Task HandleCommandAsync_ModelChange_WritesMetadata()
     {
         var agent = CreateAgent();
@@ -92,6 +147,22 @@ public sealed class InteractiveLoopTests : IDisposable
             [command, agent, _config, _modelRegistry, _authManager, _output, _sessionManager, session])!;
 
         return await task.ConfigureAwait(false);
+    }
+
+    private static async Task<string> CaptureConsoleAsync(Func<Task> action)
+    {
+        var original = Console.Out;
+        using var writer = new StringWriter();
+        Console.SetOut(writer);
+        try
+        {
+            await action().ConfigureAwait(false);
+            return writer.ToString();
+        }
+        finally
+        {
+            Console.SetOut(original);
+        }
     }
 
     public void Dispose()
