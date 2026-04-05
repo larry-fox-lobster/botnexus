@@ -131,6 +131,40 @@ public class AgentTests
             .Should().BeEquivalentTo(["base prompt"]);
     }
 
+    [Fact]
+    public async Task PromptAsync_WhenRunFails_AddsSyntheticErrorAssistantMessageAndEmitsAgentEnd()
+    {
+        using var provider = TestHelpers.RegisterProvider(
+            new TestApiProvider(
+                "test-api",
+                simpleStreamFactory: (_, _, _) => throw new InvalidOperationException("provider exploded")));
+        var agent = new Agent(TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api")));
+        AgentEndEvent? agentEnd = null;
+        using var _ = agent.Subscribe((@event, _) =>
+        {
+            if (@event is AgentEndEvent endEvent)
+            {
+                agentEnd = endEvent;
+            }
+
+            return Task.CompletedTask;
+        });
+
+        var action = () => agent.PromptAsync("boom");
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("provider exploded");
+
+        var failure = agent.State.Messages.Last().Should().BeOfType<AssistantAgentMessage>().Subject;
+        failure.Content.Should().BeEmpty();
+        failure.FinishReason.Should().Be(BotNexus.Providers.Core.Models.StopReason.Error);
+        failure.ErrorMessage.Should().Be("provider exploded");
+        agent.State.ErrorMessage.Should().Be("provider exploded");
+        agentEnd.Should().NotBeNull();
+        agentEnd!.Messages.Should().ContainSingle()
+            .Which.Should().BeOfType<AssistantAgentMessage>()
+            .Which.ErrorMessage.Should().Be("provider exploded");
+    }
+
     private static IDisposable RegisterDefaultProvider()
     {
         var provider = new TestApiProvider(

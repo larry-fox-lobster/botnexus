@@ -2,6 +2,7 @@ using BotNexus.AgentCore.Configuration;
 using BotNexus.AgentCore.Loop;
 using BotNexus.AgentCore.Types;
 using BotNexus.Providers.Core;
+using System.Runtime.ExceptionServices;
 
 namespace BotNexus.AgentCore;
 
@@ -426,11 +427,34 @@ public sealed class Agent
         }
         catch (Exception ex)
         {
+            var captured = ExceptionDispatchInfo.Capture(ex);
+            var failureMessage = new AssistantAgentMessage(
+                Content: string.Empty,
+                FinishReason: BotNexus.Providers.Core.Models.StopReason.Error,
+                ErrorMessage: ex.Message,
+                Timestamp: DateTimeOffset.UtcNow);
+
             lock (_stateLock)
             {
                 _state.SetErrorMessage(ex.Message);
+                var messages = _state.Messages.ToList();
+                messages.Add(failureMessage);
+                _state.Messages = messages;
             }
 
+            try
+            {
+                await HandleEventAsync(
+                        new AgentEndEvent([failureMessage], DateTimeOffset.UtcNow),
+                        CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                // Preserve original exception semantics for callers.
+            }
+
+            captured.Throw();
             throw;
         }
         finally
