@@ -1451,3 +1451,25 @@ Jon requested a full architecture decision for re-architecting the LLM provider 
 - The coding agent's dependency boundary is critical: ONLY `AgentCore` + `Providers.Core`. No references to the legacy `BotNexus.Agent`, `BotNexus.Core`, or `BotNexus.Gateway`. The coding agent is standalone — it IS the gateway for developer CLI usage.
 - Pi-mono's safety hooks (beforeToolCall/afterToolCall) already exist in our `AgentCore` as `BeforeToolCallDelegate`/`AfterToolCallDelegate`. The coding agent just needs to provide implementations that validate paths and commands — no new hook infrastructure needed.
 
+
+## Session: Phase 3 Port Audit Design Review (2026-04-05T09:49:50Z)
+
+Participated in design review ceremony for Phase 3 architecture. All ADs approved (9–17):
+- **AD-9** DefaultMessageConverter → Farnsworth
+- **AD-10** --thinking CLI + /thinking command → Bender  
+- **AD-11** ListDirectoryTool → Bender
+- **AD-12** ContextFileDiscovery → Bender
+- **AD-14** session metadata entries → Bender
+- **AD-15** ModelRegistry utilities → Farnsworth
+- **AD-17** /thinking slash command → Bender
+- **AD-13** deferred (OpenRouter routing types, no provider yet)
+- **AD-16** already present (maxRetryDelayMs)
+
+**Orchestration logs:** .squad/orchestration-log/2026-04-05T09-49-50Z-{agent}.md
+
+**Session log:** .squad/log/2026-04-05T09-49-50Z-port-audit-phase-3.md
+
+**Boundaries:** AgentCore ↔ CodingAgent (DefaultMessageConverter), CodingAgent ↔ Session (MetadataEntry), Providers.Core (ModelRegistry utilities).
+
+**Next:** Parallel execution tracks. Farnsworth + Bender begin implementation. Kif writes training docs. Nibbler runs consistency review.
+

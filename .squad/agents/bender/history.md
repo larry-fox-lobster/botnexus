@@ -151,6 +151,12 @@ Build is clean, tests pass. ProviderRegistry exists but is unused — evaluate i
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
+### 2026-04-05 — AD-10/14/17 Thinking Runtime Controls
+
+- Coding-agent CLI now supports `--thinking off|minimal|low|medium|high|xhigh` and maps to `ThinkingLevel?` (`off` => `null`).
+- Runtime thinking is driven by `AgentState.ThinkingLevel`; `/thinking` updates state and `/model` + `/thinking` now emit session JSONL metadata entries (`model_change`, `thinking_level_change`).
+- Session metadata writing is now first-class via `SessionManager.WriteMetadataAsync`, preserving metadata across reload/save cycles.
+
 ### 2026-04-03 — Agent Loop Multi-Turn Continuation Fix (Scribe cross-agent update)
 
 **Task:** Fixed agent loop continuation when LLM narrates intent without tool calls  
@@ -653,3 +659,25 @@ _logger.LogInformation("Agent {AgentName} configured with model={ConfiguredModel
 **All systems green. Ready for integration.**
 
 - [2026-04-05T02:23:26Z] Added list_directory tool and context file discovery for CodingAgent; validated full solution build/tests after runtime tool additions.
+
+## Session: Phase 3 Port Audit Design Review (2026-04-05T09:49:50Z)
+
+Participated in design review ceremony for Phase 3 architecture. All ADs approved (9–17):
+- **AD-9** DefaultMessageConverter → Farnsworth
+- **AD-10** --thinking CLI + /thinking command → Bender  
+- **AD-11** ListDirectoryTool → Bender
+- **AD-12** ContextFileDiscovery → Bender
+- **AD-14** session metadata entries → Bender
+- **AD-15** ModelRegistry utilities → Farnsworth
+- **AD-17** /thinking slash command → Bender
+- **AD-13** deferred (OpenRouter routing types, no provider yet)
+- **AD-16** already present (maxRetryDelayMs)
+
+**Orchestration logs:** .squad/orchestration-log/2026-04-05T09-49-50Z-{agent}.md
+
+**Session log:** .squad/log/2026-04-05T09-49-50Z-port-audit-phase-3.md
+
+**Boundaries:** AgentCore ↔ CodingAgent (DefaultMessageConverter), CodingAgent ↔ Session (MetadataEntry), Providers.Core (ModelRegistry utilities).
+
+**Next:** Parallel execution tracks. Farnsworth + Bender begin implementation. Kif writes training docs. Nibbler runs consistency review.
+

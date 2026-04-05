@@ -162,6 +162,8 @@
 - **UserMessageContent dual-mode pattern** (2026-04-04): pi-mono's `string | ContentBlock[]` union for user message content ported as a `UserMessageContent` class with implicit string conversion and a custom JsonConverter that reads/writes either a JSON string or a JSON array of content blocks.
 - **New Copilot provider (Providers.Core architecture)** (2026-04-04): Created `src/providers/BotNexus.Providers.Copilot/` as a standalone implementation of `IApiProvider` from `BotNexus.Providers.Core`. Implements OpenAI Completions wire format with Copilot auth headers (X-Initiator, Copilot-Vision-Request, Openai-Intent). Uses `JsonObject`/`JsonNode` for dynamic payload building to avoid anonymous-type serialization pitfalls with `System.Text.Json`. `CopilotOAuth` static class handles GitHub device code flow with two-stage token lifecycle: GitHub OAuth token (long-lived, stored as RefreshToken after first exchange) → Copilot session token (short-lived, ~25min). Solution folder `/src/providers/` needed to disambiguate from old `src/BotNexus.Providers.Copilot/` in slnx. `AssemblyName` set to `BotNexus.Providers.Copilot.New` to avoid output collision. Zero dependencies beyond `BotNexus.Providers.Core`.
 - **OpenAI Completions provider (Providers.Core architecture)** (2026-04-04): Created `src/providers/BotNexus.Providers.OpenAI/` implementing `IApiProvider` with `Api = "openai-completions"`. Raw HttpClient SSE streaming — no OpenAI SDK dependency. Full message conversion (user/assistant/tool), tool function format, SSE chunk parsing with text/thinking/toolcall state machine, OpenAICompletionsCompat support (developer role, strict schemas, max_tokens field name, thinking format), Copilot dynamic headers, reasoning_effort mapping from ThinkingLevel. `AssemblyName` set to `BotNexus.Providers.OpenAI.Completions` to avoid collision with old `src/BotNexus.Providers.OpenAI/` provider. 0 warnings, 0 errors.
+- 2026-04-05: `DefaultMessageConverter.Create()` is now the shared default `ConvertToLlmDelegate` in AgentCore; CodingAgent uses it directly and system agent messages are wrapped as provider user summaries (`<summary>...</summary>`).
+- 2026-04-05: `ModelRegistry` now owns model identity helpers — `SupportsExtraHigh(LlmModel)` and `ModelsAreEqual(LlmModel, LlmModel)` — and OpenAI Responses now consumes `SupportsExtraHigh` instead of provider-local xhigh checks.
 
 ## Sprint 1 Summary — 2026-04-01T17:33Z
 
@@ -492,3 +494,25 @@ All 7 foundation items completed (Farnsworth: 5, Bender: 2). Decisions merged an
 - Kif: 7 training guides (~2500 lines) — 1 commit, docs ✓
 
 **All systems green. Ready for integration.**
+
+## Session: Phase 3 Port Audit Design Review (2026-04-05T09:49:50Z)
+
+Participated in design review ceremony for Phase 3 architecture. All ADs approved (9–17):
+- **AD-9** DefaultMessageConverter → Farnsworth
+- **AD-10** --thinking CLI + /thinking command → Bender  
+- **AD-11** ListDirectoryTool → Bender
+- **AD-12** ContextFileDiscovery → Bender
+- **AD-14** session metadata entries → Bender
+- **AD-15** ModelRegistry utilities → Farnsworth
+- **AD-17** /thinking slash command → Bender
+- **AD-13** deferred (OpenRouter routing types, no provider yet)
+- **AD-16** already present (maxRetryDelayMs)
+
+**Orchestration logs:** .squad/orchestration-log/2026-04-05T09-49-50Z-{agent}.md
+
+**Session log:** .squad/log/2026-04-05T09-49-50Z-port-audit-phase-3.md
+
+**Boundaries:** AgentCore ↔ CodingAgent (DefaultMessageConverter), CodingAgent ↔ Session (MetadataEntry), Providers.Core (ModelRegistry utilities).
+
+**Next:** Parallel execution tracks. Farnsworth + Bender begin implementation. Kif writes training docs. Nibbler runs consistency review.
+

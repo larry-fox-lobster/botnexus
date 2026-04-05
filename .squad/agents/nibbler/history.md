@@ -159,3 +159,59 @@
 
 ---
 
+## 2026-04-03 — Post-Sprint Consistency Review: Port Audit Fix Sprint
+
+**Requested by:** sytone  
+**Sprint:** 18-commit port audit fix sprint (providers, agent-core, coding-agent, tests, training docs)
+
+**Review Scope:**
+1. Training docs ↔ Code alignment (5 training files)
+2. README ↔ Reality (3 READMEs)
+3. New code ↔ Comments (IAgentTool.cs XML doc)
+4. Config defaults ↔ Documented defaults
+5. Glossary cross-references
+
+**Results:**
+- **53 discrepancies found** across 9 files (17 HIGH, 12 MEDIUM, 4 LOW severity + 75 broken glossary links)
+- **All fixed** in commit 3d8eda3
+- ✅ Build: 0 errors, 0 warnings
+- ✅ Tests: 372/372 pass (all 7 test projects)
+
+**Key Fixes:**
+- 01-providers.md: Added missing OpenAIResponsesProvider, documented maxTokens 32K cap and thinking budget defaults, fixed invalid C# cast syntax, documented adaptive thinking effort mapping
+- 02-agent-core.md: Fixed tool lookup case-sensitivity (Ordinal, not case-insensitive), ToolExecutionStartEvent timing, PromptAsync concurrency behavior (throws, not blocks), InputSchema→Parameters in code example, QueueMode enum order
+- 03-coding-agent.md: Fixed CreateSessionAsync nullable param, MetricsTool example to use current IAgentTool API, added BOM stripping and compaction cut-point validation docs, added missing SessionCompactionOptions parameters
+- 04-building-your-own.md: Fixed ValueTask→Task in 5 delegate examples, IAgentTool member count, JSONL format (camelCase, session_header, version 2, leaf key)
+- 05-glossary.md: Fixed all 75 broken cross-reference links (wrong filenames throughout)
+- providers/README.md: Added OpenAIResponsesProvider, fixed CopilotProvider as static utility, fixed instance-based API, added missing StopReason values
+- AgentCore/README.md: Added missing LlmClient param, fixed ExecuteAsync signature
+- CodingAgent/README.md: Fixed tool count, added GrepTool/FileMutationQueue, fixed ExecuteAsync signature, updated project structure
+- IAgentTool.cs: Fixed XML doc comment (case-insensitive → case-sensitive)
+
+**Noted but not fixed (out of scope):**
+- Root README.md describes planned architecture (Gateway, Channels, WebUI, etc.) that doesn't exist yet — likely intentional aspirational docs
+- StreamAccumulator has only 1 unit test — flagged as coverage gap
+- CodingAgent factory has only 1 test (reflection-based) — flagged as coverage gap
+
+
+## Session: Phase 3 Port Audit Design Review (2026-04-05T09:49:50Z)
+
+Participated in design review ceremony for Phase 3 architecture. All ADs approved (9–17):
+- **AD-9** DefaultMessageConverter → Farnsworth
+- **AD-10** --thinking CLI + /thinking command → Bender  
+- **AD-11** ListDirectoryTool → Bender
+- **AD-12** ContextFileDiscovery → Bender
+- **AD-14** session metadata entries → Bender
+- **AD-15** ModelRegistry utilities → Farnsworth
+- **AD-17** /thinking slash command → Bender
+- **AD-13** deferred (OpenRouter routing types, no provider yet)
+- **AD-16** already present (maxRetryDelayMs)
+
+**Orchestration logs:** .squad/orchestration-log/2026-04-05T09-49-50Z-{agent}.md
+
+**Session log:** .squad/log/2026-04-05T09-49-50Z-port-audit-phase-3.md
+
+**Boundaries:** AgentCore ↔ CodingAgent (DefaultMessageConverter), CodingAgent ↔ Session (MetadataEntry), Providers.Core (ModelRegistry utilities).
+
+**Next:** Parallel execution tracks. Farnsworth + Bender begin implementation. Kif writes training docs. Nibbler runs consistency review.
+
