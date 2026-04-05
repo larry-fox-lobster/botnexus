@@ -297,6 +297,33 @@ public class AgentTests
     }
 
     [Fact]
+    public async Task PromptAsync_WhenListenerThrows_ContinuesRunAndReportsDiagnostic()
+    {
+        var diagnostics = new List<string>();
+        using var provider = RegisterDefaultProvider();
+        var options = TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api"))
+            with
+            {
+                OnDiagnostic = message => diagnostics.Add(message)
+            };
+        var agent = new Agent(options);
+        using var _ = agent.Subscribe((@event, _) =>
+        {
+            if (@event is MessageEndEvent)
+            {
+                throw new InvalidOperationException("listener failed");
+            }
+
+            return Task.CompletedTask;
+        });
+
+        var result = await agent.PromptAsync("hello");
+
+        result.OfType<AssistantAgentMessage>().Should().ContainSingle();
+        diagnostics.Should().Contain(message => message.Contains("Listener threw: listener failed", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task AbortAsync_WhenAgentEndListenerThrows_ReportsDiagnostic()
     {
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -324,7 +351,7 @@ public class AgentTests
         release.TrySetResult();
         await runTask;
 
-        diagnostics.Should().ContainSingle(message => message.Contains("Listener error during agent_end", StringComparison.Ordinal));
+        diagnostics.Should().ContainSingle(message => message.Contains("Listener threw: listener failed", StringComparison.Ordinal));
     }
 
     [Fact]

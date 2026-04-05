@@ -5,12 +5,36 @@ namespace BotNexus.Providers.Core.Models;
 [JsonConverter(typeof(JsonStringEnumConverter<StopReason>))]
 public enum StopReason
 {
+    /// <summary>
+    /// Normal completion of generation emitted by all providers.
+    /// </summary>
     [JsonStringEnumMemberName("stop")] Stop,
+    /// <summary>
+    /// Generation stopped because the configured or provider max token limit was reached.
+    /// Emitted by all providers.
+    /// </summary>
     [JsonStringEnumMemberName("length")] Length,
+    /// <summary>
+    /// Model requested tool execution during generation.
+    /// Emitted by all providers when tool calls are returned.
+    /// </summary>
     [JsonStringEnumMemberName("toolUse")] ToolUse,
+    /// <summary>
+    /// Provider or upstream API error occurred during generation.
+    /// </summary>
     [JsonStringEnumMemberName("error")] Error,
+    /// <summary>
+    /// Request was cancelled by the user or caller before completion.
+    /// </summary>
     [JsonStringEnumMemberName("aborted")] Aborted,
+    /// <summary>
+    /// Model refused to answer due to content policy or safety rules.
+    /// Typically surfaced by Anthropic and OpenAI safety filters.
+    /// </summary>
     [JsonStringEnumMemberName("refusal")] Refusal,
+    /// <summary>
+    /// Azure AI content filtering blocked the response as sensitive.
+    /// </summary>
     [JsonStringEnumMemberName("sensitive")] Sensitive
 }
 

@@ -624,7 +624,14 @@ public sealed class Agent
 
         foreach (var listener in listenersSnapshot)
         {
-            await listener(@event, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await listener(@event, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _options.OnDiagnostic?.Invoke($"Listener threw: {ex.Message}");
+            }
         }
     }
 
