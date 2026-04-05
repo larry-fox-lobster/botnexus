@@ -1,0 +1,150 @@
+using BotNexus.Providers.Core;
+using BotNexus.Providers.Core.Models;
+using BotNexus.Providers.Core.Utilities;
+
+namespace BotNexus.Providers.Anthropic;
+
+internal static class AnthropicRequestBuilder
+{
+    internal static Dictionary<string, object?> BuildRequestBody(
+        LlmModel model,
+        Context context,
+        StreamOptions? options,
+        AnthropicOptions? anthropicOpts,
+        bool isOAuthToken,
+        Func<string, bool> isAdaptiveThinkingModel)
+    {
+        var messages = AnthropicMessageConverter.ConvertMessages(context.Messages, model, isOAuthToken);
+
+        var body = new Dictionary<string, object?>
+        {
+            ["model"] = model.Id,
+            ["messages"] = messages,
+            ["max_tokens"] = options?.MaxTokens ?? (model.MaxTokens / 3),
+            ["stream"] = true
+        };
+
+        if (isOAuthToken)
+        {
+            var cacheControl = AnthropicMessageConverter.BuildCacheControl(
+                options?.CacheRetention ?? CacheRetention.Short,
+                model.BaseUrl);
+
+            var systemBlocks = new List<Dictionary<string, object?>>
+            {
+                new()
+                {
+                    ["type"] = "text",
+                    ["text"] = "You are Claude Code, Anthropic's official CLI for Claude.",
+                    ["cache_control"] = cacheControl
+                }
+            };
+
+            if (!string.IsNullOrWhiteSpace(context.SystemPrompt))
+            {
+                systemBlocks.Add(new Dictionary<string, object?>
+                {
+                    ["type"] = "text",
+                    ["text"] = UnicodeSanitizer.SanitizeSurrogates(context.SystemPrompt),
+                    ["cache_control"] = cacheControl
+                });
+            }
+
+            body["system"] = systemBlocks;
+        }
+        else if (context.SystemPrompt is { } systemPrompt)
+        {
+            var cacheControl = AnthropicMessageConverter.BuildCacheControl(
+                options?.CacheRetention ?? CacheRetention.Short,
+                model.BaseUrl);
+
+            body["system"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["type"] = "text",
+                    ["text"] = UnicodeSanitizer.SanitizeSurrogates(systemPrompt),
+                    ["cache_control"] = cacheControl
+                }
+            };
+        }
+
+        if (context.Tools is { Count: > 0 } tools)
+        {
+            body["tools"] = tools.Select(t => new Dictionary<string, object?>
+            {
+                ["name"] = isOAuthToken ? AnthropicMessageConverter.ToClaudeCodeName(t.Name) : t.Name,
+                ["description"] = t.Description,
+                ["input_schema"] = AnthropicMessageConverter.NormalizeToolSchema(t.Parameters)
+            }).ToList();
+        }
+
+        if (options?.Metadata is { } metadata &&
+            metadata.TryGetValue("user_id", out var rawUserId) &&
+            rawUserId is string userId &&
+            !string.IsNullOrWhiteSpace(userId))
+        {
+            body["metadata"] = new Dictionary<string, object?>
+            {
+                ["user_id"] = userId
+            };
+        }
+
+        if (anthropicOpts?.ToolChoice is { } toolChoice)
+        {
+            body["tool_choice"] = toolChoice switch
+            {
+                "auto" => new Dictionary<string, object?> { ["type"] = "auto" },
+                "any" => new Dictionary<string, object?> { ["type"] = "any" },
+                "none" => new Dictionary<string, object?> { ["type"] = "none" },
+                _ => new Dictionary<string, object?> { ["type"] = "tool", ["name"] = toolChoice }
+            };
+        }
+
+        if (model.Reasoning && anthropicOpts?.ThinkingEnabled == true)
+        {
+            if (anthropicOpts.Effort is not null && isAdaptiveThinkingModel(model.Id))
+            {
+                body["thinking"] = new Dictionary<string, object?> { ["type"] = "adaptive" };
+                body["output_config"] = new Dictionary<string, object?> { ["effort"] = anthropicOpts.Effort };
+            }
+            else if (anthropicOpts.ThinkingBudgetTokens is { } budget)
+            {
+                body["thinking"] = new Dictionary<string, object?>
+                {
+                    ["type"] = "enabled",
+                    ["budget_tokens"] = budget
+                };
+            }
+            else if (isAdaptiveThinkingModel(model.Id))
+            {
+                body["thinking"] = new Dictionary<string, object?> { ["type"] = "adaptive" };
+            }
+            else
+            {
+                body["thinking"] = new Dictionary<string, object?>
+                {
+                    ["type"] = "enabled",
+                    ["budget_tokens"] = 1024
+                };
+            }
+        }
+        else if (model.Reasoning && anthropicOpts?.ThinkingEnabled == false)
+        {
+            body["thinking"] = new Dictionary<string, object?> { ["type"] = "disabled" };
+            if (options?.Temperature.HasValue == true)
+                body["temperature"] = options.Temperature.Value;
+        }
+        else if (options?.Temperature.HasValue == true)
+        {
+            body["temperature"] = options.Temperature.Value;
+        }
+
+        AnthropicMessageConverter.ApplyLastUserMessageCacheControl(
+            messages,
+            options?.CacheRetention ?? CacheRetention.Short,
+            model.BaseUrl);
+
+        return body;
+    }
+}
