@@ -37,7 +37,7 @@ public interface IAgentTool
 
 | Member | Purpose |
 |--------|---------|
-| `Name` | Unique identifier. Used when the LLM calls the tool. Must be lowercase alphanumeric + underscores. |
+| `Name` | Unique identifier. Used when the LLM calls the tool. Must be lowercase alphanumeric + underscores. Lookup is **case-insensitive** (`StringComparison.OrdinalIgnoreCase`). |
 | `Label` | Display name for UI and documentation. |
 | `Definition` | `Tool` record with `Name`, `Description`, and JSON Schema `Parameters`. Sent to the LLM. |
 | `PrepareArgumentsAsync` | Validate and normalize arguments. Throw `ArgumentException` on invalid input. |

@@ -186,6 +186,8 @@ Hello world
 
 **Limits:** Output capped at 50 * 1024 bytes (51,200 bytes, aligned with TypeScript implementation). Process tree killed on timeout. Truncation appends `[Output truncated at N bytes]` or `[Output truncated at N lines]` suffix.
 
+**Cancellation handling:** `ShellTool` distinguishes explicit cancellation from timeout. When the caller's `CancellationToken` fires (e.g., user presses Ctrl+C), the running process is killed and the result returns `"Command cancelled."` with any partial output collected so far. Timeout expiry is reported separately as `"Command timed out after N seconds."` — both paths capture partial output and set `IsError: true`.
+
 ### `grep` — Regex search
 
 **Parameters:** `pattern` (regex, required), `path`, `glob` (file pattern, e.g. `*.cs`), `ignore_case`, `context` (lines), `limit`
@@ -395,6 +397,10 @@ Payloads over 1 MB trigger a console warning (not a block) so the user is aware 
 
 Sessions persist conversation history so agents can resume where they left off. Data is stored in `.botnexus-agent/sessions/` as `.jsonl` files.
 
+### Auto-persistence
+
+`CodingAgent.CreateAsync` wires automatic session persistence via `WireSessionAutoPersistence`. An event listener watches for `MessageEndEvent` on `AssistantAgentMessage` completions and fires a background `SaveSessionAsync` call (guarded by a `SemaphoreSlim` to serialize concurrent saves). This means every assistant turn is persisted without explicit save calls — if the process crashes mid-conversation, the last completed assistant message is recoverable. Manual `SaveSessionAsync` calls in the interactive loop still supplement this for additional save points.
+
 ### JSONL tree model
 
 Sessions use a directed acyclic graph (DAG) structure. Each entry has an `EntryId` and `ParentEntryId`, enabling branching:
@@ -581,6 +587,8 @@ var loader = new SkillsLoader();
 IReadOnlyList<string> skills = loader.LoadSkills(workingDirectory, config);
 // Loaded from: AGENTS.md, .botnexus-agent/AGENTS.md, .botnexus-agent/skills/*.md
 ```
+
+`SkillsLoader` respects `.gitignore` patterns within each skill directory. A `.gitignore` file placed in a skill directory (e.g., `.botnexus-agent/skills/.gitignore`) filters out matched paths before skill discovery. Directories like `node_modules`, `bin`, `obj`, `.git`, `build`, and `dist` are always excluded regardless of `.gitignore` presence.
 
 **When to use which:**
 - **Skills** — for teaching the agent domain-specific knowledge (no code required)

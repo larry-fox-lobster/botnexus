@@ -160,6 +160,15 @@ private Dictionary<string, object?> BuildRequestBody(
         };
     }
 
+    // Tool choice (Anthropic-specific): string shorthand or full object
+    if (anthropicOpts?.ToolChoice is { } toolChoice)
+    {
+        requestBody["tool_choice"] = BuildToolChoiceNode(toolChoice);
+        // Accepts: "auto", "any", "none", a tool name,
+        //   or a Dictionary/JsonNode/JsonElement for full control
+        //   (e.g., { "type": "auto", "disable_parallel_tool_use": true })
+    }
+
     return requestBody;
 }
 
@@ -260,7 +269,8 @@ private object ConvertContentBlock(ContentBlock block)
             type = "tool_use",
             id = tcc.Id,
             name = tcc.Name,
-            input = tcc.Arguments
+            input = tcc.Arguments,
+            signature = tcc.ThoughtSignature  // included when present (Anthropic thinking continuations)
         },
 
         _ => new { type = "text", text = block.ToString() }

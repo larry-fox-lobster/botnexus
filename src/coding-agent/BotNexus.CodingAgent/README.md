@@ -642,7 +642,7 @@ src/coding-agent/BotNexus.CodingAgent/
 │   ├── IExtension.cs           # Extension contract
 │   ├── ExtensionLoader.cs      # Assembly loading
 │   ├── ExtensionRunner.cs      # Extension lifecycle orchestration
-│   └── SkillsLoader.cs         # Skills file loading
+│   └── SkillsLoader.cs         # Skills file loading (respects .gitignore)
 ├── Auth/
 │   └── AuthManager.cs          # OAuth device flow + token management
 ├── Hooks/

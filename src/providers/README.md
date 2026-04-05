@@ -524,6 +524,9 @@ var anthropicResult = await LlmClient.CompleteAsync(anthropicModel, context,
         ThinkingBudgetTokens = 8192, // Optional token limit
         Effort = "high",             // Adaptive thinking: "low", "medium", "high", "max"
         InterleavedThinking = true,  // Thinking blocks between text/tool blocks
+        ToolChoice = "auto",         // String shorthand: "auto", "any", "none", or a tool name
+        // Or pass a full Anthropic tool_choice object for parallel control:
+        // ToolChoice = new Dictionary<string, object?> { ["type"] = "auto", ["disable_parallel_tool_use"] = true }
     });
 
 // OpenAI Reasoning (o3, GPT-4o)
@@ -1046,7 +1049,7 @@ src/providers/
 
   BotNexus.Providers.Anthropic/          — Anthropic Messages API
     AnthropicProvider.cs                  — IApiProvider implementation
-    AnthropicOptions.cs                   — ThinkingEnabled, Effort, InterleavedThinking
+    AnthropicOptions.cs                   — ThinkingEnabled, Effort, InterleavedThinking, ToolChoice
 
   BotNexus.Providers.Copilot/            — GitHub Copilot (OAuth)
     CopilotProvider.cs                    — Static utility with ResolveApiKey/ApplyDynamicHeaders

@@ -4,6 +4,7 @@ namespace BotNexus.CodingAgent.Extensions;
 
 /// <summary>
 /// Loads markdown skill instructions that are injected into system prompts.
+/// Respects <c>.gitignore</c> patterns in skill directories to exclude ignored paths.
 /// </summary>
 public sealed class SkillsLoader
 {

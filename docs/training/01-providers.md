@@ -857,6 +857,7 @@ All components handle:
 - **Authentication:** Cascading fallback from config → `ANTHROPIC_OAUTH_TOKEN` → `ANTHROPIC_API_KEY`
 - **Thinking levels:** Maps `ThinkingLevel` enum to Anthropic `budget_tokens` parameter
 - **Tool use:** Parses tool call events and integrates into `ContentBlock` stream
+- **ToolChoice:** `AnthropicOptions.ToolChoice` accepts `string` shorthand (`"auto"`, `"any"`, `"none"`, or a tool name) **or** an Anthropic `tool_choice` object (`Dictionary<string, object?>`, `JsonNode`, `JsonElement`) for full parallel control (e.g., `{ "type": "auto", "disable_parallel_tool_use": true }`)
 - **StopReason mapping:** Converts Anthropic `stop_reason` to standardized `StopReason` enum (including new `Refusal` and `Sensitive` mappings)
 
 ### Model identity (Phase 4)
