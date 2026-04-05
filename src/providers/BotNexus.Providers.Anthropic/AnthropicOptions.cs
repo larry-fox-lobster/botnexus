@@ -20,7 +20,8 @@ public record class AnthropicOptions : Core.StreamOptions
     public bool InterleavedThinking { get; set; } = true;
 
     /// <summary>
-    /// Tool choice: "auto", "any", "none", or a specific tool name.
+    /// Tool choice: "auto", "any", "none", a specific tool name,
+    /// or an Anthropic tool_choice object.
     /// </summary>
-    public string? ToolChoice { get; set; }
+    public object? ToolChoice { get; set; }
 }

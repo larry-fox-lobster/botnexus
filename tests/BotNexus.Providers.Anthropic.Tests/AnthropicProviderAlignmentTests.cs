@@ -300,6 +300,60 @@ public class AnthropicProviderAlignmentTests
     }
 
     [Fact]
+    public async Task Stream_StringToolChoice_MapsToAnthropicObject()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var context = TestHelpers.MakeContext();
+        var options = new AnthropicOptions { ApiKey = "test-key", ToolChoice = "any" };
+
+        var stream = provider.Stream(model, context, options);
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        body.RootElement.GetProperty("tool_choice").GetProperty("type").GetString().Should().Be("any");
+    }
+
+    [Fact]
+    public async Task Stream_ObjectToolChoice_PassesThroughWithoutRemapping()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var context = TestHelpers.MakeContext();
+        var options = new AnthropicOptions
+        {
+            ApiKey = "test-key",
+            ToolChoice = new Dictionary<string, object?>
+            {
+                ["type"] = "auto",
+                ["disable_parallel_tool_use"] = true
+            }
+        };
+
+        var stream = provider.Stream(model, context, options);
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        var toolChoice = body.RootElement.GetProperty("tool_choice");
+        toolChoice.GetProperty("type").GetString().Should().Be("auto");
+        toolChoice.GetProperty("disable_parallel_tool_use").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Stream_UnpairedSurrogateInUserMessage_IsSanitizedBeforeRequest()
     {
         var handler = new RecordingHandler(_ => SseResponse("""

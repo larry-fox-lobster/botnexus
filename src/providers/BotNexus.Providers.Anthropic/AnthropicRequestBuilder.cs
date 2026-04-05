@@ -102,13 +102,7 @@ internal static class AnthropicRequestBuilder
 
         if (anthropicOpts?.ToolChoice is { } toolChoice)
         {
-            body["tool_choice"] = ToNode(toolChoice switch
-            {
-                "auto" => new Dictionary<string, object?> { ["type"] = "auto" },
-                "any" => new Dictionary<string, object?> { ["type"] = "any" },
-                "none" => new Dictionary<string, object?> { ["type"] = "none" },
-                _ => new Dictionary<string, object?> { ["type"] = "tool", ["name"] = toolChoice }
-            });
+            body["tool_choice"] = BuildToolChoiceNode(toolChoice);
         }
 
         if (model.Reasoning && anthropicOpts?.ThinkingEnabled == true)
@@ -157,5 +151,37 @@ internal static class AnthropicRequestBuilder
     {
         var element = JsonSerializer.SerializeToElement(value);
         return JsonNode.Parse(element.GetRawText());
+    }
+
+    private static JsonNode? BuildToolChoiceNode(object toolChoice)
+    {
+        if (toolChoice is JsonNode node)
+        {
+            return node.DeepClone();
+        }
+
+        if (toolChoice is JsonElement element)
+        {
+            return JsonNode.Parse(element.GetRawText());
+        }
+
+        if (toolChoice is IDictionary<string, object?> dictionary)
+        {
+            return ToNode(dictionary);
+        }
+
+        if (toolChoice is IReadOnlyDictionary<string, object?> readOnlyDictionary)
+        {
+            return ToNode(readOnlyDictionary);
+        }
+
+        var choice = toolChoice as string ?? toolChoice.ToString() ?? string.Empty;
+        return ToNode(choice switch
+        {
+            "auto" => new Dictionary<string, object?> { ["type"] = "auto" },
+            "any" => new Dictionary<string, object?> { ["type"] = "any" },
+            "none" => new Dictionary<string, object?> { ["type"] = "none" },
+            _ => new Dictionary<string, object?> { ["type"] = "tool", ["name"] = choice }
+        });
     }
 }
