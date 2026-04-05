@@ -442,3 +442,12 @@ See decisions.md "Part 4: Implementation Phases & Work Items" for full roadmap w
 **Fix:** Replaced three per-element addEventListener calls (thinking toggle, tool call click, tool history click) with a single delegated click handler on #chat-messages using event.target.closest(). History tool calls now store data in activeToolCalls map via generated callId instead of closures.
 
 **Pattern Established:** Event delegation on stable parent containers for all dynamically-created interactive elements. Data needed by handlers stored as data-* attributes or in shared lookup maps rather than closure variables.
+
+### WebUI Error/Loading/Reconnect Enhancements (2026-04-05)
+**Timestamp:** 2026-04-05
+**Status:** Complete
+**Commit:** pending — feat(webui): add error states, loading indicators, and reconnection support
+
+**Features Delivered:** Connection banner states (connecting/reconnecting/failure/success), 30s response timeout warning, agent error bubbles (`.message-error`), typing indicator + streaming pulse (`.message-streaming`), send button spinner state (`.btn-sending`), and steer flow via `{ type: "steer" }` with queued badge (`.steer-indicator`).
+
+**Pattern Established:** Keep `currentSessionId` stable across reconnects and immediately rehydrate chat from `GET /api/sessions/{sessionId}` after successful reconnect so UI state self-heals after dropped sockets.

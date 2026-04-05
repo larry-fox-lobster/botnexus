@@ -8,6 +8,7 @@
     const RECONNECT_BASE_MS = 1000;
     const RECONNECT_MAX_MS = 30000;
     const PING_INTERVAL_MS = 30000;
+    const RESPONSE_TIMEOUT_MS = 30000;
     const MAX_ACTIVITY_ITEMS = 100;
 
     // --- State ---
@@ -19,7 +20,15 @@
     let reconnectAttempts = 0;
     let reconnectTimer = null;
     let pingTimer = null;
+    let responseTimeoutTimer = null;
+    let steerIndicatorTimer = null;
     let isStreaming = false;
+    let hasReceivedResponse = false;
+    let isWsConnecting = false;
+    let isRestRequestInFlight = false;
+    let shouldReconnect = true;
+    let connectionHadOpen = false;
+    let currentWsUrl = '';
     let activeMessageId = null;
     let showTools = false;
     let showThinking = false;
@@ -46,6 +55,7 @@
     const elAgentsList = $('#agents-list');
     const elConnectionStatus = $('#connection-status');
     const elStatusText = elConnectionStatus.querySelector('.status-text');
+    const elConnectionBanner = $('#connection-banner');
     const elWelcome = $('#welcome-screen');
     const elChatView = $('#chat-view');
     const elChatTitle = $('#chat-title');
@@ -59,6 +69,7 @@
     const elToggleThinking = $('#toggle-thinking');
     const elToggleActivity = $('#toggle-activity');
     const elActivityFeed = $('#activity-feed');
+    const elSteerIndicator = $('#steer-indicator');
     const elToolModal = $('#tool-modal');
     const elModalClose = elToolModal.querySelector('.modal-close');
     const elModalOverlay = elToolModal.querySelector('.modal-overlay');
@@ -139,6 +150,67 @@
         elStatusText.textContent = labels[state] || state;
     }
 
+    function showConnectionBanner(text, level = 'warning') {
+        elConnectionBanner.className = `connection-banner ${level}`;
+        elConnectionBanner.textContent = text;
+    }
+
+    function hideConnectionBanner() {
+        elConnectionBanner.className = 'connection-banner hidden';
+        elConnectionBanner.textContent = '';
+    }
+
+    function showSteerIndicator() {
+        if (steerIndicatorTimer) clearTimeout(steerIndicatorTimer);
+        elSteerIndicator.classList.remove('hidden');
+        steerIndicatorTimer = setTimeout(() => {
+            elSteerIndicator.classList.add('hidden');
+            steerIndicatorTimer = null;
+        }, 1500);
+    }
+
+    function updateSendButtonState() {
+        const hasText = !!elChatInput.value.trim();
+        if (isRestRequestInFlight) {
+            elBtnSend.disabled = true;
+            return;
+        }
+        if (isStreaming && ws && ws.readyState === WebSocket.OPEN) {
+            elBtnSend.disabled = !hasText;
+            return;
+        }
+        elBtnSend.disabled = !hasText || !elChatView || elChatView.classList.contains('hidden');
+    }
+
+    function setSendingState(isSending) {
+        isRestRequestInFlight = isSending;
+        elBtnSend.classList.toggle('btn-sending', isSending);
+        elBtnSend.textContent = isSending ? 'Sending' : 'Send';
+        updateSendButtonState();
+    }
+
+    function startResponseTimeout() {
+        clearResponseTimeout();
+        hasReceivedResponse = false;
+        responseTimeoutTimer = setTimeout(() => {
+            if (!hasReceivedResponse && isStreaming) {
+                appendSystemMessage('⏳ Agent is taking longer than expected...', 'warning');
+            }
+        }, RESPONSE_TIMEOUT_MS);
+    }
+
+    function markResponseReceived() {
+        hasReceivedResponse = true;
+        clearResponseTimeout();
+    }
+
+    function clearResponseTimeout() {
+        if (responseTimeoutTimer) {
+            clearTimeout(responseTimeoutTimer);
+            responseTimeoutTimer = null;
+        }
+    }
+
     // =========================================================================
     // Confirm dialog
     // =========================================================================
@@ -163,28 +235,53 @@
         if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
         if (!currentAgentId) return;
 
+        isWsConnecting = true;
         setStatus(reconnectAttempts > 0 ? 'reconnecting' : 'connecting');
+        showConnectionBanner(reconnectAttempts > 0 ? '⚠️ Connection lost. Reconnecting...' : 'Connecting...', 'warning');
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
         let url = `${proto}//${location.host}${WS_PATH}?agent=${encodeURIComponent(currentAgentId)}`;
         if (currentSessionId) url += `&session=${encodeURIComponent(currentSessionId)}`;
+        currentWsUrl = url;
 
         ws = new WebSocket(url);
 
         ws.onopen = () => {
+            isWsConnecting = false;
+            connectionHadOpen = true;
             setStatus('connected');
+            const wasReconnect = reconnectAttempts > 0;
             reconnectAttempts = 0;
             startPing();
             if (isActivitySubscribed) sendWs({ type: 'subscribe' });
+            if (wasReconnect) {
+                showConnectionBanner('✅ Reconnected to gateway.', 'success');
+                setTimeout(() => hideConnectionBanner(), 1400);
+                reloadCurrentSessionHistory();
+            } else {
+                hideConnectionBanner();
+            }
         };
 
         ws.onclose = () => {
+            isWsConnecting = false;
             setStatus('disconnected');
             connectionId = null;
             stopPing();
+            if (!shouldReconnect) return;
+            if (!connectionHadOpen && reconnectAttempts === 0) {
+                showConnectionBanner(`❌ Cannot connect to Gateway at ${currentWsUrl}. Check that the server is running.`, 'error');
+            } else {
+                showConnectionBanner('⚠️ Connection lost. Reconnecting...', 'warning');
+            }
             scheduleReconnect();
         };
 
-        ws.onerror = () => { setStatus('disconnected'); };
+        ws.onerror = () => {
+            setStatus('disconnected');
+            if (!connectionHadOpen && reconnectAttempts === 0) {
+                showConnectionBanner(`❌ Cannot connect to Gateway at ${currentWsUrl}. Check that the server is running.`, 'error');
+            }
+        };
 
         ws.onmessage = (event) => {
             try { handleWsMessage(JSON.parse(event.data)); }
@@ -193,12 +290,16 @@
     }
 
     function disconnectWebSocket() {
+        shouldReconnect = false;
         stopPing();
         if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
         reconnectAttempts = 0;
         if (ws) { ws.onclose = null; ws.close(); ws = null; }
+        isWsConnecting = false;
         setStatus('disconnected');
         connectionId = null;
+        hideConnectionBanner();
+        setTimeout(() => { shouldReconnect = true; }, 0);
     }
 
     function scheduleReconnect() {
@@ -206,6 +307,7 @@
         const delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, reconnectAttempts), RECONNECT_MAX_MS);
         reconnectAttempts++;
         setStatus('reconnecting');
+        showConnectionBanner(`⚠️ Connection lost. Reconnecting in ${Math.round(delay / 1000)}s...`, 'warning');
         reconnectTimer = setTimeout(() => { reconnectTimer = null; connectWebSocket(); }, delay);
     }
 
@@ -222,6 +324,17 @@
         if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
     }
 
+    async function reloadCurrentSessionHistory() {
+        if (!currentSessionId) return;
+        const session = await fetchJson(`/sessions/${encodeURIComponent(currentSessionId)}`);
+        if (!session || !session.history) return;
+        elChatMessages.innerHTML = '';
+        for (const entry of session.history) renderHistoryEntry(entry);
+        const msgCount = session.history.length || session.messageCount || 0;
+        elChatMeta.textContent = `Agent: ${currentAgentId || 'unknown'} · ${msgCount} messages`;
+        scrollToBottom();
+    }
+
     // =========================================================================
     // WebSocket message handler
     // =========================================================================
@@ -235,13 +348,16 @@
             case 'message_start':
                 activeMessageId = msg.messageId;
                 isStreaming = true;
+                setSendingState(false);
                 activeToolCount = 0;
                 thinkingBuffer = '';
                 elBtnAbort.classList.remove('hidden');
                 showStreamingIndicator();
+                startResponseTimeout();
                 break;
             case 'content_delta':
                 removeStreamingIndicator();
+                markResponseReceived();
                 appendDelta(msg.delta);
                 break;
             case 'thinking_delta':
@@ -254,9 +370,11 @@
                 handleToolEnd(msg);
                 break;
             case 'message_end':
+                markResponseReceived();
                 finalizeMessage(msg);
                 break;
             case 'error':
+                markResponseReceived();
                 handleError(msg);
                 break;
             case 'activity':
@@ -363,9 +481,9 @@
     function showStreamingIndicator() {
         removeStreamingIndicator();
         const div = document.createElement('div');
-        div.className = 'message thinking streaming-indicator';
-        div.setAttribute('aria-label', 'Agent is processing');
-        div.innerHTML = '<span class="thinking-dots" aria-hidden="true">●●●</span> Agent is processing...';
+        div.className = 'message thinking typing-indicator streaming-indicator';
+        div.setAttribute('aria-label', 'Agent is thinking');
+        div.innerHTML = 'Agent is thinking<span class="dots" aria-hidden="true">...</span>';
         elChatMessages.appendChild(div);
         scrollToBottom();
     }
@@ -381,6 +499,7 @@
     function finalizeMessage(msg) {
         isStreaming = false;
         activeMessageId = null;
+        clearResponseTimeout();
         elBtnAbort.classList.add('hidden');
         removeStreamingIndicator();
         finalizeThinkingBlock();
@@ -388,6 +507,7 @@
         const streaming = elChatMessages.querySelector('.message.assistant.streaming');
         if (streaming) {
             streaming.classList.remove('streaming');
+            streaming.classList.remove('message-streaming');
             const deltaEl = streaming.querySelector('.delta-content');
             if (deltaEl) {
                 deltaEl.innerHTML = renderMarkdown(deltaEl.textContent);
@@ -413,6 +533,7 @@
         activeToolCalls = {};
         activeToolCount = 0;
         thinkingBuffer = '';
+        setSendingState(false);
         loadSessions();
         scrollToBottom();
     }
@@ -428,9 +549,11 @@
 
     function handleError(msg) {
         isStreaming = false;
+        clearResponseTimeout();
         elBtnAbort.classList.add('hidden');
         removeStreamingIndicator();
-        appendSystemMessage(`Error: ${msg.message || 'Unknown error'}${msg.code ? ` (${msg.code})` : ''}`, 'error');
+        appendErrorMessage(`❌ ${msg.message || 'Unknown error'}${msg.code ? ` (${msg.code})` : ''}`);
+        setSendingState(false);
     }
 
     // =========================================================================
@@ -462,12 +585,27 @@
         scrollToBottom();
     }
 
+    function appendErrorMessage(text) {
+        const div = document.createElement('div');
+        div.className = 'message assistant message-error';
+        const now = formatTime(new Date().toISOString());
+        div.innerHTML = `
+            <div class="msg-header">
+                <span class="msg-role">AGENT ERROR</span>
+                <span class="msg-time">${now}</span>
+            </div>
+            <div class="msg-content">${escapeHtml(text)}</div>
+        `;
+        elChatMessages.appendChild(div);
+        scrollToBottom();
+    }
+
     function appendDelta(content) {
         if (!content) return;
         let streaming = elChatMessages.querySelector('.message.assistant.streaming');
         if (!streaming) {
             streaming = document.createElement('div');
-            streaming.className = 'message assistant streaming';
+            streaming.className = 'message assistant streaming message-streaming';
             streaming.innerHTML = `
                 <div class="msg-header">
                     <span class="msg-role">ASSISTANT</span>
@@ -557,7 +695,19 @@
         if (!text) return;
         elChatInput.value = '';
         autoResize(elChatInput);
+        updateSendButtonState();
+
+        if (isStreaming && ws && ws.readyState === WebSocket.OPEN) {
+            sendWs({ type: 'steer', content: text });
+            showSteerIndicator();
+            appendSystemMessage(`🧭 Steering: ${text}`);
+            return;
+        }
+
         appendChatMessage('user', text);
+        setSendingState(true);
+        isStreaming = true;
+        startResponseTimeout();
 
         if (ws && ws.readyState === WebSocket.OPEN) {
             sendWs({ type: 'message', content: text });
@@ -578,6 +728,7 @@
                 body: JSON.stringify(body)
             });
             removeStreamingIndicator();
+            markResponseReceived();
             if (res.ok) {
                 const data = await res.json();
                 if (data.sessionId) currentSessionId = data.sessionId;
@@ -594,19 +745,26 @@
                 }
                 loadSessions();
             } else {
-                appendSystemMessage(`Error: ${res.status} — ${await res.text()}`, 'error');
+                appendErrorMessage(`❌ ${res.status} — ${await res.text()}`);
             }
         } catch (e) {
             removeStreamingIndicator();
-            appendSystemMessage(`Connection error: ${e.message}`, 'error');
+            appendErrorMessage(`❌ Connection error: ${e.message}`);
+        } finally {
+            isStreaming = false;
+            clearResponseTimeout();
+            setSendingState(false);
+            removeStreamingIndicator();
         }
     }
 
     function abortRequest() {
         sendWs({ type: 'abort' });
         isStreaming = false;
+        clearResponseTimeout();
         elBtnAbort.classList.add('hidden');
         removeStreamingIndicator();
+        setSendingState(false);
         appendSystemMessage('Request aborted.');
     }
 
@@ -617,18 +775,20 @@
         activeToolCalls = {};
         activeToolCount = 0;
         thinkingBuffer = '';
+        clearResponseTimeout();
 
         elWelcome.classList.add('hidden');
         elChatView.classList.remove('hidden');
         elChatTitle.textContent = 'New Chat';
         elChatMeta.textContent = `Agent: ${elAgentSelect.value || 'default'} · Session will be created on first message`;
         elChatMessages.innerHTML = '';
-        elBtnSend.disabled = false;
+        setSendingState(false);
         elAgentSelect.disabled = false;
         elSessionsList.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
 
         currentAgentId = elAgentSelect.value || null;
         if (currentAgentId) connectWebSocket();
+        else updateSendButtonState();
         elChatInput.focus();
     }
 
@@ -726,7 +886,7 @@
         elChatView.classList.remove('hidden');
         elChatTitle.textContent = agentId || 'Chat';
         elChatMessages.innerHTML = '<div class="loading">Loading messages...</div>';
-        elBtnSend.disabled = false;
+        setSendingState(false);
 
         if (agentId) elAgentSelect.value = agentId;
         elAgentSelect.disabled = true;
@@ -745,6 +905,7 @@
         if (currentAgentId) connectWebSocket();
         scrollToBottom();
         elChatInput.focus();
+        updateSendButtonState();
     }
 
     // =========================================================================
@@ -780,6 +941,7 @@
             elAgentsList.appendChild(el);
         }
         populateAgentSelect(agents);
+        updateSendButtonState();
     }
 
     function populateAgentSelect(agents) {
@@ -793,6 +955,9 @@
         }
         if (!currentAgentId && agents.length > 0) {
             currentAgentId = agents[0].name || agents[0].agentId || agents[0].id;
+        }
+        if (currentAgentId && !elAgentSelect.value) {
+            elAgentSelect.value = currentAgentId;
         }
     }
 
@@ -974,11 +1139,15 @@
         elChatInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
-        elChatInput.addEventListener('input', () => autoResize(elChatInput));
+        elChatInput.addEventListener('input', () => {
+            autoResize(elChatInput);
+            updateSendButtonState();
+        });
 
         elAgentSelect.addEventListener('change', () => {
             currentAgentId = elAgentSelect.value;
             if (!currentSessionId && ws) { disconnectWebSocket(); connectWebSocket(); }
+            updateSendButtonState();
         });
 
         elToggleTools.addEventListener('change', toggleToolVisibility);
@@ -1050,6 +1219,8 @@
         initEventListeners();
         loadSessions();
         loadAgents();
+        setStatus('disconnected');
+        updateSendButtonState();
     }
 
     if (document.readyState === 'loading') {

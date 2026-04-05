@@ -69,6 +69,7 @@
 
         <!-- Main content -->
         <main id="main-content">
+            <div id="connection-banner" class="connection-banner hidden" role="status" aria-live="polite"></div>
             <!-- Welcome screen -->
             <div id="welcome-screen" class="welcome">
                 <div class="welcome-inner">
@@ -109,6 +110,7 @@
                         <textarea id="chat-input" placeholder="Type a message... (Enter to send, Shift+Enter for newline)" rows="1" aria-label="Chat message input"></textarea>
                         <button id="btn-send" class="btn btn-primary" disabled aria-label="Send message">Send</button>
                     </div>
+                    <div id="steer-indicator" class="steer-indicator hidden" aria-live="polite">Steering...</div>
                 </div>
             </div>
         </main>
