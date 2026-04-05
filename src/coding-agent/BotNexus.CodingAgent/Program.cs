@@ -73,7 +73,9 @@ internal static class Program
             modelRegistry,
             extensionRunner,
             extensionLoadResult.Tools,
-            skills).ConfigureAwait(false);
+            skills,
+            sessionManager,
+            session).ConfigureAwait(false);
         if (resumedMessages.Count > 0)
         {
             agent.State.Messages = resumedMessages;

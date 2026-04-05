@@ -7,6 +7,7 @@ using BotNexus.AgentCore.Types;
 using BotNexus.CodingAgent.Auth;
 using BotNexus.CodingAgent.Extensions;
 using BotNexus.CodingAgent.Hooks;
+using BotNexus.CodingAgent.Session;
 using BotNexus.CodingAgent.Tools;
 using BotNexus.CodingAgent.Utils;
 using BotNexus.Providers.Core;
@@ -25,7 +26,9 @@ public static class CodingAgent
         ModelRegistry modelRegistry,
         ExtensionRunner? extensionRunner = null,
         IReadOnlyList<IAgentTool>? extensionTools = null,
-        IReadOnlyList<string>? skills = null)
+        IReadOnlyList<string>? skills = null,
+        SessionManager? sessionManager = null,
+        SessionInfo? session = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         if (string.IsNullOrWhiteSpace(workingDirectory))
@@ -92,7 +95,56 @@ public static class CodingAgent
             FollowUpMode: QueueMode.OneAtATime,
             SessionId: null);
 
-        return new Agent(options);
+        var agent = new Agent(options);
+        WireSessionAutoPersistence(agent, sessionManager, session);
+        return agent;
+    }
+
+    private static void WireSessionAutoPersistence(Agent agent, SessionManager? sessionManager, SessionInfo? session)
+    {
+        if (sessionManager is null || session is null)
+        {
+            return;
+        }
+
+        var currentSession = session;
+        var saveLock = new SemaphoreSlim(1, 1);
+
+        _ = agent.Subscribe((@event, eventCt) =>
+        {
+            if (@event is not MessageEndEvent { Message: AssistantAgentMessage })
+            {
+                return Task.CompletedTask;
+            }
+
+            currentSession = currentSession with
+            {
+                UpdatedAt = DateTimeOffset.UtcNow,
+                MessageCount = agent.State.Messages.Count,
+                Model = agent.State.Model.Id
+            };
+            var snapshot = currentSession;
+
+            _ = Task.Run(async () =>
+            {
+                await saveLock.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    await sessionManager.SaveSessionAsync(snapshot, agent.State.Messages).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[warning] Failed to persist session '{snapshot.Id}': {ex.Message}");
+                }
+                finally
+                {
+                    saveLock.Release();
+                }
+            });
+
+            _ = eventCt;
+            return Task.CompletedTask;
+        });
     }
 
     private static Task<BeforeToolCallResult?> ExecuteBeforeHookAsync(
@@ -294,5 +346,4 @@ public static class CodingAgent
         };
     }
 }
-
 
