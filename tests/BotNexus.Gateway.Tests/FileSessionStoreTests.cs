@@ -111,6 +111,67 @@ public sealed class FileSessionStoreTests
         allSessions.Should().OnlyContain(s => s.History.Count == 1);
     }
 
+    [Fact]
+    public async Task SaveAsync_WithLargeHistory_PersistsAllEntries()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var session = await store.GetOrCreateAsync("large", "agent-a");
+        for (var i = 0; i < 1000; i++)
+            session.History.Add(new SessionEntry { Role = "user", Content = $"line-{i}" });
+
+        await store.SaveAsync(session);
+        var reloaded = await fixture.CreateStore().GetAsync("large");
+
+        reloaded!.History.Should().HaveCount(1000);
+        reloaded.History[999].Content.Should().Be("line-999");
+    }
+
+    [Fact]
+    public async Task GetOrCreateAsync_WithSpecialCharactersInSessionId_RoundTrips()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        const string sessionId = "s/日本語?:*&%20";
+        var created = await store.GetOrCreateAsync(sessionId, "agent-a");
+        created.History.Add(new SessionEntry { Role = "user", Content = "hello" });
+
+        await store.SaveAsync(created);
+        var reloaded = await fixture.CreateStore().GetAsync(sessionId);
+
+        reloaded.Should().NotBeNull();
+        reloaded!.SessionId.Should().Be(sessionId);
+        reloaded.History.Should().ContainSingle(e => e.Content == "hello");
+    }
+
+    [Fact]
+    public async Task ConcurrentReadWrite_SameSession_DoesNotThrowAndRemainsReadable()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        await store.GetOrCreateAsync("shared", "agent-a");
+
+        var writer = Task.Run(async () =>
+        {
+            for (var i = 0; i < 40; i++)
+            {
+                var session = await store.GetOrCreateAsync("shared", "agent-a");
+                session.UpdatedAt = DateTimeOffset.UtcNow;
+                await store.SaveAsync(session);
+            }
+        });
+        var reader = Task.Run(async () =>
+        {
+            for (var i = 0; i < 40; i++)
+                _ = await store.GetAsync("shared");
+        });
+
+        await Task.WhenAll(writer, reader);
+        var reloaded = await fixture.CreateStore().GetAsync("shared");
+
+        reloaded.Should().NotBeNull();
+    }
+
     private static async Task CreateAndSaveAsync(FileSessionStore store, string sessionId, string agentId)
     {
         var session = await store.GetOrCreateAsync(sessionId, agentId);

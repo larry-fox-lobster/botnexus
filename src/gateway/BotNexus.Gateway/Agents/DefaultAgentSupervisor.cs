@@ -13,6 +13,7 @@ public sealed class DefaultAgentSupervisor : IAgentSupervisor
     private readonly IAgentRegistry _registry;
     private readonly IReadOnlyDictionary<string, IIsolationStrategy> _strategies;
     private readonly Dictionary<string, (AgentInstance Instance, IAgentHandle Handle)> _instances = [];
+    private readonly Dictionary<string, Task<(AgentInstance Instance, IAgentHandle Handle)>> _pendingCreates = [];
     private readonly Lock _sync = new();
     private readonly ILogger<DefaultAgentSupervisor> _logger;
 
@@ -30,37 +31,39 @@ public sealed class DefaultAgentSupervisor : IAgentSupervisor
     public async Task<IAgentHandle> GetOrCreateAsync(string agentId, string sessionId, CancellationToken cancellationToken = default)
     {
         var key = MakeKey(agentId, sessionId);
+        Task<(AgentInstance Instance, IAgentHandle Handle)> creationTask;
 
         lock (_sync)
         {
             if (_instances.TryGetValue(key, out var existing) && existing.Instance.Status is AgentInstanceStatus.Idle or AgentInstanceStatus.Running)
                 return existing.Handle;
+
+            if (!_pendingCreates.TryGetValue(key, out creationTask!))
+            {
+                creationTask = CreateEntryAsync(agentId, sessionId, key, cancellationToken);
+                _pendingCreates[key] = creationTask;
+            }
         }
 
-        var descriptor = _registry.Get(agentId)
-            ?? throw new KeyNotFoundException($"Agent '{agentId}' is not registered.");
-
-        if (!_strategies.TryGetValue(descriptor.IsolationStrategy, out var strategy))
-            throw new InvalidOperationException($"Isolation strategy '{descriptor.IsolationStrategy}' is not registered.");
-
-        var context = new AgentExecutionContext { SessionId = sessionId };
-        var handle = await strategy.CreateAsync(descriptor, context, cancellationToken);
-
-        var instance = new AgentInstance
+        try
         {
-            InstanceId = key,
-            AgentId = agentId,
-            SessionId = sessionId,
-            IsolationStrategy = descriptor.IsolationStrategy,
-            Status = AgentInstanceStatus.Idle
-        };
+            var created = await creationTask;
+            lock (_sync)
+            {
+                _pendingCreates.Remove(key);
+                _instances[key] = created;
+            }
 
-        lock (_sync) _instances[key] = (instance, handle);
+            _logger.LogInformation("Created agent instance '{AgentId}' for session '{SessionId}' (isolation: {Strategy})",
+                agentId, sessionId, created.Instance.IsolationStrategy);
 
-        _logger.LogInformation("Created agent instance '{AgentId}' for session '{SessionId}' (isolation: {Strategy})",
-            agentId, sessionId, descriptor.IsolationStrategy);
-
-        return handle;
+            return created.Handle;
+        }
+        catch
+        {
+            lock (_sync) _pendingCreates.Remove(key);
+            throw;
+        }
     }
 
     /// <inheritdoc />
@@ -102,6 +105,7 @@ public sealed class DefaultAgentSupervisor : IAgentSupervisor
         {
             entries = [.. _instances.Values];
             _instances.Clear();
+            _pendingCreates.Clear();
         }
 
         foreach (var (instance, handle) in entries)
@@ -114,4 +118,31 @@ public sealed class DefaultAgentSupervisor : IAgentSupervisor
     }
 
     private static string MakeKey(string agentId, string sessionId) => $"{agentId}::{sessionId}";
+
+    private async Task<(AgentInstance Instance, IAgentHandle Handle)> CreateEntryAsync(
+        string agentId,
+        string sessionId,
+        string key,
+        CancellationToken cancellationToken)
+    {
+        var descriptor = _registry.Get(agentId)
+            ?? throw new KeyNotFoundException($"Agent '{agentId}' is not registered.");
+
+        if (!_strategies.TryGetValue(descriptor.IsolationStrategy, out var strategy))
+            throw new InvalidOperationException($"Isolation strategy '{descriptor.IsolationStrategy}' is not registered.");
+
+        var context = new AgentExecutionContext { SessionId = sessionId };
+        var handle = await strategy.CreateAsync(descriptor, context, cancellationToken);
+
+        var instance = new AgentInstance
+        {
+            InstanceId = key,
+            AgentId = agentId,
+            SessionId = sessionId,
+            IsolationStrategy = descriptor.IsolationStrategy,
+            Status = AgentInstanceStatus.Idle
+        };
+
+        return (instance, handle);
+    }
 }

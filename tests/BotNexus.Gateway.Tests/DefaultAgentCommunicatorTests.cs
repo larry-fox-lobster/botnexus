@@ -50,6 +50,25 @@ public sealed class DefaultAgentCommunicatorTests
     }
 
     [Fact]
+    public async Task CallSubAgentAsync_WithStructuredParentSession_UsesScopedChildSessionFormat()
+    {
+        var supervisor = new Mock<IAgentSupervisor>();
+        var handle = new Mock<IAgentHandle>();
+        string? capturedSessionId = null;
+        supervisor
+            .Setup(s => s.GetOrCreateAsync("child", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((_, sessionId, _) => capturedSessionId = sessionId)
+            .ReturnsAsync(handle.Object);
+        handle.Setup(h => h.PromptAsync("ping", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentResponse { Content = "pong" });
+        var communicator = new DefaultAgentCommunicator(supervisor.Object, NullLogger<DefaultAgentCommunicator>.Instance);
+
+        await communicator.CallSubAgentAsync("parent", "session-1::workspace", "child", "ping");
+
+        capturedSessionId.Should().Be("session-1::workspace::sub::child");
+    }
+
+    [Fact]
     public async Task CallCrossAgentAsync_WhenCalled_ThrowsNotImplementedException()
     {
         var communicator = new DefaultAgentCommunicator(Mock.Of<IAgentSupervisor>(), NullLogger<DefaultAgentCommunicator>.Instance);
