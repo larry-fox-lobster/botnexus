@@ -42,7 +42,7 @@ public sealed record UserMessage(string Content, IReadOnlyList<AgentImageContent
 /// <param name="ToolCalls">Optional tool calls requested by the model.</param>
 /// <param name="FinishReason">The finish reason reported by the provider (stop, error, aborted, tool_use).</param>
 /// <param name="Usage">Optional token usage details.</param>
-/// <param name="ErrorMessage">Optional message-level error details when FinishReason is Error.</param>
+/// <param name="ErrorMessage">Optional per-message error details for this assistant message when FinishReason is Error.</param>
 /// <param name="Timestamp">The message timestamp.</param>
 /// <remarks>
 /// AssistantAgentMessage is emitted during streaming (MessageUpdateEvent) and finalized at MessageEndEvent.

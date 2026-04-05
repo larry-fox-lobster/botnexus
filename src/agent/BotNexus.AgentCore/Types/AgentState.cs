@@ -114,10 +114,11 @@ public class AgentState
     public IReadOnlySet<string> PendingToolCalls => _pendingToolCalls;
 
     /// <summary>
-    /// Gets the latest runtime error message.
+    /// Gets the aggregated last-error message for the agent state.
     /// </summary>
     /// <remarks>
-    /// Set when a run fails or an assistant message has FinishReason=Error.
+    /// This is session-level error state, not a per-message field.
+    /// It is set when a run fails and synchronized from assistant message errors at turn end.
     /// Cleared at the start of each new run.
     /// </remarks>
     public string? ErrorMessage { get; private set; }
