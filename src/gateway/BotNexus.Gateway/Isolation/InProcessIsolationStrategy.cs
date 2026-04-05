@@ -117,44 +117,66 @@ internal sealed class InProcessAgentHandle : IAgentHandle
 
         using var subscription = _agent.Subscribe(async (agentEvent, ct) =>
         {
-            var streamEvent = agentEvent switch
+            try
             {
-                MessageStartEvent => new AgentStreamEvent { Type = AgentStreamEventType.MessageStart, MessageId = messageId },
-                MessageUpdateEvent update when update.ContentDelta is not null => update.IsThinking
-                    ? new AgentStreamEvent
+                var streamEvent = agentEvent switch
+                {
+                    MessageStartEvent => new AgentStreamEvent { Type = AgentStreamEventType.MessageStart, MessageId = messageId },
+                    MessageUpdateEvent update when update.ContentDelta is not null => update.IsThinking
+                        ? new AgentStreamEvent
+                        {
+                            Type = AgentStreamEventType.ThinkingDelta,
+                            ThinkingContent = update.ContentDelta,
+                            MessageId = messageId
+                        }
+                        : new AgentStreamEvent
+                        {
+                            Type = AgentStreamEventType.ContentDelta,
+                            ContentDelta = update.ContentDelta,
+                            MessageId = messageId
+                        },
+                    ToolExecutionStartEvent toolStart => new AgentStreamEvent
                     {
-                        Type = AgentStreamEventType.ThinkingDelta,
-                        ThinkingContent = update.ContentDelta,
-                        MessageId = messageId
-                    }
-                    : new AgentStreamEvent
-                    {
-                        Type = AgentStreamEventType.ContentDelta,
-                        ContentDelta = update.ContentDelta,
+                        Type = AgentStreamEventType.ToolStart,
+                        ToolCallId = toolStart.ToolCallId,
+                        ToolName = toolStart.ToolName,
                         MessageId = messageId
                     },
-                ToolExecutionStartEvent toolStart => new AgentStreamEvent
-                {
-                    Type = AgentStreamEventType.ToolStart,
-                    ToolCallId = toolStart.ToolCallId,
-                    ToolName = toolStart.ToolName,
-                    MessageId = messageId
-                },
-                ToolExecutionEndEvent toolEnd => new AgentStreamEvent
-                {
-                    Type = AgentStreamEventType.ToolEnd,
-                    ToolCallId = toolEnd.ToolCallId,
-                    ToolName = toolEnd.ToolName,
-                    ToolResult = toolEnd.Result.Content.FirstOrDefault()?.ToString(),
-                    ToolIsError = toolEnd.IsError,
-                    MessageId = messageId
-                },
-                MessageEndEvent => new AgentStreamEvent { Type = AgentStreamEventType.MessageEnd, MessageId = messageId },
-                _ => null
-            };
+                    ToolExecutionEndEvent toolEnd => new AgentStreamEvent
+                    {
+                        Type = AgentStreamEventType.ToolEnd,
+                        ToolCallId = toolEnd.ToolCallId,
+                        ToolName = toolEnd.ToolName,
+                        ToolResult = toolEnd.Result.Content.FirstOrDefault()?.ToString(),
+                        ToolIsError = toolEnd.IsError,
+                        MessageId = messageId
+                    },
+                    MessageEndEvent => new AgentStreamEvent { Type = AgentStreamEventType.MessageEnd, MessageId = messageId },
+                    _ => null
+                };
 
-            if (streamEvent is not null)
-                await events.Writer.WriteAsync(streamEvent, ct);
+                if (streamEvent is not null)
+                    await events.Writer.WriteAsync(streamEvent, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing agent event in stream for '{AgentId}' session '{SessionId}'", AgentId, SessionId);
+                try
+                {
+                    await events.Writer.WriteAsync(new AgentStreamEvent
+                    {
+                        Type = AgentStreamEventType.Error,
+                        ErrorMessage = $"Internal streaming error: {ex.Message}",
+                        MessageId = messageId
+                    }, ct);
+                }
+                catch
+                {
+                    // Best-effort error notification.
+                }
+
+                events.Writer.TryComplete(ex);
+            }
         });
 
         // Fire prompt on background task
@@ -165,7 +187,15 @@ internal sealed class InProcessAgentHandle : IAgentHandle
                 var result = await _agent.PromptAsync(message, cancellationToken);
                 tcs.TrySetResult(result);
             }
-            catch (Exception ex) { tcs.TrySetException(ex); }
+            catch (OperationCanceledException)
+            {
+                tcs.TrySetCanceled();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Agent prompt failed for '{AgentId}' session '{SessionId}'", AgentId, SessionId);
+                tcs.TrySetException(ex);
+            }
             finally { events.Writer.TryComplete(); }
         }, cancellationToken);
 
