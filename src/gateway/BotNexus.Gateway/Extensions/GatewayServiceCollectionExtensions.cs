@@ -2,11 +2,13 @@ using BotNexus.Gateway.Abstractions.Activity;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Routing;
+using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Activity;
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Isolation;
 using BotNexus.Gateway.Routing;
+using BotNexus.Gateway.Security;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BotNexus.Gateway.Extensions;
@@ -25,9 +27,11 @@ public static class GatewayServiceCollectionExtensions
         // Core services
         services.AddSingleton<IAgentRegistry, DefaultAgentRegistry>();
         services.AddSingleton<IAgentSupervisor, DefaultAgentSupervisor>();
+        services.AddSingleton<IAgentCommunicator, DefaultAgentCommunicator>();
         services.AddSingleton<DefaultMessageRouter>();
         services.AddSingleton<IMessageRouter>(sp => sp.GetRequiredService<DefaultMessageRouter>());
         services.AddSingleton<IActivityBroadcaster, InMemoryActivityBroadcaster>();
+        services.AddSingleton<IGatewayAuthHandler, ApiKeyGatewayAuthHandler>();
 
         // Default isolation strategy
         services.AddSingleton<IIsolationStrategy, InProcessIsolationStrategy>();

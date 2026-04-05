@@ -168,6 +168,7 @@
 - 2026-04-05: `BuiltInModels.RegisterAll()` now composes provider-specific registration methods (`RegisterCopilotModels`, `RegisterAnthropicModels`, `RegisterOpenAIModels`) so direct-provider catalogs can evolve independently.
 - 2026-04-05: Direct-provider baseline models are now registered in Providers.Core for `anthropic` and `openai` with `FreeCost` placeholders, explicit API model IDs, and provider base URLs.
 - 2026-04-05: `LlmModel` now carries `SupportsExtraHighThinking`; `ModelRegistry.SupportsExtraHigh()` is capability-based instead of model-id string matching.
+- 2026-04-06: Gateway now ships `DefaultAgentCommunicator` (sub-agent sessions scoped as `{parentSessionId}::sub::{childAgentId}` with Phase 2 cross-agent stub) and default `ApiKeyGatewayAuthHandler` registration in `AddBotNexusGateway`.
 
 ## Sprint 1 Summary — 2026-04-01T17:33Z
 
