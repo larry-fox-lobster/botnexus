@@ -16,6 +16,7 @@ public sealed class CodingAgentConfig
     public string SessionsDirectory { get; init; } = string.Empty;
     public string ExtensionsDirectory { get; init; } = string.Empty;
     public string SkillsDirectory { get; init; } = string.Empty;
+    public string LogsDirectory { get; init; } = string.Empty;
 
     public string? Model { get; set; }
     public string? Provider { get; set; }
@@ -65,6 +66,7 @@ public sealed class CodingAgentConfig
         Directory.CreateDirectory(config.SessionsDirectory);
         Directory.CreateDirectory(config.ExtensionsDirectory);
         Directory.CreateDirectory(config.SkillsDirectory);
+        Directory.CreateDirectory(config.LogsDirectory);
 
         var configPath = Path.Combine(config.ConfigDirectory, LocalConfigFileName);
         if (!File.Exists(configPath))
@@ -106,6 +108,7 @@ public sealed class CodingAgentConfig
             SessionsDirectory = Path.Combine(configDirectory, "sessions"),
             ExtensionsDirectory = Path.Combine(configDirectory, "extensions"),
             SkillsDirectory = Path.Combine(configDirectory, "skills"),
+            LogsDirectory = Path.Combine(configDirectory, "logs"),
             Model = null,
             Provider = null,
             ApiKey = null,
@@ -147,6 +150,7 @@ public sealed class CodingAgentConfig
             SessionsDirectory = source.SessionsDirectory,
             ExtensionsDirectory = source.ExtensionsDirectory,
             SkillsDirectory = source.SkillsDirectory,
+            LogsDirectory = source.LogsDirectory,
             Model = Coalesce(overrides.Model, source.Model),
             Provider = Coalesce(overrides.Provider, source.Provider),
             ApiKey = Coalesce(overrides.ApiKey, source.ApiKey),

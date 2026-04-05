@@ -5,13 +5,29 @@ namespace BotNexus.CodingAgent.Cli;
 /// <summary>
 /// Writes formatted terminal output for coding-agent interactions.
 /// </summary>
-public sealed class OutputFormatter
+public sealed class OutputFormatter : IDisposable
 {
     private readonly bool _nonInteractive;
+    private TextWriter? _logWriter;
 
     public OutputFormatter(bool nonInteractive = false)
     {
         _nonInteractive = nonInteractive;
+    }
+
+    /// <summary>
+    /// Enable log file mirroring. All console output will also be written to this writer.
+    /// </summary>
+    public void SetLogWriter(TextWriter writer)
+    {
+        _logWriter = writer;
+    }
+
+    public void Dispose()
+    {
+        _logWriter?.Flush();
+        _logWriter?.Dispose();
+        _logWriter = null;
     }
 
     public void WriteWelcome(string model, SessionInfo? session)
@@ -23,10 +39,12 @@ public sealed class OutputFormatter
             if (session is not null)
             {
                 Console.WriteLine($"[session:start] id={session.Id} model={model} provider={provider}");
+                _logWriter?.WriteLine($"[session:start] id={session.Id} model={model} provider={provider}");
             }
             else
             {
                 Console.WriteLine($"[session:start] model={model}");
+                _logWriter?.WriteLine($"[session:start] model={model}");
             }
             return;
         }
@@ -52,6 +70,7 @@ public sealed class OutputFormatter
         if (_nonInteractive)
         {
             Console.Write(text);
+            _logWriter?.Write(text);
         }
         else
         {
@@ -64,6 +83,7 @@ public sealed class OutputFormatter
         if (_nonInteractive)
         {
             Console.WriteLine($"[tool:start] {toolName}");
+            _logWriter?.WriteLine($"[tool:start] {toolName}");
             return;
         }
 
@@ -76,6 +96,7 @@ public sealed class OutputFormatter
         if (_nonInteractive)
         {
             Console.WriteLine($"[tool:end] {toolName} success={success.ToString().ToLowerInvariant()}");
+            _logWriter?.WriteLine($"[tool:end] {toolName} success={success.ToString().ToLowerInvariant()}");
             return;
         }
 
@@ -89,6 +110,7 @@ public sealed class OutputFormatter
         if (_nonInteractive)
         {
             Console.WriteLine($"[error] {message}");
+            _logWriter?.WriteLine($"[error] {message}");
         }
         else
         {
@@ -101,11 +123,13 @@ public sealed class OutputFormatter
         if (_nonInteractive)
         {
             Console.WriteLine("---");
+            _logWriter?.WriteLine("---");
         }
         else
         {
             WriteColoredLine(Environment.NewLine + "────────────────────────────────────────", ConsoleColor.DarkGray);
         }
+        _logWriter?.Flush();
     }
 
     public void WriteSessionInfo(SessionInfo session)
@@ -115,6 +139,7 @@ public sealed class OutputFormatter
             var model = session.Model ?? "unknown";
             var provider = session.Provider ?? "unknown";
             Console.WriteLine($"[session:info] id={session.Id} name={session.Name} model={model} provider={provider} messages={session.MessageCount} updated={session.UpdatedAt:yyyy-MM-dd HH:mm:ss}");
+            _logWriter?.WriteLine($"[session:info] id={session.Id} name={session.Name} model={model} provider={provider} messages={session.MessageCount} updated={session.UpdatedAt:yyyy-MM-dd HH:mm:ss}");
         }
         else
         {
@@ -124,19 +149,21 @@ public sealed class OutputFormatter
         }
     }
 
-    private static void WriteColored(string text, ConsoleColor color)
+    private void WriteColored(string text, ConsoleColor color)
     {
         var previous = Console.ForegroundColor;
         Console.ForegroundColor = color;
         Console.Write(text);
         Console.ForegroundColor = previous;
+        _logWriter?.Write(text);
     }
 
-    private static void WriteColoredLine(string text, ConsoleColor color)
+    private void WriteColoredLine(string text, ConsoleColor color)
     {
         var previous = Console.ForegroundColor;
         Console.ForegroundColor = color;
         Console.WriteLine(text);
         Console.ForegroundColor = previous;
+        _logWriter?.WriteLine(text);
     }
 }

@@ -14,6 +14,7 @@ public sealed class CommandParser
         string? provider = null;
         string? resume = null;
         string? explicitPrompt = null;
+        string? logPath = null;
         ThinkingLevel? thinkingLevel = null;
         var thinkingSpecified = false;
         var nonInteractive = false;
@@ -36,6 +37,9 @@ public sealed class CommandParser
                     break;
                 case "--prompt":
                     explicitPrompt = ReadValue(args, ref index, "--prompt");
+                    break;
+                case "--log":
+                    logPath = ReadValue(args, ref index, "--log");
                     break;
                 case "--thinking":
                     thinkingSpecified = true;
@@ -72,7 +76,8 @@ public sealed class CommandParser
             NonInteractive: nonInteractive,
             Verbose: verbose,
             ShowHelp: showHelp,
-            InitialPrompt: string.IsNullOrWhiteSpace(prompt) ? null : prompt);
+            InitialPrompt: string.IsNullOrWhiteSpace(prompt) ? null : prompt,
+            LogPath: logPath);
     }
 
     public static string GetUsage()
@@ -88,6 +93,7 @@ public sealed class CommandParser
                  --provider <provider>    Override provider id
                  --resume <session-id>    Resume an existing session
                  --prompt <text>          Prompt text (alternative to positional argument)
+                 --log <path>             Mirror console output to a log file
                  --thinking <level>       Set reasoning level: off|minimal|low|medium|high|xhigh
                  --non-interactive        Run one prompt and exit
                  --verbose                Enable verbose logs
@@ -133,4 +139,5 @@ public sealed record CommandOptions(
     bool NonInteractive,
     bool Verbose,
     bool ShowHelp,
-    string? InitialPrompt);
+    string? InitialPrompt,
+    string? LogPath);

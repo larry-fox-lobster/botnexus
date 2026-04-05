@@ -55,6 +55,20 @@ internal static class Program
         var nonInteractive = command.NonInteractive || !string.IsNullOrWhiteSpace(initialPrompt);
         var output = new OutputFormatter(nonInteractive);
 
+        if (!string.IsNullOrWhiteSpace(command.LogPath))
+        {
+            var logDir = Path.GetDirectoryName(Path.GetFullPath(command.LogPath));
+            if (!string.IsNullOrWhiteSpace(logDir))
+            {
+                Directory.CreateDirectory(logDir);
+            }
+            var logWriter = new StreamWriter(command.LogPath, append: false, new System.Text.UTF8Encoding(false))
+            {
+                AutoFlush = false
+            };
+            output.SetLogWriter(logWriter);
+        }
+
         SessionInfo session;
         IReadOnlyList<AgentMessage> resumedMessages = [];
         if (!string.IsNullOrWhiteSpace(command.ResumeSessionId))
@@ -116,6 +130,7 @@ internal static class Program
                 await extensionRunner
                     .OnSessionEndAsync(new SessionLifecycleContext(session, workingDirectory, agent.State.Model.Id))
                     .ConfigureAwait(false);
+                output.Dispose();
             }
         }
 
@@ -127,19 +142,26 @@ internal static class Program
             Console.WriteLine();
         }
 
-        var loop = new InteractiveLoop();
-        await loop.RunAsync(
-            agent,
-            config,
-            llmClient,
-            modelRegistry,
-            authManager,
-            extensionRunner,
-            sessionManager,
-            session,
-            output,
-            CancellationToken.None).ConfigureAwait(false);
-        return 0;
+        try
+        {
+            var loop = new InteractiveLoop();
+            await loop.RunAsync(
+                agent,
+                config,
+                llmClient,
+                modelRegistry,
+                authManager,
+                extensionRunner,
+                sessionManager,
+                session,
+                output,
+                CancellationToken.None).ConfigureAwait(false);
+            return 0;
+        }
+        finally
+        {
+            output.Dispose();
+        }
     }
 
     private static async Task RunSinglePromptAsync(

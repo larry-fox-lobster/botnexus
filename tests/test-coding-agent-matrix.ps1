@@ -65,6 +65,12 @@ $filteredPrompts = $prompts | Where-Object { $tierFilter -contains $_.Tier }
 # --- Session directory (don't delete sessions) ---
 $sessionsDir = Join-Path (Get-Location) ".botnexus-agent\sessions"
 
+# --- Logs directory ---
+$logsDir = Join-Path (Get-Location) ".botnexus-agent" "logs"
+if (-not (Test-Path $logsDir)) {
+    New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
+}
+
 Write-Host ""
 Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host " BotNexus CodingAgent — Copilot Test Matrix" -ForegroundColor Cyan
@@ -90,7 +96,8 @@ foreach ($model in $modelList) {
         # Run the CLI
         $startTime = Get-Date
         try {
-            $output = & dotnet run --no-build --project $projectPath -- --model $model --non-interactive --prompt $prompt.Prompt 2>&1 | Out-String
+            $logFile = Join-Path $logsDir "$model-$($prompt.Id).log"
+            $output = & dotnet run --no-build --project $projectPath -- --model $model --non-interactive --prompt $prompt.Prompt --log $logFile 2>&1 | Out-String
             $exitCode = $LASTEXITCODE
         } catch {
             $output = $_.Exception.Message
@@ -199,6 +206,7 @@ foreach ($model in $modelList) {
             Reason = $failReason
             SessionId = $sessionId
             SessionFile = $sessionFile
+            LogFile = $logFile
         }
     }
     Write-Host ""
@@ -242,7 +250,10 @@ foreach ($r in $results) {
     $icon = if ($r.Passed) { "✓" } else { "✗" }
     $color = if ($r.Passed) { "DarkGray" } else { "Yellow" }
     Write-Host "  $icon $($r.Model)/$($r.Test): $($r.SessionId)" -ForegroundColor $color
+    Write-Host "  Log: $($r.LogFile)" -ForegroundColor DarkGray
 }
 
+Write-Host ""
+Write-Host "Logs directory: $logsDir" -ForegroundColor Cyan
 Write-Host ""
 exit $(if ($failed -eq 0) { 0 } else { 1 })
