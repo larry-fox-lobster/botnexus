@@ -39,7 +39,7 @@ public static class CodingAgent
         var tools = CreateTools(root, extensionTools);
         var gitBranch = await GitUtils.GetBranchAsync(root).ConfigureAwait(false);
         var gitStatus = await GitUtils.GetStatusAsync(root).ConfigureAwait(false);
-        var packageManager = PackageManagerDetector.Detect(root);
+        var packageManager = PackageManagerDetector.Detect(root);`r`n        var contextFiles = await ContextFileDiscovery.DiscoverAsync(root, CancellationToken.None).ConfigureAwait(false);
 
         var promptBuilder = new SystemPromptBuilder();
         var systemPrompt = promptBuilder.Build(new SystemPromptContext(
@@ -256,4 +256,5 @@ public static class CodingAgent
         };
     }
 }
+
 
