@@ -43,7 +43,8 @@ public static class CodingAgent
         var gitBranch = await GitUtils.GetBranchAsync(root).ConfigureAwait(false);
         var gitStatus = await GitUtils.GetStatusAsync(root).ConfigureAwait(false);
         var packageManager = PackageManagerDetector.Detect(root);
-        var contextFiles = await ContextFileDiscovery.DiscoverAsync(root, CancellationToken.None).ConfigureAwait(false);
+        var configDirectoryName = Path.GetFileName(config.ConfigDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        var contextFiles = await ContextFileDiscovery.DiscoverAsync(root, CancellationToken.None, configDirectoryName).ConfigureAwait(false);
 
         var promptBuilder = new SystemPromptBuilder();
         var systemPrompt = promptBuilder.Build(new SystemPromptContext(
@@ -53,7 +54,9 @@ public static class CodingAgent
             PackageManager: packageManager,
             ToolNames: tools.Select(tool => tool.Name).ToList(),
             Skills: skills ?? [],
-            CustomInstructions: null,
+            CustomInstructions: ResolveCustomText(config, "customInstructions"),
+            CustomPrompt: ResolveCustomText(config, "customPrompt"),
+            AppendSystemPrompt: ResolveCustomText(config, "appendSystemPrompt"),
             ContextFiles: contextFiles));
 
         // Resolve initial API key via AuthManager (auto-refreshes saved creds)
@@ -342,6 +345,27 @@ public static class CodingAgent
             "medium" => ThinkingLevel.Medium,
             "high" => ThinkingLevel.High,
             "xhigh" => ThinkingLevel.ExtraHigh,
+            _ => null
+        };
+    }
+
+    private static string? ResolveCustomText(CodingAgentConfig config, string key)
+    {
+        if (!config.Custom.TryGetValue(key, out var value) || value is null)
+        {
+            return null;
+        }
+
+        return value switch
+        {
+            string text when !string.IsNullOrWhiteSpace(text) => text,
+            JsonElement { ValueKind: JsonValueKind.String } element => element.GetString(),
+            JsonElement { ValueKind: JsonValueKind.Array } element => string.Join(
+                Environment.NewLine,
+                element.EnumerateArray()
+                    .Where(static item => item.ValueKind == JsonValueKind.String)
+                    .Select(static item => item.GetString())
+                    .Where(static item => !string.IsNullOrWhiteSpace(item))),
             _ => null
         };
     }

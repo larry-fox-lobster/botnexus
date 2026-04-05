@@ -20,8 +20,11 @@ public sealed record SystemPromptContext(
     IReadOnlyList<string> ToolNames,
     IReadOnlyList<string> Skills,
     string? CustomInstructions,
+    string? CustomPrompt = null,
+    string? AppendSystemPrompt = null,
     IReadOnlyList<ToolPromptContribution>? ToolContributions = null,
-    IReadOnlyList<PromptContextFile>? ContextFiles = null);
+    IReadOnlyList<PromptContextFile>? ContextFiles = null,
+    DateTimeOffset? CurrentDateTime = null);
 
 public sealed class SystemPromptBuilder
 {
@@ -29,32 +32,67 @@ public sealed class SystemPromptBuilder
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var sections = new List<(string? Title, string Content)>
+        var normalizedWorkingDirectory = context.WorkingDirectory.Replace('\\', '/');
+        var timestamp = (context.CurrentDateTime ?? DateTimeOffset.Now).ToString("O");
+        var builder = new StringBuilder();
+
+        if (!string.IsNullOrWhiteSpace(context.CustomPrompt))
         {
-            (null, "You are a coding assistant with access to tools for reading, writing, and editing files, and executing shell commands."),
-            ("Environment", BuildEnvironmentSection(context)),
-            ("Available Tools", BuildToolsSection(context)),
-            ("Tool Guidelines", BuildToolGuidelinesSection(context))
-        };
+            builder.Append(context.CustomPrompt.Trim());
+        }
+        else
+        {
+            var sections = new List<(string? Title, string Content)>
+            {
+                (null, "You are a coding assistant with access to tools for reading, writing, and editing files, and executing shell commands."),
+                ("Environment", BuildEnvironmentSection(context)),
+                ("Available Tools", BuildToolsSection(context)),
+                ("Tool Guidelines", BuildToolGuidelinesSection(context))
+            };
+
+            builder.Append(BuildDocument(sections));
+        }
+
+        if (!string.IsNullOrWhiteSpace(context.AppendSystemPrompt))
+        {
+            builder.AppendLine();
+            builder.AppendLine();
+            builder.Append(context.AppendSystemPrompt.Trim());
+        }
 
         var contextFilesSection = BuildContextFilesSection(context.ContextFiles ?? []);
         if (!string.IsNullOrWhiteSpace(contextFilesSection))
         {
-            sections.Add(("Project Context", contextFilesSection));
+            builder.AppendLine();
+            builder.AppendLine();
+            builder.AppendLine("## Project Context");
+            builder.Append(contextFilesSection);
         }
 
-        var skillsSection = BuildSkillsSection(context.Skills);
+        var hasReadTool = context.ToolNames.Any(static name => string.Equals(name, "read", StringComparison.OrdinalIgnoreCase));
+        var skillsSection = hasReadTool ? BuildSkillsSection(context.Skills) : string.Empty;
         if (!string.IsNullOrWhiteSpace(skillsSection))
         {
-            sections.Add(("Skills", skillsSection));
+            builder.AppendLine();
+            builder.AppendLine();
+            builder.AppendLine("## Skills");
+            builder.Append(skillsSection);
         }
 
         if (!string.IsNullOrWhiteSpace(context.CustomInstructions))
         {
-            sections.Add(("Custom Instructions", context.CustomInstructions.Trim()));
+            builder.AppendLine();
+            builder.AppendLine();
+            builder.AppendLine("## Custom Instructions");
+            builder.Append(context.CustomInstructions.Trim());
         }
 
-        return BuildDocument(sections);
+        builder.AppendLine();
+        builder.Append($"Current date/time: {timestamp}");
+        builder.AppendLine();
+        builder.Append($"Current working directory: {normalizedWorkingDirectory}");
+
+        return builder.ToString().TrimEnd();
     }
 
     private static string BuildDocument(IEnumerable<(string? Title, string Content)> sections)
@@ -90,7 +128,7 @@ public sealed class SystemPromptBuilder
         var lines = new[]
         {
             $"- OS: {RuntimeInformation.OSDescription}",
-            $"- Working directory: {context.WorkingDirectory}",
+            $"- Working directory: {context.WorkingDirectory.Replace('\\', '/')}",
             $"- Git branch: {context.GitBranch ?? "N/A"}",
             $"- Git status: {context.GitStatus ?? "N/A"}",
             $"- Package manager: {context.PackageManager}"
@@ -120,8 +158,26 @@ public sealed class SystemPromptBuilder
             "Use tools proactively.",
             "Read files before editing.",
             "Make precise edits.",
-            "Verify changes compile."
+            "Verify changes compile.",
+            "Be concise in your responses.",
+            "Show file paths clearly when working with files."
         };
+
+        var hasBash = context.ToolNames.Any(static name => string.Equals(name, "bash", StringComparison.OrdinalIgnoreCase));
+        var hasGrep = context.ToolNames.Any(static name => string.Equals(name, "grep", StringComparison.OrdinalIgnoreCase));
+        var hasFind = context.ToolNames.Any(static name => string.Equals(name, "find", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "glob", StringComparison.OrdinalIgnoreCase));
+        var hasListDirectory = context.ToolNames.Any(static name =>
+            string.Equals(name, "ls", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(name, "list_directory", StringComparison.OrdinalIgnoreCase));
+
+        if (hasBash && !hasGrep && !hasFind && !hasListDirectory)
+        {
+            guidelines.Add("Use bash for file operations like ls, rg, find.");
+        }
+        else if (hasBash && (hasGrep || hasFind || hasListDirectory))
+        {
+            guidelines.Add("Prefer grep/find/ls tools over bash for file exploration (faster, respects .gitignore).");
+        }
 
         foreach (var guideline in (context.ToolContributions ?? []).SelectMany(contribution => contribution.Guidelines ?? []))
         {

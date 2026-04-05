@@ -18,6 +18,7 @@ public sealed class SystemPromptBuilderTests
             ToolNames: ["read", "write", "bash"],
             Skills: [],
             CustomInstructions: null,
+            CurrentDateTime: new DateTimeOffset(2026, 4, 6, 10, 30, 0, TimeSpan.Zero),
             ToolContributions:
             [
                 new ToolPromptContribution("read", "Read files with line numbers.", ["Prefer read before edit."]),
@@ -29,11 +30,13 @@ public sealed class SystemPromptBuilderTests
 
         prompt.Should().Contain("You are a coding assistant");
         prompt.Should().Contain("## Environment");
-        prompt.Should().Contain("- Working directory: C:\\repo");
+        prompt.Should().Contain("- Working directory: C:/repo");
         prompt.Should().Contain("## Available Tools");
         prompt.Should().Contain("- read: Read files with line numbers.");
         prompt.Should().Contain("## Tool Guidelines");
         prompt.Should().Contain("Prefer read before edit.");
+        prompt.Should().Contain("Current date/time: 2026-04-06T10:30:00.0000000+00:00");
+        prompt.Should().Contain("Current working directory: C:/repo");
     }
 
     [Fact]
@@ -49,19 +52,20 @@ public sealed class SystemPromptBuilderTests
             [
                 """
                 ---
-                name: skill-a
+                name: read
                 description: skill a description
                 ---
                 Skill A
                 """,
                 "Skill B"
             ],
-            CustomInstructions: "Use concise responses.");
+            CustomInstructions: "Use concise responses.",
+            CurrentDateTime: new DateTimeOffset(2026, 4, 6, 10, 30, 0, TimeSpan.Zero));
 
         var prompt = _builder.Build(context);
 
         prompt.Should().Contain("## Skills");
-        prompt.Should().Contain("name: skill-a");
+        prompt.Should().Contain("name: read");
         prompt.Should().Contain("description: skill a description");
         prompt.Should().Contain("Skill A");
         prompt.Should().Contain("Skill B");
@@ -80,6 +84,7 @@ public sealed class SystemPromptBuilderTests
             ToolNames: ["read"],
             Skills: [],
             CustomInstructions: null,
+            CurrentDateTime: new DateTimeOffset(2026, 4, 6, 10, 30, 0, TimeSpan.Zero),
             ContextFiles:
             [
                 new PromptContextFile(".botnexus-agent/context/runtime.md", "Runtime details")
@@ -103,11 +108,34 @@ public sealed class SystemPromptBuilderTests
             ToolNames: ["read"],
             Skills: [],
             CustomInstructions: "   ",
+            CurrentDateTime: new DateTimeOffset(2026, 4, 6, 10, 30, 0, TimeSpan.Zero),
             ToolContributions: [new ToolPromptContribution("read", null, ["  "])],
             ContextFiles: [new PromptContextFile("context.md", "   ")]);
 
         var prompt = _builder.Build(context);
 
         prompt.Should().NotContain("## Skills");
+    }
+
+    [Fact]
+    public void Build_WithCustomPrompt_ReplacesBaseAndAppendsConfiguredText()
+    {
+        var context = new SystemPromptContext(
+            WorkingDirectory: @"C:\repo",
+            GitBranch: null,
+            GitStatus: null,
+            PackageManager: "dotnet",
+            ToolNames: ["read"],
+            Skills: [],
+            CustomInstructions: null,
+            CustomPrompt: "Custom base prompt",
+            AppendSystemPrompt: "Appended prompt",
+            CurrentDateTime: new DateTimeOffset(2026, 4, 6, 10, 30, 0, TimeSpan.Zero));
+
+        var prompt = _builder.Build(context);
+
+        prompt.Should().StartWith("Custom base prompt");
+        prompt.Should().Contain("Appended prompt");
+        prompt.Should().NotContain("## Environment");
     }
 }
