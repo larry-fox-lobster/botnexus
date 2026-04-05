@@ -31,10 +31,21 @@ public sealed record AgentDescriptor
     public string? SystemPrompt { get; init; }
 
     /// <summary>
+    /// Path to a file containing the system prompt (alternative to <see cref="SystemPrompt" />).
+    /// Relative paths are resolved from the agent configuration directory.
+    /// </summary>
+    public string? SystemPromptFile { get; init; }
+
+    /// <summary>
     /// Tool identifiers this agent has access to.
     /// Resolved through the tool registry at agent creation time.
     /// </summary>
     public IReadOnlyList<string> ToolIds { get; init; } = [];
+
+    /// <summary>
+    /// Agent IDs this agent can call as sub-agents.
+    /// </summary>
+    public IReadOnlyList<string> SubAgentIds { get; init; } = [];
 
     /// <summary>
     /// The isolation strategy to use when running this agent.
@@ -52,5 +63,11 @@ public sealed record AgentDescriptor
     /// Agent-level metadata for extensibility (tags, owner, etc.).
     /// </summary>
     public IReadOnlyDictionary<string, object?> Metadata { get; init; } =
+        new Dictionary<string, object?>();
+
+    /// <summary>
+    /// Strategy-specific isolation configuration for <see cref="IsolationStrategy" />.
+    /// </summary>
+    public IReadOnlyDictionary<string, object?> IsolationOptions { get; init; } =
         new Dictionary<string, object?>();
 }
