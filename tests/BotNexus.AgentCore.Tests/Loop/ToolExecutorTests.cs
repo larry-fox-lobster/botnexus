@@ -57,6 +57,33 @@ public class ToolExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ParallelMode_BeforeToolCallHooksRunInToolCallOrder()
+    {
+        var tool = new RecordingTool("echo", delayMs: 50);
+        var context = new AgentContext(null, [], [tool]);
+        var assistant = CreateAssistantMessage(("t1", "echo", "first"), ("t2", "echo", "second"), ("t3", "echo", "third"));
+        var beforeOrder = new List<string>();
+        var config = TestHelpers.CreateTestConfig(
+            toolExecutionMode: ToolExecutionMode.Parallel,
+            beforeToolCall: async (beforeContext, _) =>
+            {
+                var delay = beforeContext.ToolCallRequest.Id switch
+                {
+                    "t1" => 60,
+                    "t2" => 30,
+                    _ => 0
+                };
+                await Task.Delay(delay);
+                beforeOrder.Add(beforeContext.ToolCallRequest.Id);
+                return null;
+            });
+
+        _ = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
+
+        beforeOrder.Should().Equal("t1", "t2", "t3");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WhenToolNotFound_ReturnsErrorResult()
     {
         var context = new AgentContext(null, [], []);

@@ -10,7 +10,7 @@ public class ToolCallIdNormalizationTests
 
     private static string NormalizeToolCallId(string id)
     {
-        var normalized = NonAlphanumericRegex.Replace(id, "");
+        var normalized = NonAlphanumericRegex.Replace(id, "_");
         if (normalized.Length > 64)
             normalized = normalized[..64];
         return normalized;
@@ -21,11 +21,11 @@ public class ToolCallIdNormalizationTests
     {
         var result = NormalizeToolCallId("toolu_01!@#$%^&*()");
 
-        result.Should().Be("toolu_01");
+        result.Should().Be("toolu_01__________");
     }
 
     [Fact]
-    public void LongId_TruncatedTo64Characters()
+    public void NormalizeToolCallId_LongId_TruncatedTo64Characters()
     {
         var longId = new string('a', 100);
         var result = NormalizeToolCallId(longId);
@@ -50,10 +50,27 @@ public class ToolCallIdNormalizationTests
     }
 
     [Fact]
-    public void DotsAndSpaces_Removed()
+    public void NormalizeToolCallId_DotsAndSpaces_ReplacedWithUnderscores()
     {
         var result = NormalizeToolCallId("tool.call id:v2");
 
-        result.Should().Be("toolcallidv2");
+        result.Should().Be("tool_call_id_v2");
+    }
+
+    [Fact]
+    public void NormalizeToolCallId_PipeCharacter_ReplacedWithUnderscore()
+    {
+        var result = NormalizeToolCallId("call_abc|fc_xyz");
+
+        result.Should().Be("call_abc_fc_xyz");
+    }
+
+    [Fact]
+    public void NormalizeToolCallId_WithReplacement_TruncatesTo64Characters()
+    {
+        var id = $"call_{new string('a', 70)}|fc_xyz";
+        var expected = id.Replace("|", "_", StringComparison.Ordinal)[..64];
+
+        NormalizeToolCallId(id).Should().Be(expected);
     }
 }

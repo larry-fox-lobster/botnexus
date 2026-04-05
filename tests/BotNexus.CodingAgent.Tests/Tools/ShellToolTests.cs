@@ -42,4 +42,16 @@ public sealed class ShellToolTests
         await action.Should().ThrowAsync<TimeoutException>()
             .WithMessage("*timed out*");
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenOutputExceedsLimit_ReturnsTruncatedTailWithPrefix()
+    {
+        var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?>
+        {
+            ["command"] = "$payload = ('a' * 52000) + 'TAIL-MARKER'; Write-Output $payload"
+        });
+
+        result.Content[0].Value.Should().Contain("[Output truncated — showing last 50000 characters]")
+            .And.Contain("TAIL-MARKER");
+    }
 }

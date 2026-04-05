@@ -74,6 +74,20 @@ public sealed class WriteToolTests : IDisposable
         result.Content[0].Value.Should().Contain($"({expectedBytes} bytes)");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WrittenFile_DoesNotStartWithUtf8Bom()
+    {
+        var fullPath = Path.Combine(_tempDirectory, "no-bom.txt");
+        await _tool.ExecuteAsync("test-call", new Dictionary<string, object?>
+        {
+            ["path"] = "no-bom.txt",
+            ["content"] = "plain text"
+        });
+
+        var bytes = await File.ReadAllBytesAsync(fullPath);
+        bytes.Take(3).Should().NotEqual(new byte[] { 0xEF, 0xBB, 0xBF });
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempDirectory))

@@ -195,6 +195,100 @@ public class AnthropicProviderAlignmentTests
     }
 
     [Fact]
+    public async Task Stream_RedactedThinkingBlock_UsesThinkingSignatureAsData()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var assistant = new AssistantMessage(
+            Content:
+            [
+                new ThinkingContent("should-never-be-sent", "sig-redacted", Redacted: true)
+            ],
+            Api: model.Api,
+            Provider: model.Provider,
+            ModelId: model.Id,
+            Usage: Usage.Empty(),
+            StopReason: StopReason.Stop,
+            ErrorMessage: null,
+            ResponseId: "resp_1",
+            Timestamp: timestamp);
+        var context = new Context(
+            SystemPrompt: "system",
+            Messages: [new UserMessage(new UserMessageContent("hello"), timestamp), assistant]);
+
+        var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        var redacted = body.RootElement.GetProperty("messages")[1].GetProperty("content")[0];
+
+        redacted.GetProperty("data").GetString().Should().Be("sig-redacted");
+    }
+
+    [Fact]
+    public async Task Stream_ReasoningModelWithThinkingDisabled_SendsDisabledThinkingConfig()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel(reasoning: true);
+        var context = TestHelpers.MakeContext();
+        var options = new AnthropicOptions
+        {
+            ApiKey = "test-key",
+            ThinkingEnabled = false
+        };
+
+        var stream = provider.Stream(model, context, options);
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        body.RootElement.GetProperty("thinking").GetProperty("type").GetString().Should().Be("disabled");
+    }
+
+    [Fact]
+    public async Task Stream_UnpairedSurrogateInUserMessage_IsSanitizedBeforeRequest()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var context = new Context(
+            SystemPrompt: "system",
+            Messages: [new UserMessage(new UserMessageContent("hello \uD800 world"), timestamp)]);
+
+        var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        body.RootElement.GetProperty("messages")[0]
+            .GetProperty("content")[0]
+            .GetProperty("text")
+            .GetString()
+            .Should()
+            .Be("hello \uFFFD world");
+    }
+
+    [Fact]
     public void Constructor_ThrowsWhenHttpClientIsNull()
     {
         var act = () => _ = new AnthropicProvider(null!);
