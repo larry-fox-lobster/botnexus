@@ -107,13 +107,13 @@ public sealed class GatewayWebSocketHandler
         }
     }
 
-    private async Task ProcessMessagesAsync(System.Net.WebSockets.WebSocket socket, string agentId, string sessionId, CancellationToken ct)
+    private async Task ProcessMessagesAsync(System.Net.WebSockets.WebSocket socket, string agentId, string sessionId, CancellationToken cancellationToken)
     {
         var buffer = new byte[4096];
 
-        while (socket.State == WebSocketState.Open && !ct.IsCancellationRequested)
+        while (socket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
         {
-            var result = await socket.ReceiveAsync(buffer, ct);
+            var result = await socket.ReceiveAsync(buffer, cancellationToken);
             if (result.MessageType == WebSocketMessageType.Close)
                 break;
 
@@ -124,35 +124,35 @@ public sealed class GatewayWebSocketHandler
             switch (msg.Type)
             {
                 case "message" when msg.Content is not null:
-                    await HandleUserMessageAsync(socket, agentId, sessionId, msg.Content, ct);
+                    await HandleUserMessageAsync(socket, agentId, sessionId, msg.Content, cancellationToken);
                     break;
 
                 case "abort":
                     var handle = _supervisor.GetInstance(agentId, sessionId);
                     if (handle is not null)
                     {
-                        var agentHandle = await _supervisor.GetOrCreateAsync(agentId, sessionId, ct);
-                        await agentHandle.AbortAsync(ct);
+                        var agentHandle = await _supervisor.GetOrCreateAsync(agentId, sessionId, cancellationToken);
+                        await agentHandle.AbortAsync(cancellationToken);
                     }
                     break;
 
                 case "ping":
-                    await SendJsonAsync(socket, new { type = "pong" }, ct);
+                    await SendJsonAsync(socket, new { type = "pong" }, cancellationToken);
                     break;
             }
         }
     }
 
-    private async Task HandleUserMessageAsync(System.Net.WebSockets.WebSocket socket, string agentId, string sessionId, string content, CancellationToken ct)
+    private async Task HandleUserMessageAsync(System.Net.WebSockets.WebSocket socket, string agentId, string sessionId, string content, CancellationToken cancellationToken)
     {
-        var session = await _sessions.GetOrCreateAsync(sessionId, agentId, ct);
+        var session = await _sessions.GetOrCreateAsync(sessionId, agentId, cancellationToken);
         session.History.Add(new SessionEntry { Role = "user", Content = content });
 
         try
         {
-            var handle = await _supervisor.GetOrCreateAsync(agentId, sessionId, ct);
+            var handle = await _supervisor.GetOrCreateAsync(agentId, sessionId, cancellationToken);
 
-            await foreach (var evt in handle.StreamAsync(content, ct))
+            await foreach (var evt in handle.StreamAsync(content, cancellationToken))
             {
                 object wsMessage = evt.Type switch
                 {
@@ -165,23 +165,23 @@ public sealed class GatewayWebSocketHandler
                     _ => (object)new { type = "unknown" }
                 };
 
-                await SendJsonAsync(socket, wsMessage, ct);
+                await SendJsonAsync(socket, wsMessage, cancellationToken);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error handling WebSocket message for agent '{AgentId}'", agentId);
-            await SendJsonAsync(socket, new { type = "error", message = ex.Message, code = "AGENT_ERROR" }, ct);
+            await SendJsonAsync(socket, new { type = "error", message = ex.Message, code = "AGENT_ERROR" }, cancellationToken);
         }
 
         session.UpdatedAt = DateTimeOffset.UtcNow;
-        await _sessions.SaveAsync(session, ct);
+        await _sessions.SaveAsync(session, cancellationToken);
     }
 
-    private static async Task SendJsonAsync(System.Net.WebSockets.WebSocket socket, object message, CancellationToken ct)
+    private static async Task SendJsonAsync(System.Net.WebSockets.WebSocket socket, object message, CancellationToken cancellationToken)
     {
         var json = JsonSerializer.SerializeToUtf8Bytes(message, JsonOptions);
-        await socket.SendAsync(json, WebSocketMessageType.Text, true, ct);
+        await socket.SendAsync(json, WebSocketMessageType.Text, true, cancellationToken);
     }
 
     private sealed record WsClientMessage(
