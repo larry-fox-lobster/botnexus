@@ -4,6 +4,8 @@ using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
 using BotNexus.CodingAgent.Utils;
 using BotNexus.Providers.Core.Models;
+using DiffPlex.DiffBuilder;
+using DiffPlex.DiffBuilder.Model;
 
 namespace BotNexus.CodingAgent.Tools;
 
@@ -93,8 +95,13 @@ public sealed class EditTool : IAgentTool
 
         return await _fileMutationQueue.WithFileLockAsync(fullPath, async () =>
         {
-            var original = await File.ReadAllTextAsync(fullPath, cancellationToken).ConfigureAwait(false);
-            original = original.TrimStart('\uFEFF');
+            var originalBytes = await File.ReadAllBytesAsync(fullPath, cancellationToken).ConfigureAwait(false);
+            var hasUtf8Bom = HasUtf8Bom(originalBytes);
+            var original = Encoding.UTF8.GetString(originalBytes);
+            if (hasUtf8Bom && original.StartsWith('\uFEFF'))
+            {
+                original = original[1..];
+            }
             var originalLineEnding = DetectLineEnding(original);
             var normalizedOriginal = NormalizeLineEndings(original);
             var replacements = ResolveReplacements(normalizedOriginal, edits);
@@ -105,12 +112,11 @@ public sealed class EditTool : IAgentTool
                 throw new InvalidOperationException("Edit produced no change — the replacement text is identical to the original.");
             }
 
-            await File.WriteAllTextAsync(fullPath, updatedText, new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
+            await File.WriteAllTextAsync(fullPath, updatedText, new UTF8Encoding(hasUtf8Bom), cancellationToken).ConfigureAwait(false);
 
-            var firstChange = replacements[0];
-            var snippet = BuildSnippet(updatedNormalized, firstChange.StartIndex, firstChange.NewText.Length);
             var relativePath = PathUtils.GetRelativePath(fullPath, _workingDirectory);
-            var message = $"Successfully replaced {replacements.Count} block(s) in '{relativePath}'.\nContext:\n{snippet}";
+            var diff = BuildUnifiedDiff(relativePath, normalizedOriginal, updatedNormalized);
+            var message = $"Successfully replaced {replacements.Count} block(s) in '{relativePath}'.\n{diff}";
 
             return new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, message)]);
         }).ConfigureAwait(false);
@@ -353,8 +359,12 @@ public sealed class EditTool : IAgentTool
 
             for (var i = lineStart; i < trimmedEnd; i++)
             {
-                normalized.Append(NormalizeFuzzyChar(text[i]));
-                indexMap.Add(i);
+                var mapped = NormalizeFuzzyText(text[i]);
+                foreach (var mappedChar in mapped)
+                {
+                    normalized.Append(mappedChar);
+                    indexMap.Add(i);
+                }
             }
 
             if (!hasLineBreak)
@@ -371,16 +381,23 @@ public sealed class EditTool : IAgentTool
         return new NormalizedFuzzyText(normalized.ToString(), indexMap);
     }
 
-    private static char NormalizeFuzzyChar(char value)
+    private static string NormalizeFuzzyText(char value)
     {
-        return value switch
+        var normalized = value.ToString().Normalize(NormalizationForm.FormKC);
+        var builder = new StringBuilder(normalized.Length);
+        foreach (var character in normalized)
         {
-            '\u201C' or '\u201D' => '"',
-            '\u2018' or '\u2019' => '\'',
-            '\u2014' or '\u2013' => '-',
-            '\u00A0' => ' ',
-            _ => value
-        };
+            builder.Append(character switch
+            {
+                '\u2018' or '\u2019' or '\u201A' or '\u201B' => '\'',
+                '\u201C' or '\u201D' or '\u201E' or '\u201F' => '"',
+                '\u2010' or '\u2011' or '\u2012' or '\u2013' or '\u2014' or '\u2015' or '\u2212' => '-',
+                '\u00A0' or '\u2002' or '\u2003' or '\u2004' or '\u2005' or '\u2006' or '\u2007' or '\u2008' or '\u2009' or '\u200A' or '\u202F' or '\u205F' or '\u3000' => ' ',
+                _ => character
+            });
+        }
+
+        return builder.ToString();
     }
 
     private static string DetectLineEnding(string value)
@@ -395,12 +412,115 @@ public sealed class EditTool : IAgentTool
             : value;
     }
 
-    private static string BuildSnippet(string content, int replacementIndex, int replacementLength)
+    private static bool HasUtf8Bom(byte[] bytes)
     {
-        const int contextWindow = 120;
-        var snippetStart = Math.Max(0, replacementIndex - contextWindow);
-        var snippetEnd = Math.Min(content.Length, replacementIndex + replacementLength + contextWindow);
-        return content[snippetStart..snippetEnd];
+        return bytes.Length >= 3 &&
+               bytes[0] == 0xEF &&
+               bytes[1] == 0xBB &&
+               bytes[2] == 0xBF;
+    }
+
+    private static string BuildUnifiedDiff(string relativePath, string before, string after)
+    {
+        var diff = InlineDiffBuilder.Diff(before, after);
+        var lines = diff.Lines;
+        var changedLineIndexes = new List<int>();
+        for (var index = 0; index < lines.Count; index++)
+        {
+            if (lines[index].Type != ChangeType.Unchanged)
+            {
+                changedLineIndexes.Add(index);
+            }
+        }
+
+        if (changedLineIndexes.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        const int contextLines = 3;
+        var hunks = new List<(int Start, int End)>();
+        var currentStart = Math.Max(0, changedLineIndexes[0] - contextLines);
+        var currentEnd = Math.Min(lines.Count - 1, changedLineIndexes[0] + contextLines);
+
+        for (var i = 1; i < changedLineIndexes.Count; i++)
+        {
+            var nextStart = Math.Max(0, changedLineIndexes[i] - contextLines);
+            var nextEnd = Math.Min(lines.Count - 1, changedLineIndexes[i] + contextLines);
+            if (nextStart <= currentEnd + 1)
+            {
+                currentEnd = nextEnd;
+                continue;
+            }
+
+            hunks.Add((currentStart, currentEnd));
+            currentStart = nextStart;
+            currentEnd = nextEnd;
+        }
+
+        hunks.Add((currentStart, currentEnd));
+
+        var builder = new StringBuilder();
+        builder.AppendLine($"--- a/{relativePath.Replace('\\', '/')}");
+        builder.AppendLine($"+++ b/{relativePath.Replace('\\', '/')}");
+        foreach (var (start, end) in hunks)
+        {
+            var oldLine = 1;
+            var newLine = 1;
+            for (var i = 0; i < start; i++)
+            {
+                if (lines[i].Type != ChangeType.Inserted)
+                {
+                    oldLine++;
+                }
+
+                if (lines[i].Type != ChangeType.Deleted)
+                {
+                    newLine++;
+                }
+            }
+
+            var oldCount = 0;
+            var newCount = 0;
+            for (var i = start; i <= end; i++)
+            {
+                if (lines[i].Type != ChangeType.Inserted)
+                {
+                    oldCount++;
+                }
+
+                if (lines[i].Type != ChangeType.Deleted)
+                {
+                    newCount++;
+                }
+            }
+
+            builder.AppendLine($"@@ -{oldLine},{oldCount} +{newLine},{newCount} @@");
+            for (var i = start; i <= end; i++)
+            {
+                var line = lines[i];
+                switch (line.Type)
+                {
+                    case ChangeType.Unchanged:
+                        builder.AppendLine($" {line.Text}");
+                        break;
+                    case ChangeType.Deleted:
+                        builder.AppendLine($"-{line.Text}");
+                        break;
+                    case ChangeType.Inserted:
+                        builder.AppendLine($"+{line.Text}");
+                        break;
+                    case ChangeType.Modified:
+                        builder.AppendLine($"-{line.Text}");
+                        builder.AppendLine($"+{line.Text}");
+                        break;
+                    case ChangeType.Imaginary:
+                        break;
+                }
+            }
+        }
+
+        return builder.ToString().TrimEnd();
     }
 
     private sealed record EditEntry(string OldText, string NewText);
