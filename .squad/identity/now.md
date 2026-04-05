@@ -1,68 +1,80 @@
 ---
-updated_at: 2026-04-06T12:00:00Z
-focus_area: Post-Audit Stabilization — P1 Triage + Doc Process Improvement
-active_issues: [15 remaining P1s, 24 P2s, AgentSession design, provider conformance tests, doc checkpoint gate]
+updated_at: 2026-07-11T12:00:00Z
+focus_area: Phase 5 Planning — Process Improvements + P1 Triage
+active_issues: [remaining P1s from Phase 4, P2/P3 backlog, provider conformance tests, doc checkpoint gate, AgentSession design]
 status: between_sprints
 ---
 
 # What We're Focused On
 
-**Port audit complete — all 3 phases done.** Phase 3 scanned pi-mono packages/ai, packages/agent, packages/coding-agent. 7 ADs implemented, 1 deferred (YAGNI), 1 already present. 415 tests passing, 0 build errors, 0 warnings. Architecture grade held at A. Next sprint: P1 triage, doc process improvement (stagger docs behind code), provider conformance tests.
+**Port audit Phase 4 complete.** 67 findings triaged (7 P0, 23 P1, 23 P2, 14 P3). All 7 P0s fixed, 6 P1s fixed. 438 tests passing, 0 build errors. 24 architecture decisions locked across 4 phases. Next: process improvements (sequencing refactors, build gates), P1 triage, provider conformance tests.
 
 ## Current Status
 
-✅ **Sprint:** Phase 3 complete — retrospective done  
+✅ **Sprint:** Phase 4 complete — retrospective done  
 ✅ **Build:** 0 errors, 0 warnings  
-✅ **Tests:** 415 passing (132 Core + 53 Anthropic + 41 OpenAI + 24 OpenAICompat + 15 Copilot + 40 AgentCore + 110 CodingAgent)  
-✅ **P0s:** 25/25 closed across all audit phases  
-📋 **Decisions:** 17 architecture decisions locked (AD-1 through AD-17)  
-📋 **Port audit:** Complete — all 3 phases finished
+✅ **Tests:** 438 passing (134 Core + 54 Anthropic + 42 OpenAI + 24 OpenAICompat + 15 Copilot + 52 AgentCore + 117 CodingAgent)  
+✅ **P0s:** 32/32 closed across all audit phases (25 prior + 7 Phase 4)  
+📋 **Decisions:** 24 architecture decisions locked (AD-1–AD-17 + P0-1–P0-7)  
+📋 **Port audit:** 4 phases complete
 
-## Completed — Phase 3 Sprint Results (13 commits, 6 agents)
+## Completed — Phase 4 Sprint Results (20+ commits, 8 agents)
 
-- **Farnsworth:** 2 commits — DefaultMessageConverter (AD-9), ModelRegistry utilities (AD-15)
-- **Bender:** 5 commits — ListDirectoryTool (AD-11), ContextFileDiscovery (AD-12), --thinking CLI (AD-10), session metadata (AD-14), /thinking command (AD-17)
-- **Kif:** 1 commit — 4 new training modules (~1,325 lines)
-- **Nibbler:** 2 commits — consistency review (22 fixes across 7 files)
-- **Scribe:** 2 commits — orchestration logs, history updates
-- **Bender:** 1 commit — learnings recorded
+- **Farnsworth:** P0-4 ModelsAreEqual, P0-5 StopReason mapping, P1 apiKey fallback, P1 Anthropic file split, P1 JSON construction
+- **Bender (agent):** P0-6 swallowed exceptions, P0-7 MessageStartEvent, P1 HasQueuedMessages, P1 queue mode setters, P1 TransformContext, P1 ConvertToLlm fallback
+- **Bender (coding-agent):** P0-1 DiffPlex EditTool, P0-2 Git Bash ShellTool, P0-3 byte limit alignment, P1 truncation suffix, P1 timeout docs
+- **Hermes:** 16 new tests covering all P0 fixes
+- **Kif:** 5 training module updates + new changelog module
+- **Nibbler:** Consistency review
+- **Scribe:** Orchestration logs, history updates
+
+## Action Items (from Phase 4 Retro)
+
+1. **Sequence structural refactors before behavioral fixes** — prevents cross-agent build conflicts (P0)
+2. **Same-method changes go to same agent** — prevents merge-induced scoping bugs (P0)
+3. **Build gate between merges to same file** — automated catch for scope/merge issues (P1)
+4. **Provider conformance test suite** — action item from all 4 phase retros (P1)
+5. **Doc checkpoint gate** — docs agent reads final code before authoring (P1)
+6. **Stagger doc authoring behind code** — Kif starts after code commits land (P1)
 
 ## Remaining Backlog
 
-### P1 — Next Sprint Candidates (15 items)
+### P1 — Next Sprint Candidates
 - Streaming error recovery and retry-after handling
-- Model capability metadata per provider
 - Context window pressure tracking with thresholds
+- Provider-level error categorization
+- Rate limit backoff coordination
+- Model capability metadata per provider
 - Compaction quality scoring
 - Tool timeout configuration
 - Session restore edge cases
 - isStreaming semantics refinement
-- Provider-level error categorization
-- Rate limit backoff coordination
 - Tool result size limits
 - Agent.Subscribe cleanup on dispose
 - Hook ordering under concurrent access
 - ContinueAsync steering deduplication
 - OpenAI Responses API streaming gaps
 - Anthropic cache_control TTL optimization
+- Phase 4 P2/P3 items (23 P2, 14 P3)
 
-### Process Improvements (from Phase 3 retro)
-- **Doc checkpoint gate** — docs agent must read final code before authoring examples (P0)
-- **Stagger doc authoring** — Kif starts after code commits land, not in parallel (P0)
+### Process Improvements
 - **Signature extraction script** — utility to extract public API signatures from assemblies (P1)
 - **Consistency review shifts left** — Nibbler checks before sprint-complete, not after (P1)
+- **Behavioral equivalence test harness** — carried from Phase 1 retro (P1)
 
 ### Deferred Architecture
 - **AgentSession wrapper** — AD-1 composition constraint locked. Dedicated sprint needed.
 - **Proxy implementation** — New project. Backlogged.
-- **Provider conformance test suite** — Action item from all 3 phase retros.
+- Missing providers (Google, Bedrock, Azure, Mistral, Codex)
+- RPC mode, JSON mode, HTML export
+- Full CLI flag parity, slash command parity
 
 ## Next Sprint Priorities
-1. P1 triage — rank by user-facing impact
-2. Doc process improvement (implement checkpoint gate)
+1. Process improvements — implement sequencing + build gate action items
+2. P1 triage — rank by user-facing impact
 3. Provider conformance test suite (quality gate investment)
-4. AgentSession design sprint (AD-1 constraint ready)
-5. Streaming error recovery (top P1)
+4. Streaming error recovery (top P1)
+5. AgentSession design sprint (AD-1 constraint ready)
 
 ## Key Architecture Decisions (Locked)
 
@@ -85,8 +97,22 @@ status: between_sprints
 | AD-15 | ModelRegistry SupportsExtraHigh + ModelsAreEqual | Identity and capability utilities for model comparison |
 | AD-16 | maxRetryDelayMs — ALREADY PRESENT | Verified existing implementation is sufficient |
 | AD-17 | /thinking slash command | Interactive thinking level control via slash command |
+| P0-1 | EditTool — DiffPlex for unified diff | Proper library vs hand-rolled; fixes token-wasting full-file diffs |
+| P0-2 | ShellTool — Git Bash detection on Windows | Bash semantics parity with TS; PowerShell fallback with warning |
+| P0-3 | Byte limit 50×1024 across all tools | Alignment with TS reference |
+| P0-4 | ModelsAreEqual — Id+Provider only | BaseUrl is transport, not identity |
+| P0-5 | StopReason — map dead values from providers | Wire up Refusal/Sensitive from provider responses |
+| P0-6 | Agent.cs — log swallowed listener exceptions | Diagnostic callback instead of bare catch |
+| P0-7 | MessageStartEvent — defer add to MessageEnd | Prevents partial messages in state during streaming |
 
 ## What's Done
+
+### Port Audit Phase 4 (20+ commits, 8 agents)
+- 67 findings triaged: 7 P0, 23 P1, 23 P2, 14 P3
+- 7/7 P0s fixed, 6/6 P1s fixed
+- 16 new tests added (422 → 438)
+- DiffPlex adoption, Git Bash detection, MessageStartEvent fix
+- Architecture grade: **A**
 
 ### Port Audit Phase 3 (13 commits, 6 agents)
 - 9 architecture decisions (AD-9–AD-17): 7 implemented, 1 deferred, 1 already present
@@ -116,6 +142,8 @@ status: between_sprints
 
 ## Key Artifacts
 
+- `.squad/decisions/inbox/leela-retro-port-audit-phase4.md` — Phase 4 retrospective
+- `.squad/decisions/inbox/leela-design-review-phase4.md` — Phase 4 architecture decisions
 - `.squad/decisions/inbox/leela-retro-port-audit-phase-3.md` — Phase 3 retrospective
 - `.squad/decisions/inbox/leela-retro-port-audit-sprint-2.md` — Phase 2 retrospective
 - `.squad/decisions/inbox/leela-design-review-port-audit-2.md` — Phase 2 architecture decisions

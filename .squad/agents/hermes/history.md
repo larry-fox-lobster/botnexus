@@ -471,3 +471,33 @@ All Sprints 1-2 foundation work completed by Farnsworth and Bender. Hermes ready
 - Kif: 7 training guides (~2500 lines) — 1 commit, docs ✓
 
 **All systems green. Ready for integration.**
+- Preserved strict home isolation by using CliHomeScope.CreateAsync() in every test to avoid touching %USERPROFILE%\.botnexus.
+
+---
+
+## 2026-04-05T11:52:58Z — Sprint 4 Consolidation: P0/P1 Test Suite Complete
+
+**Status:** ✅ COMPLETE  
+**Timestamp:** 2026-04-05T11:52:58Z  
+**Orchestration Log:** .squad/orchestration-log/2026-04-05T11-52-58Z-hermes.md
+
+**Your Deliverables (Hermes — QA & Testing):**
+
+1. **Test Coverage (3 commits, 16 new tests):**
+   - Provider tests: Mapping validation, JSON construction, apiKey fallback (6 tests)
+   - Agent tests: Lifecycle, queue state, listener error handling (5 tests)
+   - CodingAgent tests: Tool diff, Git Bash detection, truncation (5 tests)
+
+2. **Test Suite Metrics:**
+   - Total: 438 tests (↑16 from 422)
+   - Status: 100% passing
+   - Coverage: All P0/P1 implementations verified
+   - Regression: 0 failures from prior sprints
+
+**Cross-Agent Validation:**
+- Verified Bender's AgentCore P0/P1 fixes
+- Verified Farnsworth's provider P0/P1 fixes
+- No integration blockers detected
+- All systems build clean
+
+**Next Phase:** Ready for production E2E validation.

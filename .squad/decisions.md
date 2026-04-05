@@ -5603,6 +5603,180 @@ $ botnexus-agent config init
 
 ---
 
+## Design Review: Port Audit Phase 4 (2026-04-05)
+
+**Date:** 2026-04-05  
+**Author:** Leela (Lead)  
+**Status:** Approved for Sprint  
+**Scope:** 67 findings from 3-way pi-mono ↔ BotNexus audit (7 P0, 23 P1, 23 P2, 14 P3)
+
+### Validation Summary
+
+All 7 P0s confirmed against source. No false positives.
+
+| # | Finding | File | Confirmed |
+|---|---------|------|-----------|
+| P0-1 | EditTool diff broken | `EditTool.cs:421-440` | ✅ `BuildUnifiedDiff` dumps all lines as -/+ with no context |
+| P0-2 | ShellTool uses PowerShell on Windows | `ShellTool.cs:187` | ✅ Hardcoded `("powershell", ...)` on Windows |
+| P0-3 | Byte limit 50,000 vs 51,200 | `ShellTool.cs:27`, `GrepTool.cs:18`, `ReadTool.cs:15`, `ListDirectoryTool.cs:12` | ✅ All tools use `50_000` / `50000` |
+| P0-4 | ModelsAreEqual compares BaseUrl | `ModelRegistry.cs:67-69` | ✅ Compares Id+Provider+BaseUrl; TS only Id+Provider |
+| P0-5 | Dead StopReason values | `Enums.cs:13-15` | ✅ Refusal/PauseTurn/Sensitive never produced by any mapper |
+| P0-6 | Swallowed listener exceptions | `Agent.cs:444-446, 473-475` | ✅ Bare `catch { }` on AgentEndEvent emission |
+| P0-7 | MessageStartEvent premature add | `Agent.cs:605-611` | ✅ Adds assistant to state.Messages during streaming |
+
+### Architecture Decisions
+
+#### P0-1: EditTool Diff — Use DiffPlex NuGet
+
+**Decision:** Add the `DiffPlex` NuGet package and replace `BuildUnifiedDiff` with a proper inline diff that produces context-style unified output.
+
+**Rationale:**
+- The current implementation (lines 421-440) joins all `beforeLines` as removals and all `afterLines` as additions. For a 1-line edit in a 200-line file, this generates 400 diff lines instead of ~7 context lines. This balloons token usage and confuses the LLM.
+- DiffPlex is the standard .NET diff library — MIT-licensed, mature, well-maintained, zero transitive dependencies.
+- Rolling our own LCS is unnecessary complexity. DiffPlex's `InlineDiffBuilder` produces exactly the unified output format we need.
+- The TS side uses a custom LCS but we don't need to replicate that when a battle-tested library exists.
+
+**Implementation:** `dotnet add src/coding-agent/BotNexus.CodingAgent/BotNexus.CodingAgent.csproj package DiffPlex`. Replace `BuildUnifiedDiff` body with `InlineDiffBuilder.Diff(before, after)` → format as unified diff with context lines (3-line default). Keep the `--- a/` / `+++ b/` header format. Add test: single-line edit in 50-line file should produce ≤12 diff lines, not 100.
+
+**Owner:** Bender
+
+---
+
+#### P0-2: ShellTool — Detect Git Bash, Keep Tool Name
+
+**Decision:** On Windows, detect Git Bash at the standard `C:\Program Files\Git\bin\bash.exe` path (and `PATH` fallback), and use it instead of PowerShell. Keep the tool name as `bash`. If Git Bash is not found, fall back to PowerShell with a diagnostic warning in the output.
+
+**Rationale:**
+- The TS agent always uses bash, even on Windows (via Git Bash). This is intentional — the system prompt is written for bash semantics, and PowerShell differences (quoting, pipelines, env vars) cause subtle tool-call failures.
+- Renaming the tool to "shell" would require prompt changes and break TS parity. The tool name is `bash` and should stay `bash`.
+- Git Bash ships with Git for Windows, which is a near-universal dependency for dev environments. If it's missing, we emit a clear warning rather than silently failing.
+- The fallback to PowerShell keeps the tool functional in environments without Git Bash (e.g., CI containers).
+
+**Implementation:** Add `FindBashExecutable()` that checks: (1) `C:\Program Files\Git\bin\bash.exe`, (2) `C:\Program Files (x86)\Git\bin\bash.exe`, (3) `where.exe bash` on PATH. Cache the resolved path (static lazy). Don't re-resolve every call. When falling back to PowerShell, prepend `[warning: bash not found, using PowerShell]` to output. Non-Windows path unchanged.
+
+**Owner:** Bender
+
+---
+
+#### P0-3: Byte Limit — Align to 51,200 (50 × 1024)
+
+**Decision:** Change all `MaxOutputBytes` constants from `50000`/`50_000` to `50 * 1024` (51,200) across all tools.
+
+**Rationale:** Trivial alignment fix. The TS uses `50 * 1024` consistently. Using a non-power-of-two value is just a typo.
+
+**Files:** `ShellTool.cs`, `GrepTool.cs`, `ReadTool.cs`, `ListDirectoryTool.cs`
+
+**Owner:** Bender
+
+---
+
+#### P0-4: ModelsAreEqual — Remove BaseUrl Comparison
+
+**Decision:** Remove the `BaseUrl` comparison from `ModelRegistry.ModelsAreEqual`. Match on `Id` + `Provider` only, consistent with TS.
+
+**Rationale:**
+- TS compares `model.id` and `model.provider` only.
+- BaseUrl is a transport concern, not an identity concern. Two references to `claude-3-opus` on the same provider are the same model regardless of which endpoint serves them.
+- Including BaseUrl causes false negatives when the same model is registered with different base URLs (e.g., proxy vs direct).
+
+**Owner:** Farnsworth
+
+---
+
+#### P0-5: StopReason Dead Values — Keep Enum, Map Correctly
+
+**Decision:** Keep `Refusal`, `PauseTurn`, and `Sensitive` in the enum. Map them from provider responses where applicable (OpenAI produces `refusal`; Anthropic may produce content-policy stops). Remove `PauseTurn` only if no provider path exists after mapping audit.
+
+**Rationale:**
+- These are valid stop reasons that providers can return. The bug isn't that they exist in the enum — the bug is that no mapper in our providers actually produces them.
+- `MessageTransformer.cs:70` already handles them correctly alongside Error/Aborted for skip logic. The code is correct but untested because the values are never populated.
+- Removing enum values creates a forward-compatibility risk. Better to wire them up properly.
+
+**Implementation:** Audit each provider mapper: Anthropic → map content-policy blocks to `Refusal`; OpenAI → map `content_filter` to `Sensitive`, `refusal` to `Refusal`. `PauseTurn` — verify if any provider has a "pause" / "incomplete" stop. If not after audit, remove it. Add StopReason mapping tests per provider.
+
+**Owner:** Farnsworth
+
+---
+
+#### P0-6: Swallowed Listener Exceptions — Log, Don't Swallow
+
+**Decision:** Replace the bare `catch { }` blocks in Agent.cs abort/failure paths with `catch (Exception ex)` that logs the exception through a diagnostic callback, then continues. Do NOT let listener errors prevent the abort/failure result from being returned.
+
+**Rationale:**
+- The current code (lines 444-446, 473-475) silently swallows all exceptions. If a listener throws during agent_end on a failure path, the error is completely lost — no log, no diagnostic, nothing.
+- We can't let listener errors propagate here because we're already in an error/abort handler. Rethrowing would mask the original error.
+- The correct pattern: catch, log via a diagnostic channel (the existing `AgentOptions.OnDiagnostic` callback or `ILogger` if wired), then continue.
+- TS does the same — it catches but logs to `console.error`.
+
+**Implementation:** Add diagnostic callback to Agent (if not present) or use existing tracing. Replace both `catch { }` blocks with `catch (Exception ex) { _options.OnDiagnostic?.Invoke($"Listener error during agent_end: {ex.Message}"); }` or equivalent. Keep the return flow unchanged — the abort/failure message must still be returned.
+
+**Owner:** Bender
+
+---
+
+#### P0-7: MessageStartEvent — Defer Add to MessageEnd
+
+**Decision:** Remove the `_state.Messages.Add(startingAssistant)` from the `MessageStartEvent` handler. Only add the assistant message to `_state.Messages` in the `MessageEndEvent` handler, consistent with TS.
+
+**Rationale:**
+- Currently (lines 605-611), the assistant message is added to `_state.Messages` the instant streaming begins. This means:
+  - Any code reading `_state.Messages` during streaming sees an incomplete/partial message.
+  - The `MessageEndEvent` handler then *replaces* the last message (lines 628-632), creating a read-update-replace pattern that's fragile under concurrency.
+- TS waits until `message_end` to add the message to the transcript. During streaming, it only sets a `streamingMessage` field for UI purposes.
+- Our code already sets `_state.SetStreamingMessage(startingAssistant)` at line 608, which is the correct way to expose the in-progress message. The `Add` on line 610 is the premature part.
+
+**Implementation:** In `MessageStartEvent` handler: keep `SetStreamingMessage(startingAssistant)`, remove `startedMessages.Add(...)` / `_state.Messages = startedMessages`. In `MessageEndEvent` handler: always add (not replace) the final message. Simplify the logic — no need to check if the last message is already an assistant. Verify: agent loop's `messages.Add(assistantMessage)` in AgentLoopRunner.cs:186 is the canonical add and happens after streaming completes. The state handler should mirror, not duplicate, this.
+
+**Owner:** Bender
+
+---
+
+### P1 Sprint Items (Approved)
+
+| # | Finding | Decision | Owner |
+|---|---------|----------|-------|
+| 8 | HasQueuedMessages missing | Add `bool HasQueuedMessages => _steeringQueue.Count > 0 \|\| _followUpQueue.Count > 0;` to Agent.cs | Bender |
+| 9 | Runtime queue mode setters | Add `SetSteeringMode(QueueMode)` and `SetFollowUpMode(QueueMode)` to Agent.cs | Bender |
+| 10 | Line truncation suffix `"..."` vs `"... [truncated]"` | Change GrepTool `TruncateLine` suffix from `"..."` to `"... [truncated]"` to match TS | Bender |
+| 11 | SimpleOptionsHelper apiKey fallback | In `BuildBaseOptions`, fall through to `options?.ApiKey` when `apiKey` param is null/empty | Farnsworth |
+| 14 | Shell timeout default 120s | Keep 120s default. TS has no default (infinite), but a default is safer. Document deviation. | Bender |
+| 15 | TransformContext required vs optional | Make `TransformContext` optional in `AgentLoopConfig` (default to identity passthrough). Aligns with TS. | Bender |
+| 16 | ConvertToLlm no auto-default | Add fallback to `DefaultMessageConverter.ConvertToLlm` when null. Aligns with TS `defaultConvertToLlm`. | Bender |
+| 17 | Break up AnthropicProvider.cs (1,087 lines) | Extract streaming, request building, and response mapping into separate internal classes within the same namespace. Target: no file over 400 lines. | Farnsworth |
+| 18 | Consistent JSON construction | Standardize on `JsonSerializer.SerializeToElement()` pattern across all providers. No mixed `JsonObject`/string concatenation. | Farnsworth |
+
+---
+
+### P1 Deferred Items (Not This Sprint)
+
+The following are **new features**, not port-parity fixes. They go to the backlog:
+
+- Missing providers (Google, Bedrock, Azure, Mistral, Codex)
+- RPC mode, JSON mode, HTML export
+- Full CLI flag parity, slash command parity
+- Event bus, output guard, prompt templates
+- Model fuzzy/glob matching (#13) — deferred pending design for glob syntax
+
+---
+
+### P2/P3 Items
+
+Tracked but not assigned this sprint. Will be picked up in the next cycle or as drive-by fixes during P0/P1 work.
+
+---
+
+### Assignment Summary
+
+**Bender** (agent + coding-agent): P0-1, P0-2, P0-3, P0-6, P0-7, #8, #9, #10, #14, #15, #16
+**Farnsworth** (providers): P0-4, P0-5, #11, #17, #18
+
+Sprint order:
+1. P0s first (all 7, parallel tracks)
+2. P1s second (after P0s pass tests)
+3. P2/P3 as drive-bys only
+
+---
+
 ## bender-codingagent-audit.md
 
 # CodingAgent Alignment Audit
