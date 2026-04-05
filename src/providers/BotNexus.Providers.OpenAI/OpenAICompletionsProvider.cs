@@ -159,7 +159,7 @@ public sealed class OpenAICompletionsProvider(
             payload["temperature"] = options.Temperature.Value;
 
         if (compat.SupportsStore)
-            payload["store"] = true;
+            payload["store"] = false;
 
         if (compat.SupportsUsageInStreaming)
             payload["stream_options"] = new JsonObject { ["include_usage"] = true };
