@@ -1,6 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text;
-using System.Text.Json;
+using System.Text.Json.Nodes;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
 using BotNexus.Providers.Core.Registry;
@@ -18,12 +18,6 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
     private const string ApiVersion = "2023-06-01";
     private const string ClaudeCodeVersion = "2.1.75";
     private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-    };
 
     public string Api => "anthropic-messages";
 
@@ -158,11 +152,11 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
         if (options?.OnPayload is { } onPayload)
         {
             var modified = await onPayload(requestBody, model);
-            if (modified is Dictionary<string, object?> modifiedDict)
-                requestBody = modifiedDict;
+            if (modified is JsonObject modifiedObject)
+                requestBody = modifiedObject;
         }
 
-        var json = JsonSerializer.Serialize(requestBody, JsonOptions);
+        var json = requestBody.ToJsonString();
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/messages");
         httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");

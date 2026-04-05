@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Compatibility;
 using BotNexus.Providers.Core.Models;
@@ -89,11 +90,11 @@ public sealed class OpenAICompatProvider(HttpClient httpClient) : IApiProvider
         if (options?.OnPayload is not null)
         {
             var modified = await options.OnPayload(requestBody, model);
-            if (modified is JsonElement modifiedElement)
-                requestBody = modifiedElement;
+            if (modified is JsonObject modifiedObject)
+                requestBody = modifiedObject;
         }
 
-        var requestJson = JsonSerializer.Serialize(requestBody);
+        var requestJson = requestBody.ToJsonString();
         var url = $"{model.BaseUrl.TrimEnd('/')}/chat/completions";
 
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
@@ -291,14 +292,14 @@ public sealed class OpenAICompatProvider(HttpClient httpClient) : IApiProvider
         stream.End(finalMessage);
     }
 
-    private static object BuildRequestBody(
+    private static JsonObject BuildRequestBody(
         LlmModel model, Context context, StreamOptions? options, OpenAICompletionsCompat compat)
     {
         var messages = BuildMessages(context, compat, model);
-        var body = new Dictionary<string, object?>
+        var body = new JsonObject
         {
             ["model"] = model.Id,
-            ["messages"] = messages,
+            ["messages"] = ToNode(messages),
             ["stream"] = true,
         };
 
@@ -316,7 +317,7 @@ public sealed class OpenAICompatProvider(HttpClient httpClient) : IApiProvider
 
         // Stream options for usage in streaming
         if (compat.SupportsUsageInStreaming != false)
-            body["stream_options"] = new Dictionary<string, object?> { ["include_usage"] = true };
+            body["stream_options"] = ToNode(new Dictionary<string, object?> { ["include_usage"] = true });
 
         // Reasoning effort
         if (options is OpenAICompatOptions compatOpts && compatOpts.ReasoningEffort is not null && compat.SupportsReasoningEffort != false)
@@ -348,10 +349,16 @@ public sealed class OpenAICompatProvider(HttpClient httpClient) : IApiProvider
                     ["function"] = fn,
                 });
             }
-            body["tools"] = tools;
+            body["tools"] = ToNode(tools);
         }
 
         return body;
+    }
+
+    private static JsonNode? ToNode<T>(T value)
+    {
+        var element = JsonSerializer.SerializeToElement(value);
+        return JsonNode.Parse(element.GetRawText());
     }
 
     private static List<Dictionary<string, object?>> BuildMessages(

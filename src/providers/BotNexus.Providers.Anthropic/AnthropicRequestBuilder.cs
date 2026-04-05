@@ -1,12 +1,14 @@
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
 using BotNexus.Providers.Core.Utilities;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace BotNexus.Providers.Anthropic;
 
 internal static class AnthropicRequestBuilder
 {
-    internal static Dictionary<string, object?> BuildRequestBody(
+    internal static JsonObject BuildRequestBody(
         LlmModel model,
         Context context,
         StreamOptions? options,
@@ -15,11 +17,15 @@ internal static class AnthropicRequestBuilder
         Func<string, bool> isAdaptiveThinkingModel)
     {
         var messages = AnthropicMessageConverter.ConvertMessages(context.Messages, model, isOAuthToken);
+        AnthropicMessageConverter.ApplyLastUserMessageCacheControl(
+            messages,
+            options?.CacheRetention ?? CacheRetention.Short,
+            model.BaseUrl);
 
-        var body = new Dictionary<string, object?>
+        var body = new JsonObject
         {
             ["model"] = model.Id,
-            ["messages"] = messages,
+            ["messages"] = ToNode(messages),
             ["max_tokens"] = options?.MaxTokens ?? (model.MaxTokens / 3),
             ["stream"] = true
         };
@@ -50,7 +56,7 @@ internal static class AnthropicRequestBuilder
                 });
             }
 
-            body["system"] = systemBlocks;
+            body["system"] = ToNode(systemBlocks);
         }
         else if (context.SystemPrompt is { } systemPrompt)
         {
@@ -58,7 +64,7 @@ internal static class AnthropicRequestBuilder
                 options?.CacheRetention ?? CacheRetention.Short,
                 model.BaseUrl);
 
-            body["system"] = new object[]
+            body["system"] = ToNode(new object[]
             {
                 new Dictionary<string, object?>
                 {
@@ -66,17 +72,17 @@ internal static class AnthropicRequestBuilder
                     ["text"] = UnicodeSanitizer.SanitizeSurrogates(systemPrompt),
                     ["cache_control"] = cacheControl
                 }
-            };
+            });
         }
 
         if (context.Tools is { Count: > 0 } tools)
         {
-            body["tools"] = tools.Select(t => new Dictionary<string, object?>
+            body["tools"] = ToNode(tools.Select(t => new Dictionary<string, object?>
             {
                 ["name"] = isOAuthToken ? AnthropicMessageConverter.ToClaudeCodeName(t.Name) : t.Name,
                 ["description"] = t.Description,
                 ["input_schema"] = AnthropicMessageConverter.NormalizeToolSchema(t.Parameters)
-            }).ToList();
+            }).ToList());
         }
 
         if (options?.Metadata is { } metadata &&
@@ -84,54 +90,54 @@ internal static class AnthropicRequestBuilder
             rawUserId is string userId &&
             !string.IsNullOrWhiteSpace(userId))
         {
-            body["metadata"] = new Dictionary<string, object?>
+            body["metadata"] = ToNode(new Dictionary<string, object?>
             {
                 ["user_id"] = userId
-            };
+            });
         }
 
         if (anthropicOpts?.ToolChoice is { } toolChoice)
         {
-            body["tool_choice"] = toolChoice switch
+            body["tool_choice"] = ToNode(toolChoice switch
             {
                 "auto" => new Dictionary<string, object?> { ["type"] = "auto" },
                 "any" => new Dictionary<string, object?> { ["type"] = "any" },
                 "none" => new Dictionary<string, object?> { ["type"] = "none" },
                 _ => new Dictionary<string, object?> { ["type"] = "tool", ["name"] = toolChoice }
-            };
+            });
         }
 
         if (model.Reasoning && anthropicOpts?.ThinkingEnabled == true)
         {
             if (anthropicOpts.Effort is not null && isAdaptiveThinkingModel(model.Id))
             {
-                body["thinking"] = new Dictionary<string, object?> { ["type"] = "adaptive" };
-                body["output_config"] = new Dictionary<string, object?> { ["effort"] = anthropicOpts.Effort };
+                body["thinking"] = ToNode(new Dictionary<string, object?> { ["type"] = "adaptive" });
+                body["output_config"] = ToNode(new Dictionary<string, object?> { ["effort"] = anthropicOpts.Effort });
             }
             else if (anthropicOpts.ThinkingBudgetTokens is { } budget)
             {
-                body["thinking"] = new Dictionary<string, object?>
+                body["thinking"] = ToNode(new Dictionary<string, object?>
                 {
                     ["type"] = "enabled",
                     ["budget_tokens"] = budget
-                };
+                });
             }
             else if (isAdaptiveThinkingModel(model.Id))
             {
-                body["thinking"] = new Dictionary<string, object?> { ["type"] = "adaptive" };
+                body["thinking"] = ToNode(new Dictionary<string, object?> { ["type"] = "adaptive" });
             }
             else
             {
-                body["thinking"] = new Dictionary<string, object?>
+                body["thinking"] = ToNode(new Dictionary<string, object?>
                 {
                     ["type"] = "enabled",
                     ["budget_tokens"] = 1024
-                };
+                });
             }
         }
         else if (model.Reasoning && anthropicOpts?.ThinkingEnabled == false)
         {
-            body["thinking"] = new Dictionary<string, object?> { ["type"] = "disabled" };
+            body["thinking"] = ToNode(new Dictionary<string, object?> { ["type"] = "disabled" });
             if (options?.Temperature.HasValue == true)
                 body["temperature"] = options.Temperature.Value;
         }
@@ -140,11 +146,12 @@ internal static class AnthropicRequestBuilder
             body["temperature"] = options.Temperature.Value;
         }
 
-        AnthropicMessageConverter.ApplyLastUserMessageCacheControl(
-            messages,
-            options?.CacheRetention ?? CacheRetention.Short,
-            model.BaseUrl);
-
         return body;
+    }
+
+    private static JsonNode? ToNode<T>(T value)
+    {
+        var element = JsonSerializer.SerializeToElement(value);
+        return JsonNode.Parse(element.GetRawText());
     }
 }
