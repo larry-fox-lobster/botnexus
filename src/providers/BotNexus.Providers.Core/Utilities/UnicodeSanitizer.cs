@@ -8,10 +8,8 @@ namespace BotNexus.Providers.Core.Utilities;
 /// </summary>
 public static class UnicodeSanitizer
 {
-    private const char ReplacementChar = '\uFFFD';
-
     /// <summary>
-    /// Replace unpaired Unicode surrogates with the replacement character (U+FFFD).
+    /// Remove unpaired Unicode surrogates.
     /// </summary>
     public static string SanitizeSurrogates(string text)
     {
@@ -52,16 +50,8 @@ public static class UnicodeSanitizer
                     sb.Append(c);
                     sb.Append(text[++i]);
                 }
-                else
-                {
-                    sb.Append(ReplacementChar);
-                }
             }
-            else if (char.IsLowSurrogate(c))
-            {
-                sb.Append(ReplacementChar);
-            }
-            else
+            else if (!char.IsLowSurrogate(c))
             {
                 sb.Append(c);
             }

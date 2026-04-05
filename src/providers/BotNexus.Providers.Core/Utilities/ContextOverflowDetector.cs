@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using BotNexus.Providers.Core.Models;
 
 namespace BotNexus.Providers.Core.Utilities;
 
@@ -68,5 +69,23 @@ public static class ContextOverflowDetector
         }
 
         return ex.InnerException is not null && IsContextOverflow(ex.InnerException);
+    }
+
+    public static bool IsContextOverflow(AssistantMessage? message, int? contextWindow = null)
+    {
+        if (message is null)
+            return false;
+
+        if (message.StopReason == StopReason.Error && IsContextOverflow(message.ErrorMessage))
+            return true;
+
+        if (contextWindow is > 0 && message.StopReason == StopReason.Stop)
+        {
+            var inputTokens = message.Usage.Input + message.Usage.CacheRead;
+            if (inputTokens > contextWindow.Value)
+                return true;
+        }
+
+        return false;
     }
 }

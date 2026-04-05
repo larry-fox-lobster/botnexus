@@ -18,6 +18,7 @@ public sealed class LlmStream : IAsyncEnumerable<AssistantMessageEvent>
         });
 
     private readonly TaskCompletionSource<AssistantMessage> _resultTcs = new();
+    private bool _done;
 
     /// <summary>
     /// Push an event into the stream. Providers call this to emit events.
@@ -25,13 +26,18 @@ public sealed class LlmStream : IAsyncEnumerable<AssistantMessageEvent>
     /// </summary>
     public void Push(AssistantMessageEvent evt)
     {
+        if (_done)
+            return;
+
         switch (evt)
         {
             case DoneEvent done:
                 _resultTcs.TrySetResult(done.Message);
+                _done = true;
                 break;
             case ErrorEvent error:
                 _resultTcs.TrySetResult(error.Error);
+                _done = true;
                 break;
         }
 
@@ -43,6 +49,7 @@ public sealed class LlmStream : IAsyncEnumerable<AssistantMessageEvent>
     /// </summary>
     public void End(AssistantMessage? result = null)
     {
+        _done = true;
         if (result is not null)
             _resultTcs.TrySetResult(result);
 

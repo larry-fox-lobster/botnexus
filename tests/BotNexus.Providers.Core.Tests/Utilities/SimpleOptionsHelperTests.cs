@@ -91,8 +91,8 @@ public class SimpleOptionsHelperTests
         var (maxTokens, thinkingBudget) = SimpleOptionsHelper.AdjustMaxTokensForThinking(
             model, requestedMaxTokens: 8000, thinkingBudget: 4000);
 
-        maxTokens.Should().BeGreaterThanOrEqualTo(4000 + 1024);
-        thinkingBudget.Should().BeLessThan(maxTokens);
+        maxTokens.Should().Be(12000);
+        thinkingBudget.Should().Be(4000);
     }
 
     [Fact]
@@ -103,7 +103,8 @@ public class SimpleOptionsHelperTests
         var (maxTokens, thinkingBudget) = SimpleOptionsHelper.AdjustMaxTokensForThinking(
             model, requestedMaxTokens: 2000, thinkingBudget: 4000);
 
-        maxTokens.Should().BeGreaterThanOrEqualTo(4000 + 1024);
+        maxTokens.Should().Be(6000);
+        thinkingBudget.Should().Be(4000);
     }
 
     [Fact]
@@ -122,14 +123,12 @@ public class SimpleOptionsHelperTests
     {
         var budgets = new ThinkingBudgets
         {
-            Medium = new ThinkingBudgetLevel(8000, 12000)
+            Medium = 8000
         };
 
         var result = SimpleOptionsHelper.GetBudgetForLevel(ThinkingLevel.Medium, budgets);
 
-        result.Should().NotBeNull();
-        result!.ThinkingBudget.Should().Be(8000);
-        result.MaxTokens.Should().Be(12000);
+        result.Should().Be(8000);
     }
 
     [Fact]

@@ -28,12 +28,12 @@ public static class SimpleOptionsHelper
             MaxTokens = options?.MaxTokens ?? Math.Min(model.MaxTokens, 32000),
             CancellationToken = options?.CancellationToken ?? CancellationToken.None,
             ApiKey = apiKey,
-            Transport = options?.Transport ?? Transport.Sse,
-            CacheRetention = options?.CacheRetention ?? CacheRetention.Short,
+            Transport = options?.Transport ?? new StreamOptions().Transport,
+            CacheRetention = options?.CacheRetention ?? new StreamOptions().CacheRetention,
             SessionId = options?.SessionId,
             OnPayload = options?.OnPayload,
             Headers = options?.Headers,
-            MaxRetryDelayMs = options?.MaxRetryDelayMs ?? 60000,
+            MaxRetryDelayMs = options?.MaxRetryDelayMs ?? new StreamOptions().MaxRetryDelayMs,
             Metadata = options?.Metadata,
         };
     }
@@ -51,7 +51,7 @@ public static class SimpleOptionsHelper
     /// <summary>
     /// Resolve thinking budget for a given level from custom budgets or defaults.
     /// </summary>
-    public static ThinkingBudgetLevel? GetBudgetForLevel(
+    public static int? GetBudgetForLevel(
         ThinkingLevel level,
         ThinkingBudgets? customBudgets)
     {
@@ -87,23 +87,11 @@ public static class SimpleOptionsHelper
         int? requestedMaxTokens,
         int thinkingBudget)
     {
-        var maxTokens = requestedMaxTokens ?? model.MaxTokens;
+        var baseMaxTokens = requestedMaxTokens ?? model.MaxTokens;
+        var maxTokens = Math.Min(baseMaxTokens + thinkingBudget, model.MaxTokens);
 
-        // Ensure maxTokens is at least thinkingBudget + minimum output room
-        var minRequired = thinkingBudget + 1024;
-        if (maxTokens < minRequired)
-            maxTokens = minRequired;
-
-        // Cap at model maximum
-        if (maxTokens > model.MaxTokens)
-            maxTokens = model.MaxTokens;
-
-        // Recalculate budget if it exceeds adjusted maxTokens
-        if (thinkingBudget >= maxTokens)
-            thinkingBudget = maxTokens - 1024;
-
-        if (thinkingBudget < 1024)
-            thinkingBudget = 1024;
+        if (maxTokens <= thinkingBudget)
+            thinkingBudget = Math.Max(0, maxTokens - 1024);
 
         return (maxTokens, thinkingBudget);
     }

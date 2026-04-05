@@ -14,24 +14,26 @@ public class UnicodeSanitizerTests
     }
 
     [Fact]
-    public void UnpairedHighSurrogate_ReplacedWithFFFD()
+    public void UnpairedHighSurrogate_Removed()
     {
         // \uD800 is a high surrogate without a following low surrogate
         var input = "before\uD800after";
         var result = UnicodeSanitizer.SanitizeSurrogates(input);
 
-        result.Should().Contain("\uFFFD");
+        result.Should().NotContain("\uFFFD");
         result.Should().NotContain("\uD800");
+        result.Should().Be("beforeafter");
     }
 
     [Fact]
-    public void UnpairedLowSurrogate_ReplacedWithFFFD()
+    public void UnpairedLowSurrogate_Removed()
     {
         // \uDC00 is a low surrogate without a preceding high surrogate
         var input = "before\uDC00after";
         var result = UnicodeSanitizer.SanitizeSurrogates(input);
 
-        result.Should().Contain("\uFFFD");
+        result.Should().NotContain("\uFFFD");
+        result.Should().Be("beforeafter");
     }
 
     [Fact]

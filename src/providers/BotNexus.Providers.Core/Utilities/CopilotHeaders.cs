@@ -15,15 +15,8 @@ public static class CopilotHeaders
     /// </summary>
     public static string InferInitiator(IReadOnlyList<Message> messages)
     {
-        // Walk backwards to find the last non-toolResult message
-        for (var i = messages.Count - 1; i >= 0; i--)
-        {
-            if (messages[i] is not ToolResultMessage)
-            {
-                return messages[i] is UserMessage ? "user" : "agent";
-            }
-        }
-        return "user";
+        var last = messages.Count > 0 ? messages[^1] : null;
+        return last is UserMessage ? "user" : "agent";
     }
 
     /// <summary>

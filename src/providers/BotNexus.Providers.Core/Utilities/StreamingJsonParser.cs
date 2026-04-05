@@ -26,6 +26,11 @@ public static class StreamingJsonParser
             var element = JsonDocument.Parse(repaired).RootElement;
             if (element.ValueKind == JsonValueKind.Object)
                 return ElementToDictionary(element);
+
+            return new Dictionary<string, object?>
+            {
+                ["$value"] = ConvertElement(element)
+            };
         }
         catch (JsonException)
         {
@@ -40,10 +45,6 @@ public static class StreamingJsonParser
         var trimmed = json.Trim();
         if (trimmed.Length == 0)
             return "{}";
-
-        // Ensure starts with {
-        if (!trimmed.StartsWith('{'))
-            trimmed = "{" + trimmed;
 
         // Remove trailing commas before closing brackets
         var sb = new StringBuilder(trimmed);

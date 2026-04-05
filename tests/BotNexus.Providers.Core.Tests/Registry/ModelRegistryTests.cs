@@ -134,13 +134,13 @@ public class ModelRegistryTests : IDisposable
     }
 
     [Fact]
-    public void SupportsExtraHigh_WithReasoningDisabled_ReturnsFalse()
+    public void SupportsExtraHigh_WithReasoningDisabled_ReturnsTrue()
     {
         var model = MakeModel(id: "claude-opus-4.6") with { Reasoning = false };
 
         var result = ModelRegistry.SupportsExtraHigh(model);
 
-        result.Should().BeFalse();
+        result.Should().BeTrue();
     }
 
     [Fact]
