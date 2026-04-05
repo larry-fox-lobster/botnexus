@@ -9,15 +9,29 @@ BotNexus is a modular AI agent execution platform built in C#/.NET. This guide w
 | Doc | Topic | You'll learn |
 |-----|-------|-------------|
 | [00 — Architecture overview](00-overview.md) | System architecture | How the layers connect, project structure, dependency flow |
-| [01 — Provider system](01-providers.md) | LLM providers | Streaming protocol, message types, provider registry |
-| [02 — Agent core](02-agent-core.md) | The agent loop | State management, tool execution, hooks, events |
-| [03 — Coding agent](03-coding-agent.md) | Building a coding agent | Factory, tools, sessions, extensions, safety |
+| [01 — Provider system](01-providers.md) | LLM providers | Streaming protocol, message types, provider registry, AnthropicProvider refactor (Phase 4) |
+| [02 — Agent core](02-agent-core.md) | The agent loop | State management, tool execution, hooks, events, streaming behavior (Phase 4) |
+| [03 — Coding agent](03-coding-agent.md) | Building a coding agent | Factory, tools, sessions, extensions, safety, EditTool/ShellTool improvements (Phase 4) |
 | [04 — Building your own](04-building-your-own.md) | Tutorial | Step-by-step: custom agent, tool, provider, and extension |
 | [06 — Context file discovery](06-context-file-discovery.md) | Project documentation | How the agent auto-discovers and injects README, copilot-instructions, and docs |
 | [07 — Thinking levels](07-thinking-levels.md) | Extended reasoning | How thinking levels work from CLI to provider implementation |
 | [08 — Building custom coding agent](08-building-custom-coding-agent.md) | Hands-on guide | Create a coding agent: AgentOptions, tools, system prompt, full example |
 | [09 — Tool development](09-tool-development.md) | Tool reference | Design and implement custom tools with full examples |
+| [10 — Architecture deep dive](10-architecture-deep-dive.md) | Technical details | Class hierarchies, sequence diagrams, implementation patterns |
+| [11 — Provider development guide](11-provider-development-guide.md) | Provider tutorial | Implement IApiProvider: SSE parsing, stop reason mapping (Phase 4), tool calls |
+| [12 — Port Audit Phase 4 changelog](12-port-audit-changelog.md) | **NEW:** What changed | Summary of Phase 4 changes, before/after examples, migration guide |
 | [05 — Glossary](05-glossary.md) | Reference | All key terms and concepts in the codebase |
+
+### Focused deep dives
+
+These standalone documents cover specific topics in depth with full code examples:
+
+| Doc | Topic | You'll learn |
+|-----|-------|-------------|
+| [Provider architecture](providers.md) | LLM providers | IApiProvider contract, LlmClient routing, model registry, streaming event protocol, implementing a new provider |
+| [Agent event system](agent-events.md) | Agent lifecycle | All event types, subscribe/unsubscribe, hooks, steering/follow-up queues, error handling |
+| [Tool security model](tool-security.md) | Security | Path containment, blocked paths/commands, file mutation queue, shell safety, audit logging |
+| [Building a coding agent](building-a-coding-agent.md) | Capstone tutorial | Full walkthrough: system prompt, tools, sessions, extensions, configuration, message flow |
 
 ## Prerequisites
 
@@ -44,6 +58,12 @@ BotNexus is a modular AI agent execution platform built in C#/.NET. This guide w
 4. [Building your own](04-building-your-own.md) — Tool and extension tutorials
 
 **Full deep dive:** Read 00 through 05 in order.
+
+**If you want to understand the internals deeply:**
+1. [Provider architecture](providers.md) — streaming protocol and provider implementation
+2. [Agent event system](agent-events.md) — lifecycle events, hooks, and message queues
+3. [Tool security model](tool-security.md) — how tools are sandboxed
+4. [Building a coding agent](building-a-coding-agent.md) — complete capstone tutorial
 
 **Quick reference:** Jump straight to the [Glossary](05-glossary.md) for any term.
 
