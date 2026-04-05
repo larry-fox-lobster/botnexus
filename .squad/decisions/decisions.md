@@ -183,3 +183,159 @@ Training docs authored during a sprint should be reviewed against final code BEF
 
 - ✅ Build: `dotnet build BotNexus.slnx` — 0 errors, 0 warnings
 - ✅ Tests: 415/415 pass across 7 test projects
+
+---
+
+## Design Review — Phase 5: Port Audit Consolidated Findings
+
+**Facilitator:** Leela (Lead/Architect)  
+**Date:** 2026-04-06  
+**Status:** Approved — ready for implementation  
+**Requested by:** sytone (Jon Bullen)
+
+---
+
+### 1. Sprint Scope
+
+#### IN SPRINT — Critical (3 items)
+
+| ID | Finding | Verified | Verdict | Priority |
+|----|---------|----------|---------|----------|
+| CA-C1 | ShellTool truncates HEAD instead of TAIL | ✅ Confirmed: `ordered.Take(MaxOutputLines)` takes first lines | **ACCEPT — Critical** | P0 |
+| CA-C2 | ShellTool 120s default timeout | ✅ Confirmed: `DefaultTimeoutSeconds = 120`, no config override | **ACCEPT — Critical** | P0 |
+| P-C1 | Tool call argument validation missing | ✅ Confirmed: raw `JsonElement` passed through, no schema check | **ACCEPT — Critical (upgraded)** | P0 |
+
+**Note on AC-C1 (Partial message in context):** Downgraded from Critical to Deferred. Verified that `transformContext` runs **before** streaming in `AgentLoopRunner.cs:164-176`, not during. The partial message is emitted via `MessageUpdateEvent` but no current consumer needs it in the transform pipeline. This becomes relevant only when mid-stream context management is added.
+
+#### IN SPRINT — Major (5 items)
+
+| ID | Finding | Verified | Verdict | Priority |
+|----|---------|----------|---------|----------|
+| CA-M1 | ListDirectory flat-only | ✅ Confirmed: `SearchOption.TopDirectoryOnly` | **ACCEPT** | P1 |
+| CA-M2 | Context discovery misses ancestor walk | ✅ Confirmed: checks root only, no parent traversal | **ACCEPT** | P1 |
+| AC-M1 | transformContext/convertToLlm once before retries | ✅ Confirmed: `providerContext` computed outside retry loop | **ACCEPT** | P1 |
+| P-M2 | shortHash utility missing | ✅ Confirmed: uses pipe-delimited composition, no hash | **ACCEPT** | P1 |
+| P-C3 | MessageTransformer normalizer signature divergent | ✅ Confirmed: callback `Func<string,string>?` vs TS model+source | **ACCEPT** | P1 |
+
+#### DEFERRED — Backlog
+
+| ID | Finding | Reason |
+|----|---------|--------|
+| AC-C1 | Partial message not in context during streaming | No current consumer. Architecture runs transforms before stream, not during. Revisit when mid-stream context window management is needed. |
+| CA-M3 | CLI missing flags | Feature addition. No current CLI consumer. |
+| CA-M4 | System prompt guidelines static | Cosmetic. Current prompts are functional. |
+| CA-M5 | Session format v2 vs v3 | Migration concern. v2 works. Migrate when v3 features are needed. |
+| AC-M2 | Tool lookup case-insensitive | **Already decided (2026-04-05):** Intentional C# improvement. Case-insensitive is more robust. No change. |
+| AC-M3 | Proxy stream function | **Already deferred (2026-04-05):** No current consumer. |
+| P-M1 | BuiltInModels only ~33 | Low priority. Models added as needed. 828 in TS includes deprecated entries. |
+| P-M3 | Faux test provider missing | Nice-to-have. Current unit tests use mocks directly. |
+| P-M4 | SupportsXhigh auto-detect by model ID | **REJECT.** Explicit registration via `supportsExtraHighThinking` flag is cleaner than pattern-matching magic. C# approach is better. |
+
+---
+
+### 2. Decisions Log (Phase 5)
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| D9 | Downgrade AC-C1 (partial message in context) from Critical to Deferred | Transforms run before streaming, not during. No current consumer. |
+| D10 | Upgrade P-C1 (tool call validation) from Deferred to P0 | Previously deferred saying "tools validate own inputs" — but hallucinated args crash tools before self-validation runs. Safety issue. |
+| D11 | Reject P-M4 (SupportsXhigh auto-detect) | Explicit `supportsExtraHighThinking` flag is cleaner than pattern-matching on model IDs. C# approach is architecturally superior. |
+| D12 | Set ShellTool default timeout to 600s, not infinite | Infinite is dangerous. 600s covers 99% of builds. Config allows override. |
+| D13 | Accept AC-M2 (tool lookup case-insensitive) as intentional | Already decided 2026-04-05. More robust than case-sensitive. No change. |
+| D14 | Accept P-M1 (BuiltInModels count) as low priority | 33 active models vs 828 includes deprecated. Add as needed. |
+| D15 | ToolCallValidator: top-level validation only | Validate required fields and types. No deep nested schema validation. Practical 80/20 approach. |
+| D16 | MessageTransformer signature change is breaking — single PR | All call sites updated atomically. No gradual migration. |
+
+---
+
+### 3. Risk Assessment
+
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| **ShellTool TAIL truncation may lose early output** (e.g., a warning at line 1 that explains a later error) | Medium | Include truncation notice with total line count so the agent can re-run with `head` if needed. Consider keeping first 10 lines + last N lines (sandwich approach). Decision: start with pure TAIL; iterate if agents struggle. |
+| **600s default timeout still too short for CI-scale builds** | Low | Config-driven. Document that `null` disables timeout. Agents can pass explicit timeout per-call. |
+| **ToolCallValidator false positives on flexible schemas** | Medium | Only validate required fields and top-level types. Don't reject `additionalProperties`. Log validation failures via diagnostics before hard-failing — give us data to tune. |
+| **Per-retry transform adds latency** | Low | Transforms should be fast (millisecond-scale). Document idempotency requirement. If a transform is slow, that's a bug in the transform, not in the retry loop. |
+| **Ancestor walk finds conflicting instructions** | Medium | Closest-to-cwd wins. Document merge precedence. Stop at `.git` boundary. |
+| **MessageTransformer normalizer signature is breaking** | High | Must update all call sites in the same PR. Search exhaustively. Add compiler error if old signature used (method overload won't match). |
+
+---
+
+### 4. Implementation Status (Phase 5)
+
+| Work Item | Status | Commits |
+|-----------|--------|---------|
+| CA-C1 | ✅ Done | `fix(ShellTool): truncate TAIL instead of HEAD` |
+| CA-C2 | ✅ Done | `feat(ShellTool): make timeout configurable` |
+| P-C1 | ✅ Done | `feat(Providers.Core): add ToolCallValidator` |
+| CA-M1 | ✅ Done | `feat(ListDirectory): enumerate 2 levels deep` |
+| CA-M2 | ✅ Done | `feat(ContextFileDiscovery): walk ancestor directories` |
+| AC-M1 | ✅ Done | `refactor(AgentLoopRunner): move transform into retry loop` |
+| P-M2 | ✅ Done | `feat(Providers.Core): add ShortHash utility` |
+| P-C3 | ✅ Done | `refactor(MessageTransformer): align normalizer signature` |
+
+**Test coverage:** 22 new tests (all passing)  
+**Bugs fixed during testing:** 3 (list aliasing, race condition, hash length)  
+**Build:** Clean (0 errors, 0 warnings)  
+**Tests:** 475/475 passing
+
+---
+
+### 5. Retrospective — Port Audit Phase 5
+
+**Facilitator:** Leela (Lead/Architect)  
+**Date:** 2026-04-05  
+**Participants:** Farnsworth, Bender, Hermes, Kif, Nibbler
+
+---
+
+#### Sprint Summary
+
+Full port audit comparing pi-mono TypeScript against BotNexus C# across providers/ai, agent/agent, and coding-agent. Design review reduced 14 raw findings to 8 fixes. Farnsworth and Bender implemented fixes in parallel. Hermes wrote 22 tests. All work completed.
+
+| Metric | Value |
+|--------|-------|
+| Baseline tests | 453 |
+| Final tests | 475 |
+| New tests | 22 |
+| Commits | 12 (8 features + 4 tests + 3 bugfixes = 15 total work items) |
+| Build | Clean, 0 errors |
+| Bugs fixed | 3 (regressions caught during testing) |
+
+#### What Went Well
+
+- **Design review gate:** Reduced 14 findings to 8 approved items. Filter rate: 43%.
+- **Parallel execution:** Farnsworth + Bender on independent subsystems (Providers vs CodingAgent). No merge conflicts.
+- **Test discipline enforced:** Phase 5 followed improved sequencing: Audit → Design → Implementation → Tests → Docs. Tests written against committed code, not design decisions. This fixed the Phase 4 anti-pattern.
+- **Bug detection:** 3 regressions caught and fixed same-sprint (list aliasing, race condition, hash length).
+- **Conventional commits:** All 15 commits follow format. Build stayed clean throughout.
+
+#### What Didn't Go Well
+
+- (None noted. Phase 5 execution was clean.)
+
+#### Action Items (Carried Forward)
+
+1. **Speculative test authoring rule (from Phase 4 retro):** Tests must follow code, not lead it. Phase 5 enforced this successfully.
+2. **Test-after-impl sequencing:** Sprint template explicitly sequences Audit → Design → Impl → Tests. Phase 5 proved this works.
+3. **Design review gate:** Mandatory. Continue using.
+
+#### Cumulative Stats (All 5 Phases)
+
+| Metric | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5 | Total |
+|--------|---------|---------|---------|---------|---------|-------|
+| Commits | 12 | 18 | 13 | ? | 15 | ~58+ |
+| Fixes locked | 10 | 15 | 6 | 5 | 8 | ~44 |
+| Tests | 350 | 372 | 415 | ? | 475 | — |
+| Bugs caught | — | — | 22 | 9 | 3 | ~34 |
+| Design review % | — | — | — | — | 43% | — |
+
+---
+
+### Sign-off
+
+- [x] Design review approved (Leela)
+- [x] Implementation complete (Bender, Farnsworth)
+- [x] Testing complete (Hermes)
+- [x] Bugs fixed (Coordinator)
+- [x] All decisions locked

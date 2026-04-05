@@ -662,3 +662,577 @@ if (output.Contains("[Output truncated at"))
 - [Agent core](02-agent-core.md) — updated with new properties and streaming behavior
 - [Coding agent](03-coding-agent.md) — updated EditTool and ShellTool documentation
 - [Provider development guide](11-provider-development-guide.md) — updated stop reason mapping examples
+
+---
+
+# Phase 5 Changelog
+
+Port Audit Phase 5 (completed with 14 commits) brings validation, configuration, and cross-provider compatibility improvements to BotNexus. This section documents the changes and provides before/after examples.
+
+> **Audience:** Developers maintaining providers, agents, or extensions. Understand what changed and how to update your code.
+
+---
+
+## What changed — at a glance
+
+| Layer | Component | Change | Impact |
+|-------|-----------|--------|--------|
+| **Coding Agent** | `ShellTool` | TAIL truncation (keep last lines) | Better tail-based error visibility |
+| **Coding Agent** | `ShellTool` | Configurable timeout (`DefaultShellTimeoutSeconds`) | More control over long-running commands |
+| **Coding Agent** | `ShellTool` | Per-call timeout override via `timeout` arg | Runtime command-specific timeouts |
+| **Coding Agent** | `ListDirectoryTool` | Show 2 levels deep (children + grandchildren) | Better directory structure visibility |
+| **Coding Agent** | `ContextFileDiscovery` | Ancestor walk from cwd to git root | Hierarchical AGENTS.md discovery |
+| **Provider Core** | `ToolCallValidator` | New validation before dispatch | Catch schema violations early |
+| **Provider Core** | `ShortHash` | Utility for cross-provider ID normalization | Consistent tool call ID hashing |
+| **Agent Core** | `MessageTransformer` | Normalizer receives `(callId, sourceModel, targetProviderId)` | Provider-aware ID normalization |
+| **Agent Core** | `AgentLoopRunner` | Per-retry context transform | Overflow compaction visible per attempt |
+| **Agent Core** | `CompactForOverflow` | Fixed list aliasing bug | Clean overflow recovery |
+
+---
+
+## Coding Agent Layer
+
+### ShellTool — TAIL truncation
+
+**Before Phase 5:**
+```csharp
+// Output was truncated at the HEAD (kept first lines)
+// Errors at the end were often missing
+```
+
+**Phase 5:**
+```csharp
+// Output is truncated at the TAIL (keeps last lines)
+// Truncation notice appears at the top
+[output truncated — showing last 100 lines of 5000]
+... (last 100 lines) ...
+```
+
+**Why:** Errors and results are typically at the end of command output (logs, build output, test results). Keeping the tail means you see the actual error without scrolling up.
+
+**Your code — if you parse ShellTool output:**
+
+```csharp
+// Before Phase 5: errors might be at the top
+var output = shellResult.Content[0].Value;
+if (output.Contains("Error") || output.Contains("Exception"))
+{
+    // Might miss errors at the tail
+}
+
+// Phase 5: check tail for errors
+if (output.Contains("[output truncated"))
+{
+    // Output was truncated; the error is likely in the visible tail
+}
+```
+
+---
+
+### ShellTool — Configurable timeout
+
+**Before Phase 5:**
+```csharp
+// Timeout hardcoded to 120 seconds (or ~arbitrary based on platform)
+// No way to configure per-command
+```
+
+**Phase 5:**
+```csharp
+// Default via CodingAgentConfig.DefaultShellTimeoutSeconds (600s default)
+// Per-call override via "timeout" argument
+```
+
+**Configure default:**
+
+```csharp
+var config = CodingAgentConfig.Load(workingDirectory);
+config.DefaultShellTimeoutSeconds = 600;  // or set in config.json
+```
+
+**Override per-call:**
+
+```csharp
+var toolCall = new ToolCallContent(
+    Name: "bash",
+    Arguments: new Dictionary<string, object?>
+    {
+        { "command", "npm run build" },
+        { "timeout", 1800 }  // 30 minutes for this build
+    });
+```
+
+**Tool definition:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "command": { "type": "string", "description": "Shell command text" },
+    "timeout": { "type": "integer", "description": "Optional timeout in seconds" }
+  },
+  "required": ["command"]
+}
+```
+
+**Why:** Different workloads have different runtimes. Long builds, CI/CD, or system provisioning may need 30+ minutes. Short commands should fail fast if they hang. Per-call override lets you tune without changing config.
+
+---
+
+### ListDirectoryTool — 2 levels deep
+
+**Before Phase 5:**
+```csharp
+// Listed only direct children, flat
+ls: directory/
+  file1.txt
+  file2.txt
+  subdir (not expanded)
+```
+
+**Phase 5:**
+```csharp
+// Shows children + grandchildren (2 levels)
+directory/
+├── file1.txt
+├── file2.txt
+├── subdir/
+│   ├── nested1.txt
+│   └── nested2.txt
+```
+
+**Why:** One level is often insufficient to understand structure. Two levels gives you the mental model without overwhelming output.
+
+**Your code:** No changes — the output format is automatic.
+
+---
+
+### ContextFileDiscovery — Ancestor walk
+
+**Before Phase 5:**
+```csharp
+// Looked for AGENTS.md and copilot-instructions.md only in cwd
+// Missed context from parent directories
+```
+
+**Phase 5:**
+```csharp
+// Walks from cwd → parent → ... → git root
+// Discovers the first AGENTS.md and copilot-instructions.md at each level
+// Stops at git root or filesystem root
+```
+
+**Discovery order:**
+1. Check `cwd/.github/copilot-instructions.md`
+2. Check `cwd/AGENTS.md`
+3. Move to parent directory, repeat
+4. Stop at git root (first `.git` found) or filesystem root
+
+**Why:** Monorepos often have project-level and org-level context files. Walking the hierarchy ensures you get the most specific context first.
+
+**Example:**
+
+```
+project/
+├── .git/                           (git root)
+├── .github/copilot-instructions.md (org-level)
+├── AGENTS.md                       (org-level)
+├── services/
+│   └── api/
+│       ├── .github/copilot-instructions.md (project-level — discovered first)
+│       ├── AGENTS.md               (project-level — discovered first)
+│       └── src/
+└── services/
+    └── web/
+        ├── .github/copilot-instructions.md
+        ├── AGENTS.md
+        └── src/
+```
+
+When running from `services/api/src/`, discovery finds:
+1. `services/api/.github/copilot-instructions.md`
+2. `services/api/AGENTS.md`
+3. Stops (both found)
+
+**Your code:** No changes — discovery is automatic. If you have multiple `AGENTS.md` files, the closest one is used.
+
+---
+
+## Provider Core Layer
+
+### ToolCallValidator
+
+**New in Phase 5:** Pre-dispatch validation of tool call arguments against JSON Schema.
+
+```csharp
+using BotNexus.Providers.Core.Validation;
+
+public static (bool IsValid, string[] Errors) Validate(
+    JsonElement arguments,
+    JsonElement parameterSchema)
+```
+
+**Example:**
+
+```csharp
+var toolCall = assistantMessage.Content
+    .OfType<ToolCallContent>()
+    .First();
+
+var tool = state.Tools.FirstOrDefault(t => t.Name == toolCall.Name);
+if (tool is null)
+{
+    return ToolError("Unknown tool");
+}
+
+var (isValid, errors) = ToolCallValidator.Validate(
+    toolCall.Arguments,
+    tool.Definition.ParameterSchema);
+
+if (!isValid)
+{
+    return ToolError($"Invalid arguments: {string.Join("; ", errors)}");
+}
+
+// Safe to execute
+return await tool.ExecuteAsync(callId, toolCall.Arguments, ct);
+```
+
+**Checks:**
+- **Required properties:** Missing required fields generate errors
+- **Type matching:** Arguments must match schema type (string, number, object, etc.)
+- **Enum validation:** Fields with `enum` constraint must be one of the allowed values
+
+**Why:** Schema violations should be caught before tool execution. Clear error feedback helps the LLM correct its arguments.
+
+**Your code — if you build custom tool executors:**
+
+```csharp
+// Integrate validation before tool dispatch
+var (isValid, errors) = ToolCallValidator.Validate(arguments, parameterSchema);
+if (!isValid)
+{
+    return new ToolResultMessage(
+        ToolCallId: toolCall.Id,
+        ToolName: toolCall.Name,
+        Content: [new TextContent($"Validation error: {string.Join("; ", errors)}")],
+        IsError: true);
+}
+
+// Execute tool
+```
+
+---
+
+### ShortHash utility
+
+**New in Phase 5:** Deterministic hashing for tool call ID normalization.
+
+```csharp
+using BotNexus.Providers.Core.Utilities;
+
+public static string Generate(string input)
+```
+
+**Example:**
+
+```csharp
+var callId = "tool_call_12345";
+var normalized = ShortHash.Generate(callId);
+// Output: "a1b2c3d4" (deterministic, lowercase base-36)
+```
+
+**Properties:**
+- **Deterministic:** Same input always produces same hash
+- **Cross-provider:** Matches pi-mono's `shortHash()` behavior
+- **Lowercase base-36:** Compact alphanumeric output
+- **Non-cryptographic:** Fast, not for security
+
+**Why:** Tool call IDs vary by provider. When transforming messages across providers, consistent hashing ensures tool results map to the correct tool calls.
+
+**Your code — in MessageTransformer normalizer:**
+
+```csharp
+// Normalize tool call IDs when switching providers
+normalizeToolCallId: (callId, sourceModel, targetProviderId) =>
+{
+    if (!string.Equals(sourceModel.Provider, targetProviderId, StringComparison.Ordinal))
+    {
+        return ShortHash.Generate(callId);
+    }
+    return callId;
+}
+```
+
+---
+
+## Agent Core Layer
+
+### MessageTransformer — Normalizer signature
+
+**Before Phase 5:**
+
+```csharp
+public static List<Message> TransformMessages(
+    IReadOnlyList<Message> messages,
+    LlmModel targetModel,
+    Func<string, string>? normalizeToolCallId = null)
+    //                    ^^^ just (callId) -> normalizedId
+```
+
+**Phase 5:**
+
+```csharp
+public static List<Message> TransformMessages(
+    IReadOnlyList<Message> messages,
+    LlmModel targetModel,
+    Func<string, LlmModel, string, string>? normalizeToolCallId = null)
+    //  ^^^ (callId, sourceModel, targetProviderId) -> normalizedId
+```
+
+**Why:** The normalizer now has context about both the source and target models. This enables provider-aware ID schemes.
+
+**Your code — if you provide a normalizer:**
+
+```csharp
+// Before Phase 5
+normalizeToolCallId: (callId) => ShortHash.Generate(callId)
+
+// Phase 5: update signature
+normalizeToolCallId: (callId, sourceModel, targetProviderId) =>
+{
+    // Normalize only when switching providers
+    if (!string.Equals(sourceModel.Provider, targetProviderId, StringComparison.Ordinal))
+    {
+        return ShortHash.Generate(callId);
+    }
+    return callId;  // Same provider, keep ID unchanged
+}
+```
+
+**Callback parameters:**
+- **`callId`** — Original tool call ID from source model
+- **`sourceModel`** — Model that produced the tool call (with Provider, Api, Id, etc.)
+- **`targetProviderId`** — Provider ID of the target model (e.g., `"anthropic"`, `"openai"`)
+
+---
+
+### AgentLoopRunner — Per-retry context transform
+
+**Before Phase 5:**
+
+```csharp
+// Transform ran once before retries
+var transformedMessages = config.TransformContext is null
+    ? messages
+    : await config.TransformContext(messages, ct);
+
+while (attempt < maxAttempts)
+{
+    try
+    {
+        // Retry with same transformed messages
+    }
+    catch (ContextOverflow)
+    {
+        // Compact and retry
+    }
+}
+```
+
+**Phase 5:**
+
+```csharp
+while (attempt < maxAttempts)
+{
+    // Re-run transform per attempt
+    var transformedMessages = config.TransformContext is null
+        ? messages
+        : await config.TransformContext(messages, ct);
+
+    try
+    {
+        // Attempt with fresh transform
+    }
+    catch (ContextOverflow)
+    {
+        // Compact source, re-transform and retry
+    }
+}
+```
+
+**Why:** If overflow triggers compaction, the transform should see the compacted messages, not the original. This makes overflow recovery visible to custom transforms.
+
+**Your code — if you implement context transforms:**
+
+```csharp
+// Before Phase 5: transform ran once
+config = config with
+{
+    TransformContext: async (msgs, ct) =>
+    {
+        // This ran once; you didn't see overflow compaction
+        return msgs.TakeLast(10).ToList();
+    }
+};
+
+// Phase 5: transform runs per attempt
+config = config with
+{
+    TransformContext: async (msgs, ct) =>
+    {
+        // This runs per retry attempt
+        // You see overflow compaction if it happens
+        Console.WriteLine($"Transform: {msgs.Count} messages");
+        return msgs.TakeLast(10).ToList();
+    }
+};
+```
+
+---
+
+### CompactForOverflow — List aliasing fix
+
+**Before Phase 5:**
+
+```csharp
+private static IReadOnlyList<AgentMessage> CompactForOverflow(IReadOnlyList<AgentMessage> messages)
+{
+    if (messages.Count <= 12)
+    {
+        return messages;  // ❌ Returns same reference
+    }
+
+    var keep = Math.Max(8, messages.Count / 3);
+    return messages.Skip(messages.Count - keep).ToList();
+}
+
+// Bug: If messages <= 12, it returns the same list reference
+// Later, messages.Clear() also clears the compacted result
+```
+
+**Phase 5:**
+
+```csharp
+private static IReadOnlyList<AgentMessage> CompactForOverflow(IReadOnlyList<AgentMessage> messages)
+{
+    if (messages.Count <= 12)
+    {
+        return messages.ToList();  // ✓ Returns a copy
+    }
+
+    var keep = Math.Max(8, messages.Count / 3);
+    return messages.Skip(messages.Count - keep).ToList();
+}
+
+// Fixed: Always returns a fresh list, no aliasing
+```
+
+**Why:** The caller does `messages.Clear(); messages.AddRange(compacted)`. If both point to the same list, the compaction is lost.
+
+**Your code:** No changes needed — this is an internal fix.
+
+---
+
+## Migration Guide
+
+### Updating your code — by scenario
+
+#### Scenario 1: I provide a MessageTransformer normalizer
+
+**Required update:**
+
+```csharp
+// Before Phase 5
+TransformMessages(messages, targetModel, 
+    normalizeToolCallId: (callId) => ShortHash.Generate(callId))
+
+// Phase 5: update signature
+TransformMessages(messages, targetModel,
+    normalizeToolCallId: (callId, sourceModel, targetProviderId) =>
+    {
+        if (!string.Equals(sourceModel.Provider, targetProviderId, StringComparison.Ordinal))
+        {
+            return ShortHash.Generate(callId);
+        }
+        return callId;
+    })
+```
+
+#### Scenario 2: I implement a custom tool executor
+
+**Recommended update:**
+
+```csharp
+// Add validation before tool dispatch
+var (isValid, errors) = ToolCallValidator.Validate(arguments, tool.Definition.ParameterSchema);
+if (!isValid)
+{
+    return ToolError(string.Join("; ", errors));
+}
+
+return await tool.ExecuteAsync(callId, arguments, ct);
+```
+
+#### Scenario 3: I parse ShellTool output
+
+**Recommended:**
+
+Recognize the new truncation format:
+
+```csharp
+// Before Phase 5: truncation was at head
+// [command exited with code 1]
+// (error output mostly missing)
+
+// Phase 5: truncation is at tail
+// [output truncated — showing last 100 lines of 5000]
+// ... (error output at the end, visible!)
+```
+
+#### Scenario 4: I have multiple AGENTS.md files
+
+**No code changes:** Discovery now walks the hierarchy. The closest AGENTS.md is used.
+
+#### Scenario 5: I have long-running commands
+
+**Recommended:** Set timeout in config or per-call.
+
+```csharp
+// In config.json
+{
+    "defaultShellTimeoutSeconds": 1800  // 30 minutes for builds
+}
+
+// Or override per-call
+{
+    "command": "npm run build",
+    "timeout": 3600  // 1 hour for this build
+}
+```
+
+---
+
+## Summary of benefits
+
+| Change | Benefit |
+|--------|---------|
+| ShellTool TAIL truncation | Errors and results visible (usually at tail) |
+| Configurable timeout | Control long-running commands, fail fast on hangs |
+| ListDirectory 2 levels | Better structure visibility without clutter |
+| Context discovery ancestor walk | Hierarchical context (monorepo support) |
+| ToolCallValidator | Schema violations caught early, clear error feedback |
+| ShortHash | Consistent cross-provider tool call ID hashing |
+| MessageTransformer normalizer context | Provider-aware ID normalization |
+| Per-retry context transform | Overflow compaction visible to transforms |
+| CompactForOverflow fix | Clean overflow recovery, no data loss |
+
+---
+
+## See also
+
+- [Migration guide](13-phase5-migration-guide.md) — quick reference for breaking changes
+- [Providers](01-providers.md) — updated MessageTransformer and validation
+- [Agent core](02-agent-core.md) — retry and context transform behavior
+- [Coding agent](03-coding-agent.md) — ShellTool and ContextFileDiscovery updates
+

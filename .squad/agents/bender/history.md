@@ -729,3 +729,9 @@ Participated in design review ceremony for Phase 3 architecture. All ADs approve
 - `PathUtils.ResolvePath` now resolves symlink targets and rejects only final targets escaping root; internal symlinks remain allowed.
 - Retry backoff now supports `MaxRetryDelayMs` via `AgentOptions` → `AgentLoopConfig` with runtime validation (`> 0` when set) and capped delay application in `AgentLoopRunner`.
 
+### 2026-04-06 — ShellTool parity fixes (CA-C1, CA-C2)
+
+- `ShellTool.BuildOutput` now preserves output tail (last lines/bytes), and emits `[output truncated — showing last {n} lines of {total}]` at the top when truncated.
+- `ShellTool` timeout is now configuration-driven via `CodingAgentConfig.DefaultShellTimeoutSeconds` (default 600s), with per-call `timeout` still overriding.
+- Runtime wiring in `CodingAgent.CreateTools` now passes config timeout into `ShellTool`, removing the old 120s hardcoded default.
+

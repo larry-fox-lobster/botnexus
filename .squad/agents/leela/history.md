@@ -1536,3 +1536,29 @@ Participated in design review ceremony for Phase 3 architecture. All ADs approve
 - **Deferred backlog needs active grooming.** Six items were deferred across this sprint. Without explicit prioritization, deferred items drift indefinitely. Schedule backlog grooming at sprint planning — ripgrep adapter and schema validation are highest-value next items.
 
 - **Audit confidence ratings would reduce false positives.** Adding a High/Medium/Low confidence column forces the auditor to self-assess. Medium/Low findings get mandatory second review before becoming work items. This is a low-cost process change with high impact on audit accuracy.
+
+---
+
+## 2026-04-05T13:31Z — Port Audit Remediation Sprint 2 Retrospective (Lead)
+
+**Status:** ✅ Complete
+**Timestamp:** 2026-04-05T13:31Z
+**Requested by:** sytone
+**Ceremony:** Retrospective
+
+**Sprint outcome:**
+Design review filtered 14 audit findings down to 6 real fixes (5 already implemented, 1 intentional improvement). Farnsworth delivered 3 fixes (tool lookup, thinking signature, toolChoice). Bender delivered 3 fixes (session persist, shell cancel, .gitignore). Hermes wrote 30 new tests. 9 failed on first run due to speculative authoring — fixed in follow-up. Final: 483 tests passing, 9 conventional commits, clean build.
+
+**Decision:** `.squad/decisions/inbox/leela-port-audit-retro.md`
+
+## Learnings — Port Audit Sprint 2 Retrospective (2026-04-05)
+
+- **Speculative test writing is the test equivalent of docs-before-code.** 9 of 30 tests failed because Hermes wrote them against audit findings and design review decisions, not against actual implementations. Three specific mismatches: SessionCompactor returns SystemAgentMessage (not UserMessage), InteractiveLoop leaf count wrong, SkillsLoader .gitignore path wrong. This is the same root cause as Phase 3's doc-API mismatch. Tests that assert specific behavior (types, counts, paths) must be authored AFTER implementation is final.
+
+- **Tests must follow code, never lead it.** Sprint sequencing must enforce: Audit → Design Review → Implementation → Tests → Docs → Consistency. The test phase should start after fix commits land, not in parallel with them. Conceptual test plans can parallel; concrete assertions cannot.
+
+- **The speculative-parallel anti-pattern has recurred twice.** Phase 3: 18/22 doc consistency issues from docs-against-plan. This sprint: 9/30 test failures from tests-against-plan. The pattern is clear and the fix is the same: sequence artifacts that assert behavior after the behavior is committed.
+
+- **Design review filter rate is improving.** This sprint: 57% of findings filtered (8 of 14). Previous sprint: 18% false-positive rate (3 of 17). The gate is the single most valuable ceremony in the audit pipeline.
+
+- **5-agent parallel execution with zero merge conflicts is repeatable.** Farnsworth, Bender, Hermes, Kif, and Nibbler ran in parallel. Non-overlapping file assignment continues to prevent conflicts across four consecutive sprints now.
