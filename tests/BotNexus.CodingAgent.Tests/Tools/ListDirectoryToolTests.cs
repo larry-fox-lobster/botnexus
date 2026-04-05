@@ -15,36 +15,36 @@ public sealed class ListDirectoryToolTests : IDisposable
     }
 
     [Fact]
-    public async Task ExecuteAsync_ListsFilesAndSubdirectories()
+    public async Task ExecuteAsync_ListsTwoLevelsDeep()
     {
         var nestedDirectory = Path.Combine(_tempDirectory, "src");
-        Directory.CreateDirectory(nestedDirectory);
+        var grandchildDirectory = Path.Combine(nestedDirectory, "agent");
+        var tooDeepDirectory = Path.Combine(grandchildDirectory, "deep");
+        Directory.CreateDirectory(tooDeepDirectory);
         await File.WriteAllTextAsync(Path.Combine(_tempDirectory, "root.txt"), "root");
-        await File.WriteAllTextAsync(Path.Combine(nestedDirectory, "child.txt"), "child");
+        await File.WriteAllTextAsync(Path.Combine(grandchildDirectory, "child.txt"), "child");
+        await File.WriteAllTextAsync(Path.Combine(tooDeepDirectory, "too-deep.txt"), "nope");
 
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "." });
 
         result.Content[0].Value.Should().Contain("src/");
-        result.Content[0].Value.Should().Contain("root.txt");
-        result.Content[0].Value.Should().NotContain("child.txt");
+        result.Content[0].Value.Should().Contain("src/agent/");
+        result.Content[0].Value.Should().Contain("src/agent/child.txt");
+        result.Content[0].Value.Should().NotContain("src/agent/deep/too-deep.txt");
     }
 
     [Fact]
-    public async Task ExecuteAsync_DepthLimitsTraversal()
+    public async Task ExecuteAsync_DirectoriesHaveTrailingSlash()
     {
-        var levelOne = Path.Combine(_tempDirectory, "level1");
-        var levelTwo = Path.Combine(levelOne, "level2");
-        Directory.CreateDirectory(levelTwo);
-        await File.WriteAllTextAsync(Path.Combine(levelTwo, "file.txt"), "content");
-        await File.WriteAllTextAsync(Path.Combine(_tempDirectory, "another.txt"), "x");
+        Directory.CreateDirectory(Path.Combine(_tempDirectory, "alpha"));
+        Directory.CreateDirectory(Path.Combine(_tempDirectory, "alpha", "beta"));
+        await File.WriteAllTextAsync(Path.Combine(_tempDirectory, "alpha", "beta", "child.txt"), "child");
 
-        var depthOne = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "." });
-        var depthTwo = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = ".", ["limit"] = 1 });
+        var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "." });
 
-        depthOne.Content[0].Value.Should().Contain("level1/");
-        depthOne.Content[0].Value.Should().NotContain("level2/");
-        depthOne.Content[0].Value.Should().NotContain("file.txt");
-        depthTwo.Content[0].Value.Should().Contain("entries limit reached");
+        result.Content[0].Value.Should().Contain("alpha/");
+        result.Content[0].Value.Should().Contain("alpha/beta/");
+        result.Content[0].Value.Should().NotContain("alpha/beta/child.txt/");
     }
 
     [Fact]
@@ -57,6 +57,38 @@ public sealed class ListDirectoryToolTests : IDisposable
 
         listing.Content[0].Value.Should().Contain("visible.txt");
         listing.Content[0].Value.Should().Contain(".hidden.txt");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_OutputFormatMatchesSpec()
+    {
+        Directory.CreateDirectory(Path.Combine(_tempDirectory, "src"));
+        Directory.CreateDirectory(Path.Combine(_tempDirectory, "src", "agent"));
+        await File.WriteAllTextAsync(Path.Combine(_tempDirectory, "README.md"), "readme");
+
+        var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "." });
+
+        var lines = result.Content[0].Value
+            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+            .Take(3)
+            .ToArray();
+        lines.Should().Contain("README.md");
+        lines.Should().Contain("src/");
+        lines.Should().Contain("src/agent/");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CapsOutputAtMaxEntries()
+    {
+        for (var i = 0; i < 550; i++)
+        {
+            await File.WriteAllTextAsync(Path.Combine(_tempDirectory, $"file-{i:D3}.txt"), "x");
+        }
+
+        var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "." });
+        var lines = result.Content[0].Value.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+
+        lines.Should().Contain(line => line.Contains("500 entries limit reached", StringComparison.Ordinal));
     }
 
     [Fact]
