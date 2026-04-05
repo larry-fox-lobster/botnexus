@@ -11,6 +11,8 @@ namespace BotNexus.CodingAgent.Cli;
 /// </summary>
 public sealed class InteractiveLoop
 {
+    private const int MessageCompactionThreshold = 100;
+
     public async Task RunAsync(
         Agent agent,
         CodingAgentConfig config,
@@ -26,6 +28,7 @@ public sealed class InteractiveLoop
         ArgumentNullException.ThrowIfNull(output);
 
         var currentSession = session;
+        var sessionCompactor = new SessionCompactor();
         output.WriteWelcome(agent.State.Model.Id, currentSession);
 
         using var loopCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -57,6 +60,7 @@ public sealed class InteractiveLoop
                     output.WriteToolEnd(toolEnd.ToolName, !toolEnd.IsError);
                     break;
                 case TurnEndEvent:
+                    CompactIfNeeded(agent, sessionCompactor);
                     output.WriteTurnSeparator();
                     currentSession = UpdateSessionSnapshot(currentSession, agent);
                     await sessionManager.SaveSessionAsync(currentSession, agent.State.Messages).ConfigureAwait(false);
@@ -129,6 +133,16 @@ public sealed class InteractiveLoop
             currentSession = UpdateSessionSnapshot(currentSession, agent);
             await sessionManager.SaveSessionAsync(currentSession, agent.State.Messages).ConfigureAwait(false);
         }
+    }
+
+    private static void CompactIfNeeded(Agent agent, SessionCompactor compactor)
+    {
+        if (agent.State.Messages.Count <= MessageCompactionThreshold)
+        {
+            return;
+        }
+
+        agent.State.Messages = compactor.Compact(agent.State.Messages);
     }
 
     private static bool HandleCommand(
