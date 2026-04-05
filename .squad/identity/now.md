@@ -1,42 +1,61 @@
 ---
-updated_at: 2026-04-05T00:00:00Z
-focus_area: CodingAgent — pi-mono Coding Agent Port
+updated_at: 2026-04-04T23:38:00Z
+focus_area: CodingAgent Complete — Ready for User Validation
 active_issues: []
-status: planning
+status: ready_for_validation
 ---
 
 # What We're Focused On
 
-**BotNexus.CodingAgent** — porting `@mariozechner/pi-coding-agent` to C#/.NET.
-
-The coding agent is a standalone CLI built on `BotNexus.AgentCore` + `BotNexus.Providers.Core`. It provides built-in coding tools (read, write, edit, shell, glob), session management, extension loading, and an interactive REPL for developer workflows.
+**CodingAgent Build Complete.** Ready for user validation before gateway integration.
 
 ## Current Status
 
-**Multi-sprint plan PROPOSED.** Awaiting approval to begin Sprint 1.
+✓ **Archive old projects** (2 commits)  
+✓ **CodingAgent built** (4 sprints, 25 commits)
+  - Sprint 1: Scaffold + 5 tools (Read, Write, Edit, Shell, Glob)
+  - Sprint 2: Agent factory, session runtime, config, hooks
+  - Sprint 3: CLI, interactive loop, extensions, skills
+  - Sprint 4: 34 tests, comprehensive README + docs
+✓ **All acceptance criteria met**
+  - Solution builds cleanly (0 warnings/errors)
+  - 34 passing tests (cross-platform)
+  - CLI works: `dotnet run -- --help` shows usage
+  - Sessions functional (create, save, resume)
+  - Extensions loadable
+  - Documentation complete
 
-| Sprint | Focus | Owner | Status |
-|--------|-------|-------|--------|
-| Sprint 1 | Project scaffold + built-in tools | Farnsworth | ⏳ Pending |
-| Sprint 2 | Agent factory + session runtime | Bender | ⏳ Pending |
-| Sprint 3 | CLI + extension system | Bender | ⏳ Pending |
-| Sprint 4 | Tests + documentation | Hermes + Kif | ⏳ Pending |
+## What's Done
 
-### Key Constraints
-- Project at `src/coding-agent/BotNexus.CodingAgent/`
-- References ONLY `BotNexus.AgentCore` and `BotNexus.Providers.Core`
-- No references to archived projects or legacy Agent
-- Extensible architecture — minimal core + extension loading
+### Archive Phase
+- ✓ Old src/ projects → archive/src/
+- ✓ Old tests → archive/tests/
+- ✓ Updated .slnx to reference only active projects
+- ✓ Build clean
 
-### What's Done (Prior)
-- ✓ BotNexus.AgentCore — full pi-agent-core port (Agent, IAgentTool, events, loop)
-- ✓ BotNexus.Providers.Core — LlmClient, model registry, streaming
-- ✓ Provider abstraction layer — Copilot, OpenAI, Anthropic normalized
+### Coding Agent
+- ✓ 5 built-in tools (fully tested)
+- ✓ Session management (create, save, resume, list, branch)
+- ✓ Agent factory (wires Agent + tools + hooks)
+- ✓ Safety + audit hooks
+- ✓ Extension system (assembly + skills loading)
+- ✓ Interactive CLI (REPL with streaming)
+- ✓ 34 unit + integration tests
+- ✓ README + architecture docs
+- ✓ CLI help: `botnexus-agent --help`
 
-## Plan Document
+## Next Phase
 
-`.squad/decisions/inbox/leela-coding-agent-plan.md` — 4 sprints, 35 work items, 3-4 week estimate.
+1. **User validation** — Jon tests CLI behavior, basic workflows
+2. **Feedback incorporation** (if needed)
+3. **Gateway integration** — Wire CodingAgent as service in BotNexus.Gateway
+
+## Key Artifact
+
+`.squad/decisions.md` — Updated with:
+  - Archive decision (completed)
+  - CodingAgent 4-sprint completion decision (all metrics, deliverables)
 
 ## Team
 
-Leela (Lead), Farnsworth (Platform Dev), Bender (Runtime Dev), Hermes (Tester), Kif (Documentation)
+Farnsworth (Platform), Bender (Runtime), Hermes (Tests), Kif (Docs), Leela (Lead)

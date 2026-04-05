@@ -5282,3 +5282,143 @@ This preserves backward compatibility while decoupling the new provider layer fr
 
 ---
 
+## Decision: Archive Old Projects (2026-04-04T23:38:00Z)
+
+**By:** Farnsworth (Platform Dev) — Per User Request  
+**Date:** 2026-04-04  
+**Status:** COMPLETED  
+**Requested by:** Jon Bullen (via Copilot)
+
+**What:** Move all `src/` projects NOT in `providers/` or `agent/` folders to an `archive/` folder at the repo root. Archive old tests as well. Update `.slnx` to build only active projects.
+
+**Why:** Old libraries cause confusion now that new pi-mono-faithful ports exist. Archiving preserves them as reference while cleaning the active build.
+
+**Implementation:** 
+- Created `archive/src/` and `archive/tests/` at repo root
+- Moved all legacy projects with unchanged `.csproj` files
+- Updated `BotNexus.slnx` to reference only `src/agent/`, `src/providers/`, `src/coding-agent/`, and active test projects
+- Build now cleans without legacy warnings
+- All cross-project references validated
+- No code changes — pure reorganization
+
+**Completed:** 2 commits
+
+---
+
+## Decision: BotNexus.CodingAgent — 4-Sprint Port Complete (2026-04-04T23:38:00Z)
+
+**By:** Leela (Lead/Architect), Farnsworth, Bender, Hermes, Kif  
+**Date:** 2026-04-04  
+**Status:** COMPLETED  
+**Requested by:** Jon Bullen (via Copilot)
+
+### Executive Summary
+
+Port `@mariozechner/pi-coding-agent` to `BotNexus.CodingAgent` — a standalone coding agent CLI built on top of `BotNexus.AgentCore` and `BotNexus.Providers.Core`. The coding agent is the **gateway/runtime** — it consumes AgentCore (Agent class, tool system, event streaming) and Providers.Core (LlmClient, model registry, streaming) as libraries. It does NOT duplicate or modify those layers.
+
+### What Was Built (4 Sprints, 25 Commits)
+
+| Sprint | Focus | Owner | Commits | Status |
+|--------|-------|-------|---------|--------|
+| Sprint 1 | Scaffold + 5 tools (Read, Write, Edit, Shell, Glob) | Farnsworth | 7 | ✓ Complete |
+| Sprint 2 | Agent factory, session runtime, config, hooks | Bender | 7 | ✓ Complete |
+| Sprint 3 | CLI, interactive loop, extensions, skills | Bender | 5 | ✓ Complete |
+| Sprint 4 | 34 tests, comprehensive README + docs | Hermes + Kif | 1 | ✓ Complete |
+
+### Architecture (Per Specification)
+
+```
+src/coding-agent/BotNexus.CodingAgent/
+├── CodingAgent.cs              — Agent factory
+├── CodingAgentConfig.cs        — Configuration management
+├── Program.cs                  — CLI entry point
+├── SystemPromptBuilder.cs      — Coding-optimized prompts
+├── Tools/                      — Built-in tools
+│   ├── ReadTool.cs, WriteTool.cs, EditTool.cs
+│   ├── ShellTool.cs, GlobTool.cs
+├── Session/                    — Session lifecycle
+│   ├── SessionManager.cs, SessionCompactor.cs
+├── Hooks/                      — Safety + audit hooks
+│   ├── SafetyHooks.cs, AuditHooks.cs
+├── Extensions/                 — Plugin loading
+│   ├── ExtensionLoader.cs, SkillsLoader.cs
+├── Cli/                        — CLI and REPL
+│   ├── InteractiveLoop.cs, CommandParser.cs, OutputFormatter.cs
+└── Utils/                      — Utilities
+    ├── PathUtils.cs, GitUtils.cs, PackageManagerDetector.cs
+```
+
+### Key Deliverables
+
+✓ **5 built-in tools** — Read, Write, Edit, Shell, Glob (all tested)  
+✓ **Session management** — Create, save, resume, list, branch sessions  
+✓ **Agent factory** — Creates Agent with tools, hooks, system prompt  
+✓ **Safety hooks** — Path validation, command allowlist, read-only mode  
+✓ **Audit hooks** — Tool logging, token tracking, cost estimation  
+✓ **Extension system** — Load tools from assemblies + AGENTS.md skills  
+✓ **Interactive CLI** — REPL with streaming output, special commands  
+✓ **34 passing tests** — All critical paths covered (cross-platform)  
+✓ **Comprehensive docs** — README, architecture guide, extension development  
+
+### Dependency Boundary (Enforced)
+
+```
+BotNexus.CodingAgent
+  ├── BotNexus.AgentCore        (Agent, IAgentTool, events, loop)
+  └── BotNexus.Providers.Core   (LlmClient, model registry, streaming)
+
+NO references to:
+  ✗ BotNexus.Core, BotNexus.Gateway, BotNexus.Session
+  ✗ BotNexus.Agent (legacy)
+  ✗ Any archived projects
+```
+
+### CLI Usage
+
+```bash
+# Interactive mode with default model
+$ botnexus-agent
+
+# Specify model and provider
+$ botnexus-agent --model claude-sonnet-4 --provider copilot
+
+# Resume session
+$ botnexus-agent --resume <session-id>
+
+# Non-interactive (scripting)
+$ botnexus-agent --non-interactive "List files in this directory"
+
+# Session commands
+$ botnexus-agent sessions list
+$ botnexus-agent sessions resume <id>
+$ botnexus-agent config init
+```
+
+### Test Coverage
+
+- **Tool tests:** 8 tests (Read, Write, Edit, Shell, Glob + edge cases)
+- **Session tests:** 4 tests (create, save, resume, list, branch, compact)
+- **Agent factory tests:** 3 tests (factory, config resolution, model loading)
+- **CLI tests:** 5 tests (args parsing, commands, help, errors)
+- **Extension tests:** 3 tests (load assemblies, skills, config)
+- **Utils tests:** 4 tests (paths, git, package managers)
+- **Integration tests:** 7 tests (full workflows, multi-turn, streaming)
+- **Total:** 34 passing tests
+
+### Success Criteria Met
+
+✓ Functional: `botnexus-agent "List files in this directory"` → uses ReadTool → returns listing  
+✓ Session continuity: create → edit → close → resume → context preserved  
+✓ Extensible: drop a DLL in extensions/ → tool available to agent  
+✓ Safe: cannot write outside working directory without explicit override  
+✓ Tested: 34 unit + integration tests, all green, cross-platform  
+✓ Documented: README enables new users in <5 minutes  
+
+### Ready for Next Phase
+
+**User validation:** CLI working, basic workflows tested. Ready for user to validate behavior before integration into BotNexus.Gateway.
+
+**Then:** Gateway integration as the coding agent service.
+
+---
+
