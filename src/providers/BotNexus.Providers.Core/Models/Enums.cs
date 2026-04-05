@@ -6,11 +6,12 @@ namespace BotNexus.Providers.Core.Models;
 public enum StopReason
 {
     /// <summary>
-    /// Normal completion of generation emitted by all providers.
+    /// Normal completion of generation.
+    /// Emitted by all providers.
     /// </summary>
     [JsonStringEnumMemberName("stop")] Stop,
     /// <summary>
-    /// Generation stopped because the configured or provider max token limit was reached.
+    /// Generation stopped because the maximum token limit was reached.
     /// Emitted by all providers.
     /// </summary>
     [JsonStringEnumMemberName("length")] Length,
@@ -28,8 +29,8 @@ public enum StopReason
     /// </summary>
     [JsonStringEnumMemberName("aborted")] Aborted,
     /// <summary>
-    /// Model refused to answer due to content policy or safety rules.
-    /// Typically surfaced by Anthropic and OpenAI safety filters.
+    /// Content policy refusal.
+    /// Emitted by Anthropic and OpenAI safety filters.
     /// </summary>
     [JsonStringEnumMemberName("refusal")] Refusal,
     /// <summary>
