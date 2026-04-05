@@ -270,13 +270,14 @@ public static class CodingAgent
             content.AddRange(assistant.ToolCalls);
         }
 
-        var usage = Usage.Empty();
-        if (assistant.Usage is not null)
-        {
-            usage.Input = assistant.Usage.InputTokens ?? 0;
-            usage.Output = assistant.Usage.OutputTokens ?? 0;
-            usage.TotalTokens = usage.Input + usage.Output;
-        }
+        var usage = assistant.Usage is null
+            ? Usage.Empty()
+            : new Usage
+            {
+                Input = assistant.Usage.InputTokens ?? 0,
+                Output = assistant.Usage.OutputTokens ?? 0,
+                TotalTokens = (assistant.Usage.InputTokens ?? 0) + (assistant.Usage.OutputTokens ?? 0)
+            };
 
         return new AssistantMessage(
             Content: content,

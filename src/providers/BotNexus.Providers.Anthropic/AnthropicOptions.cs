@@ -3,7 +3,7 @@ namespace BotNexus.Providers.Anthropic;
 /// <summary>
 /// Anthropic-specific streaming options extending the base StreamOptions.
 /// </summary>
-public class AnthropicOptions : Core.StreamOptions
+public record class AnthropicOptions : Core.StreamOptions
 {
     public bool? ThinkingEnabled { get; set; }
     public int? ThinkingBudgetTokens { get; set; }

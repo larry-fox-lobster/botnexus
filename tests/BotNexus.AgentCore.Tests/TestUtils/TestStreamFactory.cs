@@ -54,10 +54,12 @@ internal static class TestStreamFactory
         StopReason reason,
         IReadOnlyList<ContentBlock>? content = null)
     {
-        var usage = Usage.Empty();
-        usage.Input = 10;
-        usage.Output = 5;
-        usage.TotalTokens = 15;
+        var usage = new Usage
+        {
+            Input = 10,
+            Output = 5,
+            TotalTokens = 15
+        };
 
         return new AssistantMessage(
             Content: content ?? [new TextContent(text)],

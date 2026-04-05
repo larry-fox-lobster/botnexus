@@ -8,17 +8,14 @@ public record UsageCost(
     decimal Total
 );
 
-public sealed class Usage
+public sealed record Usage
 {
-    public int Input { get; set; }
-    public int Output { get; set; }
-    public int CacheRead { get; set; }
-    public int CacheWrite { get; set; }
-    public int TotalTokens { get; set; }
-    public UsageCost Cost { get; set; } = new(0, 0, 0, 0, 0);
+    public int Input { get; init; }
+    public int Output { get; init; }
+    public int CacheRead { get; init; }
+    public int CacheWrite { get; init; }
+    public int TotalTokens { get; init; }
+    public UsageCost Cost { get; init; } = new(0, 0, 0, 0, 0);
 
-    public static Usage Empty() => new()
-    {
-        Cost = new UsageCost(0, 0, 0, 0, 0)
-    };
+    public static Usage Empty() => new();
 }

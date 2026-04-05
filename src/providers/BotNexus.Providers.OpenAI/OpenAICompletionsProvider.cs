@@ -439,7 +439,7 @@ public sealed class OpenAICompletionsProvider(
                 if (root.TryGetProperty("usage", out var usageProp) &&
                     usageProp.ValueKind == JsonValueKind.Object)
                 {
-                    ParseUsage(usageProp, usage, model);
+                    usage = ParseUsage(usageProp, usage, model);
                 }
 
                 if (!root.TryGetProperty("choices", out var choices) ||
@@ -618,22 +618,24 @@ public sealed class OpenAICompletionsProvider(
 
     #region Usage & Mapping
 
-    private static void ParseUsage(JsonElement usageElement, Usage usage, LlmModel model)
+    private static Usage ParseUsage(JsonElement usageElement, Usage usage, LlmModel model)
     {
+        var updated = usage;
         if (usageElement.TryGetProperty("prompt_tokens", out var pt))
-            usage.Input = pt.GetInt32();
+            updated = updated with { Input = pt.GetInt32() };
 
         if (usageElement.TryGetProperty("completion_tokens", out var ct))
-            usage.Output = ct.GetInt32();
+            updated = updated with { Output = ct.GetInt32() };
 
         if (usageElement.TryGetProperty("prompt_tokens_details", out var ptDetails) &&
             ptDetails.TryGetProperty("cached_tokens", out var cached))
         {
-            usage.CacheRead = cached.GetInt32();
+            updated = updated with { CacheRead = cached.GetInt32() };
         }
 
-        usage.TotalTokens = usage.Input + usage.Output;
-        usage.Cost = ModelRegistry.CalculateCost(model, usage);
+        updated = updated with { TotalTokens = updated.Input + updated.Output };
+        updated = updated with { Cost = ModelRegistry.CalculateCost(model, updated) };
+        return updated;
     }
 
     private static StopReason MapStopReason(string? reason) => reason switch

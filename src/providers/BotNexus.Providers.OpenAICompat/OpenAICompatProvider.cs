@@ -172,7 +172,7 @@ public sealed class OpenAICompatProvider : IApiProvider
 
             // Parse usage from the chunk (some servers send it in the final chunk)
             if (chunk.TryGetProperty("usage", out var usageProp))
-                ParseUsage(usageProp, output, model);
+                output = output with { Usage = ParseUsage(usageProp, output.Usage, model) };
 
             if (!chunk.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
                 continue;
@@ -529,16 +529,17 @@ public sealed class OpenAICompatProvider : IApiProvider
         return msg;
     }
 
-    private static void ParseUsage(JsonElement usageProp, AssistantMessage output, LlmModel model)
+    private static Usage ParseUsage(JsonElement usageProp, Usage usage, LlmModel model)
     {
+        var updated = usage;
         if (usageProp.TryGetProperty("prompt_tokens", out var inputTokens))
-            output.Usage.Input = inputTokens.GetInt32();
+            updated = updated with { Input = inputTokens.GetInt32() };
         if (usageProp.TryGetProperty("completion_tokens", out var outputTokens))
-            output.Usage.Output = outputTokens.GetInt32();
+            updated = updated with { Output = outputTokens.GetInt32() };
         if (usageProp.TryGetProperty("total_tokens", out var totalTokens))
-            output.Usage.TotalTokens = totalTokens.GetInt32();
+            updated = updated with { TotalTokens = totalTokens.GetInt32() };
 
-        output.Usage.Cost = ModelRegistry.CalculateCost(model, output.Usage);
+        return updated with { Cost = ModelRegistry.CalculateCost(model, updated) };
     }
 
     private static void UpdateOutputContent(

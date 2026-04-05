@@ -470,10 +470,10 @@ public sealed class Agent
         }
 
         var generationSettings = CloneGenerationSettings(_options.GenerationSettings);
-        generationSettings.Reasoning = thinkingLevel;
+        generationSettings = generationSettings with { Reasoning = thinkingLevel };
         if (!string.IsNullOrWhiteSpace(_options.SessionId))
         {
-            generationSettings.SessionId = _options.SessionId;
+            generationSettings = generationSettings with { SessionId = _options.SessionId };
         }
 
         return new AgentLoopConfig(
@@ -492,21 +492,10 @@ public sealed class Agent
 
     private static SimpleStreamOptions CloneGenerationSettings(SimpleStreamOptions source)
     {
-        return new SimpleStreamOptions
+        return source with
         {
-            Temperature = source.Temperature,
-            MaxTokens = source.MaxTokens,
-            CancellationToken = source.CancellationToken,
-            ApiKey = source.ApiKey,
-            Transport = source.Transport,
-            CacheRetention = source.CacheRetention,
-            SessionId = source.SessionId,
-            OnPayload = source.OnPayload,
             Headers = source.Headers is null ? null : new Dictionary<string, string>(source.Headers),
-            MaxRetryDelayMs = source.MaxRetryDelayMs,
             Metadata = source.Metadata is null ? null : new Dictionary<string, object>(source.Metadata),
-            Reasoning = source.Reasoning,
-            ThinkingBudgets = source.ThinkingBudgets
         };
     }
 

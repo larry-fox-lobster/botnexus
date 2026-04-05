@@ -226,7 +226,7 @@ public static class AgentLoopRunner
         var apiKey = await config.GetApiKey(config.Model.Provider, cancellationToken).ConfigureAwait(false);
         if (!string.IsNullOrWhiteSpace(apiKey))
         {
-            options.ApiKey = apiKey;
+            options = options with { ApiKey = apiKey };
         }
 
         return options;
@@ -234,21 +234,11 @@ public static class AgentLoopRunner
 
     private static SimpleStreamOptions CloneOptions(SimpleStreamOptions source, CancellationToken cancellationToken)
     {
-        return new SimpleStreamOptions
+        return source with
         {
-            Temperature = source.Temperature,
-            MaxTokens = source.MaxTokens,
             CancellationToken = cancellationToken,
-            ApiKey = source.ApiKey,
-            Transport = source.Transport,
-            CacheRetention = source.CacheRetention,
-            SessionId = source.SessionId,
-            OnPayload = source.OnPayload,
             Headers = source.Headers is null ? null : new Dictionary<string, string>(source.Headers),
-            MaxRetryDelayMs = source.MaxRetryDelayMs,
             Metadata = source.Metadata is null ? null : new Dictionary<string, object>(source.Metadata),
-            Reasoning = source.Reasoning,
-            ThinkingBudgets = source.ThinkingBudgets
         };
     }
 

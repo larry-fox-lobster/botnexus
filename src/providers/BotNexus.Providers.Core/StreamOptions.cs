@@ -6,26 +6,26 @@ namespace BotNexus.Providers.Core;
 /// Base options shared by all providers. Maps to pi-mono's StreamOptions.
 /// CancellationToken replaces AbortSignal from the TypeScript version.
 /// </summary>
-public class StreamOptions
+public record class StreamOptions
 {
-    public float? Temperature { get; set; }
-    public int? MaxTokens { get; set; }
-    public CancellationToken CancellationToken { get; set; }
-    public string? ApiKey { get; set; }
-    public Transport Transport { get; set; } = Transport.Sse;
-    public CacheRetention CacheRetention { get; set; } = CacheRetention.Short;
-    public string? SessionId { get; set; }
-    public Func<object, LlmModel, Task<object?>>? OnPayload { get; set; }
-    public Dictionary<string, string>? Headers { get; set; }
-    public int MaxRetryDelayMs { get; set; } = 60000;
-    public Dictionary<string, object>? Metadata { get; set; }
+    public float? Temperature { get; init; }
+    public int? MaxTokens { get; init; }
+    public CancellationToken CancellationToken { get; init; }
+    public string? ApiKey { get; init; }
+    public Transport Transport { get; init; } = Transport.Sse;
+    public CacheRetention CacheRetention { get; init; } = CacheRetention.Short;
+    public string? SessionId { get; init; }
+    public Func<object, LlmModel, Task<object?>>? OnPayload { get; init; }
+    public Dictionary<string, string>? Headers { get; init; }
+    public int MaxRetryDelayMs { get; init; } = 60000;
+    public Dictionary<string, object>? Metadata { get; init; }
 }
 
 /// <summary>
 /// Extended options with reasoning/thinking support. Maps to pi-mono's SimpleStreamOptions.
 /// </summary>
-public class SimpleStreamOptions : StreamOptions
+public record class SimpleStreamOptions : StreamOptions
 {
-    public ThinkingLevel? Reasoning { get; set; }
-    public ThinkingBudgets? ThinkingBudgets { get; set; }
+    public ThinkingLevel? Reasoning { get; init; }
+    public ThinkingBudgets? ThinkingBudgets { get; init; }
 }

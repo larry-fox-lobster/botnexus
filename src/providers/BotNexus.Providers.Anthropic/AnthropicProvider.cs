@@ -47,6 +47,7 @@ public sealed partial class AnthropicProvider : IApiProvider
             {
                 await StreamCoreAsync(model, context, options, stream,
                     contentBlocks, usage,
+                    updatedUsage => usage = updatedUsage,
                     id => responseId = id,
                     reason => stopReason = reason, ct);
 
@@ -137,9 +138,12 @@ public sealed partial class AnthropicProvider : IApiProvider
                 var (adjustedMax, adjustedBudget) = SimpleOptionsHelper.AdjustMaxTokensForThinking(
                     model, maxTokens, budgetTokens);
 
-                anthropicOpts.ThinkingEnabled = true;
-                anthropicOpts.ThinkingBudgetTokens = adjustedBudget;
-                anthropicOpts.MaxTokens = adjustedMax;
+                anthropicOpts = anthropicOpts with
+                {
+                    ThinkingEnabled = true,
+                    ThinkingBudgetTokens = adjustedBudget,
+                    MaxTokens = adjustedMax
+                };
             }
         }
 
@@ -150,10 +154,12 @@ public sealed partial class AnthropicProvider : IApiProvider
 
     private async Task StreamCoreAsync(
         LlmModel model, Context context, StreamOptions? options,
-        LlmStream stream, List<ContentBlock> contentBlocks, Usage usage,
+        LlmStream stream, List<ContentBlock> contentBlocks, Usage initialUsage,
+        Action<Usage> setUsage,
         Action<string?> setResponseId, Action<StopReason> setStopReason,
         CancellationToken ct)
     {
+        var usage = initialUsage;
         var anthropicOpts = options as AnthropicOptions;
         var apiKey = options?.ApiKey ?? EnvironmentApiKeys.GetApiKey(model.Provider) ?? "";
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -233,13 +239,14 @@ public sealed partial class AnthropicProvider : IApiProvider
                     ProcessSseEvent(currentEvent, doc.RootElement, model, stream,
                         contentBlocks, blockTypes, textAccumulators, signatureAccumulators,
                         toolCallIds, toolCallNames, usage,
-                        ref responseId, ref stopReason);
+                        ref responseId, ref stopReason, out usage);
                 }
 
                 currentEvent = null;
             }
         }
 
+        setUsage(usage);
         setResponseId(responseId);
         setStopReason(stopReason);
     }
@@ -250,8 +257,9 @@ public sealed partial class AnthropicProvider : IApiProvider
         Dictionary<int, StringBuilder> textAccumulators,
         Dictionary<int, StringBuilder> signatureAccumulators,
         Dictionary<int, string> toolCallIds, Dictionary<int, string> toolCallNames,
-        Usage usage, ref string? responseId, ref StopReason stopReason)
+        Usage usage, ref string? responseId, ref StopReason stopReason, out Usage updatedUsage)
     {
+        updatedUsage = usage;
         var type = data.TryGetProperty("type", out var typeProp)
             ? typeProp.GetString()
             : eventType;
@@ -264,10 +272,10 @@ public sealed partial class AnthropicProvider : IApiProvider
                     if (msg.TryGetProperty("id", out var id))
                         responseId = id.GetString();
                     if (msg.TryGetProperty("usage", out var msgUsage))
-                        UpdateUsage(usage, msgUsage);
+                        updatedUsage = UpdateUsage(updatedUsage, msgUsage);
                 }
                 stream.Push(new StartEvent(
-                    BuildMessage(model, contentBlocks, usage, StopReason.Stop, null, responseId)));
+                    BuildMessage(model, contentBlocks, updatedUsage, StopReason.Stop, null, responseId)));
                 break;
 
             case "content_block_start":
@@ -292,7 +300,7 @@ public sealed partial class AnthropicProvider : IApiProvider
                     stopReason = MapStopReason(sr.GetString());
                 }
                 if (data.TryGetProperty("usage", out var deltaUsage))
-                    UpdateUsage(usage, deltaUsage);
+                    updatedUsage = UpdateUsage(updatedUsage, deltaUsage);
                 break;
 
             case "message_stop":
@@ -799,15 +807,21 @@ public sealed partial class AnthropicProvider : IApiProvider
         LlmModel model, List<ContentBlock> content,
         Usage usage, StopReason stopReason, string? errorMessage, string? responseId)
     {
-        usage.TotalTokens = usage.Input + usage.Output;
-        usage.Cost = ModelRegistry.CalculateCost(model, usage);
+        var usageWithTotals = usage with
+        {
+            TotalTokens = usage.Input + usage.Output
+        };
+        usageWithTotals = usageWithTotals with
+        {
+            Cost = ModelRegistry.CalculateCost(model, usageWithTotals)
+        };
 
         return new AssistantMessage(
             Content: [.. content],
             Api: "anthropic-messages",
             Provider: model.Provider,
             ModelId: model.Id,
-            Usage: usage,
+            Usage: usageWithTotals,
             StopReason: stopReason,
             ErrorMessage: errorMessage,
             ResponseId: responseId,
@@ -815,16 +829,18 @@ public sealed partial class AnthropicProvider : IApiProvider
         );
     }
 
-    private static void UpdateUsage(Usage usage, JsonElement usageElement)
+    private static Usage UpdateUsage(Usage usage, JsonElement usageElement)
     {
+        var updated = usage;
         if (usageElement.TryGetProperty("input_tokens", out var it))
-            usage.Input = it.GetInt32();
+            updated = updated with { Input = it.GetInt32() };
         if (usageElement.TryGetProperty("output_tokens", out var ot))
-            usage.Output = ot.GetInt32();
+            updated = updated with { Output = ot.GetInt32() };
         if (usageElement.TryGetProperty("cache_read_input_tokens", out var cr))
-            usage.CacheRead = cr.GetInt32();
+            updated = updated with { CacheRead = cr.GetInt32() };
         if (usageElement.TryGetProperty("cache_creation_input_tokens", out var cw))
-            usage.CacheWrite = cw.GetInt32();
+            updated = updated with { CacheWrite = cw.GetInt32() };
+        return updated;
     }
 
     private static StopReason MapStopReason(string? reason) => reason switch
