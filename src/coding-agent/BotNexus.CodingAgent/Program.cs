@@ -87,7 +87,8 @@ internal static class Program
         session = session with
         {
             WorkingDirectory = Path.GetFullPath(workingDirectory),
-            Model = agent.State.Model.Id
+            Model = agent.State.Model.Id,
+            Provider = agent.State.Model.Provider
         };
 
         var runSinglePrompt = command.NonInteractive || !string.IsNullOrWhiteSpace(initialPrompt);

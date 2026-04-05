@@ -11,4 +11,5 @@ public sealed record SessionInfo(
     int Version = 1,
     string? ParentSessionId = null,
     string? ActiveLeafId = null,
-    string? SessionFilePath = null);
+    string? SessionFilePath = null,
+    string? Provider = null);

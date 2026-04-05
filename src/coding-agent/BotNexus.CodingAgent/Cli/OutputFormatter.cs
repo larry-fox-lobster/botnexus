@@ -16,12 +16,17 @@ public sealed class OutputFormatter
 
     public void WriteWelcome(string model, SessionInfo? session)
     {
+        var provider = session?.Provider ?? "unknown";
+        
         if (_nonInteractive)
         {
-            Console.WriteLine($"[session:start] model={model}");
             if (session is not null)
             {
-                Console.WriteLine($"[session:info] id={session.Id} name={session.Name} messages={session.MessageCount}");
+                Console.WriteLine($"[session:start] id={session.Id} model={model} provider={provider}");
+            }
+            else
+            {
+                Console.WriteLine($"[session:start] model={model}");
             }
             return;
         }
@@ -29,7 +34,7 @@ public sealed class OutputFormatter
         WriteColoredLine("╔══════════════════════════════════════╗", ConsoleColor.Cyan);
         WriteColoredLine("║         BotNexus Coding Agent       ║", ConsoleColor.Cyan);
         WriteColoredLine("╚══════════════════════════════════════╝", ConsoleColor.Cyan);
-        WriteColoredLine($"Model: {model}", ConsoleColor.DarkCyan);
+        WriteColoredLine($"Model: {model} | Provider: {provider}", ConsoleColor.DarkCyan);
 
         if (session is not null)
         {
@@ -107,7 +112,9 @@ public sealed class OutputFormatter
     {
         if (_nonInteractive)
         {
-            Console.WriteLine($"[session:info] id={session.Id} name={session.Name} messages={session.MessageCount} updated={session.UpdatedAt:yyyy-MM-dd HH:mm:ss}");
+            var model = session.Model ?? "unknown";
+            var provider = session.Provider ?? "unknown";
+            Console.WriteLine($"[session:info] id={session.Id} name={session.Name} model={model} provider={provider} messages={session.MessageCount} updated={session.UpdatedAt:yyyy-MM-dd HH:mm:ss}");
         }
         else
         {

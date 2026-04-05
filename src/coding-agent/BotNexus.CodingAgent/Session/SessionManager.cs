@@ -101,7 +101,9 @@ public sealed class SessionManager
         state.Header = state.Header with
         {
             Name = session.Name,
-            UpdatedAt = now
+            UpdatedAt = now,
+            Model = session.Model,
+            Provider = session.Provider
         };
 
         await PersistStateAsync(state).ConfigureAwait(false);
@@ -135,7 +137,9 @@ public sealed class SessionManager
             state.Header = state.Header with
             {
                 Name = session.Name,
-                UpdatedAt = now
+                UpdatedAt = now,
+                Model = session.Model,
+                Provider = session.Provider
             };
 
             await PersistStateAsync(state).ConfigureAwait(false);
@@ -162,12 +166,13 @@ public sealed class SessionManager
             CreatedAt: state.Header.CreatedAt,
             UpdatedAt: state.Header.UpdatedAt,
             MessageCount: messages.Count,
-            Model: null,
+            Model: state.Header.Model,
             WorkingDirectory: state.Header.WorkingDirectory,
             Version: state.Header.Version,
             ParentSessionId: state.Header.ParentSessionId,
             ActiveLeafId: state.ActiveLeafId,
-            SessionFilePath: state.FilePath);
+            SessionFilePath: state.FilePath,
+            Provider: state.Header.Provider);
 
         return (session, messages);
     }
@@ -200,12 +205,13 @@ public sealed class SessionManager
                 CreatedAt: state.Header.CreatedAt,
                 UpdatedAt: state.Header.UpdatedAt,
                 MessageCount: branchMessages,
-                Model: null,
+                Model: state.Header.Model,
                 WorkingDirectory: state.Header.WorkingDirectory,
                 Version: state.Header.Version,
                 ParentSessionId: state.Header.ParentSessionId,
                 ActiveLeafId: state.ActiveLeafId,
-                SessionFilePath: state.FilePath));
+                SessionFilePath: state.FilePath,
+                Provider: state.Header.Provider));
         }
 
         foreach (var directory in Directory.EnumerateDirectories(root))
@@ -705,7 +711,9 @@ public sealed class SessionManager
         string WorkingDirectory,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
-        string? ParentSessionId);
+        string? ParentSessionId,
+        string? Model = null,
+        string? Provider = null);
 
     private abstract record SessionEntryBase(
         string Type,

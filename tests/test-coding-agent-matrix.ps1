@@ -62,11 +62,8 @@ $modelList = $Models -split ","
 $tierFilter = if ($Tier -eq "all") { @(1,2,3) } else { @([int]$Tier) }
 $filteredPrompts = $prompts | Where-Object { $tierFilter -contains $_.Tier }
 
-# --- Clean sessions ---
+# --- Session directory (don't delete sessions) ---
 $sessionsDir = Join-Path (Get-Location) ".botnexus-agent\sessions"
-if (Test-Path $sessionsDir) {
-    Get-ChildItem $sessionsDir -File -Filter "*.jsonl" -ErrorAction SilentlyContinue | Remove-Item -Force
-}
 
 Write-Host ""
 Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
@@ -90,9 +87,6 @@ foreach ($model in $modelList) {
         $testId = "$model/$($prompt.Id)"
         Write-Host -NoNewline "  T$($prompt.Tier) $($prompt.Id)... " -ForegroundColor Gray
         
-        # Clean session files before each test
-        Get-ChildItem $sessionsDir -File -Filter "*.jsonl" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
-        
         # Run the CLI
         $startTime = Get-Date
         try {
@@ -104,16 +98,25 @@ foreach ($model in $modelList) {
         }
         $duration = ((Get-Date) - $startTime).TotalSeconds
         
+        # Parse session ID from output
+        $sessionId = $null
+        if ($output -match '\[session:start\]\s+id=(\S+)') {
+            $sessionId = $Matches[1]
+        }
+        
         # Check for errors in output
         $hasError = $output -match "\[error\]" -or $output -match "HTTP [45]\d\d" -or $output -match "Exception"
         
-        # Check session file for API errors
+        # Check session file for API errors using parsed session ID
         $sessionError = $null
-        $latestSession = Get-ChildItem $sessionsDir -File -Filter "*.jsonl" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-        if ($latestSession) {
-            $sessionContent = Get-Content $latestSession.FullName -Raw
-            if ($sessionContent -match '"errorMessage"\s*:\s*"([^"]+)"') {
-                $sessionError = $Matches[1]
+        $sessionFile = $null
+        if ($sessionId -and (Test-Path $sessionsDir)) {
+            $sessionFile = Join-Path $sessionsDir "$sessionId.jsonl"
+            if (Test-Path $sessionFile) {
+                $sessionContent = Get-Content $sessionFile -Raw
+                if ($sessionContent -match '"errorMessage"\s*:\s*"([^"]+)"') {
+                    $sessionError = $Matches[1]
+                }
             }
         }
         
@@ -194,6 +197,8 @@ foreach ($model in $modelList) {
             Passed = $testPassed
             Duration = [math]::Round($duration, 1)
             Reason = $failReason
+            SessionId = $sessionId
+            SessionFile = $sessionFile
         }
     }
     Write-Host ""
@@ -229,6 +234,14 @@ foreach ($model in $modelList) {
         }
     }
     Write-Host $row
+}
+
+Write-Host ""
+Write-Host "Sessions for review:" -ForegroundColor Cyan
+foreach ($r in $results) {
+    $icon = if ($r.Passed) { "✓" } else { "✗" }
+    $color = if ($r.Passed) { "DarkGray" } else { "Yellow" }
+    Write-Host "  $icon $($r.Model)/$($r.Test): $($r.SessionId)" -ForegroundColor $color
 }
 
 Write-Host ""
