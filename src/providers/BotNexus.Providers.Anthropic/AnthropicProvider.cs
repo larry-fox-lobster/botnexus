@@ -558,12 +558,16 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
             {
                 case UserMessage user:
                     isLastToolResult = false;
-                    result.Add(ConvertUserMessage(user));
+                    var userMessage = ConvertUserMessage(user);
+                    if (userMessage is not null)
+                        result.Add(userMessage);
                     break;
 
                 case AssistantMessage assistant:
                     isLastToolResult = false;
-                    result.Add(ConvertAssistantMessage(assistant));
+                    var assistantMessage = ConvertAssistantMessage(assistant);
+                    if (assistantMessage is not null)
+                        result.Add(assistantMessage);
                     break;
 
                 case ToolResultMessage toolResult:
@@ -589,13 +593,16 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
         return result;
     }
 
-    private static Dictionary<string, object?> ConvertUserMessage(UserMessage msg)
+    private static Dictionary<string, object?>? ConvertUserMessage(UserMessage msg)
     {
         object content;
 
         if (msg.Content.IsText)
         {
-            content = UnicodeSanitizer.SanitizeSurrogates(msg.Content.Text!);
+            if (string.IsNullOrWhiteSpace(msg.Content.Text))
+                return null;
+
+            content = UnicodeSanitizer.SanitizeSurrogates(msg.Content.Text);
         }
         else
         {
@@ -605,6 +612,9 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
                 switch (block)
                 {
                     case TextContent text:
+                        if (string.IsNullOrWhiteSpace(text.Text))
+                            break;
+
                         blocks.Add(new Dictionary<string, object?>
                         {
                             ["type"] = "text",
@@ -625,6 +635,9 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
                         break;
                 }
             }
+            if (blocks.Count == 0)
+                return null;
+
             content = blocks;
         }
 
@@ -635,7 +648,7 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
         };
     }
 
-    private static Dictionary<string, object?> ConvertAssistantMessage(AssistantMessage msg)
+    private static Dictionary<string, object?>? ConvertAssistantMessage(AssistantMessage msg)
     {
         var blocks = new List<object>();
 
@@ -644,6 +657,9 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
             switch (block)
             {
                 case TextContent text:
+                    if (string.IsNullOrWhiteSpace(text.Text))
+                        break;
+
                     var textBlock = new Dictionary<string, object?>
                     {
                         ["type"] = "text",
@@ -657,6 +673,9 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
                 case ThinkingContent thinking:
                     if (thinking.Redacted == true)
                     {
+                        if (string.IsNullOrWhiteSpace(thinking.ThinkingSignature))
+                            break;
+
                         blocks.Add(new Dictionary<string, object?>
                         {
                             ["type"] = "redacted_thinking",
@@ -665,14 +684,25 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
                     }
                     else
                     {
-                        var thinkBlock = new Dictionary<string, object?>
+                        if (string.IsNullOrWhiteSpace(thinking.Thinking))
+                            break;
+
+                        if (string.IsNullOrWhiteSpace(thinking.ThinkingSignature))
+                        {
+                            blocks.Add(new Dictionary<string, object?>
+                            {
+                                ["type"] = "text",
+                                ["text"] = UnicodeSanitizer.SanitizeSurrogates(thinking.Thinking)
+                            });
+                            break;
+                        }
+
+                        blocks.Add(new Dictionary<string, object?>
                         {
                             ["type"] = "thinking",
-                            ["thinking"] = UnicodeSanitizer.SanitizeSurrogates(thinking.Thinking)
-                        };
-                        if (thinking.ThinkingSignature is not null)
-                            thinkBlock["signature"] = thinking.ThinkingSignature;
-                        blocks.Add(thinkBlock);
+                            ["thinking"] = UnicodeSanitizer.SanitizeSurrogates(thinking.Thinking),
+                            ["signature"] = thinking.ThinkingSignature
+                        });
                     }
                     break;
 
@@ -687,6 +717,9 @@ public sealed partial class AnthropicProvider(HttpClient httpClient) : IApiProvi
                     break;
             }
         }
+
+        if (blocks.Count == 0)
+            return null;
 
         return new Dictionary<string, object?>
         {

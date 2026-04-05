@@ -112,6 +112,89 @@ public class AnthropicProviderAlignmentTests
     }
 
     [Fact]
+    public async Task Stream_SkipsEmptyUserTextAndContentBlocks()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var context = new Context(
+            SystemPrompt: "system",
+            Messages:
+            [
+                new UserMessage(new UserMessageContent("   "), timestamp),
+                new UserMessage(new UserMessageContent([new TextContent(""), new ImageContent("aGVsbG8=", "image/png")]), timestamp)
+            ]);
+
+        var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        var messages = body.RootElement.GetProperty("messages");
+        messages.GetArrayLength().Should().Be(1);
+        messages[0].GetProperty("role").GetString().Should().Be("user");
+        messages[0].GetProperty("content").GetArrayLength().Should().Be(1);
+        messages[0].GetProperty("content")[0].GetProperty("type").GetString().Should().Be("image");
+    }
+
+    [Fact]
+    public async Task Stream_SkipsEmptyThinking_AndConvertsUnsignedThinkingToText()
+    {
+        var handler = new RecordingHandler(_ => SseResponse("""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """));
+        var provider = new AnthropicProvider(new HttpClient(handler));
+        var model = TestHelpers.MakeModel();
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var assistant = new AssistantMessage(
+            Content:
+            [
+                new ThinkingContent("  ", "sig-empty"),
+                new ThinkingContent("unsigned thinking", null),
+                new ThinkingContent("signed thinking", "sig-123"),
+                new ThinkingContent("redacted thinking", "", Redacted: true),
+                new TextContent(""),
+                new TextContent("visible")
+            ],
+            Api: model.Api,
+            Provider: model.Provider,
+            ModelId: model.Id,
+            Usage: Usage.Empty(),
+            StopReason: StopReason.Stop,
+            ErrorMessage: null,
+            ResponseId: "resp_1",
+            Timestamp: timestamp);
+        var context = new Context(
+            SystemPrompt: "system",
+            Messages: [new UserMessage(new UserMessageContent("hello"), timestamp), assistant]);
+
+        var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        var assistantMsg = body.RootElement.GetProperty("messages")[1];
+        var content = assistantMsg.GetProperty("content");
+
+        content.GetArrayLength().Should().Be(3);
+        content[0].GetProperty("type").GetString().Should().Be("text");
+        content[0].GetProperty("text").GetString().Should().Be("unsigned thinking");
+        content[1].GetProperty("type").GetString().Should().Be("thinking");
+        content[1].GetProperty("signature").GetString().Should().Be("sig-123");
+        content[2].GetProperty("type").GetString().Should().Be("text");
+        content[2].GetProperty("text").GetString().Should().Be("visible");
+    }
+
+    [Fact]
     public void Constructor_ThrowsWhenHttpClientIsNull()
     {
         var act = () => _ = new AnthropicProvider(null!);
