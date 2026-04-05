@@ -916,6 +916,165 @@ public enum StopReason
 
 ---
 
+## ToolCallValidator (Phase 5)
+
+`ToolCallValidator` validates tool call arguments against the tool's JSON Schema parameter definition before dispatch.
+
+```csharp
+using BotNexus.Providers.Core.Validation;
+
+public static (bool IsValid, string[] Errors) Validate(
+    JsonElement arguments,
+    JsonElement parameterSchema)
+```
+
+### When to use
+
+Integrate into your tool execution pipeline to catch schema violations early:
+
+```csharp
+var toolCall = assistantMessage.Content
+    .OfType<ToolCallContent>()
+    .First();
+
+var tool = state.Tools.FirstOrDefault(t => t.Name == toolCall.Name);
+var paramSchema = tool.Definition.ParameterSchema;
+
+var (isValid, errors) = ToolCallValidator.Validate(
+    toolCall.Arguments, paramSchema);
+
+if (!isValid)
+{
+    return ToolError($"Invalid arguments: {string.Join(", ", errors)}");
+}
+
+// Safe to execute
+return await tool.ExecuteAsync(toolCall.Id, toolCall.Arguments, ct);
+```
+
+### Validation rules
+
+- **Required fields:** Any property listed in the schema's `"required"` array must be present.
+- **Type checking:** Argument values must match the schema's type (string, number, integer, boolean, object, array, null).
+- **Enum validation:** Fields with an `"enum"` constraint must match one of the allowed values.
+
+### Error format
+
+Errors are plain-English strings suitable for returning to the LLM:
+
+```csharp
+(false, new[] 
+{
+    "Missing required property 'command'.",
+    "Property 'timeout' must be of type integer.",
+    "Property 'level' must be one of the allowed enum values."
+})
+```
+
+> **Key takeaway:** Validate early to provide clear, actionable feedback to the LLM. Invalid tool calls should never reach the tool's `ExecuteAsync`.
+
+---
+
+## ShortHash utility (Phase 5)
+
+`ShortHash` generates deterministic, cross-provider tool call ID hashes.
+
+```csharp
+using BotNexus.Providers.Core.Utilities;
+
+public static string Generate(string input)
+```
+
+### Purpose
+
+Tool call IDs vary by provider. When transforming messages across providers, consistent hashing ensures tool results map to the correct tool calls:
+
+```csharp
+var sourceId = "tool_call_abc123";  // From Anthropic
+var normalizedId = ShortHash.Generate(sourceId);
+// Output: "9f4a2e1d" (deterministic, lowercase base-36)
+```
+
+### Properties
+
+- **Deterministic:** Same input always produces the same hash
+- **Cross-provider:** Matches pi-mono's `shortHash()` implementation
+- **Lowercase base-36:** Compact alphanumeric format
+- **Fast:** Non-cryptographic; optimized for hashing tool call IDs
+
+### Integration
+
+Use in `MessageTransformer` normalizer callbacks:
+
+```csharp
+normalizeToolCallId: (callId, sourceModel, targetProviderId) =>
+{
+    // Normalize IDs only when switching providers
+    if (!string.Equals(sourceModel.Provider, targetProviderId, StringComparison.Ordinal))
+    {
+        return ShortHash.Generate(callId);
+    }
+    return callId;
+}
+```
+
+> **Key takeaway:** `ShortHash` provides stable ID normalization for cross-provider message transformation. Use it when `MessageTransformer` switches providers.
+
+---
+
+## MessageTransformer — normalizer signature (Phase 5)
+
+`MessageTransformer.TransformMessages` now passes additional context to the normalizer callback.
+
+**Before Phase 5:**
+```csharp
+Func<string, string>? normalizeToolCallId
+// (callId) -> normalizedId
+```
+
+**Phase 5:**
+```csharp
+Func<string, LlmModel, string, string>? normalizeToolCallId
+// (callId, sourceModel, targetProviderId) -> normalizedId
+```
+
+### New parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `callId` | `string` | Original tool call ID from the source model |
+| `sourceModel` | `LlmModel` | The model that produced the tool call (with Provider, Api, Id, etc.) |
+| `targetProviderId` | `string` | The provider ID of the target model (e.g., `"anthropic"`, `"openai"`) |
+
+### Example — normalize only when switching providers
+
+```csharp
+normalizeToolCallId: (callId, sourceModel, targetProviderId) =>
+{
+    var isSameProvider = string.Equals(
+        sourceModel.Provider, 
+        targetProviderId, 
+        StringComparison.Ordinal);
+
+    if (!isSameProvider)
+    {
+        // Cross-provider: use stable hash
+        return ShortHash.Generate(callId);
+    }
+
+    // Same provider: keep original ID
+    return callId;
+}
+```
+
+### Breaking change
+
+If you provide a custom normalizer, update the signature. If you don't provide one (pass `null`), no changes are required — tool call IDs pass through unchanged.
+
+> **Key takeaway:** The normalizer now has context about both source and target. This enables provider-aware ID schemes and better cross-provider tool call tracking.
+
+---
+
 ## See also
 
 - [Architecture overview](00-overview.md) — where the provider layer sits in the stack
