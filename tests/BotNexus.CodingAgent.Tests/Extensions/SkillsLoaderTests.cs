@@ -151,8 +151,9 @@ public sealed class SkillsLoaderTests : IDisposable
     [Fact]
     public void LoadSkills_RespectsCustomGitignorePatterns()
     {
-        Directory.CreateDirectory(Path.Combine(_tempDirectory, ".botnexus-agent", "skills"));
-        File.WriteAllText(Path.Combine(_tempDirectory, ".gitignore"), "custom-ignore/\n");
+        var skillsDir = Path.Combine(_tempDirectory, ".botnexus-agent", "skills");
+        Directory.CreateDirectory(skillsDir);
+        File.WriteAllText(Path.Combine(skillsDir, ".gitignore"), "custom-ignore/\n");
 
         var ignoredSkillDirectory = Path.Combine(_tempDirectory, ".botnexus-agent", "skills", "custom-ignore", "hidden");
         Directory.CreateDirectory(ignoredSkillDirectory);

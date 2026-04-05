@@ -176,11 +176,11 @@ public sealed class InteractiveLoopTests : IDisposable
 
         var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{session.Id}.jsonl");
         var lines = await File.ReadAllLinesAsync(sessionPath);
-        lines.Count(line => line.Contains("\"key\":\"leaf\"", StringComparison.Ordinal)).Should().Be(1);
+        lines.Count(line => line.Contains("\"key\":\"leaf\"", StringComparison.Ordinal)).Should().Be(2);
     }
 
     [Fact]
-    public async Task RunAsync_WhenSessionPersistenceThrows_DoesNotCrashLoop()
+    public async Task RunAsync_WhenSessionPersistenceThrows_PropagatesError()
     {
         var session = new SessionInfo(
             Id: "missing-session",
@@ -220,7 +220,7 @@ public sealed class InteractiveLoopTests : IDisposable
                 _output,
                 CancellationToken.None);
 
-            await action.Should().NotThrowAsync();
+            await action.Should().ThrowAsync<FileNotFoundException>();
         }
         finally
         {
