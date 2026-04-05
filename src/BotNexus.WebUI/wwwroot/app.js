@@ -178,8 +178,14 @@
         }
         if (isStreaming && ws && ws.readyState === WebSocket.OPEN) {
             elBtnSend.disabled = !hasText;
+            elBtnSend.textContent = '🧭 Steer';
+            elBtnSend.classList.add('btn-steer');
+            elChatInput.placeholder = 'Steer the agent... (Enter to send)';
             return;
         }
+        elBtnSend.classList.remove('btn-steer');
+        elBtnSend.textContent = 'Send';
+        elChatInput.placeholder = 'Type a message... (Enter to send, Shift+Enter for newline)';
         elBtnSend.disabled = !hasText || !elChatView || elChatView.classList.contains('hidden');
     }
 
@@ -314,7 +320,7 @@
         const delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, reconnectAttempts), RECONNECT_MAX_MS);
         reconnectAttempts++;
         setStatus('reconnecting');
-        showConnectionBanner(`⚠️ Connection lost. Reconnecting in ${Math.round(delay / 1000)}s...`, 'warning');
+        showConnectionBanner(`⚠️ Connection lost. Reconnecting in ${Math.round(delay / 1000)}s... (attempt ${reconnectAttempts}/${RECONNECT_MAX_ATTEMPTS})`, 'warning');
         reconnectTimer = setTimeout(() => { reconnectTimer = null; connectWebSocket(); }, delay);
     }
 
@@ -358,9 +364,11 @@
                 setSendingState(false);
                 activeToolCount = 0;
                 thinkingBuffer = '';
+                toolStartTimes = {};
                 elBtnAbort.classList.remove('hidden');
                 showStreamingIndicator();
                 startResponseTimeout();
+                updateSendButtonState();
                 break;
             case 'content_delta':
                 removeStreamingIndicator();
@@ -396,6 +404,11 @@
     // Thinking display
     // =========================================================================
 
+    function formatCharCount(len) {
+        if (len < 1000) return `${len} chars`;
+        return `${(len / 1000).toFixed(1)}k chars`;
+    }
+
     function handleThinkingDelta(msg) {
         if (!msg.delta) return;
         thinkingBuffer += msg.delta;
@@ -409,6 +422,7 @@
                 <div class="thinking-toggle" role="button" tabindex="0" aria-expanded="${showThinking}" aria-label="Toggle thinking details">
                     <span class="thinking-icon" aria-hidden="true">💭</span>
                     <span class="thinking-label">Thinking...</span>
+                    <span class="thinking-stats"></span>
                     <span class="thinking-chevron" aria-hidden="true">${showThinking ? '▾' : '▸'}</span>
                 </div>
                 <div class="thinking-content"><pre class="thinking-pre"></pre></div>
@@ -417,13 +431,16 @@
         }
 
         thinkingEl.querySelector('.thinking-pre').textContent = thinkingBuffer;
+        thinkingEl.querySelector('.thinking-stats').textContent = formatCharCount(thinkingBuffer.length);
         scrollToBottom();
     }
 
     function finalizeThinkingBlock() {
         const thinkingEl = elChatMessages.querySelector('.thinking-block');
         if (thinkingEl) {
-            thinkingEl.querySelector('.thinking-label').textContent = 'Thought process';
+            const charCount = thinkingBuffer.length > 0 ? ` (${formatCharCount(thinkingBuffer.length)})` : '';
+            thinkingEl.querySelector('.thinking-label').textContent = `Thought process${charCount}`;
+            thinkingEl.querySelector('.thinking-stats').textContent = '';
             thinkingEl.classList.add('complete');
         }
     }
@@ -432,9 +449,14 @@
     // Tool call handling
     // =========================================================================
 
+    /** @type {Object<string, number>} */
+    let toolStartTimes = {};
+    let toolElapsedTimer = null;
+
     function handleToolStart(msg) {
         const callId = msg.toolCallId || `tc-${Date.now()}`;
         activeToolCount++;
+        toolStartTimes[callId] = Date.now();
         activeToolCalls[callId] = {
             toolName: msg.toolName || 'unknown',
             args: msg.toolArgs || '',
@@ -442,6 +464,7 @@
             status: 'running'
         };
         appendToolCall(callId, msg.toolName, 'running');
+        startToolElapsedTimer();
     }
 
     function handleToolEnd(msg) {
@@ -450,7 +473,10 @@
             activeToolCalls[callId].result = msg.toolResult || '';
             activeToolCalls[callId].status = 'complete';
         }
-        updateToolCallStatus(callId, 'complete');
+        const elapsed = toolStartTimes[callId] ? Math.round((Date.now() - toolStartTimes[callId]) / 1000) : 0;
+        delete toolStartTimes[callId];
+        updateToolCallStatus(callId, 'complete', elapsed);
+        if (Object.keys(toolStartTimes).length === 0) stopToolElapsedTimer();
     }
 
     function appendToolCall(callId, toolName, status) {
@@ -462,23 +488,41 @@
         div.innerHTML = `
             <span class="tool-icon" aria-hidden="true">🔧</span>
             <span class="tool-name">${escapeHtml(toolName)}</span>
+            <span class="tool-elapsed" aria-live="polite"></span>
             <span class="tool-status-badge ${status}">${status === 'running' ? '⏳ Running' : '✓ Done'}</span>
         `;
         elChatMessages.appendChild(div);
         scrollToBottom();
     }
 
-    function updateToolCallStatus(callId, status) {
+    function updateToolCallStatus(callId, status, elapsed) {
         const el = elChatMessages.querySelector(`.tool-call[data-call-id="${callId}"]`);
         if (!el) return;
         el.classList.remove('tool-running');
         el.classList.add(`tool-${status}`);
         const badge = el.querySelector('.tool-status-badge');
         if (badge) {
+            const elapsedStr = elapsed > 0 ? ` ${elapsed}s` : '';
             badge.className = `tool-status-badge ${status}`;
-            badge.textContent = status === 'error' ? '✗ Error' : '✓ Done';
+            badge.textContent = status === 'error' ? `✗ Error${elapsedStr}` : `✓ Done${elapsedStr}`;
         }
+        const elapsedEl = el.querySelector('.tool-elapsed');
+        if (elapsedEl) elapsedEl.textContent = '';
         el.style.cursor = 'pointer';
+    }
+
+    function startToolElapsedTimer() {
+        if (toolElapsedTimer) return;
+        toolElapsedTimer = setInterval(() => {
+            for (const [callId, startTime] of Object.entries(toolStartTimes)) {
+                const el = elChatMessages.querySelector(`.tool-call[data-call-id="${callId}"] .tool-elapsed`);
+                if (el) el.textContent = `${Math.round((Date.now() - startTime) / 1000)}s`;
+            }
+        }, 1000);
+    }
+
+    function stopToolElapsedTimer() {
+        if (toolElapsedTimer) { clearInterval(toolElapsedTimer); toolElapsedTimer = null; }
     }
 
     // =========================================================================
@@ -539,8 +583,11 @@
 
         activeToolCalls = {};
         activeToolCount = 0;
+        toolStartTimes = {};
+        stopToolElapsedTimer();
         thinkingBuffer = '';
         setSendingState(false);
+        updateSendButtonState();
         loadSessions();
         scrollToBottom();
     }
@@ -557,10 +604,12 @@
     function handleError(msg) {
         isStreaming = false;
         clearResponseTimeout();
+        stopToolElapsedTimer();
         elBtnAbort.classList.add('hidden');
         removeStreamingIndicator();
         appendErrorMessage(`❌ ${msg.message || 'Unknown error'}${msg.code ? ` (${msg.code})` : ''}`);
         setSendingState(false);
+        updateSendButtonState();
     }
 
     // =========================================================================
@@ -769,9 +818,11 @@
         sendWs({ type: 'abort' });
         isStreaming = false;
         clearResponseTimeout();
+        stopToolElapsedTimer();
         elBtnAbort.classList.add('hidden');
         removeStreamingIndicator();
         setSendingState(false);
+        updateSendButtonState();
         appendSystemMessage('Request aborted.');
     }
 
