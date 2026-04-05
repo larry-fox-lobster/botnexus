@@ -824,8 +824,10 @@ public sealed partial class AnthropicProvider : IApiProvider
     };
 
     private static bool IsAdaptiveThinkingModel(string modelId) =>
-        modelId.Contains("opus-4", StringComparison.OrdinalIgnoreCase) ||
-        modelId.Contains("sonnet-4", StringComparison.OrdinalIgnoreCase);
+        modelId.Contains("opus-4-6", StringComparison.OrdinalIgnoreCase) ||
+        modelId.Contains("opus-4.6", StringComparison.OrdinalIgnoreCase) ||
+        modelId.Contains("sonnet-4-6", StringComparison.OrdinalIgnoreCase) ||
+        modelId.Contains("sonnet-4.6", StringComparison.OrdinalIgnoreCase);
 
     [GeneratedRegex("[^a-zA-Z0-9_-]")]
     private static partial Regex NonAlphanumericRegex();
