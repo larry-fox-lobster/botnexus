@@ -84,6 +84,8 @@ public sealed class Agent
         }
     }
 
+    public bool HasQueuedMessages => _steeringQueue.HasItems || _followUpQueue.HasItems;
+
     /// <summary>
     /// Subscribe to agent lifecycle events.
     /// </summary>
