@@ -29,6 +29,20 @@ public sealed class ContextFileDiscoveryTests : IDisposable
     }
 
     [Fact]
+    public async Task DiscoverAsync_FindsInstructionsMdAlongAncestors()
+    {
+        var repoRoot = Path.Combine(_testRoot, "repo");
+        var workingDirectory = Path.Combine(repoRoot, "src", "feature");
+        Directory.CreateDirectory(Path.Combine(repoRoot, ".git"));
+        Directory.CreateDirectory(workingDirectory);
+        await File.WriteAllTextAsync(Path.Combine(repoRoot, "INSTRUCTIONS.md"), "runtime instructions");
+
+        var discovered = await ContextFileDiscovery.DiscoverAsync(workingDirectory, CancellationToken.None);
+
+        discovered.Should().Contain(file => file.Content.Contains("runtime instructions", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task DiscoverAsync_StopsAtGitBoundary()
     {
         var outsideRoot = Path.Combine(_testRoot, "outside");
@@ -62,6 +76,21 @@ public sealed class ContextFileDiscoveryTests : IDisposable
 
         agentsFiles.Should().ContainSingle();
         agentsFiles[0].Content.Should().Be("child");
+    }
+
+    [Fact]
+    public async Task DiscoverAsync_UsesConfigDirectoryNameForAgentsLookup()
+    {
+        var repoRoot = Path.Combine(_testRoot, "repo");
+        var workingDirectory = Path.Combine(repoRoot, "src");
+        Directory.CreateDirectory(Path.Combine(repoRoot, ".git"));
+        Directory.CreateDirectory(Path.Combine(repoRoot, ".custom-agent"));
+        Directory.CreateDirectory(workingDirectory);
+        await File.WriteAllTextAsync(Path.Combine(repoRoot, ".custom-agent", "AGENTS.md"), "custom agent instructions");
+
+        var discovered = await ContextFileDiscovery.DiscoverAsync(workingDirectory, CancellationToken.None, ".custom-agent");
+
+        discovered.Should().Contain(file => file.Content.Contains("custom agent instructions", StringComparison.Ordinal));
     }
 
     [Fact]

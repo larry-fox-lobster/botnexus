@@ -7,8 +7,12 @@ public static class ContextFileDiscovery
 {
     private const int ContextBudgetBytes = 16 * 1024;
     private const string TruncatedMarker = "[truncated]";
+    private const string DefaultConfigDirectoryName = ".botnexus-agent";
 
-    public static async Task<IReadOnlyList<PromptContextFile>> DiscoverAsync(string workingDirectory, CancellationToken ct)
+    public static async Task<IReadOnlyList<PromptContextFile>> DiscoverAsync(
+        string workingDirectory,
+        CancellationToken ct,
+        string? configDirectoryName = null)
     {
         if (string.IsNullOrWhiteSpace(workingDirectory))
         {
@@ -24,10 +28,13 @@ public static class ContextFileDiscovery
         var discovered = new List<PromptContextFile>();
         var remainingBudget = ContextBudgetBytes;
         var seenFileKinds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var resolvedConfigDirectoryName = string.IsNullOrWhiteSpace(configDirectoryName)
+            ? DefaultConfigDirectoryName
+            : configDirectoryName!;
 
         foreach (var directory in EnumerateDiscoveryDirectories(cwd))
         {
-            foreach (var (kind, filePath) in GetContextCandidates(directory))
+            foreach (var (kind, filePath) in GetContextCandidates(directory, resolvedConfigDirectoryName))
             {
                 ct.ThrowIfCancellationRequested();
                 if (remainingBudget <= 0 || seenFileKinds.Contains(kind) || !File.Exists(filePath))
@@ -100,11 +107,14 @@ public static class ContextFileDiscovery
         }
     }
 
-    private static IEnumerable<(string Kind, string Path)> GetContextCandidates(string directory)
+    private static IEnumerable<(string Kind, string Path)> GetContextCandidates(
+        string directory,
+        string configDirectoryName)
     {
         yield return ("copilot-instructions", Path.Combine(directory, ".github", "copilot-instructions.md"));
+        yield return ("instructions", Path.Combine(directory, "INSTRUCTIONS.md"));
         yield return ("agents", Path.Combine(directory, "AGENTS.md"));
-        yield return ("botnexus-agent", Path.Combine(directory, ".botnexus-agent", "AGENTS.md"));
+        yield return ("config-agents", Path.Combine(directory, configDirectoryName, "AGENTS.md"));
     }
 
     private static string FitContentToBudget(string content, int maxBytes)

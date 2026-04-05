@@ -36,6 +36,8 @@ internal static class Program
             return 0;
         }
 
+        var stdinPrompt = await ReadPipedStdinAsync().ConfigureAwait(false);
+        var initialPrompt = CombinePrompt(stdinPrompt, command.InitialPrompt);
         var workingDirectory = Directory.GetCurrentDirectory();
         var config = CodingAgentConfig.Load(workingDirectory);
         CodingAgentConfig.EnsureDirectories(workingDirectory);
@@ -87,10 +89,10 @@ internal static class Program
             Model = agent.State.Model.Id
         };
 
-        var runSinglePrompt = command.NonInteractive || !string.IsNullOrWhiteSpace(command.InitialPrompt);
+        var runSinglePrompt = command.NonInteractive || !string.IsNullOrWhiteSpace(initialPrompt);
         if (runSinglePrompt)
         {
-            if (string.IsNullOrWhiteSpace(command.InitialPrompt))
+            if (string.IsNullOrWhiteSpace(initialPrompt))
             {
                 Console.Error.WriteLine("A prompt is required in non-interactive mode.");
                 return 1;
@@ -102,7 +104,7 @@ internal static class Program
             try
             {
                 output.WriteWelcome(agent.State.Model.Id, session);
-                await RunSinglePromptAsync(agent, command.InitialPrompt, output, config, llmClient, authManager, extensionRunner).ConfigureAwait(false);
+                await RunSinglePromptAsync(agent, initialPrompt, output, config, llmClient, authManager, extensionRunner).ConfigureAwait(false);
                 session = UpdateSessionSnapshot(session, agent);
                 await sessionManager.SaveSessionAsync(session, agent.State.Messages).ConfigureAwait(false);
                 return 0;
@@ -246,6 +248,37 @@ internal static class Program
             MessageCount = agent.State.Messages.Count,
             Model = agent.State.Model.Id
         };
+    }
+
+    private static async Task<string?> ReadPipedStdinAsync()
+    {
+        if (!Console.IsInputRedirected)
+        {
+            return null;
+        }
+
+        var input = await Console.In.ReadToEndAsync().ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return null;
+        }
+
+        return input.Trim();
+    }
+
+    private static string? CombinePrompt(string? stdinPrompt, string? cliPrompt)
+    {
+        if (string.IsNullOrWhiteSpace(stdinPrompt))
+        {
+            return cliPrompt;
+        }
+
+        if (string.IsNullOrWhiteSpace(cliPrompt))
+        {
+            return stdinPrompt;
+        }
+
+        return $"{stdinPrompt}{cliPrompt}";
     }
 
     /// <summary>
