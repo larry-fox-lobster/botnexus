@@ -405,3 +405,31 @@ See decisions.md "Part 4: Implementation Phases & Work Items" for full roadmap w
 
 ---
 
+
+---
+
+## Learnings
+
+### Phase 2 WebUI Enrichment (2026-04-04)
+
+**Timestamp:** 2026-04-04  
+**Status:** ✅ Complete  
+**Commit:** 593731c — feat(webui): Phase 2 enrichment  
+
+**Features Delivered:**
+1. **Thinking Display** — Collapsible thinking block for `thinking_delta` events with toggle
+2. **Tool Call Enhancement** — Status badges (Running/Done/Error), tool modal, tool count in footer
+3. **Sessions Sidebar** — Delete with confirm dialog, loading states, active highlighting
+4. **Agent Management** — Add agent form modal, provider/model selection, status dots
+5. **Error States** — Styled error messages, reconnecting status, exponential backoff
+6. **Activity Monitor** — Collapsible sidebar feed, subscribe toggle, color-coded events
+
+**Patterns Established:**
+- `showStreamingIndicator()` / `removeStreamingIndicator()` replaces old `showThinkingIndicator` for processing state
+- Thinking block uses `collapsed` class toggle for show/hide, separate from tool visibility
+- Tool calls use `data-call-id` attribute for status updates during streaming
+- Confirm dialog pattern: `showConfirm(message, title, callback)` — reusable for any destructive action
+- Agent form loads providers then models filtered by provider selection
+- Activity feed uses `insertBefore(el, firstChild)` for newest-first ordering with max item trim
+
+**Decisions:** All 6 features shipped as single commit (interleaved across 3 tightly-coupled files)
