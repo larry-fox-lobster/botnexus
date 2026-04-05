@@ -27,7 +27,7 @@ public static class GatewayServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the core Gateway services: registry, supervisor, router, broadcaster,
-    /// in-process isolation strategy, and the Gateway host background service.
+    /// registered isolation strategies, and the Gateway host background service.
     /// </summary>
     /// <remarks>
     /// Registers <see cref="InMemorySessionStore"/> as the default <see cref="ISessionStore"/> via
@@ -51,8 +51,11 @@ public static class GatewayServiceCollectionExtensions
         services.AddSingleton<IActivityBroadcaster, InMemoryActivityBroadcaster>();
         services.AddSingleton<IGatewayAuthHandler, ApiKeyGatewayAuthHandler>();
 
-        // Default isolation strategy
+        // Built-in isolation strategies
         services.AddSingleton<IIsolationStrategy, InProcessIsolationStrategy>();
+        services.AddSingleton<IIsolationStrategy, SandboxIsolationStrategy>();
+        services.AddSingleton<IIsolationStrategy, ContainerIsolationStrategy>();
+        services.AddSingleton<IIsolationStrategy, RemoteIsolationStrategy>();
 
         // Gateway host
         services.AddHostedService<GatewayHost>();
