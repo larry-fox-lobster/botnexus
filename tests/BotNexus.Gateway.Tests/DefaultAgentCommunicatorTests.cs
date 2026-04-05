@@ -69,13 +69,38 @@ public sealed class DefaultAgentCommunicatorTests
     }
 
     [Fact]
-    public async Task CallCrossAgentAsync_WhenCalled_ThrowsNotImplementedException()
+    public async Task CallCrossAgentAsync_WithRemoteEndpoint_ThrowsNotSupportedException()
     {
         var communicator = new DefaultAgentCommunicator(Mock.Of<IAgentSupervisor>(), NullLogger<DefaultAgentCommunicator>.Instance);
 
         var act = () => communicator.CallCrossAgentAsync("a", "https://target", "b", "hello");
 
-        await act.Should().ThrowAsync<NotImplementedException>();
+        await act.Should().ThrowAsync<NotSupportedException>();
+    }
+
+    [Fact]
+    public async Task CallCrossAgentAsync_WithLocalEndpoint_CreatesCrossSessionAndPromptsTargetAgent()
+    {
+        var supervisor = new Mock<IAgentSupervisor>();
+        var handle = new Mock<IAgentHandle>();
+        string? capturedSessionId = null;
+        var expected = new AgentResponse { Content = "ok" };
+        supervisor
+            .Setup(s => s.GetOrCreateAsync("target", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((_, sessionId, _) => capturedSessionId = sessionId)
+            .ReturnsAsync(handle.Object);
+        handle
+            .Setup(h => h.PromptAsync("hello", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+        var communicator = new DefaultAgentCommunicator(supervisor.Object, NullLogger<DefaultAgentCommunicator>.Instance);
+
+        var result = await communicator.CallCrossAgentAsync("source", string.Empty, "target", "hello");
+
+        result.Should().Be(expected);
+        capturedSessionId.Should().NotBeNull();
+        capturedSessionId.Should().StartWith("cross::source::target::");
+        supervisor.Verify(s => s.GetOrCreateAsync("target", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        handle.Verify(h => h.PromptAsync("hello", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

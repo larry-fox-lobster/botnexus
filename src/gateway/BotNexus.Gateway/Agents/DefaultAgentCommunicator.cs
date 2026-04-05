@@ -46,11 +46,28 @@ public sealed class DefaultAgentCommunicator : IAgentCommunicator
     }
 
     /// <inheritdoc />
-    public Task<AgentResponse> CallCrossAgentAsync(
+    public async Task<AgentResponse> CallCrossAgentAsync(
         string sourceAgentId,
         string targetEndpoint,
         string targetAgentId,
         string message,
-        CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException("Cross-agent calls are Phase 2.");
+        CancellationToken cancellationToken = default)
+    {
+        if (!string.IsNullOrWhiteSpace(targetEndpoint))
+        {
+            throw new NotSupportedException(
+                $"Remote cross-agent calls to '{targetEndpoint}' are not yet supported. " +
+                "Use local cross-agent calls by leaving targetEndpoint empty.");
+        }
+
+        var crossSessionId = $"cross::{sourceAgentId}::{targetAgentId}::{Guid.NewGuid():N}";
+        _logger.LogInformation(
+            "Cross-agent call from '{SourceAgentId}' to '{TargetAgentId}' session '{CrossSessionId}'",
+            sourceAgentId,
+            targetAgentId,
+            crossSessionId);
+
+        var handle = await _supervisor.GetOrCreateAsync(targetAgentId, crossSessionId, cancellationToken);
+        return await handle.PromptAsync(message, cancellationToken);
+    }
 }
