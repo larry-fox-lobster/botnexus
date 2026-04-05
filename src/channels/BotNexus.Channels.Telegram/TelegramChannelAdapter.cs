@@ -1,6 +1,8 @@
+using BotNexus.Channels.Core;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace BotNexus.Channels.Telegram;
 
@@ -15,22 +17,20 @@ namespace BotNexus.Channels.Telegram;
 /// </remarks>
 public sealed class TelegramChannelAdapter(
     ILogger<TelegramChannelAdapter> logger,
-    TelegramOptions options) : IChannelAdapter
+    IOptions<TelegramOptions> optionsAccessor) : ChannelAdapterBase(logger)
 {
     private readonly ILogger<TelegramChannelAdapter> _logger = logger;
-    private readonly TelegramOptions _options = options;
-    private IChannelDispatcher? _dispatcher;
-    private bool _isRunning;
+    private readonly TelegramOptions _options = optionsAccessor.Value;
 
     /// <summary>
     /// Gets the channel type identifier.
     /// </summary>
-    public string ChannelType => "telegram";
+    public override string ChannelType => "telegram";
 
     /// <summary>
     /// Gets the human-readable channel display name.
     /// </summary>
-    public string DisplayName => "Telegram Bot";
+    public override string DisplayName => "Telegram Bot";
 
     /// <summary>
     /// Gets a value indicating whether this channel supports streaming deltas.
@@ -38,27 +38,12 @@ public sealed class TelegramChannelAdapter(
     /// <remarks>
     /// Telegram Bot API is message-based and does not support delta streaming natively.
     /// </remarks>
-    public bool SupportsStreaming => false;
+    public override bool SupportsStreaming => false;
 
-    /// <summary>
-    /// Gets a value indicating whether the adapter is running.
-    /// </summary>
-    public bool IsRunning => _isRunning;
-
-    /// <summary>
-    /// Starts the Telegram adapter stub and stores the dispatcher callback.
-    /// </summary>
-    /// <param name="dispatcher">Dispatcher used for routing inbound messages to the gateway.</param>
-    /// <param name="cancellationToken">Cancellation token for startup operations.</param>
-    /// <returns>A completed task once startup state is recorded.</returns>
-    /// <remarks>
-    /// Phase 2 stub: full implementation would connect to Telegram Bot API via long polling or webhook.
-    /// </remarks>
-    public Task StartAsync(IChannelDispatcher dispatcher, CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    protected override Task OnStartAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _dispatcher = dispatcher;
-        _isRunning = true;
         _logger.LogInformation(
             "{DisplayName} channel adapter stub started (WebhookUrlConfigured: {WebhookUrlConfigured}, AllowedChatCount: {AllowedChatCount})",
             DisplayName,
@@ -67,22 +52,10 @@ public sealed class TelegramChannelAdapter(
         return Task.CompletedTask;
     }
 
-    /// <summary>
-    /// Stops the Telegram adapter stub.
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token for shutdown operations.</param>
-    /// <returns>A completed task once shutdown state is recorded.</returns>
-    public Task StopAsync(CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    protected override Task OnStopAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
-        if (_dispatcher is null && !_isRunning)
-        {
-            return Task.CompletedTask;
-        }
-
-        _isRunning = false;
-        _dispatcher = null;
         _logger.LogInformation("{DisplayName} channel adapter stub stopped", DisplayName);
         return Task.CompletedTask;
     }
@@ -96,7 +69,7 @@ public sealed class TelegramChannelAdapter(
     /// <remarks>
     /// Phase 2 stub: full implementation would call Telegram <c>sendMessage</c> API.
     /// </remarks>
-    public Task SendAsync(OutboundMessage message, CancellationToken cancellationToken = default)
+    public override Task SendAsync(OutboundMessage message, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -119,7 +92,7 @@ public sealed class TelegramChannelAdapter(
     /// <remarks>
     /// Phase 2 stub: streaming is not supported for Telegram.
     /// </remarks>
-    public Task SendStreamDeltaAsync(string conversationId, string delta, CancellationToken cancellationToken = default)
+    public override Task SendStreamDeltaAsync(string conversationId, string delta, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
