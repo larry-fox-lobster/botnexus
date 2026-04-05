@@ -47,6 +47,11 @@ public sealed class CodingAgentConfig
         return merged;
     }
 
+    /// <summary>
+    /// Creates the .botnexus-agent/ directory structure and writes a default config.json
+    /// if one does not already exist. Called on every startup so the user always has
+    /// a visible, editable configuration file in their project root.
+    /// </summary>
     public static void EnsureDirectories(string workingDirectory)
     {
         var config = Load(workingDirectory);
@@ -54,6 +59,35 @@ public sealed class CodingAgentConfig
         Directory.CreateDirectory(config.SessionsDirectory);
         Directory.CreateDirectory(config.ExtensionsDirectory);
         Directory.CreateDirectory(config.SkillsDirectory);
+
+        var configPath = Path.Combine(config.ConfigDirectory, LocalConfigFileName);
+        if (!File.Exists(configPath))
+        {
+            WriteDefaultConfig(configPath);
+        }
+    }
+
+    private static void WriteDefaultConfig(string path)
+    {
+        var defaults = new ConfigDocument
+        {
+            Model = null,
+            Provider = null,
+            ApiKey = null,
+            MaxToolIterations = 40,
+            MaxContextTokens = 100000,
+            AllowedCommands = [],
+            BlockedPaths = [],
+            Custom = new Dictionary<string, object?>()
+        };
+
+        var json = JsonSerializer.Serialize(defaults, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        });
+
+        File.WriteAllText(path, json);
     }
 
     private static CodingAgentConfig CreateDefaults(string workingDirectory)

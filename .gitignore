@@ -50,3 +50,4 @@ TestResults/
 
 # Extension build output
 /extensions/
+.botnexus-agent

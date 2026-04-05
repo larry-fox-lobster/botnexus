@@ -5,19 +5,75 @@ Minimal coding agent CLI with read, edit, write, shell, and glob tools. Built on
 ## Quick Start
 
 Build the project:
-```bash
+```powershell
 dotnet build src/coding-agent/BotNexus.CodingAgent/BotNexus.CodingAgent.csproj
 ```
 
 Run interactively:
-```bash
+```powershell
 dotnet run --project src/coding-agent/BotNexus.CodingAgent/
 ```
 
 Run with a single prompt (non-interactive):
-```bash
+```powershell
 dotnet run --project src/coding-agent/BotNexus.CodingAgent/ -- --non-interactive "Your prompt here"
 ```
+
+### Setting Up with GitHub Copilot (OAuth)
+
+The coding agent supports GitHub Copilot via OAuth device code flow, giving you access to all Copilot-proxied models (GPT-4o, Claude Sonnet, etc.) through your existing Copilot subscription.
+
+**Step 1: Configure for Copilot**
+
+Edit `.botnexus-agent/config.json` (created on first run):
+```json
+{
+  "model": "gpt-4.1",
+  "provider": "github-copilot"
+}
+```
+
+**Step 2: Authenticate via device code flow**
+
+Set your GitHub token via environment variable — Copilot checks these in order:
+```powershell
+# Option A: Use the GitHub CLI (recommended — handles OAuth automatically)
+$env:GITHUB_TOKEN = $(gh auth token)
+
+# Option B: Use a Copilot-specific token
+$env:COPILOT_GITHUB_TOKEN = "gho_your_token_here"
+
+# Option C: Use a general GitHub token
+$env:GH_TOKEN = "ghp_your_token_here"
+```
+
+Or authenticate programmatically using `CopilotOAuth` from `BotNexus.Providers.Copilot`:
+```csharp
+using BotNexus.Providers.Copilot;
+
+// Device code flow — displays a URL and code for the user to authorize
+var credentials = await CopilotOAuth.LoginAsync(
+    onUserCode: (url, code) =>
+    {
+        Console.WriteLine($"Open {url} and enter code: {code}");
+    });
+
+// Use the token
+Environment.SetEnvironmentVariable("COPILOT_GITHUB_TOKEN", credentials.AccessToken);
+
+// Refresh when expired (credentials.ExpiresAt is a Unix timestamp)
+if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() >= credentials.ExpiresAt)
+{
+    credentials = await CopilotOAuth.RefreshAsync(credentials);
+}
+```
+
+**Step 3: Run**
+```powershell
+dotnet run --project src/coding-agent/BotNexus.CodingAgent/ -- --provider github-copilot --model gpt-4.1
+```
+
+**Available Copilot models** include `gpt-4.1`, `gpt-4o`, `claude-sonnet-4-20250514`, `o4-mini`, and others — whatever your Copilot subscription provides access to.
 
 ## CLI Usage
 
@@ -38,30 +94,27 @@ Options:
 ### Usage Patterns
 
 **Interactive mode** (starts a chat loop):
-```bash
+```powershell
 dotnet run --project src/coding-agent/BotNexus.CodingAgent/
 ```
 
 **Single prompt** (non-interactive):
-```bash
-dotnet run --project src/coding-agent/BotNexus.CodingAgent/ -- \
-  --non-interactive "Summarize all C# files in src/"
+```powershell
+dotnet run --project src/coding-agent/BotNexus.CodingAgent/ -- --non-interactive "Summarize all C# files in src/"
 ```
 
 **Override model**:
-```bash
-dotnet run --project src/coding-agent/BotNexus.CodingAgent/ -- \
-  --model gpt-4.1 --provider openai
+```powershell
+dotnet run --project src/coding-agent/BotNexus.CodingAgent/ -- --model gpt-4.1 --provider openai
 ```
 
 **Resume session**:
-```bash
-dotnet run --project src/coding-agent/BotNexus.CodingAgent/ -- \
-  --resume abc123def456
+```powershell
+dotnet run --project src/coding-agent/BotNexus.CodingAgent/ -- --resume abc123def456
 ```
 
 **Verbose logging**:
-```bash
+```powershell
 dotnet run --project src/coding-agent/BotNexus.CodingAgent/ -- --verbose
 ```
 
@@ -199,7 +252,7 @@ Sessions are stored in `.botnexus-agent/sessions/<session-id>/`:
 ### Creating Sessions
 
 By default, running the agent creates a new session:
-```bash
+```powershell
 dotnet run --project src/coding-agent/BotNexus.CodingAgent/
 ```
 
@@ -208,9 +261,8 @@ The session ID is generated automatically (UUID format).
 ### Resuming Sessions
 
 Continue an existing session by ID:
-```bash
-dotnet run --project src/coding-agent/BotNexus.CodingAgent/ -- \
-  --resume abc123def456
+```powershell
+dotnet run --project src/coding-agent/BotNexus.CodingAgent/ -- --resume abc123def456
 ```
 
 The agent loads all prior messages and continues with the same model and context.
@@ -518,19 +570,19 @@ Both systems prioritize:
 
 ### Build
 
-```bash
+```powershell
 dotnet build src/coding-agent/BotNexus.CodingAgent/BotNexus.CodingAgent.csproj
 ```
 
 ### Run
 
-```bash
+```powershell
 dotnet run --project src/coding-agent/BotNexus.CodingAgent/
 ```
 
 ### Release Build
 
-```bash
+```powershell
 dotnet build src/coding-agent/BotNexus.CodingAgent/BotNexus.CodingAgent.csproj -c Release
 ```
 
