@@ -220,7 +220,7 @@ public sealed class SessionCompactorTests
     }
 
     [Fact]
-    public async Task CompactAsync_WhenCutFallsMidTurn_AppendsTurnPrefixSummary()
+    public async Task CompactAsync_WhenCutFallsMidTurn_AdvancesToUserTurnBoundary()
     {
         var compactor = new SessionCompactor();
         var messages = new AgentMessage[]
@@ -246,9 +246,49 @@ public sealed class SessionCompactorTests
         var compacted = await compactor.CompactAsync(messages, options);
         var summary = compacted[0].As<SystemAgentMessage>().Content;
 
-        summary.Should().Contain("Turn Context (split turn)");
-        summary.Should().Contain("## Original Request");
-        compacted.Skip(1).Any(message => message is ToolResultAgentMessage || message is AssistantAgentMessage).Should().BeTrue();
+        summary.Should().NotContain("Turn Context (split turn)");
+        compacted.Skip(1).OfType<AgentUserMessage>().Select(message => message.Content)
+            .Should().ContainSingle().Which.Should().Be("keep this recent");
+    }
+
+    [Fact]
+    public async Task CompactAsync_NeverSplitsAssistantToolCallAndToolResultPair()
+    {
+        var compactor = new SessionCompactor();
+        var messages = new AgentMessage[]
+        {
+            new AgentUserMessage("Please read the file"),
+            new AssistantAgentMessage(
+                "Calling read tool",
+                [
+                    new ToolCallContent("call-1", "read", new Dictionary<string, object?> { ["path"] = "src/file.cs" })
+                ],
+                StopReason.ToolUse),
+            new ToolResultAgentMessage(
+                "call-1",
+                "read",
+                new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, "file content payload")])),
+            new AgentUserMessage("Continue"),
+            new AssistantAgentMessage(new string('x', 20))
+        };
+
+        var options = new SessionCompactor.SessionCompactionOptions(
+            MaxContextTokens: 6,
+            ReserveTokens: 1,
+            KeepRecentTokens: 5,
+            KeepRecentCount: 1,
+            LlmClient: MakeClientReturningSummary("## Goal\nCompacted"),
+            Model: MakeModel());
+
+        var compacted = await compactor.CompactAsync(messages, options);
+        var remainingToolCallIds = compacted
+            .OfType<AssistantAgentMessage>()
+            .SelectMany(message => message.ToolCalls ?? [])
+            .Select(toolCall => toolCall.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
+        compacted.OfType<ToolResultAgentMessage>()
+            .Should().OnlyContain(toolResult => remainingToolCallIds.Contains(toolResult.ToolCallId));
     }
 
     [Fact]

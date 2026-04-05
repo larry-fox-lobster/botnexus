@@ -132,6 +132,24 @@ public sealed class GrepToolTests : IDisposable
         result.Content[0].Value.Should().NotContain(longLine);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WithoutMaxResults_UsesDefaultLimitOf100()
+    {
+        var lines = string.Join('\n', Enumerable.Range(1, 150).Select(index => $"match line {index}"));
+        await File.WriteAllTextAsync(Path.Combine(_tempDirectory, "default-max.txt"), lines);
+
+        var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?>
+        {
+            ["pattern"] = "match line"
+        });
+
+        var matchedLines = result.Content[0].Value
+            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+            .Count(line => line.StartsWith("default-max.txt:", StringComparison.Ordinal));
+        matchedLines.Should().Be(100);
+        result.Content[0].Value.Should().Contain("[warning] Results truncated at 100 matches.");
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempDirectory))

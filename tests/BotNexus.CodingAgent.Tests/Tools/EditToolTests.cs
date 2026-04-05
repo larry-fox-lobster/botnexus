@@ -177,6 +177,28 @@ public sealed class EditToolTests : IDisposable
         (await File.ReadAllTextAsync(filePath)).Should().Contain("Console.WriteLine(\"updated\");");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_MatchesOldTextWhenFileStartsWithBom()
+    {
+        var filePath = Path.Combine(_tempDirectory, "bom.txt");
+        await File.WriteAllTextAsync(filePath, "\uFEFFbefore target after");
+
+        await _tool.ExecuteAsync("test-call", new Dictionary<string, object?>
+        {
+            ["path"] = "bom.txt",
+            ["edits"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["oldText"] = "before target after",
+                    ["newText"] = "before updated after"
+                }
+            }
+        });
+
+        (await File.ReadAllTextAsync(filePath)).Should().Contain("before updated after");
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempDirectory))
