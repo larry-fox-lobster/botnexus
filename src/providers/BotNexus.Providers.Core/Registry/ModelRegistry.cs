@@ -65,8 +65,7 @@ public sealed class ModelRegistry
     public static bool ModelsAreEqual(LlmModel a, LlmModel b)
     {
         return string.Equals(a.Id, b.Id, StringComparison.OrdinalIgnoreCase) &&
-               string.Equals(a.Provider, b.Provider, StringComparison.OrdinalIgnoreCase) &&
-               string.Equals(a.BaseUrl, b.BaseUrl, StringComparison.OrdinalIgnoreCase);
+               string.Equals(a.Provider, b.Provider, StringComparison.OrdinalIgnoreCase);
     }
 
     public void Clear()
