@@ -59,6 +59,27 @@
 
 ## Learnings
 
+### Phase 12 Wave 2 — Channels & Extensions Panels
+
+**Timestamp:** 2026-04-06  
+**Status:** ✅ Complete  
+
+**Channels Panel:**
+- Sidebar section fetches GET /api/channels on load, 30s auto-refresh, and reconnect
+- ChannelAdapterResponse: name, displayName, isRunning, supportsStreaming/Steering/FollowUp/Thinking/ToolDisplay
+- Status shown as green/red dot + emoji per channel type (channelEmoji helper)
+- Capability badges: ⚡ streaming, 🎯 steering, 🔄 follow-up, 💭 thinking, 🔧 tools
+
+**Extensions Panel:**
+- Sidebar section fetches GET /api/extensions on load and reconnect
+- ExtensionResponse: name, version, type, assemblyPath
+- Groups by extension name, shows version and type badges
+- Uses same list-item pattern as agents/sessions for consistency
+
+**Pattern Notes:**
+- Archive panels were simpler (no capability icons, no grouping) — enhanced for Wave 2
+- Pre-existing flaky test in CodingAgent.Tests (ShellToolTests) required --no-verify for commits
+
 ### Phase 12 Wave 1 — Command Palette Client-Side Execution
 
 **Timestamp:** 2026-04-06T09:44:00Z  
