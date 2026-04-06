@@ -161,6 +161,23 @@ public sealed class GatewaySessionThreadSafetyTests
         replay.Should().BeEmpty();
     }
 
+    [Fact]
+    public void ReplayBuffer_WhenUsedDirectly_RemainsCompatibleWithSessionReplayApis()
+    {
+        var session = CreateSession();
+
+        session.ReplayBuffer.AddStreamEvent(1, """{"type":"connected","sequenceId":1}""", replayWindowSize: 2);
+        session.ReplayBuffer.AddStreamEvent(2, """{"type":"pong","sequenceId":2}""", replayWindowSize: 2);
+        session.ReplayBuffer.AddStreamEvent(3, """{"type":"pong","sequenceId":3}""", replayWindowSize: 2);
+
+        session.GetStreamEventSnapshot().Select(evt => evt.SequenceId).Should().ContainInOrder(2, 3);
+        session.GetStreamEventsAfter(lastSequenceId: 2, maxReplayCount: 10)
+            .Select(evt => evt.SequenceId)
+            .Should()
+            .ContainSingle()
+            .Which.Should().Be(3);
+    }
+
     private static GatewaySession CreateSession()
         => new() { SessionId = $"session-{Guid.NewGuid():N}", AgentId = "agent-a" };
 }
