@@ -9,6 +9,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace BotNexus.Gateway.Tests;
@@ -108,11 +109,27 @@ public sealed class SessionLockingTests
     }
 
     private static GatewayWebSocketHandler CreateHandler()
-        => new(
+    {
+        var options = Options.Create(new GatewayWebSocketOptions());
+        var channelAdapter = new WebSocketChannelAdapter(NullLogger<WebSocketChannelAdapter>.Instance);
+        var sessions = new InMemorySessionStore();
+        var connectionManager = new WebSocketConnectionManager(options, NullLogger<WebSocketConnectionManager>.Instance);
+        var dispatcher = new WebSocketMessageDispatcher(
             Mock.Of<IAgentSupervisor>(),
-            new WebSocketChannelAdapter(NullLogger<WebSocketChannelAdapter>.Instance),
-            new InMemorySessionStore(),
+            channelAdapter,
+            sessions,
+            options,
+            connectionManager,
+            NullLogger<WebSocketMessageDispatcher>.Instance);
+
+        return new GatewayWebSocketHandler(
+            channelAdapter,
+            sessions,
+            options,
+            connectionManager,
+            dispatcher,
             NullLogger<GatewayWebSocketHandler>.Instance);
+    }
 
     private static HttpContext CreateWebSocketContext(string agentId, string sessionId, WebSocket socket)
     {

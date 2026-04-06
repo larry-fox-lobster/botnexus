@@ -22,6 +22,8 @@ public static class GatewayApiServiceCollectionExtensions
         if (configure is not null)
             services.Configure(configure);
 
+        services.AddSingleton<WebSocketConnectionManager>();
+        services.AddSingleton<WebSocketMessageDispatcher>();
         services.AddSingleton<GatewayWebSocketHandler>();
         services.AddSingleton<ActivityWebSocketHandler>();
         services.AddControllers()

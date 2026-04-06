@@ -395,12 +395,27 @@ public sealed class GatewayWebSocketHandlerTests
         WebSocketChannelAdapter? channelAdapter = null,
         InMemorySessionStore? sessions = null,
         IOptions<GatewayWebSocketOptions>? options = null)
-        => new(
+    {
+        var resolvedOptions = options ?? Options.Create(new GatewayWebSocketOptions());
+        var resolvedChannelAdapter = channelAdapter ?? new WebSocketChannelAdapter(NullLogger<WebSocketChannelAdapter>.Instance);
+        var resolvedSessions = sessions ?? new InMemorySessionStore();
+        var connectionManager = new WebSocketConnectionManager(resolvedOptions, NullLogger<WebSocketConnectionManager>.Instance);
+        var dispatcher = new WebSocketMessageDispatcher(
             supervisor ?? Mock.Of<IAgentSupervisor>(),
-            channelAdapter ?? new WebSocketChannelAdapter(NullLogger<WebSocketChannelAdapter>.Instance),
-            sessions ?? new InMemorySessionStore(),
-            options ?? Options.Create(new GatewayWebSocketOptions()),
+            resolvedChannelAdapter,
+            resolvedSessions,
+            resolvedOptions,
+            connectionManager,
+            NullLogger<WebSocketMessageDispatcher>.Instance);
+
+        return new GatewayWebSocketHandler(
+            resolvedChannelAdapter,
+            resolvedSessions,
+            resolvedOptions,
+            connectionManager,
+            dispatcher,
             NullLogger<GatewayWebSocketHandler>.Instance);
+    }
 
     private sealed class TestWebSocketFeature : IHttpWebSocketFeature
     {
