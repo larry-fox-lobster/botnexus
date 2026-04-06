@@ -1,0 +1,249 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using BotNexus.Providers.Copilot;
+using BotNexus.Providers.Core;
+using Microsoft.Extensions.Logging;
+
+namespace BotNexus.Gateway.Configuration;
+
+/// <summary>
+/// Resolves provider API keys for Gateway-hosted agents.
+/// </summary>
+public sealed class GatewayAuthManager
+{
+    private const string AuthFileName = "auth.json";
+    private readonly PlatformConfig _platformConfig;
+    private readonly ILogger<GatewayAuthManager> _logger;
+    private readonly string _authFilePath;
+    private readonly object _sync = new();
+    private Dictionary<string, AuthEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
+    private bool _loaded;
+
+    public GatewayAuthManager(PlatformConfig platformConfig, ILogger<GatewayAuthManager> logger)
+    {
+        _platformConfig = platformConfig;
+        _logger = logger;
+        _authFilePath = Path.Combine(PlatformConfigLoader.DefaultConfigDirectory, AuthFileName);
+    }
+
+    /// <summary>
+    /// Resolves an API key from <c>~/.botnexus/auth.json</c>, environment variables, or platform config.
+    /// </summary>
+    public async Task<string?> GetApiKeyAsync(string provider, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(provider))
+        {
+            return null;
+        }
+
+        var authKey = await GetApiKeyFromAuthEntryAsync(provider, ct).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(authKey))
+        {
+            return authKey;
+        }
+
+        var envKey = EnvironmentApiKeys.GetApiKey(provider);
+        if (!string.IsNullOrWhiteSpace(envKey))
+        {
+            return envKey;
+        }
+
+        return await ResolveProviderConfigApiKeyAsync(provider, ct).ConfigureAwait(false);
+    }
+
+    private async Task<string?> ResolveProviderConfigApiKeyAsync(string provider, CancellationToken ct)
+    {
+        if (_platformConfig.Providers is null)
+        {
+            return null;
+        }
+
+        if (!TryGetProviderConfig(_platformConfig.Providers, provider, out var providerConfig) ||
+            string.IsNullOrWhiteSpace(providerConfig?.ApiKey))
+        {
+            return null;
+        }
+
+        const string AuthPrefix = "auth:";
+        if (providerConfig.ApiKey.StartsWith(AuthPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var referenceProvider = providerConfig.ApiKey[AuthPrefix.Length..].Trim();
+            if (string.IsNullOrWhiteSpace(referenceProvider))
+            {
+                return null;
+            }
+
+            return await GetApiKeyFromAuthEntryAsync(referenceProvider, ct).ConfigureAwait(false);
+        }
+
+        return providerConfig.ApiKey;
+    }
+
+    private async Task<string?> GetApiKeyFromAuthEntryAsync(string provider, CancellationToken ct)
+    {
+        LoadAuthEntries();
+
+        if (!TryGetAuthEntry(provider, out var entry))
+        {
+            return null;
+        }
+
+        if (!NeedsRefresh(entry))
+        {
+            return entry.Access;
+        }
+
+        try
+        {
+            var refreshed = await RefreshEntryAsync(entry, ct).ConfigureAwait(false);
+            UpdateEntry(provider, refreshed);
+            return refreshed.Access;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed refreshing auth credentials for provider '{Provider}'.", provider);
+            return null;
+        }
+    }
+
+    private static bool NeedsRefresh(AuthEntry entry)
+    {
+        if (!string.Equals(entry.Type, "oauth", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        return nowMs >= entry.Expires - 60_000 || string.IsNullOrWhiteSpace(entry.Endpoint);
+    }
+
+    private static async Task<AuthEntry> RefreshEntryAsync(AuthEntry entry, CancellationToken ct)
+    {
+        var credentials = new OAuthCredentials(
+            AccessToken: entry.Access,
+            RefreshToken: entry.Refresh,
+            ExpiresAt: entry.Expires / 1000,
+            ApiEndpoint: entry.Endpoint);
+
+        var refreshed = await CopilotOAuth.RefreshAsync(credentials, ct).ConfigureAwait(false);
+
+        return new AuthEntry
+        {
+            Type = entry.Type,
+            Refresh = refreshed.RefreshToken,
+            Access = refreshed.AccessToken,
+            Expires = refreshed.ExpiresAt * 1000,
+            Endpoint = refreshed.ApiEndpoint ?? entry.Endpoint
+        };
+    }
+
+    private bool TryGetAuthEntry(string provider, out AuthEntry entry)
+    {
+        lock (_sync)
+        {
+            return _entries.TryGetValue(provider, out entry!);
+        }
+    }
+
+    private void UpdateEntry(string provider, AuthEntry entry)
+    {
+        lock (_sync)
+        {
+            _entries[provider] = entry;
+            SaveAuthEntries();
+        }
+    }
+
+    private void LoadAuthEntries()
+    {
+        lock (_sync)
+        {
+            if (_loaded)
+            {
+                return;
+            }
+
+            if (!File.Exists(_authFilePath))
+            {
+                _loaded = true;
+                return;
+            }
+
+            try
+            {
+                var json = File.ReadAllText(_authFilePath);
+                var deserialized = JsonSerializer.Deserialize<Dictionary<string, AuthEntry>>(json, JsonOptions) ??
+                    new Dictionary<string, AuthEntry>();
+                _entries = new Dictionary<string, AuthEntry>(deserialized, StringComparer.OrdinalIgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse auth file '{AuthPath}'.", _authFilePath);
+                _entries = new Dictionary<string, AuthEntry>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            _loaded = true;
+        }
+    }
+
+    private void SaveAuthEntries()
+    {
+        var directory = Path.GetDirectoryName(_authFilePath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var json = JsonSerializer.Serialize(_entries, JsonOptions);
+        File.WriteAllText(_authFilePath, json);
+    }
+
+    private static bool TryGetProviderConfig(
+        IReadOnlyDictionary<string, ProviderConfig> providers,
+        string provider,
+        out ProviderConfig? providerConfig)
+    {
+        if (providers.TryGetValue(provider, out var exact))
+        {
+            providerConfig = exact;
+            return true;
+        }
+
+        foreach (var (key, value) in providers)
+        {
+            if (string.Equals(key, provider, StringComparison.OrdinalIgnoreCase))
+            {
+                providerConfig = value;
+                return true;
+            }
+        }
+
+        providerConfig = null;
+        return false;
+    }
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    private sealed class AuthEntry
+    {
+        [JsonPropertyName("type")]
+        public string Type { get; set; } = "oauth";
+
+        [JsonPropertyName("refresh")]
+        public string Refresh { get; set; } = string.Empty;
+
+        [JsonPropertyName("access")]
+        public string Access { get; set; } = string.Empty;
+
+        [JsonPropertyName("expires")]
+        public long Expires { get; set; }
+
+        [JsonPropertyName("endpoint")]
+        public string? Endpoint { get; set; }
+    }
+}

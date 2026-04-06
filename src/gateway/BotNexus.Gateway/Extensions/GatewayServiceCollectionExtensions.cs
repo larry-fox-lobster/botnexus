@@ -90,6 +90,7 @@ public static class GatewayServiceCollectionExtensions
             .Configure(options => ApplyPlatformConfig(options, config));
         services.Replace(ServiceDescriptor.Singleton(serviceProvider =>
             serviceProvider.GetRequiredService<IOptions<PlatformConfig>>().Value));
+        services.TryAddSingleton<GatewayAuthManager>();
         services.Replace(ServiceDescriptor.Singleton<IGatewayAuthHandler>(serviceProvider =>
             new ApiKeyGatewayAuthHandler(
                 serviceProvider.GetRequiredService<IOptions<PlatformConfig>>().Value,
@@ -119,6 +120,13 @@ public static class GatewayServiceCollectionExtensions
             services.RemoveAll<IAgentConfigurationSource>();
             services.AddFileAgentConfiguration(agentsPath);
         }
+
+        services.AddSingleton<IAgentConfigurationSource>(serviceProvider =>
+            new PlatformConfigAgentSource(
+                serviceProvider.GetRequiredService<IOptions<PlatformConfig>>(),
+                configDirectory,
+                serviceProvider.GetRequiredService<ILogger<PlatformConfigAgentSource>>()));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AgentConfigurationHostedService>());
 
         return services;
     }

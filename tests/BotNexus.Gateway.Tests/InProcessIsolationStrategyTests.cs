@@ -1,5 +1,6 @@
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Isolation;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
@@ -27,7 +28,10 @@ public sealed class InProcessIsolationStrategyTests
     public async Task CreateAsync_WhenModelNotRegistered_ThrowsInvalidOperationException()
     {
         var llmClient = new LlmClient(new ApiProviderRegistry(), new ModelRegistry());
-        var strategy = new InProcessIsolationStrategy(llmClient, NullLogger<InProcessIsolationStrategy>.Instance);
+        var strategy = new InProcessIsolationStrategy(
+            llmClient,
+            new GatewayAuthManager(new PlatformConfig(), NullLogger<GatewayAuthManager>.Instance),
+            NullLogger<InProcessIsolationStrategy>.Instance);
 
         var act = () => strategy.CreateAsync(
             CreateDescriptor(modelId: "missing-model"),
@@ -73,7 +77,10 @@ public sealed class InProcessIsolationStrategyTests
             MaxTokens: 1024));
 
         var llmClient = new LlmClient(new ApiProviderRegistry(), modelRegistry);
-        return new InProcessIsolationStrategy(llmClient, NullLogger<InProcessIsolationStrategy>.Instance);
+        return new InProcessIsolationStrategy(
+            llmClient,
+            new GatewayAuthManager(new PlatformConfig(), NullLogger<GatewayAuthManager>.Instance),
+            NullLogger<InProcessIsolationStrategy>.Instance);
     }
 
     private static AgentDescriptor CreateDescriptor(string modelId = "test-model")

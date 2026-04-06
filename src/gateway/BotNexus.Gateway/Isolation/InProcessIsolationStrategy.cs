@@ -5,6 +5,7 @@ using BotNexus.AgentCore.Types;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Configuration;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
 using Microsoft.Extensions.Logging;
@@ -23,11 +24,16 @@ namespace BotNexus.Gateway.Isolation;
 public sealed class InProcessIsolationStrategy : IIsolationStrategy
 {
     private readonly LlmClient _llmClient;
+    private readonly GatewayAuthManager _authManager;
     private readonly ILogger<InProcessIsolationStrategy> _logger;
 
-    public InProcessIsolationStrategy(LlmClient llmClient, ILogger<InProcessIsolationStrategy> logger)
+    public InProcessIsolationStrategy(
+        LlmClient llmClient,
+        GatewayAuthManager authManager,
+        ILogger<InProcessIsolationStrategy> logger)
     {
         _llmClient = llmClient;
+        _authManager = authManager;
         _logger = logger;
     }
 
@@ -48,7 +54,7 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
             LlmClient: _llmClient,
             ConvertToLlm: null,
             TransformContext: null,
-            GetApiKey: (provider, ct) => Task.FromResult<string?>(null),
+            GetApiKey: (provider, ct) => _authManager.GetApiKeyAsync(provider, ct),
             GetSteeringMessages: null,
             GetFollowUpMessages: null,
             ToolExecutionMode: ToolExecutionMode.Parallel,

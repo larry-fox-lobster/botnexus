@@ -195,7 +195,8 @@ public sealed class PlatformConfigurationTests
 
         gatewayOptions.DefaultAgentId.Should().Be("config-agent");
         sessionStore.Should().BeOfType<FileSessionStore>();
-        agentSources.Should().ContainSingle();
+        agentSources.Should().Contain(source => source is FileAgentConfigurationSource);
+        agentSources.Should().Contain(source => source is PlatformConfigAgentSource);
     }
 
     [Fact]
