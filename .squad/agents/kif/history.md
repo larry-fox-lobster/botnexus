@@ -38,6 +38,20 @@
 
 ---
 
+## Learnings
+
+- Updated `docs/api-reference.md` — comprehensive Wave 1 API surface update (+191 lines):
+  - Added `GET /api/channels` section (ChannelsController) — lists registered channel adapters with 8 capability flags (supportsStreaming, supportsSteering, supportsFollowUp, supportsThinking, supportsToolDisplay, isRunning, name, displayName)
+  - Added `GET /api/extensions` section (ExtensionsController) — lists loaded runtime extensions with name, version, type, assemblyPath fields. Multi-type extensions appear once per type.
+  - Added `reconnect_ack` server→client WebSocket message (sessionKey, replayed, lastSeqId)
+  - Documented `sequenceId` field present on all server→client WebSocket messages for replay tracking
+  - Fixed `tool_end` message docs — added missing `toolName` and `toolIsError` fields per GatewayWebSocketHandler.cs
+  - Added full reconnection flow diagram (5-step sequence with ASCII art)
+  - Added complete Activity Stream event schema (`GatewayActivity` record) with all 12 `GatewayActivityType` enum values
+  - Updated TOC with new Channels Management and Extensions Management sections
+  - Every field verified against controller source code, WebSocket handler, and abstractions models
+  - Pre-existing build/test issues unrelated (flaky timing test, CodingAgent test host crash)
+
 ## Learnings (Archive)
 
 - Sprint 7A: Created OpenAPI spec export pipeline (`scripts/export-openapi.ps1`). Swashbuckle.AspNetCore.Cli 7.2.0 targets net9.0 only — doesn't work on net10.0 even with LatestMajor roll-forward (crashes on `IServerAddressesFeature`). Used live-server approach instead: script starts API on temp port, fetches `/swagger/v1/swagger.json`, saves to `docs/api/openapi.json`. Key: PlatformConfig.GetListenUrl() overrides `--urls` parameter — must set `BotNexus__ConfigPath` to empty JSON file to prevent user config from hijacking port. Generated spec has 15 REST paths with XML doc comment descriptions. Commit: 88666b0.
