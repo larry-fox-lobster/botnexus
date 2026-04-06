@@ -3,6 +3,7 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Api.Controllers;
 using FluentAssertions;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -90,5 +91,34 @@ public sealed class ChatControllerTests
 
         result.Result.Should().BeOfType<ObjectResult>()
             .Which.StatusCode.Should().Be(StatusCodes.Status429TooManyRequests);
+    }
+
+    [Fact]
+    public async Task Send_WhenAgentIsUnknown_ReturnsNotFound()
+    {
+        var supervisor = new Mock<IAgentSupervisor>();
+        supervisor.Setup(s => s.GetOrCreateAsync("missing-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new KeyNotFoundException("Agent 'missing-agent' is not registered."));
+        var sessionStore = new Mock<ISessionStore>();
+        var controller = new ChatController(supervisor.Object, sessionStore.Object);
+
+        var result = await controller.Send(new ChatRequest("missing-agent", "hello"), CancellationToken.None);
+
+        result.Result.Should().BeOfType<NotFoundObjectResult>();
+        sessionStore.Verify(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Send_WhenMessageIsEmpty_ReturnsBadRequest()
+    {
+        var supervisor = new Mock<IAgentSupervisor>();
+        var sessionStore = new Mock<ISessionStore>();
+        var controller = new ChatController(supervisor.Object, sessionStore.Object);
+
+        var result = await controller.Send(new ChatRequest("agent-a", ""), CancellationToken.None);
+
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
+        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        sessionStore.Verify(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

@@ -618,6 +618,13 @@ _logger.LogInformation("Agent {AgentName} configured with model={ConfiguredModel
 **Next:** Execute 3 P1 items in next sprint
 
 **Files Created:**
+
+### 2026-04-05 — Live Copilot Gateway Integration Findings
+
+- Verified live REST flow against `github-copilot` (`gpt-4.1`) at `http://localhost:5005`: `/health`, `/api/agents`, `/api/sessions`, and `/api/config/validate` all returned healthy/valid responses.
+- Fixed WebSocket runtime wiring by registering `IChannelAdapter` to resolve the existing `WebSocketChannelAdapter` singleton; this removed the "no dispatcher is registered" warning and restored inbound dispatch + streamed events.
+- Hardened `POST /api/chat` validation and error mapping: empty messages now return `400`, unknown agents return `404` instead of unhandled `500`.
+- Session persistence and continuity validated: repeated prompts in `live-test-1` retained context and `/api/sessions/live-test-1/history` showed the full transcript.
 - `BotNexus.Providers.OpenAICompat.csproj` — NET 10.0, references Core only, no external SDK
 - `OpenAICompatProvider.cs` — `IApiProvider` impl (api="openai-compat"), raw HttpClient SSE streaming, compat-aware request/response
 - `OpenAICompatOptions.cs` — extends `StreamOptions` with `ToolChoice` and `ReasoningEffort`

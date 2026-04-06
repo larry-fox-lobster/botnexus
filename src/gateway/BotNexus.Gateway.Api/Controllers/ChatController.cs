@@ -28,20 +28,30 @@ public sealed class ChatController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ChatResponse>> Send([FromBody] ChatRequest request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.AgentId))
+            return BadRequest(new { error = "agentId is required." });
+
+        if (string.IsNullOrWhiteSpace(request.Message))
+            return BadRequest(new { error = "message is required." });
+
         try
         {
-            var sessionId = request.SessionId ?? Guid.NewGuid().ToString("N");
-            var session = await _sessions.GetOrCreateAsync(sessionId, request.AgentId, cancellationToken);
-
-            session.AddEntry(new SessionEntry { Role = "user", Content = request.Message });
-
+            var sessionId = string.IsNullOrWhiteSpace(request.SessionId)
+                ? Guid.NewGuid().ToString("N")
+                : request.SessionId;
             var handle = await _supervisor.GetOrCreateAsync(request.AgentId, sessionId, cancellationToken);
             var response = await handle.PromptAsync(request.Message, cancellationToken);
 
+            var session = await _sessions.GetOrCreateAsync(sessionId, request.AgentId, cancellationToken);
+            session.AddEntry(new SessionEntry { Role = "user", Content = request.Message });
             session.AddEntry(new SessionEntry { Role = "assistant", Content = response.Content });
             await _sessions.SaveAsync(session, cancellationToken);
 
             return Ok(new ChatResponse(sessionId, response.Content, response.Usage));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
         }
         catch (AgentConcurrencyLimitExceededException ex)
         {
