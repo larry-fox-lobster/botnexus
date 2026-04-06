@@ -5,6 +5,39 @@
 - **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI/Copilot), Session, Tools.GitHub, WebUI
 - **Created:** 2026-04-01
 
+## 2026-04-05T19:41:00Z — Phase 7 Gateway Gap Analysis (Lead)
+
+**Timestamp:** 2026-04-05T19:41:00Z  
+**Status:** ✅ Complete  
+**Requested by:** Jon Bullen (via Copilot)  
+**Scope:** Architecture gap analysis against 6 refined Gateway requirements
+
+**Context:**
+Phases 1-6 are complete (build green, 225 tests, Phase 6 Grade A). Owner provided refined requirements for Phase 7. Performed comprehensive gap analysis across all gateway, channels, WebUI, CLI, and test code.
+
+**Key Findings:**
+
+1. **Agent Management (75% complete):** Core registry, supervisor, communicator, config sources all done. Missing: max call chain depth limit (P1), cross-agent timeout (P1).
+
+2. **Isolation Strategies (25% complete):** `IIsolationStrategy` interface solid. InProcess works. Sandbox/Container/Remote are stubs (by design — Phase 2 items). Only P1 gap: typed isolation options model.
+
+3. **Channel Adapters (60% complete):** WebSocket channel is full-featured (streaming, steering, follow-up, thinking, tools). TUI has streaming + thinking/tool display. Telegram is stub. Gaps: TUI needs steering support (P1), need explicit message queuing abstraction (P1).
+
+4. **Session Management (70% complete):** Two session stores (memory, file), cleanup service, thread-safe history, routing all done. **P0 gap:** No session reconnection with event replay — clients lose stream on disconnect.
+
+5. **API Surface (65% complete):** REST controllers for agents/chat/sessions/config done. WS handlers for chat and activity done. Auth middleware done. **P0 gap:** No WS reconnection replay. P1 gaps: missing session suspend/resume, history pagination, agent update endpoints, OpenAPI spec, authorization enforcement.
+
+6. **Platform Configuration (70% complete):** PlatformConfig + loader + watcher + CLI validation all done. Gaps: no JSON Schema (P1), no `botnexus init` command (P1), no CLI agent management (P1), no session store config selection (P1).
+
+**Sprint Plan Delivered:**
+- **Sprint 7A (P0+critical P1):** Session reconnection, suspend/resume, history pagination, depth limit, timeout, OpenAPI, TUI steering, message queuing. 3-5 days.
+- **Sprint 7B (remaining P1):** Agent update API, auth enforcement, isolation options, JSON Schema, CLI init/agents, WebUI enhancements. 3-5 days.
+- **Sprint 7C (P2 polish):** Rate limiting, correlation IDs, lifecycle events, health checks, SQLite store, WebUI module split. 3-5 days.
+
+**Carried-forward Phase 5/6 issues:** DIP violation in WebSocketHandler, Path.HasExtension auth bypass, StreamAsync background task leak.
+
+**Decision written to:** `.squad/decisions/inbox/leela-phase7-plan.md`
+
 ## 2026-04-03T16:25:00Z — Provider Response Normalization Layer (Lead)
 
 **Timestamp:** 2026-04-03T16:25:00Z  
