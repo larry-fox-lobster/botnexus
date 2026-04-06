@@ -7,6 +7,27 @@
 
 ## Learnings
 
+- Created `docs/dev-guide.md` — comprehensive developer guide (~500 lines, 12 sections) covering prerequisites through troubleshooting. Every config example, port number, and file path verified against actual source code:
+  - Gateway default port is 5005 in scripts (`start-gateway.ps1` `-Port` default, `dev-loop.ps1`)
+  - `BotNexusHome.Initialize()` creates 5 directories: extensions, tokens, sessions, logs, agents
+  - `BotNexusHome.ScaffoldAgentWorkspace()` creates 4 files: SOUL.md, IDENTITY.md, USER.md, MEMORY.md
+  - Auth middleware skips `/health`, `/webui`, `/swagger` (from `GatewayAuthMiddleware.ShouldSkipAuth`)
+  - Config hot reload uses 500ms debounce via `PlatformConfigWatcher`
+  - Provider auth resolution: auth.json → env vars → config.json
+  - WebSocket rate limit: 20 attempts per 300-second window (`GatewayWebSocketOptions` defaults)
+- Updated `docs/api-reference.md` — added 4 missing endpoints verified against controller source:
+  - `GET /api/agents/instances` (AgentsController.ListInstances)
+  - `POST /api/agents/{agentId}/sessions/{sessionId}/stop` (AgentsController.StopInstance)
+  - `GET /api/config/validate` (ConfigController.Validate)
+  - `/ws/activity` WebSocket (ActivityWebSocketHandler)
+  - Removed fictitious `PUT /api/agents/{name}` not in AgentsController
+  - Fixed parameter names from `{name}` to `{agentId}` to match controller route params
+  - Fixed `/health` response from `{"status":"healthy"}` to `{"status":"ok"}` matching Program.cs line 76
+  - Added full WebSocket protocol documentation with message flow diagram
+- Updated `README.md` — added documentation navigation table, dev-guide link, fixed Quick Start
+- Updated `src/gateway/README.md` — added dev-guide cross-reference
+- Updated `docs/architecture.md` — added See Also cross-references
+
 - Created 5 module READMEs (~550 lines total) for Gateway sub-modules:
   - `src/gateway/BotNexus.Gateway.Abstractions/README.md` — Complete contract catalog: 13 interfaces, 15 model types, 3 enums, extension point guide for implementers
   - `src/gateway/BotNexus.Gateway.Sessions/README.md` — FileSessionStore (JSONL + .meta.json sidecar, SemaphoreSlim thread safety, ConfigureAwait(false) pattern) and InMemorySessionStore (Lock-based)

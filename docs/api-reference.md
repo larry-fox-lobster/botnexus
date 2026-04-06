@@ -89,12 +89,12 @@ X-Api-Key: your-api-key
 
 ### Get Agent Details
 
-**Endpoint:** `GET /api/agents/{name}`
+**Endpoint:** `GET /api/agents/{agentId}`
 
-**Description:** Retrieve configuration for a specific agent.
+**Description:** Retrieve a specific agent by ID.
 
 **Parameters:**
-- `name` (string, path) — Agent name (normalized to lowercase with dashes)
+- `agentId` (string, path) — Agent ID
 
 **Request:**
 ```http
@@ -193,68 +193,14 @@ Content-Type: application/json
 
 ---
 
-### Update Agent
-
-**Endpoint:** `PUT /api/agents/{name}`
-
-**Description:** Update an existing agent's configuration.
-
-**Parameters:**
-- `name` (string, path) — Agent name
-
-**Request Body:** (same as POST, all fields optional)
-```json
-{
-  "systemPrompt": "Updated instructions",
-  "temperature": 0.9
-}
-```
-
-**Request:**
-```http
-PUT /api/agents/my-agent
-X-Api-Key: your-api-key
-Content-Type: application/json
-
-{
-  "model": "gpt-4-turbo",
-  "temperature": 0.8
-}
-```
-
-**Response:** 200 OK
-```json
-{
-  "name": "my-agent",
-  "systemPrompt": "You are helpful",
-  "model": "gpt-4-turbo",
-  "provider": "openai",
-  "maxTokens": 2000,
-  "temperature": 0.8,
-  "disallowedTools": [],
-  "disabledSkills": []
-}
-```
-
-**Side Effects:**
-- Config is backed up to `config.json.bak` before update
-- Config is hot-reloaded (no restart needed)
-
-**Error Responses:**
-- `404 Not Found` — Agent does not exist
-- `400 Bad Request` — Invalid configuration
-- `500 Internal Server Error` — Update failed
-
----
-
 ### Delete Agent
 
-**Endpoint:** `DELETE /api/agents/{name}`
+**Endpoint:** `DELETE /api/agents/{agentId}`
 
-**Description:** Remove an agent from the configuration.
+**Description:** Unregister an agent.
 
 **Parameters:**
-- `name` (string, path) — Agent name
+- `agentId` (string, path) — Agent ID
 
 **Request:**
 ```http
@@ -264,14 +210,80 @@ X-Api-Key: your-api-key
 
 **Response:** 204 No Content
 
-**Side Effects:**
-- Config is backed up to `config.json.bak`
-- Agent workspace directory is preserved (not deleted)
-- Config is hot-reloaded
-
 **Error Responses:**
 - `404 Not Found` — Agent does not exist
-- `500 Internal Server Error` — Deletion failed
+
+---
+
+### List Active Instances
+
+**Endpoint:** `GET /api/agents/instances`
+
+**Description:** List all active agent instances (running agents with live sessions).
+
+**Request:**
+```http
+GET /api/agents/instances
+X-Api-Key: your-api-key
+```
+
+**Response:** 200 OK
+```json
+[
+  {
+    "agentId": "assistant",
+    "sessionId": "abc123",
+    "status": "running",
+    "startedAt": "2026-01-15T10:30:00Z"
+  }
+]
+```
+
+---
+
+### Get Instance Status
+
+**Endpoint:** `GET /api/agents/{agentId}/sessions/{sessionId}/status`
+
+**Description:** Check the status of a specific running agent instance.
+
+**Parameters:**
+- `agentId` (string, path) — Agent ID
+- `sessionId` (string, path) — Session ID
+
+**Request:**
+```http
+GET /api/agents/assistant/sessions/abc123/status
+X-Api-Key: your-api-key
+```
+
+**Response:** 200 OK — Returns the agent instance details.
+
+**Error Responses:**
+- `404 Not Found` — No active instance for the given agent/session
+
+---
+
+### Stop Instance
+
+**Endpoint:** `POST /api/agents/{agentId}/sessions/{sessionId}/stop`
+
+**Description:** Stop a running agent instance.
+
+**Parameters:**
+- `agentId` (string, path) — Agent ID
+- `sessionId` (string, path) — Session ID
+
+**Request:**
+```http
+POST /api/agents/assistant/sessions/abc123/stop
+X-Api-Key: your-api-key
+```
+
+**Response:** 204 No Content
+
+**Error Responses:**
+- `404 Not Found` — No active instance for the given agent/session
 
 ---
 
@@ -476,10 +488,54 @@ Content-Type: application/json
 **Response:** 200 OK
 ```json
 {
-  "status": "healthy",
-  "timestamp": "2026-01-15T11:50:00Z"
+  "status": "ok"
 }
 ```
+
+---
+
+### Config Validation
+
+**Endpoint:** `GET /api/config/validate`
+
+**Description:** Validates the platform configuration file and returns any errors.
+
+**Query Parameters:**
+- `path` (string, optional) — Explicit path to a config file. Defaults to `~/.botnexus/config.json`.
+
+**Request:**
+```http
+GET /api/config/validate
+X-Api-Key: your-api-key
+```
+
+**Response (valid config):** 200 OK
+```json
+{
+  "isValid": true,
+  "configPath": "/home/user/.botnexus/config.json",
+  "errors": []
+}
+```
+
+**Response (invalid config):** 200 OK
+```json
+{
+  "isValid": false,
+  "configPath": "/home/user/.botnexus/config.json",
+  "errors": [
+    "agents.assistant.provider is required (example: 'copilot').",
+    "agents.assistant.model is required (example: 'gpt-4.1')."
+  ]
+}
+```
+
+**Validation checks include:**
+- `gateway.listenUrl` must be a valid absolute HTTP/HTTPS URL
+- Each provider must have `apiKey` or `baseUrl`
+- Each agent must have `provider` and `model`
+- Each channel must have a `type`
+- API keys must have `apiKey`, `tenantId`, and at least one permission
 
 ---
 
@@ -807,8 +863,146 @@ For detailed configuration guidance, see [Configuration Guide § Agent Iteration
 
 ---
 
+## WebSocket Protocol
+
+### Agent WebSocket (`/ws`)
+
+Real-time streaming connection for interacting with agents.
+
+**Connection URL:**
+```
+ws://localhost:5005/ws?agent={agentId}&session={sessionId}
+```
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `agent` | Yes | Target agent ID |
+| `session` | No | Session ID (auto-generated if omitted) |
+
+**Authentication:** Subject to `GatewayAuthMiddleware` rules. In development mode (no API keys configured), connections are allowed without auth.
+
+**Session locking:** Each session allows one active WebSocket at a time. A second connection to the same session is closed with status code **4409** (`"Session already has an active connection"`).
+
+**Rate limiting:** WebSocket connections are rate-limited per client IP + agent. Default: 20 attempts per 300-second window. Excess connections receive HTTP 429 with a `Retry-After` header.
+
+#### Client → Server Messages
+
+**Send a message:**
+```json
+{ "type": "message", "content": "What is 2+2?" }
+```
+
+**Abort current execution:**
+```json
+{ "type": "abort" }
+```
+
+**Inject steering message into active run:**
+```json
+{ "type": "steer", "content": "Focus on the main point." }
+```
+
+**Queue a follow-up for the next run:**
+```json
+{ "type": "follow_up", "content": "And what about 3+3?" }
+```
+
+**Keepalive ping:**
+```json
+{ "type": "ping" }
+```
+
+#### Server → Client Messages
+
+**Connection established:**
+```json
+{ "type": "connected", "connectionId": "abc123", "sessionId": "def456" }
+```
+
+**Agent started processing:**
+```json
+{ "type": "message_start", "messageId": "uuid-..." }
+```
+
+**Thinking delta (streaming agent reasoning):**
+```json
+{ "type": "thinking_delta", "delta": "Let me think about...", "messageId": "uuid-..." }
+```
+
+**Content delta (streaming response text):**
+```json
+{ "type": "content_delta", "delta": "2+2 is 4", "messageId": "uuid-..." }
+```
+
+**Tool execution started:**
+```json
+{ "type": "tool_start", "toolCallId": "call_...", "toolName": "calculate", "messageId": "uuid-..." }
+```
+
+**Tool result received:**
+```json
+{ "type": "tool_end", "toolCallId": "call_...", "toolResult": "4", "messageId": "uuid-..." }
+```
+
+**Agent completed:**
+```json
+{ "type": "message_end", "messageId": "uuid-...", "usage": { "inputTokens": 50, "outputTokens": 100 } }
+```
+
+**Error occurred:**
+```json
+{ "type": "error", "message": "Agent not found", "code": "NOT_FOUND" }
+```
+
+**Keepalive pong:**
+```json
+{ "type": "pong" }
+```
+
+#### WebSocket Message Flow
+
+```
+Client                          Server
+  │                               │
+  │──── { type: "message" } ─────►│
+  │                               │
+  │◄──── { type: "message_start" }│
+  │◄──── { type: thinking_delta } │  (if thinking enabled)
+  │◄──── { type: content_delta }  │  (streamed chunks)
+  │◄──── { type: content_delta }  │
+  │◄──── { type: tool_start }     │  (if tool called)
+  │◄──── { type: tool_end }       │
+  │◄──── { type: content_delta }  │  (post-tool response)
+  │◄──── { type: message_end }    │
+  │                               │
+```
+
+---
+
+### Activity Stream WebSocket (`/ws/activity`)
+
+Real-time stream of gateway activity events for monitoring.
+
+**Connection URL:**
+```
+ws://localhost:5005/ws/activity?agent={agentFilter}
+```
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `agent` | No | Filter events to a specific agent ID. Omit for all agents. |
+
+**Behavior:**
+- Subscribes to `IActivityBroadcaster` and streams all gateway activity events
+- Events are JSON-serialized with `camelCase` naming
+- Connection stays open until the client disconnects or the server shuts down
+- When an `agent` filter is provided, only events for that agent are sent
+
+---
+
 ## See Also
 
+- [Developer Guide](dev-guide.md) — Local development setup and workflow
 - [Configuration Guide](configuration.md) — Detailed configuration options
 - [Getting Started](getting-started.md) — Quick start guide
 - [Extension Development](extension-development.md) — Build custom tools and providers

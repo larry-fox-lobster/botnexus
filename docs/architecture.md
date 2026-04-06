@@ -2118,3 +2118,12 @@ BotNexus is a modular, contract-first platform for running multiple AI agents co
 - **Maintainability**: Clean separation of concerns, minimal core, SOLID principles
 
 The architecture supports deploying to `~/.botnexus/` with configurable extensions, persistent sessions, and OAuth-backed providers.
+
+---
+
+## See Also
+
+- [Developer Guide](dev-guide.md) — Local development setup and workflow
+- [API Reference](api-reference.md) — REST and WebSocket endpoint documentation
+- [Configuration Guide](configuration.md) — Complete configuration reference
+- [Extension Development](extension-development.md) — Building custom providers, channels, and tools
