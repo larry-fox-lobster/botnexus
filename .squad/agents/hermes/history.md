@@ -607,3 +607,9 @@ Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
 - Expanded Gateway coverage from 244 to 264 tests by adding reconnect protocol edge tests (invalid session key, bounded replay window, no-missed replay ack) plus `GatewaySession` sequence/replay unit coverage.
 - Added suspend/resume and history pagination edges (`Resume` unknown session 404, offset-beyond-total, empty-history responses) and validated TUI `/steer` isolation so normal input is unaffected.
 - Added queueing, timeout, and configuration depth coverage: sequential per-session queue execution, closed-session rejection behavior, cross-agent depth reset/under-limit success, fast-timeout success, cancellation propagation, and SessionStore registration defaults (InMemory/File/unspecified).
+
+### 2026-04-06 — Gateway coverage gap fill (protocol + lifecycle)
+
+- Added Gateway WebSocket protocol tests for `abort`, `ping/pong`, steer-without-session error, and reconnect rejection when agent/session mismatch to harden reconnect and control-flow semantics.
+- Added Gateway host lifecycle coverage to validate channel adapter start/stop orchestration under startup failures, plus platform config watch error-callback coverage for invalid hot-reload payloads.
+- Extended auth and concurrency tests for invalid `auth.json` fallback behavior and same-session reuse at max concurrency; suite now passes with 274 Gateway tests.

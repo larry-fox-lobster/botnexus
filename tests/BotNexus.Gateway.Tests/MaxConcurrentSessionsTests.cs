@@ -55,6 +55,17 @@ public sealed class MaxConcurrentSessionsTests
         supervisor.GetAllInstances().Should().HaveCount(20);
     }
 
+    [Fact]
+    public async Task SupervisorReusesExistingSession_WhenMaxReachedForAgent()
+    {
+        var supervisor = CreateSupervisor(maxConcurrentSessions: 1);
+
+        var first = await supervisor.GetOrCreateAsync("agent-a", "session-1");
+        var second = await supervisor.GetOrCreateAsync("agent-a", "session-1");
+
+        second.Should().BeSameAs(first);
+    }
+
     private static DefaultAgentSupervisor CreateSupervisor(int? maxConcurrentSessions = null)
     {
         var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);

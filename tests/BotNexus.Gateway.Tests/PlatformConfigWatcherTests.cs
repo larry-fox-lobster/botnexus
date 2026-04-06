@@ -1,5 +1,6 @@
 using BotNexus.Gateway.Configuration;
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -50,6 +51,20 @@ public sealed class PlatformConfigWatcherTests : IDisposable
         {
             PlatformConfigLoader.ConfigChanged -= handler;
         }
+    }
+
+    [Fact]
+    public async Task Watch_WhenConfigBecomesInvalid_InvokesErrorCallback()
+    {
+        var callback = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var watcher = PlatformConfigLoader.Watch(_configPath, onError: ex => callback.TrySetResult(ex));
+
+        File.WriteAllText(_configPath, "{ invalid json");
+
+        var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+
+        completed.Should().Be(callback.Task);
+        (await callback.Task).Should().BeOfType<OptionsValidationException>();
     }
 
     public void Dispose()

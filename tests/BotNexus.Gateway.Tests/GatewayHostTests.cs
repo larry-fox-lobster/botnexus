@@ -378,6 +378,52 @@ public sealed class GatewayHostTests
             Times.Exactly(2));
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WhenStarted_ManagesChannelLifecycleAndShutdown()
+    {
+        var supervisor = new Mock<IAgentSupervisor>();
+        supervisor.Setup(s => s.StopAllAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var firstChannel = CreateChannelAdapter("web", supportsStreaming: false);
+        firstChannel.Setup(c => c.StartAsync(It.IsAny<IChannelDispatcher>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        firstChannel.Setup(c => c.StopAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var secondChannel = CreateChannelAdapter("telegram", supportsStreaming: false);
+        secondChannel.Setup(c => c.StartAsync(It.IsAny<IChannelDispatcher>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("start failed"));
+        secondChannel.Setup(c => c.StopAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var manager = new Mock<IChannelManager>();
+        manager.SetupGet(m => m.Adapters).Returns([firstChannel.Object, secondChannel.Object]);
+        manager.Setup(m => m.Get(It.IsAny<string>())).Returns((string channelType) =>
+            string.Equals(channelType, "web", StringComparison.OrdinalIgnoreCase)
+                ? firstChannel.Object
+                : string.Equals(channelType, "telegram", StringComparison.OrdinalIgnoreCase)
+                    ? secondChannel.Object
+                    : null);
+
+        var host = new GatewayHost(
+            supervisor.Object,
+            Mock.Of<IMessageRouter>(),
+            new InMemorySessionStore(),
+            new RecordingActivityBroadcaster(),
+            manager.Object,
+            NullLogger<GatewayHost>.Instance);
+
+        await host.StartAsync(CancellationToken.None);
+        await Task.Delay(150);
+        await host.StopAsync(CancellationToken.None);
+
+        firstChannel.Verify(c => c.StartAsync(It.IsAny<IChannelDispatcher>(), It.IsAny<CancellationToken>()), Times.Once);
+        secondChannel.Verify(c => c.StartAsync(It.IsAny<IChannelDispatcher>(), It.IsAny<CancellationToken>()), Times.Once);
+        firstChannel.Verify(c => c.StopAsync(It.IsAny<CancellationToken>()), Times.Once);
+        secondChannel.Verify(c => c.StopAsync(It.IsAny<CancellationToken>()), Times.Once);
+        supervisor.Verify(s => s.StopAllAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private static Mock<IAgentHandle> CreatePromptHandle(string agentId, string sessionId, string content)
     {
         var handle = new Mock<IAgentHandle>();

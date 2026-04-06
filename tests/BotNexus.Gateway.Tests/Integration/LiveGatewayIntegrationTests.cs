@@ -34,6 +34,17 @@ public sealed class LiveGatewayIntegrationTests
     }
 
     [Fact]
+    public async Task GatewayStartupTest_SwaggerEndpoint_ReturnsOk()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/swagger/v1/swagger.json");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task RestApiTests_AgentsSessionsAndConfigEndpoints_ReturnExpectedResponses()
     {
         await using var factory = CreateFactory();

@@ -235,6 +235,87 @@ public sealed class GatewayWebSocketHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_WithAbortMessage_AbortsActiveHandle()
+    {
+        var handle = new Mock<IAgentHandle>();
+        var supervisor = new Mock<IAgentSupervisor>();
+        supervisor.Setup(s => s.GetInstance("agent-a", "session-123"))
+            .Returns(new AgentInstance
+            {
+                InstanceId = "agent-a::session-123",
+                AgentId = "agent-a",
+                SessionId = "session-123",
+                IsolationStrategy = "in-process"
+            });
+        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-123", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(handle.Object);
+
+        var context = new DefaultHttpContext();
+        context.Request.QueryString = new QueryString("?agent=agent-a&session=session-123");
+        var socket = new TestWebSocket();
+        socket.QueueIncomingText("""{"type":"abort"}""");
+        context.Features.Set<IHttpWebSocketFeature>(new TestWebSocketFeature { IsWebSocketRequest = true, Socket = socket });
+        var handler = CreateHandler(supervisor.Object);
+
+        await handler.HandleAsync(context, CancellationToken.None);
+
+        handle.Verify(h => h.AbortAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithPingMessage_SendsPongPayload()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.QueryString = new QueryString("?agent=agent-a&session=session-123");
+        var socket = new TestWebSocket();
+        socket.QueueIncomingText("""{"type":"ping"}""");
+        context.Features.Set<IHttpWebSocketFeature>(new TestWebSocketFeature { IsWebSocketRequest = true, Socket = socket });
+        var handler = CreateHandler();
+
+        await handler.HandleAsync(context, CancellationToken.None);
+
+        var payloads = ParsePayloads(socket.SentMessages);
+        payloads.Any(payload => HasStringProperty(payload, "type", "pong")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithSteerMessageWithoutSession_SendsSessionNotFoundError()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.QueryString = new QueryString("?agent=agent-a&session=session-123");
+        var socket = new TestWebSocket();
+        socket.QueueIncomingText("""{"type":"steer","content":"adjust"}""");
+        context.Features.Set<IHttpWebSocketFeature>(new TestWebSocketFeature { IsWebSocketRequest = true, Socket = socket });
+        var handler = CreateHandler();
+
+        await handler.HandleAsync(context, CancellationToken.None);
+
+        var payloads = ParsePayloads(socket.SentMessages);
+        payloads.Any(payload => HasStringProperty(payload, "type", "error") && HasStringProperty(payload, "code", "SESSION_NOT_FOUND"))
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithReconnectForDifferentAgent_SendsSessionNotFoundError()
+    {
+        var store = new InMemorySessionStore();
+        await store.GetOrCreateAsync("session-123", "agent-b", CancellationToken.None);
+
+        var context = new DefaultHttpContext();
+        context.Request.QueryString = new QueryString("?agent=agent-a&session=session-123");
+        var socket = new TestWebSocket();
+        socket.QueueIncomingText("""{"type":"reconnect","sessionKey":"session-123","lastSeqId":0}""");
+        context.Features.Set<IHttpWebSocketFeature>(new TestWebSocketFeature { IsWebSocketRequest = true, Socket = socket });
+        var handler = CreateHandler(sessions: store);
+
+        await handler.HandleAsync(context, CancellationToken.None);
+
+        var payloads = ParsePayloads(socket.SentMessages);
+        payloads.Any(payload => HasStringProperty(payload, "type", "error") && HasStringProperty(payload, "code", "SESSION_NOT_FOUND"))
+            .Should().BeTrue();
+    }
+
+    [Fact]
     public async Task HandleAsync_WithMessage_DispatchesInboundViaChannelPipeline()
     {
         var dispatcher = new Mock<IChannelDispatcher>();

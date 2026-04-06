@@ -47,6 +47,25 @@ public sealed class ActivityWebSocketHandlerTests
         payload.RootElement.GetProperty("message").GetString().Should().Be("keep");
     }
 
+    [Fact]
+    public async Task HandleAsync_WhenStreamCompletes_ClosesSocketNormally()
+    {
+        var activities = new[]
+        {
+            new GatewayActivity { Type = GatewayActivityType.System, AgentId = "agent-a", Message = "done" }
+        };
+
+        var context = new DefaultHttpContext();
+        var socket = new TestWebSocket();
+        context.Features.Set<IHttpWebSocketFeature>(new TestWebSocketFeature { IsWebSocketRequest = true, Socket = socket });
+        var handler = new ActivityWebSocketHandler(new TestBroadcaster(activities), NullLogger<ActivityWebSocketHandler>.Instance);
+
+        await handler.HandleAsync(context, CancellationToken.None);
+
+        socket.LastCloseStatus.Should().Be(WebSocketCloseStatus.NormalClosure);
+        socket.LastCloseDescription.Should().Be("Activity stream closed");
+    }
+
     private sealed class TestBroadcaster(IEnumerable<GatewayActivity> activities) : IActivityBroadcaster
     {
         private readonly IReadOnlyList<GatewayActivity> _activities = activities.ToList();
@@ -79,6 +98,8 @@ public sealed class ActivityWebSocketHandlerTests
         private WebSocketState _state = WebSocketState.Open;
 
         public List<byte[]> SentMessages { get; } = [];
+        public WebSocketCloseStatus? LastCloseStatus { get; private set; }
+        public string? LastCloseDescription { get; private set; }
 
         public override WebSocketCloseStatus? CloseStatus => null;
         public override string? CloseStatusDescription => null;
@@ -90,6 +111,8 @@ public sealed class ActivityWebSocketHandlerTests
 
         public override Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
         {
+            LastCloseStatus = closeStatus;
+            LastCloseDescription = statusDescription;
             _state = WebSocketState.Closed;
             return Task.CompletedTask;
         }

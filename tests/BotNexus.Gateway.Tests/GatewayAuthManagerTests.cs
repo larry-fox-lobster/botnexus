@@ -98,6 +98,18 @@ public sealed class GatewayAuthManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetApiKeyAsync_WhenAuthJsonIsInvalid_FallsBackToEnvironmentVariable()
+    {
+        await File.WriteAllTextAsync(_authFilePath, "{ invalid json");
+        SetEnvironmentVariable("OPENAI_API_KEY", "env-openai-key");
+        var manager = CreateManager(new PlatformConfig());
+
+        var apiKey = await manager.GetApiKeyAsync("openai");
+
+        apiKey.Should().Be("env-openai-key");
+    }
+
+    [Fact]
     public async Task GetApiKeyAsync_WhenNoAuthOrEnv_FallsBackToPlatformConfigApiKey()
     {
         SetEnvironmentVariable("OPENAI_API_KEY", null);
