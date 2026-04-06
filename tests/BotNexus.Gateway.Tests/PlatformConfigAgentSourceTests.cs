@@ -1,6 +1,15 @@
+using System.Reflection;
+using BotNexus.Gateway.Abstractions.Agents;
+using BotNexus.Gateway.Abstractions.Isolation;
+using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Configuration;
+using BotNexus.Gateway.Isolation;
+using BotNexus.Providers.Core;
+using BotNexus.Providers.Core.Models;
+using BotNexus.Providers.Core.Registry;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace BotNexus.Gateway.Tests;
@@ -86,6 +95,54 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
     }
 
     [Fact]
+    public async Task PlatformConfigAgentSource_LoadsAgents_ThatInProcessIsolationCanCreate()
+    {
+        var source = new PlatformConfigAgentSource(
+            Options.Create(new PlatformConfig
+            {
+                Agents = new Dictionary<string, AgentDefinitionConfig>
+                {
+                    ["assistant"] = new()
+                    {
+                        Provider = "test-provider",
+                        Model = "test-model",
+                        IsolationStrategy = "in-process",
+                        Enabled = true
+                    }
+                }
+            }),
+            _configDirectory,
+            new ListLogger<PlatformConfigAgentSource>());
+
+        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+
+        var modelRegistry = new ModelRegistry();
+        modelRegistry.Register("test-provider", new LlmModel(
+            Id: "test-model",
+            Name: "test-model",
+            Api: "responses",
+            Provider: "test-provider",
+            BaseUrl: "https://llm.test",
+            Reasoning: false,
+            Input: ["text"],
+            Cost: new ModelCost(0, 0, 0, 0),
+            ContextWindow: 8192,
+            MaxTokens: 1024));
+
+        var strategy = new InProcessIsolationStrategy(
+            new LlmClient(new ApiProviderRegistry(), modelRegistry),
+            CreateGatewayAuthManagerWithTempAuthPath(),
+            NullLogger<InProcessIsolationStrategy>.Instance);
+
+        var handle = await strategy.CreateAsync(
+            descriptor,
+            new AgentExecutionContext { SessionId = "session-1" });
+
+        handle.AgentId.Should().Be("assistant");
+        handle.SessionId.Should().Be("session-1");
+    }
+
+    [Fact]
     public void Watch_ReturnsNull()
     {
         var source = new PlatformConfigAgentSource(
@@ -100,6 +157,15 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
     {
         if (Directory.Exists(_configDirectory))
             Directory.Delete(_configDirectory, recursive: true);
+    }
+
+    private GatewayAuthManager CreateGatewayAuthManagerWithTempAuthPath()
+    {
+        var authManager = new GatewayAuthManager(new PlatformConfig(), NullLogger<GatewayAuthManager>.Instance);
+        var authPathField = typeof(GatewayAuthManager).GetField("_authFilePath", BindingFlags.NonPublic | BindingFlags.Instance);
+        authPathField.Should().NotBeNull();
+        authPathField!.SetValue(authManager, Path.Combine(_configDirectory, "auth.json"));
+        return authManager;
     }
 
     private sealed class ListLogger<T> : ILogger<T>
