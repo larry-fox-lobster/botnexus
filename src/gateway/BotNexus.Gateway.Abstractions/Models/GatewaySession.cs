@@ -40,6 +40,9 @@ public sealed class GatewaySession
     /// </summary>
     public List<SessionEntry> History { get; init; } = [];
 
+    /// <summary>Number of entries in the conversation history.</summary>
+    public int MessageCount => History.Count;
+
     /// <summary>Session-level metadata for extensibility.</summary>
     public Dictionary<string, object?> Metadata { get; init; } = [];
 
