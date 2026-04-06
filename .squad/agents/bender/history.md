@@ -925,6 +925,12 @@ Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
 
 ### 2026-04-06 — Sprint 7A session reconnect + queueing runtime controls
 - `GatewayWebSocketHandler` now uses `IGatewayWebSocketChannelAdapter` + `ISessionStore`, sequences every outbound frame with `sequenceId`, records replay payloads in session state, and supports `{"type":"reconnect","sessionKey":"...","lastSeqId":N}` with bounded replay (`GatewayWebSocketOptions.ReplayWindowSize`, default 1000).
+
+### 2026-04-06 — MessageCount property for session list
+- Added `MessageCount` computed property to `GatewaySession` (returns `History.Count`) to fix WebUI session list showing "0 msgs" for all sessions
+- The API endpoint `GET /api/sessions` now includes `messageCount` in the JSON response (System.Text.Json camelCase serialization)
+- This was a simple computed property addition — no changes to session persistence, no new tests required (existing 436 Gateway tests still pass)
+- Commit `830cb3f`: "Add MessageCount property to GatewaySession"
 - `GatewaySession` now persists WebSocket replay state (`NextSequenceId`, `StreamEventLog`) with helper APIs (`AllocateSequenceId`, `AddStreamEvent`, `GetStreamEventsAfter`), and `FileSessionStore` now round-trips that state through `.meta.json`.
 - `SessionsController` now exposes `PATCH /api/sessions/{id}/suspend` and `PATCH /api/sessions/{id}/resume` with 404/409 semantics; `GatewayHost` rejects non-active sessions before prompt execution.
 - `GatewayHost` now runs per-session bounded queues (`System.Threading.Channels`) with busy backpressure responses and tracked worker lifecycle on shutdown; control metadata `control=steer` routes to `IAgentHandle.SteerAsync` instead of normal prompt flow.
