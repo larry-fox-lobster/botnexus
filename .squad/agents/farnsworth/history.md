@@ -5,6 +5,12 @@
 - **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI), Session, Tools.GitHub, WebUI
 - **Created:** 2026-04-01
 
+## Core Context
+
+**Phases 1-6 Complete.** Build green, 225 tests passing. Farnsworth owns platform configuration, session store, cross-agent guardrails. Implemented PlatformConfig loader + validator, OAuth provider registration, session store abstraction (InMemory/File). Currently hardening gateway: max call chain depth, cross-agent timeout, history pagination, explicit session store config selection. 234 tests passing.
+
+---
+
 ## 2026-04-03T17:45:00Z — System Messages Sprint (Team Sync)
 
 **Delivered by:** Farnsworth (Platform)  

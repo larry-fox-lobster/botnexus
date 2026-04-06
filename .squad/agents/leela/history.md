@@ -5,6 +5,26 @@
 - **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI/Copilot), Session, Tools.GitHub, WebUI
 - **Created:** 2026-04-01
 
+## Core Context
+
+**Phases 1-6 Complete.** Build green (0 errors), 225 tests passing, Phase 6 grade A. Core systems operational:
+- Agent registry, supervisor, cross-agent calling with recursion guard
+- WebSocket, TUI, Telegram channel adapters
+- File and in-memory session stores
+- OAuth + API key auth
+- Provider abstraction: OpenAI, Anthropic, Copilot
+- WebUI dashboard with thinking/tool display, reconnection, activity feed
+- Comprehensive integration tests
+
+**Phase 5-6 Carried Findings:**
+- DIP violation: `GatewayWebSocketHandler` takes concrete `WebSocketChannelAdapter`, not interface
+- `Path.HasExtension` auth bypass in `GatewayAuthMiddleware`
+- StreamAsync background task leak in providers
+
+**Phase 7 Focus:** Resilience (reconnection, pagination, queueing), channel consolidation, test hardening, observability.
+
+---
+
 ## 2026-04-05T19:41:00Z — Phase 7 Gateway Gap Analysis (Lead)
 
 **Timestamp:** 2026-04-05T19:41:00Z  

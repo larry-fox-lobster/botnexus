@@ -5,6 +5,12 @@
 - **Stack:** C# (.NET latest), modular class libraries, dynamic extension loading, Copilot provider with OAuth, centralized cron service
 - **Created:** 2026-04-01
 
+## Core Context
+
+**Phases 1-6 Complete.** Kif owns developer experience, training materials, documentation. Created lifecycle skill, dev guide, deployment scripts. Built OpenAPI spec export infrastructure: live-server workaround for net10.0 Swashbuckle limitation, PlatformConfig override handling, JSON spec generation. Manages project documentation and knowledge transfer.
+
+---
+
 ## Learnings
 
 - Sprint 7A: Created OpenAPI spec export pipeline (`scripts/export-openapi.ps1`). Swashbuckle.AspNetCore.Cli 7.2.0 targets net9.0 only — doesn't work on net10.0 even with LatestMajor roll-forward (crashes on `IServerAddressesFeature`). Used live-server approach instead: script starts API on temp port, fetches `/swagger/v1/swagger.json`, saves to `docs/api/openapi.json`. Key: PlatformConfig.GetListenUrl() overrides `--urls` parameter — must set `BotNexus__ConfigPath` to empty JSON file to prevent user config from hijacking port. Generated spec has 15 REST paths with XML doc comment descriptions. Commit: 88666b0.

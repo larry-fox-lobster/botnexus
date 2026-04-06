@@ -5,6 +5,12 @@
 - **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI/Copilot), Session, Tools.GitHub, WebUI
 - **Created:** 2026-04-01
 
+## Core Context
+
+**Phases 1-6 Complete.** Build green, 225 tests passing. Nibbler owns consistency auditing, documentation alignment, cross-agent sync. Performed Phase 6 consistency review: 9 P0s fixed (API reference, WebSocket protocol, agent response shapes, auth exemptions), 5 P1s fixed (config examples, URL consistency, field naming). Validates code-to-docs alignment and catches drift early. Quality assurance mindset.
+
+---
+
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->

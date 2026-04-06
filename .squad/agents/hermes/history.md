@@ -5,6 +5,12 @@
 - **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI), Session, Tools.GitHub, WebUI
 - **Created:** 2026-04-01
 
+## Core Context
+
+**Phases 1-6 Complete.** Build green, 225 tests passing. Hermes owns test framework, integration testing, automation. Implemented comprehensive test matrix (unit/integration/E2E), parallel test isolation, cross-platform compatibility fixes (xplat). Currently on gateway test sprint: validation gates, session threading, live integration coverage. 
+
+---
+
 ## Team Directives (All Agents Must Follow)
 
 1. **Dynamic Assembly Loading** (2026-04-01T16:29Z)

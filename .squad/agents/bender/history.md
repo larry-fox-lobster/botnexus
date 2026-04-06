@@ -5,6 +5,12 @@
 - **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI), Session, Tools.GitHub, WebUI
 - **Created:** 2026-04-01
 
+## Core Context
+
+**Phases 1-6 Complete.** Build green, 225 tests passing. Bender leads runtime architecture: session lifecycle, queueing, channel dispatch. Key contributions: extension assembly loader, OAuth framework, provider ecosystem, API key auth. Active on gateway sprint: session reconnection, suspend/resume, TUI steering, bounded queueing (Sprint 7A). 244 tests passing.
+
+---
+
 ## 2026-04-03T20:00:00Z — Streaming Gateway Integration (Runtime)
 
 **Timestamp:** 2026-04-03T20:00:00Z  
