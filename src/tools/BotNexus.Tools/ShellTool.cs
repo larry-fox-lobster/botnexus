@@ -6,7 +6,7 @@ using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
 using BotNexus.Providers.Core.Models;
 
-namespace BotNexus.CodingAgent.Tools;
+namespace BotNexus.Tools;
 
 /// <summary>
 /// Executes shell commands and returns normalized process output.

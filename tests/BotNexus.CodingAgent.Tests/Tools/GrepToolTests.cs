@@ -1,4 +1,4 @@
-using BotNexus.CodingAgent.Tools;
+using BotNexus.Tools;
 using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests.Tools;

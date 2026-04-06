@@ -4,10 +4,10 @@ using System.Text;
 using System.Text.Json;
 using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
-using BotNexus.CodingAgent.Utils;
+using BotNexus.Tools.Utils;
 using BotNexus.Providers.Core.Models;
 
-namespace BotNexus.CodingAgent.Tools;
+namespace BotNexus.Tools;
 
 public sealed class ReadTool : IAgentTool
 {

@@ -1,5 +1,6 @@
 using System.Text;
 using BotNexus.CodingAgent;
+using BotNexus.Tools.Utils;
 
 namespace BotNexus.CodingAgent.Utils;
 

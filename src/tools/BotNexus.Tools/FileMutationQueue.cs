@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace BotNexus.CodingAgent.Tools;
+namespace BotNexus.Tools;
 
 public sealed class FileMutationQueue
 {

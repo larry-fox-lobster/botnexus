@@ -3,11 +3,11 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
-using BotNexus.CodingAgent.Utils;
+using BotNexus.Tools.Utils;
 using BotNexus.Providers.Core.Models;
 using Microsoft.Extensions.FileSystemGlobbing;
 
-namespace BotNexus.CodingAgent.Tools;
+namespace BotNexus.Tools;
 
 /// <summary>
 /// Searches file contents using regex pattern matching and returns matching lines.

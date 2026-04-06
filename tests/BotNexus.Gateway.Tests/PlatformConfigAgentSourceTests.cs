@@ -1,9 +1,11 @@
 using System.Reflection;
-using BotNexus.Gateway.Abstractions.Agents;
+using BotNexus.AgentCore.Tools;using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Isolation;
+using BotNexus.Gateway.Tools;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
 using BotNexus.Providers.Core.Registry;
@@ -133,6 +135,7 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
             new LlmClient(new ApiProviderRegistry(), modelRegistry),
             CreateGatewayAuthManagerWithTempAuthPath(),
             new PassthroughContextBuilder(),
+            new DefaultToolRegistry(Array.Empty<IAgentTool>()),
             NullLogger<InProcessIsolationStrategy>.Instance);
 
         var handle = await strategy.CreateAsync(

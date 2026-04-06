@@ -39,6 +39,7 @@ public sealed class PlatformConfigAgentSource(
                 DisplayName = agentId,
                 ModelId = agentConfig.Model ?? string.Empty,
                 ApiProvider = agentConfig.Provider ?? string.Empty,
+                ToolIds = agentConfig.ToolIds?.ToArray() ?? [],
                 IsolationStrategy = string.IsNullOrWhiteSpace(agentConfig.IsolationStrategy)
                     ? "in-process"
                     : agentConfig.IsolationStrategy

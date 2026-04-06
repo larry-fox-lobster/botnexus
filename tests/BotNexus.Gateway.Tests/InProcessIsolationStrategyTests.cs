@@ -1,8 +1,11 @@
+using BotNexus.AgentCore.Tools;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Isolation;
+using BotNexus.Gateway.Tools;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
 using BotNexus.Providers.Core.Registry;
@@ -33,6 +36,7 @@ public sealed class InProcessIsolationStrategyTests
             llmClient,
             new GatewayAuthManager(new PlatformConfig(), NullLogger<GatewayAuthManager>.Instance),
             new PassthroughContextBuilder(),
+            new DefaultToolRegistry(Array.Empty<IAgentTool>()),
             NullLogger<InProcessIsolationStrategy>.Instance);
 
         var act = () => strategy.CreateAsync(
@@ -83,6 +87,7 @@ public sealed class InProcessIsolationStrategyTests
             llmClient,
             new GatewayAuthManager(new PlatformConfig(), NullLogger<GatewayAuthManager>.Instance),
             new PassthroughContextBuilder(),
+            new DefaultToolRegistry(Array.Empty<IAgentTool>()),
             NullLogger<InProcessIsolationStrategy>.Instance);
     }
 

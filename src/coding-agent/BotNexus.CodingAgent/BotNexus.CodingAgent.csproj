@@ -7,11 +7,7 @@
     <RootNamespace>BotNexus.CodingAgent</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="DiffPlex" Version="1.9.0" />
-    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.0" />
-    <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
-  </ItemGroup>
-  <ItemGroup>
+    <ProjectReference Include="..\..\tools\BotNexus.Tools\BotNexus.Tools.csproj" />
     <ProjectReference Include="..\..\agent\BotNexus.AgentCore\BotNexus.AgentCore.csproj" />
     <ProjectReference Include="..\..\providers\BotNexus.Providers.Core\BotNexus.Providers.Core.csproj" />
     <ProjectReference Include="..\..\providers\BotNexus.Providers.Copilot\BotNexus.Providers.Copilot.csproj" />

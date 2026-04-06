@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace BotNexus.CodingAgent.Utils;
+namespace BotNexus.Tools.Utils;
 
 /// <summary>
 /// Provides path normalization, containment validation, and repository ignore checks for coding-agent tools.

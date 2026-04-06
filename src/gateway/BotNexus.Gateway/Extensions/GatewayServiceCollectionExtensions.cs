@@ -66,6 +66,9 @@ public static class GatewayServiceCollectionExtensions
         services.AddSingleton<IIsolationStrategy, ContainerIsolationStrategy>();
         services.AddSingleton<IIsolationStrategy, RemoteIsolationStrategy>();
 
+        // Built-in tools
+        services.AddBotNexusTools();
+
         // Gateway host
         services.AddHostedService<GatewayHost>();
         services.AddHostedService<SessionCleanupService>();

@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
+using BotNexus.AgentCore.Tools;
 using BotNexus.Gateway.Abstractions.Activity;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Channels;
@@ -32,7 +33,8 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
         typeof(IAgentRegistry),
         typeof(IAgentSupervisor),
         typeof(IAgentCommunicator),
-        typeof(IActivityBroadcaster)
+        typeof(IActivityBroadcaster),
+        typeof(IAgentTool)
     ];
 
     private readonly IServiceCollection _services;
@@ -234,7 +236,8 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
             "agent-registry",
             "agent-supervisor",
             "agent-communicator",
-            "activity-broadcaster"
+            "activity-broadcaster",
+            "tool"
         };
 
         var invalidTypes = extensionTypes
@@ -300,10 +303,16 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
                 continue;
             }
 
-            if (contract == typeof(IChannelAdapter) || contract == typeof(IIsolationStrategy))
+            if (contract == typeof(IChannelAdapter) || 
+                contract == typeof(IIsolationStrategy) ||
+                contract == typeof(IAgentTool))
+            {
                 _services.AddSingleton(contract, implementation);
+            }
             else
+            {
                 _services.TryAddSingleton(contract, implementation);
+            }
 
             registered.Add($"{contract.Name}->{implementation.FullName}");
         }

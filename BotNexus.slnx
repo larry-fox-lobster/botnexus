@@ -26,6 +26,9 @@
   <Folder Name="/src/coding-agent/">
     <Project Path="src/coding-agent/BotNexus.CodingAgent/BotNexus.CodingAgent.csproj" />
   </Folder>
+  <Folder Name="/src/tools/">
+    <Project Path="src/tools/BotNexus.Tools/BotNexus.Tools.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/BotNexus.AgentCore.Tests/BotNexus.AgentCore.Tests.csproj" />
     <Project Path="tests/BotNexus.Providers.Core.Tests/BotNexus.Providers.Core.Tests.csproj" />

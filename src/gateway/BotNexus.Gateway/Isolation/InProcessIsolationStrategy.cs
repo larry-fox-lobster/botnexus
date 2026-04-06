@@ -5,6 +5,7 @@ using BotNexus.AgentCore.Types;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
@@ -26,17 +27,20 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
     private readonly LlmClient _llmClient;
     private readonly GatewayAuthManager _authManager;
     private readonly IContextBuilder _contextBuilder;
+    private readonly IToolRegistry _toolRegistry;
     private readonly ILogger<InProcessIsolationStrategy> _logger;
 
     public InProcessIsolationStrategy(
         LlmClient llmClient,
         GatewayAuthManager authManager,
         IContextBuilder contextBuilder,
+        IToolRegistry toolRegistry,
         ILogger<InProcessIsolationStrategy> logger)
     {
         _llmClient = llmClient;
         _authManager = authManager;
         _contextBuilder = contextBuilder;
+        _toolRegistry = toolRegistry;
         _logger = logger;
     }
 
@@ -56,10 +60,16 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
 
         var enrichedSystemPrompt = await _contextBuilder.BuildSystemPromptAsync(descriptor, cancellationToken);
 
+        // Resolve tools for this agent
+        var tools = descriptor.ToolIds.Count > 0
+            ? _toolRegistry.ResolveTools(descriptor.ToolIds)
+            : _toolRegistry.GetAll();
+
         var options = new AgentOptions(
             InitialState: new AgentInitialState(
                 SystemPrompt: enrichedSystemPrompt,
-                Model: model),
+                Model: model,
+                Tools: tools),
             Model: model,
             LlmClient: _llmClient,
             ConvertToLlm: null,

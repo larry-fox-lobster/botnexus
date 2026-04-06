@@ -178,6 +178,8 @@ public sealed class AgentDefinitionConfig
     public string? Model { get; set; }
     /// <summary>Optional path to an external system prompt file.</summary>
     public string? SystemPromptFile { get; set; }
+    /// <summary>Tool identifiers this agent has access to.</summary>
+    public List<string>? ToolIds { get; set; }
     /// <summary>Isolation strategy name (e.g. 'in-process').</summary>
     public string? IsolationStrategy { get; set; }
     /// <summary>Whether this agent is enabled.</summary>
