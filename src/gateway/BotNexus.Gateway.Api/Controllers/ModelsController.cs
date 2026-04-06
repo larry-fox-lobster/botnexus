@@ -40,7 +40,7 @@ public sealed class ModelsController : ControllerBase
             }
         }
 
-        return Ok(models);
+        return Ok(models.OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).ToList());
     }
 }
 
