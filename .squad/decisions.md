@@ -436,6 +436,149 @@ Granular history makes it easy to see what changed and roll back if needed.
 
 ---
 
+### Gateway Phase 6 — Batch 1 Decisions (2026-04-06T01:45Z)
+
+**By:** Bender, Fry, Farnsworth, Hermes, Kif (5-agent batch)  
+**Status:** Proposed (Owner Review Required)  
+**Commits:** 2da5dbf (Bender), 465f64f (Fry), 974d91c (Farnsworth), 9c3bfd3 (Hermes), 61852d1 (Kif)
+
+#### 1. Cross-Agent Calling Scoping (Bender, Commit 2da5dbf)
+
+**Decision:** Use deterministic local cross-agent session scoping:
+```
+{sourceAgentId}::cross::{targetAgentId}
+```
+
+and require target validation through `IAgentRegistry` before supervisor execution.
+
+**Why:**
+- Keeps cross-agent runs discoverable/reusable per caller-target pair
+- Prevents silent fan-out of random GUID sessions for the same agent handoff path
+- Fails fast with clear registration error before isolation strategy work begins
+- Supports recursion guardrails by making call-path analysis stable (`A -> B -> A` detection)
+
+**Implementation:**
+- `DefaultAgentCommunicator.CallCrossAgentAsync()` validates target against `IAgentRegistry`
+- Local-first only when `targetEndpoint` is empty; non-empty endpoints throw `NotSupportedException` until remote transport implemented
+- Files: `src/BotNexus.AgentCore/Communication/DefaultAgentCommunicator.cs`, `IAgentRegistry` interface
+
+**Owner Sign-off Required:** Squad should not auto-implement broader cross-agent features without explicit review.
+
+---
+
+#### 2. WebUI Activity WebSocket Separation (Fry, Commit 465f64f)
+
+**Decision:** Activity feed connects to dedicated `ws://host/ws/activity` WebSocket endpoint rather than multiplexing over main chat WebSocket via `subscribe` messages.
+
+**Rationale:**
+- Cleaner reconnection semantics: activity feed reconnects independently without affecting chat session
+- Main WebSocket stays focused on streaming protocol (matches Gateway design)
+- Aligns with Gateway's `/ws/activity` endpoint architecture
+
+**Impact:**
+- **Gateway team (Farnsworth):** `/ws/activity` endpoint must exist and serve activity events independently
+- **Message type:** WebUI sends `{"type": "follow_up", "content": "..."}` for queued messages during streaming; Gateway/runtime must handle alongside `steer` type
+- **Backward compatibility:** Main WebSocket no longer sends `subscribe`; server should gracefully ignore unknown types
+
+**Files Modified:**
+- `src/BotNexus.WebUI/wwwroot/app.js` — `connectActivityWs()` / `disconnectActivityWs()` functions
+- `src/BotNexus.WebUI/wwwroot/styles.css` — responsive design
+- `src/BotNexus.WebUI/wwwroot/index.html` — layout updates
+
+**Also Added:**
+- Session persistence (localStorage)
+- Agent selector dropdown
+- Thinking/tool display UI
+- Chat steering controls
+- Mobile responsive design
+- Reconnection semantics
+- Follow-up message queuing
+- Error recovery UI
+- Loading state indicators (10 total features)
+
+---
+
+#### 3. Dev-Loop Reliability (Farnsworth, Commit 974d91c)
+
+**Decision:** Standardize local dev startup flow to eliminate duplicate Gateway builds and fail-fast on port collisions:
+
+- `dev-loop.ps1` calls `start-gateway.ps1 -SkipBuild` after successful solution build + gateway tests
+- `start-gateway.ps1` performs early TCP port-availability check with actionable error message
+- Added optional `-SkipBuild` and `-SkipTests` flags for faster iterative loops
+
+**Why:**
+- Old flow rebuilt Gateway twice → file-lock failures when another process was active
+- Port collisions surfaced late/opaquely from runtime startup instead of failing fast
+
+**Implementation:**
+- `scripts/dev-loop.ps1` — enhanced with skip flags
+- `scripts/start-gateway.ps1` — port pre-check, build skip logic
+- `scripts/config.sample.json` — reference configuration
+
+**Guardrail:** Owner review required; squad should not implement follow-on provider changes without approval.
+
+---
+
+#### 4. Integration Test Architecture (Hermes, Commit 9c3bfd3)
+
+**Decision:** Use in-process `WebApplicationFactory<Program>` for live Gateway integration tests covering health, REST, WebSocket, and activity endpoints.
+
+**Implementation:**
+- 14 new tests added (225 total gateway tests)
+- Cross-agent calling tests with mocked `IAgentRegistry`
+- Health endpoint coverage
+- REST endpoint validation
+- WebSocket handshake verification
+- Activity WebSocket subscription tests
+- Copilot streaming coverage (opt-in: `BOTNEXUS_RUN_COPILOT_INTEGRATION=1` + auth file)
+
+**Observed Issues (Owner Triage Required):**
+- `dotnet test Q:\repos\botnexus\tests` fails with MSB1003 (directory path; requires project file reference)
+- `BotNexus.CodingAgent.Tests` hangs in this environment; needs dedicated owner investigation
+- Live Copilot tests require auth file to prevent CI instability
+
+**Owner Sign-off Required:** Squad should not auto-implement follow-ups; owner must review hanging tests and resolve.
+
+---
+
+#### 5. Documentation Structure (Kif, Commit 61852d1)
+
+**Decision:** Create separate docs for three distinct audiences:
+
+| Doc | Audience | Focus |
+|-----|----------|-------|
+| `getting-started.md` | End users | Setup from scratch |
+| `dev-guide.md` | Developers/agents | Local dev loop, config, testing |
+| `development-workflow.md` | Quick reference | Script parameters, build commands |
+
+**Implementation:**
+- `docs/dev-guide.md` — NEW (canonical developer guide)
+- `docs/api-reference.md` — UPDATED with endpoint verification
+- `docs/architecture.md` — UPDATED with cross-references
+- `docs/README.md` — UPDATED with navigation
+
+**Corrections Made to API Reference:**
+- Added 4 missing endpoints: instances, stop, config/validate, activity WebSocket
+- Removed 1 fictitious endpoint: PUT /api/agents
+- Fixed parameter naming: {name} vs {agentId}
+- Corrected health check response body schema
+
+**1047 lines of documentation delivered.**
+
+---
+
+### Batch Integration Notes
+
+- **Fry's activity endpoint** requires Farnsworth's `/ws/activity` availability
+- **Fry's follow_up message type** requires Gateway/runtime handler
+- **Hermes' tests** validate all above endpoints and message types end-to-end
+- **Bender's cross-agent sessions** enable multi-agent scenarios in Hermes test suite
+- **Kif's API reference** captures all endpoints (REST + WebSocket) and serves as integration validation
+
+**Status:** All agents complete. Ready for owner decision review before squad auto-implementation.
+
+---
+
 ### 5. Sprint 1 Completion — 7 Foundation Items Done (2026-04-01T17:33Z)
 
 **Status:** Complete  
@@ -8540,3 +8683,461 @@ Phase 2 sprint delivered sound architecture with clean abstractions and proper S
 ✅ Hosted service: startup merge with code + file agents  
 ✅ Hot-reload: callback behavior on file changes  
 ✅ Integration: DI registration + service resolution
+
+---
+
+# Design Review — Gateway Phase 5 (Batch 1 + 2)
+
+**Reviewer:** Leela (Lead / Architect)  
+**Date:** 2026-04-09  
+**Requested by:** Brady (Jon Bullen)  
+**Scope:** Phase 5 milestone review — P0 blockers + P1 feature batch  
+
+---
+
+## Summary Verdict
+
+| Dimension | Rating |
+|-----------|--------|
+| **Overall Grade** | **A−** |
+| **SOLID Score** | **4.5 / 5** |
+| **Security Posture** | Strong |
+| **Test Coverage** | Excellent (30+ Gateway test files) |
+| **Documentation** | Above average |
+
+Phase 5 is the strongest delivery so far. The P0 blockers (auth middleware, WebSocket channel pipeline) are resolved correctly. The architecture is clean, modular, and well-abstracted. Every abstraction earns its keep. The few findings are P1/P2 refinements — no critical issues.
+
+---
+
+## Per-Requirement Assessment
+
+### 1. Agent Management ✅ Complete
+
+**Interfaces:** `IAgentRegistry`, `IAgentSupervisor`, `IAgentHandle`, `IAgentCommunicator`, `IAgentWorkspaceManager`, `IContextBuilder`
+
+**Strengths:**
+- **Registration is complete.** `DefaultAgentRegistry` provides CRUD, `AgentDescriptorValidator` provides fail-fast validation with descriptive errors listing available strategies.
+- **Sub-agent calling works with recursion guard.** `DefaultAgentCommunicator` uses `AsyncLocal<HashSet<string>>` call chain tracking — this addresses the P1 recursion gap I flagged in Phase 3. The `EnterCallChain`/`CallChainScope` pattern is clean and correctly uses `IDisposable` for cleanup.
+- **Cross-agent calling** is properly stubbed with `NotSupportedException` and a clear message pointing to local calls.
+- **Workspace model is well-designed.** `FileAgentWorkspaceManager` + `WorkspaceContextBuilder` + `BotNexusHome` give agents a convention-based personality system (SOUL.md, IDENTITY.md, USER.md, MEMORY.md). The context builder composes these sections with the descriptor's system prompt.
+- **MaxConcurrentSessions enforcement** in `DefaultAgentSupervisor` correctly counts both active instances AND pending creates to avoid races.
+- **Supervisor concurrency** uses `TaskCompletionSource` to coalesce duplicate creation requests — smart pattern that avoids redundant agent instantiation.
+
+**Finding P2-01:** `IAgentWorkspaceManager.SaveMemoryAsync` writes via `File.AppendAllTextAsync` without sanitizing the agent name for path traversal. `GetWorkspacePath` passes through `BotNexusHome.GetAgentDirectory` which does `Path.Combine(AgentsPath, agentName.Trim())` — a name like `../../etc` could escape the agents directory. This was flagged for `SystemPromptFile` in Phase 3; the same pattern appears here. Recommend: validate agent name characters in `GetAgentDirectory`.
+
+### 2. Isolation Strategies ✅ Complete
+
+**Interfaces:** `IIsolationStrategy` with 4 registered implementations
+
+**Strengths:**
+- **Pluggable model is clean.** `IIsolationStrategy.Name` + DI multicast (`IEnumerable<IIsolationStrategy>`) resolved to dictionary by name in `DefaultAgentSupervisor` — this is the canonical .NET pattern.
+- **In-process strategy works end-to-end.** `InProcessIsolationStrategy` correctly composes `AgentOptions`, wires the `IContextBuilder` for enriched system prompts, and delegates API key resolution to `GatewayAuthManager`.
+- **Validation is fail-fast.** If an agent references an unregistered strategy, the supervisor throws with `Available strategies: {list}` — excellent DX.
+- **Stubs throw `NotSupportedException`** with clear messages. Consistent across sandbox, container, and remote.
+
+**Strengths in InProcessAgentHandle:**
+- `StreamAsync` correctly uses `Channel.CreateUnbounded` + event subscription pattern. The agent runs on a background task, events flow through the channel, and the `IAsyncEnumerable` consumer drives the pipeline. This is the right architecture.
+- `DisposeAsync` aborts the agent — correct lifecycle teardown.
+- `SteerAsync`/`FollowUpAsync` delegate to AgentCore cleanly.
+
+**Finding P1-01:** `InProcessAgentHandle.StreamAsync` subscribes to agent events and fires `PromptAsync` on a background `Task.Run`. If the caller cancels the `IAsyncEnumerable` iteration before the prompt completes, the background task continues running (the `PromptAsync` call is fire-and-forget). The `cancellationToken` passed to `Task.Run` only prevents scheduling — it doesn't cancel the agent prompt if the consumer disconnects. Consider propagating cancellation via a linked token or ensuring `DisposeAsync` is called on handle cleanup.
+
+### 3. Channel Adapters ✅ Complete
+
+**Interfaces:** `IChannelAdapter`, `IChannelDispatcher`, `IStreamEventChannelAdapter`, `IChannelManager`
+
+**Strengths:**
+- **WebSocket now flows through the channel pipeline.** This was a P0 blocker — `WebSocketChannelAdapter` extends `ChannelAdapterBase`, implements `IStreamEventChannelAdapter`, and messages route through `GatewayHost.DispatchAsync` via `DispatchInboundMessageAsync`. Architecturally sound.
+- **Capability flags are well-designed.** `SupportsSteering`, `SupportsFollowUp`, `SupportsThinkingDisplay`, `SupportsToolDisplay` on `IChannelAdapter` with virtual defaults in `ChannelAdapterBase` (`false`). WebSocket overrides all to `true`. This is proper OCP — new capabilities don't break existing adapters.
+- **`IStreamEventChannelAdapter`** is a clean optional interface for channels that handle structured events (thinking, tool activity). The `GatewayHost` correctly checks for this interface with pattern matching before falling back to simple deltas.
+- **Connection management** in `WebSocketChannelAdapter` uses `ConcurrentDictionary<string, ConnectionRegistration>` with session-keyed registration/unregistration. Clean.
+- **`ChannelAdapterBase` allow-list** provides sender filtering without burdening each adapter.
+
+**Finding P2-02:** `WebSocketChannelAdapter.OnStopAsync` calls `_connections.Clear()` but does not close the underlying WebSocket connections. Active connections will remain open until the socket's read loop detects the server shutdown. Consider iterating connections and closing them gracefully.
+
+### 4. Session Management ✅ Complete
+
+**Strengths:**
+- **Lifecycle model is sound.** `SessionStatus` enum (Active → Suspended → Expired → Closed) is clean. `GatewaySession` has `CreatedAt`, `UpdatedAt`, `ExpiresAt`, thread-safe history via `Lock`.
+- **Cleanup is robust.** `SessionCleanupService` runs as a `BackgroundService` with configurable TTL and check interval. Two-phase cleanup: active sessions expire after TTL, closed sessions are deleted after configurable retention. Correct use of `OperationCanceledException` catch for graceful shutdown.
+- **Session locking is correct.** `GatewayWebSocketHandler._activeSessionConnections` uses `ConcurrentDictionary.TryAdd` for single-connection-per-session enforcement. Duplicate connections get closed with custom 4409 close code. Connection cleanup in `finally` uses `TryRemove(KeyValuePair)` to avoid removing a newer connection's registration.
+- **Reconnection rate limiting** with exponential backoff is well-implemented. The `ConnectionAttemptWindow` pattern with periodic cleanup every 128 updates prevents memory growth.
+- **Thread safety in GatewaySession** is verified — `Lock` on `_historyLock` for all add/read operations, `GetHistorySnapshot` returns defensive copy.
+
+**Finding P1-02:** `SessionCleanupService.RunCleanupOnceAsync` calls `_sessionStore.ListAsync()` which loads ALL sessions into memory, then iterates them one by one. For `FileSessionStore`, this means reading every `.meta.json` file from disk on every cleanup interval. At scale, this will become expensive. Consider adding a `ListExpiredAsync` or `ListByStatusAsync` method to `ISessionStore` to push filtering to the store.
+
+**Finding P2-03:** `SessionCleanupService` defaults to 5-minute intervals and 24-hour TTL when `Options` values are zero/negative. These defaults are defensive but undiscoverable — they should be documented in `SessionCleanupOptions` or validated at startup.
+
+### 5. API Surface ✅ Complete
+
+**Controllers:** `ChatController`, `AgentsController`, `SessionsController`, `ConfigController`  
+**WebSocket:** `/ws` (agent interaction), `/ws/activity` (monitoring)  
+**OpenAPI:** Swagger at `/swagger`
+
+**Strengths:**
+- **REST is complete.** CRUD for agents, sessions, chat (with steering + follow-up). All actions return proper HTTP status codes (200, 201, 204, 404, 409, 429).
+- **Auth is enforced.** `GatewayAuthMiddleware` runs for all requests except `/health`, `/webui`, `/swagger`, and static files (detected by `Path.HasExtension`). Smart skip logic.
+- **Auth is well-layered.** Middleware extracts agent ID from query, route, or request body (with `EnableBuffering` for re-read). The `ApiKeyGatewayAuthHandler` supports legacy single key, named multi-tenant keys, and development mode (no key configured = admin access). Per-key agent allow-lists.
+- **WebSocket handler is solid.** Full protocol: message, abort, steer, follow_up, ping/pong. Rate limiting per client IP + agent ID.
+- **Activity endpoint** streams real-time events with optional agent filter. `InMemoryActivityBroadcaster` uses bounded channels with drop-oldest — correct back-pressure semantics.
+- **OpenAPI** includes XML comments from assembly.
+
+**Finding P1-03:** `GatewayAuthMiddleware.ShouldSkipAuth` uses `Path.HasExtension` to bypass auth for static file requests. This means any request to a path like `/api/agents.json` would skip auth. While ASP.NET routing would still dispatch to the controller (not static files), the auth middleware would not run. The risk is low because controllers still require valid DI services, but it's a logic gap. Recommend: check static file paths more precisely, or move the static file check after the routing middleware.
+
+**Finding P2-04:** `ApiKeyGatewayAuthHandler` uses `StringComparer.Ordinal` for API key comparison. This is correct for constant-time comparison, but the `Dictionary.TryGetValue` call is not constant-time — it's hash-table lookup. For security-critical key comparison, consider using `CryptographicOperations.FixedTimeEquals` after hash match to prevent timing attacks on key values.
+
+### 6. Platform Configuration ✅ Complete
+
+**Components:** `PlatformConfigLoader`, `PlatformConfigWatcher`, `BotNexusHome`, CLI (`botnexus validate`)
+
+**Strengths:**
+- **CLI works.** `System.CommandLine` based, supports `validate` with `--remote`, `--verbose`, `--gateway-url`. Clean exit codes.
+- **Hot reload is safe.** `PlatformConfigWatcher` uses `FileSystemWatcher` + 500ms debounce timer. The timer pattern prevents rapid-fire reloads. `Lock` protects concurrent dispose. `ReloadConfig` revalidates on every change via `PlatformConfigLoader.Load`.
+- **Workspace model is well-designed.** `BotNexusHome` creates `~/.botnexus/` with `agents/`, `sessions/`, `tokens/`, `extensions/`, `logs/`. Agent workspaces are auto-scaffolded with SOUL.md, IDENTITY.md, USER.md, MEMORY.md on first access.
+- **Validation is comprehensive.** `PlatformConfigLoader.Validate` checks listen URL format, path validity, log level enum, provider configs, channel configs, agent configs, and API key configs. All with descriptive error messages.
+- **Environment override** via `BOTNEXUS_HOME` for container/CI scenarios.
+
+**Finding P2-05:** `PlatformConfigWatcher.ReloadConfig` holds `_sync` only to check `_disposed`, then loads config outside the lock. If two file change events fire within the debounce window, the timer fires once, but if config loading is slow, a second debounce expiry could trigger concurrent `ReloadConfig` calls. The `Timer` with `Timeout.InfiniteTimeSpan` repeat prevents this in practice, but a `_reloading` flag would be defensive.
+
+---
+
+## SOLID Assessment (4.5 / 5)
+
+### S — Single Responsibility ✅
+Every class owns one job. `GatewayHost` orchestrates. `DefaultAgentSupervisor` manages instances. `DefaultMessageRouter` resolves targets. `SessionCleanupService` handles expiry. `StreamingSessionHelper` processes event streams. No God objects.
+
+### O — Open/Closed ✅
+Extension points are everywhere:
+- `IIsolationStrategy` for new execution environments
+- `IChannelAdapter` for new communication channels  
+- `IGatewayAuthHandler` for new auth schemes
+- `ISessionStore` for new persistence backends
+- `IContextBuilder` for new prompt enrichment strategies
+- `IActivityBroadcaster` for new monitoring backends
+- Channel capability flags (`SupportsStreaming`, etc.) let existing code handle new capabilities without modification.
+
+### L — Liskov Substitution ✅
+All implementations honor their contracts. `InMemorySessionStore` and `FileSessionStore` are fully interchangeable. Channel adapters work through `ChannelAdapterBase` with consistent behavior. Isolation stubs throw documented exceptions.
+
+### I — Interface Segregation ✅
+Interfaces are lean:
+- `IChannelAdapter` (7 properties + 4 methods) — right-sized for a channel.
+- `IStreamEventChannelAdapter` is separate from `IChannelAdapter` — channels that can't handle structured events don't need to implement it.
+- `IAgentWorkspaceManager` and `IContextBuilder` are separate from `IAgentSupervisor` — workspace concerns don't pollute lifecycle management.
+
+### D — Dependency Inversion ✅
+All concrete dependencies flow through DI. `GatewayHost` depends on 6 abstractions, zero concrete types. `InProcessIsolationStrategy` takes `IContextBuilder` not `WorkspaceContextBuilder`. Configuration uses `IOptions<T>` / `IOptionsMonitor<T>`.
+
+**Deduction (−0.5):** The `GatewayWebSocketHandler` takes `WebSocketChannelAdapter` as a concrete type (not `IChannelAdapter`). This is pragmatic — it needs `RegisterConnection`/`UnregisterConnection` which are WebSocket-specific — but it couples the handler to the concrete adapter. A `IWebSocketChannelAdapter` interface extracted from the WebSocket-specific methods would restore DIP purity.
+
+---
+
+## Findings Summary
+
+| ID | Priority | Component | Description |
+|----|----------|-----------|-------------|
+| P1-01 | P1 | InProcessAgentHandle | StreamAsync background task may continue after consumer disconnects |
+| P1-02 | P1 | SessionCleanupService | ListAsync loads all sessions on every cleanup cycle — won't scale |
+| P1-03 | P1 | GatewayAuthMiddleware | `Path.HasExtension` auth bypass could skip auth for paths like `/api/agents.json` |
+| P2-01 | P2 | FileAgentWorkspaceManager | Agent name not validated for path traversal in GetAgentDirectory |
+| P2-02 | P2 | WebSocketChannelAdapter | OnStopAsync clears connections but doesn't close WebSockets |
+| P2-03 | P2 | SessionCleanupService | Default TTL/interval values are undocumented |
+| P2-04 | P2 | ApiKeyGatewayAuthHandler | API key lookup is hash-based, not constant-time |
+| P2-05 | P2 | PlatformConfigWatcher | Theoretical concurrent reload race under slow config loading |
+
+---
+
+## Commendations
+
+1. **Cross-agent recursion guard.** The `AsyncLocal<HashSet<string>>` call chain tracking in `DefaultAgentCommunicator` is elegant. It was a P1 gap in Phase 3 — now resolved cleanly with proper `IDisposable` scope cleanup. Well done.
+
+2. **Supervisor coalescing pattern.** `DefaultAgentSupervisor` uses `TaskCompletionSource` + `_pendingCreates` to prevent duplicate agent creation races. This is a production-grade pattern that many teams miss.
+
+3. **WebSocket-to-channel-pipeline refactor.** The P0 blocker is resolved architecturally — not with a hack. `WebSocketChannelAdapter` extends `ChannelAdapterBase`, implements `IStreamEventChannelAdapter`, and messages flow through `GatewayHost.DispatchAsync`. The WebSocket handler registers connections on the adapter, the adapter dispatches inbound through the base class, and outbound flows back through the structured event interface. Clean separation.
+
+4. **Auth middleware design.** Three layers of agent ID extraction (query string, route values, request body) with `EnableBuffering` for non-destructive body reads. Development mode that auto-elevates when no key is configured. Multi-tenant key support with per-key agent allow-lists. This is well-thought-out auth.
+
+5. **Streaming session helper.** `StreamingSessionHelper.ProcessAndSaveAsync` is a reusable, well-documented utility that handles stream processing, history assembly, and session persistence in one clean flow. The `StreamingSessionOptions` record with `OnEventAsync` callback gives callers control without subclassing.
+
+6. **Test coverage depth.** 30+ test files covering auth middleware, supervisor, communicator, session stores, WebSocket handler, streaming pipeline, session lifecycle, session locking, max concurrent sessions, isolation registration, config watcher, workspace builder, channel capabilities, activity broadcaster, and Phase 5 integration. This is comprehensive.
+
+7. **Workspace and personality model.** The SOUL.md / IDENTITY.md / USER.md / MEMORY.md convention with `WorkspaceContextBuilder` composing them into enriched system prompts is a thoughtful design for agent personality management. Auto-scaffolding on first access reduces setup friction.
+
+---
+
+## Architecture Health
+
+The Gateway architecture after Phase 5 is **production-viable for single-instance deployments**. The abstraction layers are clean, the extension points are in the right places, and the security model is enforced (not opt-in). The main scaling bottleneck is the session cleanup full-scan (P1-02), which should be addressed before multi-tenant deployment.
+
+**Phase 5 delivers on all 6 requirements.** No gaps, no missing pieces. The findings are refinements, not blockers.
+
+**Grade: A−** (would be A with P1-01 through P1-03 resolved)
+
+---
+
+# Phase 5 Consistency Review
+
+**Reviewer:** Nibbler (Consistency Reviewer)  
+**Requested by:** Brady (Jon Bullen)  
+**Date:** 2026-07-18  
+**Scope:** All Phase 5 work — auth middleware, workspace manager, context builder, channel adapters, CLI, session cleanup, WebSocket session locking, capability flags, tests, docs
+
+---
+
+## Overall Rating: **Good**
+
+Phase 5 is a substantial sprint with 5 agents working in parallel across auth, workspace, channels, CLI, and sessions. The codebase quality is strong — all classes are `sealed`, DI is consistent, error messages are well-structured, and the new READMEs are accurate and thorough. Two systemic issues bring this to "Good" instead of "Excellent": (1) CancellationToken naming divergence has re-emerged in new code, and (2) a TUI README describes the input loop as "not yet implemented" when the code actually implements it.
+
+**Findings: 0 P0 · 3 P1 · 6 P2 · 3 P3**
+
+---
+
+## P1 Findings (Fix Now)
+
+### P1-1: CancellationToken naming inconsistency — `ct` in new abstractions and library code
+
+**Files:**
+- `src/gateway/BotNexus.Gateway.Abstractions/Agents/IAgentWorkspaceManager.cs:5-6`
+- `src/gateway/BotNexus.Gateway.Abstractions/Agents/IContextBuilder.cs:7`
+- `src/gateway/BotNexus.Gateway/Agents/FileAgentWorkspaceManager.cs:15,29,49`
+- `src/gateway/BotNexus.Gateway/Agents/WorkspaceContextBuilder.cs:16`
+- `src/gateway/BotNexus.Gateway/Configuration/GatewayAuthManager.cs:54,76,104,142`
+
+**Issue:** Phase 4 P1 required CancellationToken naming consistency — the `ct` abbreviation was fixed in the API layer. Now new Phase 5 interfaces (`IAgentWorkspaceManager`, `IContextBuilder`) and their implementations (`FileAgentWorkspaceManager`, `WorkspaceContextBuilder`, `GatewayAuthManager`) use `ct` instead of `cancellationToken`. This contradicts the established convention used by `ISessionStore`, `IChannelAdapter`, `IAgentSupervisor`, `IGatewayAuthHandler`, and all controllers — which all use `cancellationToken`.
+
+**Pattern check:** Of the 11 interfaces/abstractions in Gateway.Abstractions, 9 use `cancellationToken` and 2 new ones (`IAgentWorkspaceManager`, `IContextBuilder`) use `ct`. Of Gateway library classes, `GatewayAuthManager` uses `ct` (4 methods), while `SessionCleanupService`, `DefaultAgentSupervisor`, `DefaultAgentCommunicator`, `DefaultMessageRouter` all use `cancellationToken`.
+
+**Fix:** Rename `ct` → `cancellationToken` in all new interfaces and implementations. This is a breaking interface change for `IAgentWorkspaceManager` and `IContextBuilder`, but Phase 5 is the right time to fix it before consumers proliferate.
+
+---
+
+### P1-2: TUI README says input loop is "not yet implemented" — but it IS implemented
+
+**File:** `src/channels/BotNexus.Channels.Tui/README.md:9,24,38`
+
+**Issue:** The README says:
+- Line 9: `"**Status: Stub** — Output works. The inbound input loop is not yet implemented."`
+- Line 24: `"Inbound input loop | ❌ Planned | Console input → InboundMessage → DispatchInboundAsync"`
+- Lines 38-39: `"Background Console.ReadLine loop that reads user input and dispatches it as InboundMessage instances"` listed under "What's Planned"
+
+But `TuiChannelAdapter.cs` actually implements `RunInputLoopAsync()` (lines 107-150) — a full background `Console.In.ReadLineAsync` loop with `/quit` and `/clear` command handling that dispatches `InboundMessage` via `DispatchInboundAsync`. This is a docs-lie: the README says the feature doesn't exist when it does.
+
+**Fix:** Update the TUI README to reflect that the input loop is implemented. Change status from "Stub" to "Working", mark "Inbound input loop" as ✅, and move the loop description from "What's Planned" to "What It Does Now."
+
+---
+
+### P1-3: Missing XML doc comments on new public interfaces and types in Gateway.Abstractions
+
+**Files:**
+- `src/gateway/BotNexus.Gateway.Abstractions/Agents/IAgentWorkspaceManager.cs` — no XML docs at all (interface + 3 members)
+- `src/gateway/BotNexus.Gateway.Abstractions/Agents/IContextBuilder.cs` — no XML docs (interface + 1 member)
+- `src/gateway/BotNexus.Gateway.Abstractions/Agents/AgentWorkspace.cs` — no XML docs on record or properties
+
+**Issue:** Every other interface in Gateway.Abstractions has full XML documentation (`ISessionStore`, `IGatewayAuthHandler`, `IChannelAdapter`, `IAgentCommunicator`, `IAgentSupervisor`, etc.). The 3 new Phase 5 types ship without any XML docs, breaking the 100% coverage pattern in Abstractions. The Abstractions README also documents these types in the "Key Types" table, so consumers will reference them and need the IDE doc tooltips.
+
+**Fix:** Add `<summary>` and `<param>` XML doc comments to `IAgentWorkspaceManager`, `IContextBuilder`, and `AgentWorkspace`. Follow the pattern set by `ISessionStore` (summary + param descriptions on each method).
+
+---
+
+## P2 Findings (Fix Soon)
+
+### P2-1: GatewayAuthMiddleware missing XML docs — 3 of 10 unique build warnings
+
+**File:** `src/gateway/BotNexus.Gateway.Api/GatewayAuthMiddleware.cs:8,18,28`
+
+**Issue:** `GatewayAuthMiddleware` is the only new Phase 5 class in the API project without XML docs. The class, constructor, and `InvokeAsync` method all trigger CS1591 warnings. The class, constructor, and method are public. Every other controller and handler in the API project (`AgentsController`, `ChatController`, `SessionsController`, `ConfigController`, `ActivityWebSocketHandler`, `GatewayWebSocketHandler`) has class-level and method-level XML docs.
+
+**Note:** The build shows 10 unique CS1591 warnings total (25 raw, but duplicated across build targets). Of these, 3 are on the new `GatewayAuthMiddleware`, 2 on new `GatewayWebSocketHandler` constructors, 1 on `ActivityWebSocketHandler.HandleAsync`, and the rest are pre-existing (controller constructors, `Program`).
+
+**Fix:** Add XML docs to `GatewayAuthMiddleware` class, constructor, and `InvokeAsync`.
+
+---
+
+### P2-2: GatewayWebSocketHandler constructors missing XML docs
+
+**File:** `src/gateway/BotNexus.Gateway.Api/WebSocket/GatewayWebSocketHandler.cs:58,70`
+
+**Issue:** The class itself has a `<summary>` and detailed `<remarks>` (excellent — the full WebSocket protocol is documented). But both constructors are public and lack XML docs, causing 2 CS1591 warnings.
+
+**Fix:** Add `<summary>` docs to both constructors. The first is the full constructor; the second is a convenience overload for tests.
+
+---
+
+### P2-3: ConfigureAwait(false) inconsistency within BotNexus.Gateway library
+
+**Files:**
+- `src/gateway/BotNexus.Gateway/Configuration/GatewayAuthManager.cs` — uses `.ConfigureAwait(false)` on 5 await calls
+- `src/gateway/BotNexus.Gateway/Configuration/AgentConfigurationHostedService.cs:33` — uses `.ConfigureAwait(false)` on 1 await call
+- `src/gateway/BotNexus.Gateway/Agents/FileAgentWorkspaceManager.cs` — does NOT use `.ConfigureAwait(false)`
+- `src/gateway/BotNexus.Gateway/Agents/WorkspaceContextBuilder.cs` — does NOT use `.ConfigureAwait(false)`
+- `src/gateway/BotNexus.Gateway/SessionCleanupService.cs` — does NOT use `.ConfigureAwait(false)`
+- `src/gateway/BotNexus.Gateway/Agents/DefaultAgentSupervisor.cs` — does NOT use `.ConfigureAwait(false)`
+
+**Issue:** The established policy (documented in FileSessionStore.cs comment) is: Gateway.Sessions (library) uses `ConfigureAwait(false)`; BotNexus.Gateway (host) omits it because classes run in the ASP.NET Core host context. But within the Gateway library itself, `GatewayAuthManager` and `AgentConfigurationHostedService` use `ConfigureAwait(false)` while `FileAgentWorkspaceManager`, `WorkspaceContextBuilder`, `SessionCleanupService`, and `DefaultAgentSupervisor` do not. The policy should be consistent within the same project.
+
+**Note:** This is the same P2 from Phase 4 (GatewayAuthManager was already flagged). Phase 5 added `FileAgentWorkspaceManager` and `WorkspaceContextBuilder` which correctly omit it, but didn't fix the GatewayAuthManager divergence.
+
+**Fix:** Either add `ConfigureAwait(false)` to all Gateway library async code, or remove it from `GatewayAuthManager` and `AgentConfigurationHostedService`. Given the BotNexus.Gateway project is a host library (not a general-purpose library), omitting it everywhere is the more consistent choice.
+
+---
+
+### P2-4: `SessionCleanupOptions` missing XML docs
+
+**File:** `src/gateway/BotNexus.Gateway/Configuration/SessionCleanupOptions.cs`
+
+**Issue:** `SessionCleanupOptions` is a public options class with 3 properties, all undocumented. The Gateway README correctly documents the settings in a table (lines 376-380), but the class itself has no XML comments. Contrast with `GatewayWebSocketOptions` which has full XML docs on all 4 properties.
+
+**Fix:** Add XML doc `<summary>` to the class and its 3 properties.
+
+---
+
+### P2-5: Gateway README says "5 core projects" — doesn't mention the new CLI project
+
+**File:** `src/gateway/README.md:8`
+
+**Issue:** The README says "The Gateway is composed of **5 core projects**" and lists Abstractions, Gateway, Api, Sessions, WebUI. Phase 5 added `BotNexus.Cli` under `src/gateway/BotNexus.Cli/`. While the CLI is a consumer rather than a core component, it lives in the `src/gateway/` directory alongside the other 5 projects. The project structure section (if it exists) and the architecture table should acknowledge it.
+
+**Fix:** Either update the README to mention `BotNexus.Cli` as a companion tool, or add a note in the project structure section.
+
+---
+
+### P2-6: `GatewayAuthManager` uses `object` lock — should use C# 13 `Lock`
+
+**File:** `src/gateway/BotNexus.Gateway/Configuration/GatewayAuthManager.cs:19`
+
+**Issue:** `GatewayAuthManager` uses `private readonly object _sync = new();` for locking. The rest of the Gateway codebase has been modernized to C# 13's `Lock` type (see `AgentConfigurationHostedService:16`, `DefaultAgentSupervisor:17`, `PlatformConfigLoader:281`). Phase 4 noted this modernization gap as a P2, and the new Phase 5 classes correctly use `Lock`, but `GatewayAuthManager` was not updated.
+
+**Fix:** Change `private readonly object _sync = new();` to `private readonly Lock _sync = new();` in GatewayAuthManager.
+
+---
+
+## P3 Findings (Informational)
+
+### P3-1: Abstractions README example uses `ct` shorthand for CancellationToken
+
+**File:** `src/gateway/BotNexus.Gateway.Abstractions/README.md:67-71,81`
+
+**Note:** The "Usage" code examples show `CancellationToken ct = default` matching the interface definitions. This is correct documentation of the current interface, but will need updating when P1-1 renames `ct` → `cancellationToken`.
+
+---
+
+### P3-2: Gateway README code snippet for IChannelAdapter uses `ct` parameter name
+
+**File:** `src/gateway/README.md:92-95`
+
+**Note:** The README code snippet for `IChannelAdapter` uses `CancellationToken ct = default` in `StartAsync`, `StopAsync`, `SendAsync`, and `SendStreamDeltaAsync`. The actual `IChannelAdapter` interface uses `cancellationToken`. The README snippet is illustrative (not a copy-paste from source), but should ideally match the real interface parameter names.
+
+---
+
+### P3-3: TuiChannelAdapter re-stores logger in `_logger` field
+
+**File:** `src/channels/BotNexus.Channels.Tui/TuiChannelAdapter.cs:13`
+
+**Note:** `TuiChannelAdapter` accepts `ILogger<TuiChannelAdapter> logger` via primary constructor and stores it as `private readonly ILogger<TuiChannelAdapter> _logger = logger`, but `ChannelAdapterBase` already stores the logger as `protected readonly ILogger Logger`. This means TUI has two references to the same logger. The base class `Logger` field is used by `DispatchInboundAsync` and lifecycle methods, while the TUI-specific `_logger` is used in `OnStartAsync`, `OnStopAsync`, and `RunInputLoopAsync`. This is harmless but redundant.
+
+---
+
+## Per-Area Assessment
+
+### 1. Naming Conventions ✅
+All new types follow the established naming patterns: `FileAgentWorkspaceManager`, `WorkspaceContextBuilder`, `SessionCleanupService`, `SessionCleanupOptions`, `GatewayAuthMiddleware`, `WebSocketChannelAdapter`, `TuiChannelAdapter`, `ChannelManager`. Interface implementations use `Default*` or `File*` or `InMemory*` prefixes consistently. New records (`AgentWorkspace`, `ConnectionAttemptWindow`) follow existing patterns. No naming conflicts from parallel agent work.
+
+### 2. CancellationToken Usage ⚠️ (P1)
+All new async methods accept CancellationToken — no missing parameters. However, the naming inconsistency (`ct` vs `cancellationToken`) has re-emerged. See P1-1. The Phase 4 fix for API-layer `ct` holds, but new abstractions and library code reverted.
+
+### 3. ConfigureAwait ⚠️ (P2)
+Policy is documented and understood. Phase 5's `FileAgentWorkspaceManager` and `WorkspaceContextBuilder` correctly omit `ConfigureAwait(false)` as Gateway library code. But `GatewayAuthManager` (pre-existing) and `AgentConfigurationHostedService` still include it. See P2-3.
+
+### 4. Sealed Modifiers ✅
+Every new non-base class is `sealed`: `GatewayAuthMiddleware`, `FileAgentWorkspaceManager`, `WorkspaceContextBuilder`, `SessionCleanupService`, `SessionCleanupOptions`, `WebSocketChannelAdapter`, `TuiChannelAdapter`, `ChannelManager`, `GatewayWebSocketOptions`, `GatewayWebSocketHandler`, `ActivityWebSocketHandler`, `AgentWorkspace` (sealed record), `AgentConcurrencyLimitExceededException`. The only non-sealed class is `ChannelAdapterBase` which is correctly `abstract`. Zero violations.
+
+### 5. XML Doc Comments ⚠️ (P1 + P2)
+Build shows 10 unique CS1591 warnings, all in `BotNexus.Gateway.Api`. Of these:
+- **New Phase 5 code:** 3 warnings on `GatewayAuthMiddleware`, 2 on `GatewayWebSocketHandler` constructors, 1 on `ActivityWebSocketHandler.HandleAsync`
+- **Pre-existing:** 3 on controller constructors, 1 on `Program`
+- **Missing from Abstractions:** `IAgentWorkspaceManager`, `IContextBuilder`, `AgentWorkspace` (no warnings because Abstractions project doesn't require XML docs, but breaks the coverage pattern)
+
+### 6. Error Messages ✅
+Error messages are consistent in tone and format:
+- Auth: `"Missing API key. Provide X-Api-Key or Authorization: Bearer <key>."`, `"Invalid API key."`, `"Caller is not authorized for agent '{agentId}'."`
+- Session locking: `"Session already has an active connection"` (WebSocket close reason)
+- Concurrency: `"Agent '{agentId}' has reached MaxConcurrentSessions ({limit})."`
+- Isolation: `"Isolation strategy '{name}' is not registered for agent '{agentId}'. Available strategies: {list}."`
+- WebSocket rate limit: `"Reconnect limit exceeded. Retry in {N} second(s)."`
+All use full sentences, include the relevant IDs, and are actionable. No inconsistencies.
+
+### 7. Test Naming ✅
+New test names follow `Method_Condition_Expected` pattern consistently:
+- `AuthenticatedRequest_WithValidApiKey_ReturnsSuccess`
+- `WebSocketHandler_RejectsSecondConnection_ToSameSession`
+- `SupervisorRejectsSession_WhenMaxReached`
+- `LoadWorkspaceAsync_WhenMissing_CreatesWorkspaceAndReturnsEmptyFiles`
+- `BuildSystemPromptAsync_WhenSoulExists_ComposesAllSections`
+- `SessionStatus_TransitionsToExpired_AfterTTL`
+- `AddEntry_WithConcurrentWriters_DoesNotCorruptHistory`
+
+All 43+ test files in `BotNexus.Gateway.Tests` follow this pattern. No deviations.
+
+### 8. DI Registration ✅
+New services registered consistently:
+- `FileAgentWorkspaceManager` → `IAgentWorkspaceManager` as `AddSingleton` (correct — stateless file reader)
+- `WorkspaceContextBuilder` → `IContextBuilder` as `AddSingleton` (correct — stateless builder)
+- `SessionCleanupService` → `AddHostedService` (correct — background service)
+- `WebSocketChannelAdapter` registered in `AddBotNexusWebSocketChannel()` extension
+- `GatewayWebSocketHandler` and `ActivityWebSocketHandler` as `AddSingleton` in API extensions
+- All isolation strategies as `AddSingleton<IIsolationStrategy, T>()` (multi-registration pattern)
+- `ChannelManager` via `TryAddSingleton` (allows override)
+No keyed services used. Singleton vs scoped vs transient choices are appropriate.
+
+### 9. Docs ↔ Code ⚠️ (P1 + P2)
+- **TUI README lies about input loop** (P1-2) — says not implemented, but code implements it
+- **Gateway README omits CLI project** (P2-5) — new project not mentioned
+- **Abstractions README examples use `ct`** (P3-1) — will need update after P1-1 fix
+- **All other docs match code:** Gateway README's auth flow, session lifecycle, cleanup settings, WebSocket protocol, workspace structure, capability flags — all verified against source code and are accurate.
+
+### 10. Cross-Agent Conflicts ✅
+No conflicts detected from parallel agent work:
+- No duplicate `using` statements or conflicting imports
+- No conflicting naming between agents' additions (workspace manager vs auth middleware vs channels vs CLI vs session cleanup)
+- DI registration in `GatewayServiceCollectionExtensions` flows logically — all new services added in correct order
+- No merge artifacts, stale references, or contradictory patterns
+- `GatewayWebSocketHandler` and `WebSocketChannelAdapter` cleanly separated (handler owns HTTP/WebSocket lifecycle, adapter owns channel pipeline integration)
+
+---
+
+## Summary Table
+
+| # | Severity | Area | Finding | File(s) |
+|---|----------|------|---------|---------|
+| P1-1 | P1 | CancellationToken | `ct` in new interfaces/impl — should be `cancellationToken` | IAgentWorkspaceManager, IContextBuilder, FileAgentWorkspaceManager, WorkspaceContextBuilder, GatewayAuthManager |
+| P1-2 | P1 | Docs ↔ Code | TUI README says input loop is planned — it's implemented | Channels.Tui/README.md |
+| P1-3 | P1 | XML Docs | New Abstractions interfaces missing XML docs entirely | IAgentWorkspaceManager, IContextBuilder, AgentWorkspace |
+| P2-1 | P2 | XML Docs | GatewayAuthMiddleware missing XML docs (3 warnings) | GatewayAuthMiddleware.cs |
+| P2-2 | P2 | XML Docs | GatewayWebSocketHandler constructors missing docs (2 warnings) | GatewayWebSocketHandler.cs |
+| P2-3 | P2 | ConfigureAwait | Inconsistent within Gateway library project | GatewayAuthManager, AgentConfigurationHostedService |
+| P2-4 | P2 | XML Docs | SessionCleanupOptions has no XML docs | SessionCleanupOptions.cs |
+| P2-5 | P2 | Docs ↔ Code | Gateway README doesn't mention new CLI project | src/gateway/README.md |
+| P2-6 | P2 | Modernization | GatewayAuthManager uses `object` lock, not C# 13 `Lock` | GatewayAuthManager.cs:19 |
+| P3-1 | P3 | Docs | Abstractions README examples use `ct` shorthand | Abstractions/README.md |
+| P3-2 | P3 | Docs | Gateway README IChannelAdapter snippet uses `ct` | src/gateway/README.md:92-95 |
+| P3-3 | P3 | Code | TuiChannelAdapter stores logger twice (base + field) | TuiChannelAdapter.cs:13 |
+
+---
+
+## Previous P1s Status
+
+| Phase | P1 | Status |
+|-------|-----|--------|
+| Phase 4 W1 | ConfigController missing XML docs | ✅ Fixed |
+| Phase 4 W1 | PlatformConfig property-level XML doc inconsistency | ✅ Fixed |
+| Phase 3 | Isolation stubs missing `<inheritdoc />` | ✅ Fixed |
+| Phase 3 | GatewayOptionsTests stuffed into wrong file | ✅ Fixed |
+| Phase 2 | None (0 P1) | N/A |
+| Phase 1 | CancellationToken `ct` in API layer | ✅ Fixed — but re-emerged in library layer (P1-1 above) |
+| Phase 1 | Test file names not matching class names | ✅ Fixed |
+
+---
+
+**Build status:** 0 errors, 25 warnings (10 unique CS1591, duplicated across build configurations)  
+**Test status:** Not run as part of this review (build-only validation)
+

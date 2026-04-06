@@ -1733,3 +1733,26 @@ Design review filtered 14 audit findings down to 6 real fixes (5 already impleme
 
 ### Key File Paths
 - Review: .squad/decisions/inbox/leela-design-review-phase3.md
+
+## Learnings — Phase 5 Design Review (2026-04-09)
+
+### Review Findings
+1. **Overall grade: A−** — Strongest delivery yet. All 6 requirements complete. Auth middleware, WebSocket channel pipeline, session lifecycle, workspace model, CLI, and API surface all architecturally sound. Three P1 findings prevent full A.
+2. **P1: StreamAsync background task leak** — InProcessAgentHandle.StreamAsync fires PromptAsync on Task.Run; if consumer cancels IAsyncEnumerable, the background task continues. Need linked cancellation token.
+3. **P1: SessionCleanupService full-scan** — ListAsync loads ALL sessions on every cleanup cycle. FileSessionStore reads every .meta.json. Won't scale. Need ListByStatusAsync or similar push-down filtering.
+4. **P1: Path.HasExtension auth bypass** — GatewayAuthMiddleware.ShouldSkipAuth uses Path.HasExtension to skip auth for "static files", but this also matches API paths like /api/agents.json.
+5. **P2: Agent name path traversal** — FileAgentWorkspaceManager.GetWorkspacePath doesn't validate agent name characters. Same pattern flagged for SystemPromptFile in Phase 3.
+6. **SOLID score: 4.5/5** — Only deduction: GatewayWebSocketHandler takes concrete WebSocketChannelAdapter (not interface) for WebSocket-specific methods. Pragmatic but impure DIP.
+7. **Cross-agent recursion guard resolved** — DefaultAgentCommunicator now uses AsyncLocal<HashSet<string>> call chain tracking with IDisposable scope cleanup. Addresses Phase 3 P1.
+8. **Supervisor coalescing pattern** — DefaultAgentSupervisor uses TaskCompletionSource + _pendingCreates to prevent duplicate agent creation races. Production-grade.
+
+### Key Patterns Observed
+- **WebSocket channel pipeline integration:** WebSocketChannelAdapter extends ChannelAdapterBase, implements IStreamEventChannelAdapter, and dispatches inbound through GatewayHost.DispatchAsync. Handler registers/unregisters connections on adapter.
+- **Channel capability flags as virtual bool properties** on ChannelAdapterBase (default false) — OCP-compliant. New capabilities don't break existing adapters.
+- **IStreamEventChannelAdapter as optional interface** — channels that can't render structured events don't implement it. GatewayHost checks via pattern matching.
+- **Auth middleware 3-layer agent extraction** — query string → route values → request body (with EnableBuffering). Multi-tenant key support with per-key allow-lists.
+- **PlatformConfigWatcher debounce pattern** — FileSystemWatcher + Timer with 500ms debounce prevents rapid-fire reloads. Correct disposal under Lock.
+- **Agent workspace convention** — SOUL.md, IDENTITY.md, USER.md, MEMORY.md auto-scaffolded by BotNexusHome.GetAgentDirectory. WorkspaceContextBuilder composes sections with separator.
+
+### Key File Paths
+- Review: .squad/decisions/inbox/leela-phase5-design-review.md
