@@ -15,7 +15,9 @@ A comprehensive guide for running BotNexus locally — for developers and AI age
 9. [Agent Configuration](#agent-configuration)
 10. [Provider Setup](#provider-setup)
 11. [Auth Setup](#auth-setup)
-12. [Troubleshooting](#troubleshooting)
+12. [Extension Development Workflow](#extension-development-workflow)
+13. [OpenAPI Spec Export](#openapi-spec-export)
+14. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -182,6 +184,36 @@ Full build → test → run cycle for rapid development.
    WebUI:      http://localhost:5005/webui
    Environment: Development
 ```
+
+### `export-openapi.ps1`
+
+Exports the OpenAPI specification from the running Gateway API.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `-Port` | int | `15099` | Temporary port for the API during export |
+| `-OutputPath` | string | `docs/api/openapi.json` | Where to save the spec |
+| `-SkipBuild` | switch | off | Skip the build step |
+
+**What it does:**
+1. Builds the Gateway API project
+2. Starts the API on a temporary port with an empty config (to prevent user config from hijacking the port binding)
+3. Waits for the health check to pass
+4. Fetches `/swagger/v1/swagger.json`
+5. Saves the spec to `docs/api/openapi.json`
+6. Stops the API process and cleans up temp files
+
+**Examples:**
+
+```powershell
+# Export with defaults
+.\scripts\export-openapi.ps1
+
+# Export on a different port, skip build
+.\scripts\export-openapi.ps1 -Port 15200 -SkipBuild
+```
+
+> **Note:** The script sets `BotNexus__ConfigPath` to an empty JSON file during export so `PlatformConfig.GetListenUrl()` returns null and doesn't override the `ASPNETCORE_URLS` port binding.
 
 ### `install-pre-commit-hook.ps1`
 
@@ -658,6 +690,61 @@ Each key can restrict access to specific agents and permissions:
 
 ---
 
+## Extension Development Workflow
+
+BotNexus supports dynamic extensions for providers, channels, and tools loaded from the `~/.botnexus/extensions/` directory.
+
+### Quick Start
+
+1. Create a new class library targeting `net10.0`
+2. Reference `BotNexus.Gateway.Abstractions` for channel/provider interfaces
+3. Build the extension:
+
+```powershell
+dotnet build path\to\MyExtension.csproj
+```
+
+4. Copy the output to the extensions directory:
+
+```
+~/.botnexus/extensions/
+├── providers/    # Provider extension DLLs
+├── channels/     # Channel adapter DLLs
+└── tools/        # Tool extension DLLs
+```
+
+5. Restart the Gateway to load the new extension.
+
+### Verifying Extensions
+
+After starting the Gateway, confirm your extension is loaded:
+
+```powershell
+# List loaded extensions
+curl http://localhost:5005/api/extensions
+
+# List registered channels (for channel extensions)
+curl http://localhost:5005/api/channels
+```
+
+For the full extension development guide with code examples, see [Extension Development](extension-development.md).
+
+---
+
+## OpenAPI Spec Export
+
+Export the Gateway's OpenAPI specification for API documentation or client generation:
+
+```powershell
+.\scripts\export-openapi.ps1
+```
+
+This generates `docs/api/openapi.json` containing all 15+ REST endpoint definitions with XML doc descriptions. Use this spec with tools like Swagger UI, Redocly, or client generators (e.g., `nswag`, `openapi-generator`).
+
+The exported spec is also browsable at `http://localhost:5005/swagger` when the Gateway is running.
+
+---
+
 ## Troubleshooting
 
 ### Build Fails
@@ -734,6 +821,7 @@ Verify extension assemblies are in the correct subdirectories:
 
 - [Architecture Overview](architecture.md) — System design and component responsibilities
 - [API Reference](api-reference.md) — REST and WebSocket endpoint documentation
-- [Configuration Guide](configuration.md) — Complete configuration reference
+- [Configuration Reference](config-reference.md) — Complete field-by-field config.json reference
+- [WebSocket Protocol](websocket-protocol.md) — Low-level WebSocket protocol specification
 - [Extension Development](extension-development.md) — Building custom providers, channels, and tools
 - [Getting Started](getting-started.md) — First-time user guide with end-to-end walkthrough
