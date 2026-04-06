@@ -53,6 +53,9 @@ public sealed class PlatformConfig
     /// <summary>CORS settings (legacy root-level form).</summary>
     public CorsConfig? Cors { get; set; }
 
+    /// <summary>Rate limiting settings (legacy root-level form).</summary>
+    public RateLimitConfig? RateLimit { get; set; }
+
     /// <summary>Logging level.</summary>
     public string? LogLevel { get; set; }
 
@@ -91,6 +94,10 @@ public sealed class PlatformConfig
     /// <summary>Returns configured extensions settings, preferring the nested Gateway section.</summary>
     public ExtensionsConfig? GetExtensions()
         => Gateway?.Extensions ?? Extensions;
+
+    /// <summary>Returns configured rate limiting settings, preferring the nested Gateway section.</summary>
+    public RateLimitConfig? GetRateLimit()
+        => Gateway?.RateLimit ?? RateLimit;
 }
 
 /// <summary>Provider-specific configuration.</summary>
@@ -121,6 +128,8 @@ public sealed class GatewaySettingsConfig
     public SessionStoreConfig? SessionStore { get; set; }
     /// <summary>CORS settings for browser-based clients.</summary>
     public CorsConfig? Cors { get; set; }
+    /// <summary>Per-client request rate limiting settings.</summary>
+    public RateLimitConfig? RateLimit { get; set; }
     /// <summary>Logging level override.</summary>
     public string? LogLevel { get; set; }
     /// <summary>Multi-tenant API keys keyed by key ID.</summary>
@@ -134,6 +143,16 @@ public sealed class CorsConfig
 {
     /// <summary>Explicit origins allowed to access the gateway from browsers.</summary>
     public List<string>? AllowedOrigins { get; set; }
+}
+
+/// <summary>Rate limiting settings for gateway HTTP endpoints.</summary>
+public sealed class RateLimitConfig
+{
+    /// <summary>Maximum requests allowed in a window for a single client.</summary>
+    public int RequestsPerMinute { get; set; } = 60;
+
+    /// <summary>Window size in seconds used for request counting.</summary>
+    public int WindowSeconds { get; set; } = 60;
 }
 
 /// <summary>Configuration for dynamic extension discovery and loading.</summary>

@@ -121,6 +121,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseCors(GatewayCorsPolicy);
 app.UseMiddleware<GatewayAuthMiddleware>();
+app.UseMiddleware<RateLimitingMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI();
 app.UseWebSockets();
