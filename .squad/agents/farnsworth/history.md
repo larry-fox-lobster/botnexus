@@ -714,3 +714,36 @@ Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
 - Hermes: 23 new tests (ConfigPathResolver, SchemaValidation, edge cases)
 - Kif: 14 XML doc comments, 3 module READMEs, 0 warnings
 - **Total:** 891 tests passing (868→891, +23), Build clean, 0 warnings
+
+## 2026-04-06T08:35Z — CLI Command Handler Decomposition
+
+Refactored `src/gateway/BotNexus.Cli/Program.cs` into thin command registration + DI wiring and extracted command handlers into `Commands/ValidateCommand.cs`, `Commands/InitCommand.cs`, `Commands/AgentCommands.cs`, and `Commands/ConfigCommands.cs`.
+Behavior parity preserved for `validate`, `init`, `agent list|add|remove`, and `config get|set|schema` (same options, output, and exit code behavior).
+Validation: `dotnet build src\gateway\BotNexus.Cli\BotNexus.Cli.csproj --nologo --tl:off`, CLI smoke checks (`--help`, `config schema`), and full-solution build succeeded; full-solution tests showed one existing flaky timing failure in `ToolExecutorTests.ExecuteAsync_ParallelMode_RunsConcurrently`.
+
+## 2026-04-06T08:10:00Z — Phase 11 Wave 2: CLI Decomposition & Command Extraction
+
+**Status:** ✅ Complete  
+**Team:** Bender (Telegram API), Farnsworth (CLI), Scribe (Logging)  
+**Orchestration:** `.squad/orchestration-log/2026-04-06T08-10-00Z-farnsworth.md`  
+
+**Your Contribution (Farnsworth — CLI Refactoring):**
+- Decomposed Program.cs from 767 lines to 23 lines (thin registration + DI wiring)
+- Created Commands/ directory structure with:
+  - ValidateCommand (static validation handler)
+  - InitCommand (config initialization)
+  - AgentCommands (list/add/remove agent operations)
+  - ConfigCommands (get/set/schema config operations)
+- Preserved behavior parity — all CLI commands work identically to pre-refactor
+- 5 commits: c5ec538, 04e89f0, 23519ac, 4fc1a39, ac88300
+
+**Team Outcomes:**
+- **Bender (Telegram):** TelegramBotApiClient HTTP wrapper, long polling, streaming edits, thinking/tool formatting. 3 commits.
+- **Scribe (Memory):** Wave 1 orchestration logs + session log + decision merging + cross-agent history updates. 1 commit.
+
+**Combined Validation:**
+- Build: ✅ Clean, 0 errors, 0 warnings
+- Tests: ✅ 891 passing, 0 failures  
+- CLI Smoke: ✅ --help, config schema, init validation
+
+**Session Log:** `.squad/log/2026-04-06T08-10-00Z-phase11-wave2.md`

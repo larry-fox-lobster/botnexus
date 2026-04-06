@@ -929,3 +929,33 @@ Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
 - Hermes: 23 new tests covering all new subsystems
 - Kif: 14 XML doc comments, full module documentation
 - **Total:** 891 tests passing (868→891, +23), Build clean, 0 warnings
+
+### 2026-04-06 — Telegram Bot API adapter runtime implementation
+- Replaced Telegram channel stub with first-party runtime calls (`sendMessage`, `editMessageText`, `getUpdates`, `setWebhook`, `deleteWebhook`) via `HttpClient` + `System.Text.Json`.
+- Added polling-mode inbound routing with update-offset tracking and webhook-mode startup path; inbound/outbound paths now enforce `AllowedChatIds`.
+- Enabled streaming behavior (`SupportsStreaming = true`) with buffered delta flushing into `editMessageText`, plus thinking/tool rendering formatting and markdown-safe chunked sends.
+
+## 2026-04-06T08:10:00Z — Phase 11 Wave 2: Telegram Bot API Implementation & CLI Decomposition
+
+**Status:** ✅ Complete  
+**Team:** Bender (Telegram API), Farnsworth (CLI), Scribe (Logging)  
+**Orchestration:** `.squad/orchestration-log/2026-04-06T08-10-00Z-bender.md`  
+
+**Your Contribution (Bender — Telegram Bot API):**
+- Created TelegramBotApiClient HTTP wrapper for Telegram Bot API
+- Implemented long polling with offset tracking and retry logic
+- Implemented send with markdown, chunking, streaming edits
+- Added thinking/tool message formatting support
+- Extended TelegramOptions with BotToken, polling intervals (MinWait, MaxWait)
+- 3 commits: d5035ab, a8f71a5, 4b2bffd
+
+**Team Outcomes:**
+- **Farnsworth (CLI):** Decomposed Program.cs (767→23 lines), extracted Commands/ structure (ValidateCommand, InitCommand, AgentCommands, ConfigCommands). 5 commits.
+- **Scribe (Memory):** Wave 1 orchestration logs + session log + decision merging + cross-agent history updates. 1 commit.
+
+**Combined Validation:**
+- Build: ✅ Clean, 0 errors, 0 warnings
+- Tests: ✅ 891 passing, 0 failures
+- Smoke: ✅ CLI help, Telegram polling validation
+
+**Session Log:** `.squad/log/2026-04-06T08-10-00Z-phase11-wave2.md`

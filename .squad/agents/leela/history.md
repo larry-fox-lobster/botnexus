@@ -2078,3 +2078,44 @@ Phase 10 delivered 6 commits across 3 agents: PUT AgentId validation fix, CORS v
 3. **Save-then-reload-and-validate is a good CLI pattern** — The CLI writes config, reloads it, and validates. This catches serialization/deserialization drift and ensures the file is well-formed. Worth replicating in other config-writing tools.
 4. **Deployment tests with isolated BOTNEXUS_HOME are effective** — Using `WebApplicationFactory<Program>` + temp root + env var override gives realistic integration testing without touching real user state. The SemaphoreSlim lock prevents parallel test interference.
 5. **Reflection-based config traversal needs tests** — dotted-path property lookup via reflection is inherently fragile. Any rename or structural change in PlatformConfig silently breaks CLI config get/set. This must be test-covered.
+
+---
+
+## 2026-04-07T00:00:00Z — Phase 11 Design Review (Lead)
+
+**Timestamp:** 2026-04-07T00:00:00Z  
+**Status:** ✅ Complete  
+**Requested by:** Jon Bullen (via Copilot)  
+**Scope:** Architectural review of all Phase 11 implementations (18 commits since `2a50c7b`)
+
+**Context:**
+Phase 11 delivered 6 work items across 4 agents (Farnsworth ×2, Bender ×2, Hermes ×1, Kif ×1). ~4700 lines added, ~950 removed. Reviewed: JSON schema/path resolver, dynamic extension loading with ALC isolation, CLI decomposition, Telegram Bot API adapter (polling/webhook/streaming), config tests (23 new), XML doc comments and module READMEs.
+
+**Grade: A-**
+
+| Area | Grade |
+|------|-------|
+| SOLID Compliance | B+ |
+| Extension Model | A |
+| API Design | A |
+| Thread Safety | A |
+| Test Quality | A |
+| Security Posture | A- |
+| Documentation | A |
+
+**Key Findings:**
+- P0: None.
+- P1 (6 items): DRY violations in CLI command helpers (duplicated JSON options + config I/O across 4 files). `new HttpClient()` in ValidateCommand bypasses IHttpClientFactory. TelegramServiceCollectionExtensions falls back to raw HttpClient. ExtensionManifest lacks minHostVersion field. No assembly signature/hash validation for extensions. Extension DI registration is startup-only (cannot affect live container after BuildServiceProvider).
+- P2 (5 items): StreamingState SemaphoreSlim not disposed. ConfigPathResolver at 786 lines. Empty AllowedChatIds permits all Telegram chats. Hardcoded extension type whitelist not derived from DiscoverableServiceContracts. TopologicalSort silently falls back on error.
+- Phase 10 P1 resolved: CLI monolithic Program.cs ✅ (now 23 lines). Config get/set test coverage ✅ (23 tests via CliConfigFixture).
+- Carried forward: StreamAsync task leak, SessionHistoryResponse location, Copilot conformance test duplication.
+
+**Decision written to:** `.squad/decisions/inbox/leela-phase11-design-review.md`
+
+## Learnings — Phase 11 Design Review (2026-04-07)
+
+1. **AssemblyLoadContext with isCollectible:true is the right isolation model for .NET extensions** — Provides dependency isolation, unload capability, and unique naming via GUID. The `AssemblyDependencyResolver` pattern handles transitive dependency resolution correctly. Key constraint: DI registrations from loaded extensions persist after unload since IServiceCollection is immutable after Build().
+2. **CLI decomposition pays compound interest** — The Phase 10 review flagged Program.cs at 850+ lines. Phase 11 delivered 23-line Program.cs with 4 command classes. But the decomposition introduced DRY violations (duplicated helpers). Next time: extract shared utilities as part of the same PR, not as follow-up.
+3. **End-to-end test fixtures that spawn real processes give highest confidence** — The CliConfigFixture approach (spawn dotnet process, isolated BOTNEXUS_HOME, capture stdout/stderr) validates the full CLI pipeline including serialization, file I/O, and System.CommandLine parsing. Worth adopting for other CLI tools.
+4. **Extension security is a layered concern** — Path traversal guards + manifest validation + ALC isolation is the right foundation. Assembly signature validation is the next layer needed before any multi-tenant or remote extension scenario. Design the manifest schema to accommodate this now (optional sha256 field) even if enforcement comes later.
+5. **Telegram MarkdownV2 escaping is a correctness concern, not just cosmetic** — Unescaped special characters cause Telegram API failures, not just bad formatting. The comprehensive escape function covering all 19 MarkdownV2 special characters is essential for production reliability.
