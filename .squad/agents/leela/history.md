@@ -1956,3 +1956,40 @@ Validated current codebase against comprehensive requirements brief covering Age
 5. **CLI has minimal parity with API** — Only `validate` command exists. No `init`, `agent list/add/remove`, `config set/get`. This creates friction for users who prefer CLI over editing JSON files.
 6. **811 total tests across 8 projects** — 76 test files, strong Gateway coverage (41 files). xUnit + Moq + FluentAssertions + ASP.NET Mvc.Testing. Test infrastructure is mature.
 7. **Active P1 carries are well-scoped** — extract-replay-buffer, IHttpClientFactory, decompose-ws-handler, provider-conformance-tests, CLI-parity. All have clear owners and bounded effort.
+
+## 2026-04-06 — Phase 9 Design Review (Lead)
+
+**Timestamp:** 2026-04-06  
+**Status:** ✅ Complete  
+**Requested by:** Jon Bullen (via Copilot)  
+**Scope:** Architectural review of all Phase 9 implementations (8 commits)
+
+**Context:**
+Phase 9 delivered 8 commits across 6 agents: IHttpClientFactory migration, WebUI processing status bar, dev-loop docs overhaul, SessionReplayBuffer extraction, configurable CORS, agent descriptor update endpoint, and provider conformance test suite. Build green, 811+ tests passing.
+
+**Grade: A-**
+
+| Area | Grade |
+|------|-------|
+| SOLID Compliance | 4.8/5 |
+| Architecture Alignment | A |
+| API Design | A- |
+| Security | A- |
+| Test Quality | A |
+
+**Key Findings:**
+- P0: None.
+- P1: HttpClient singleton bridge partially defeats IHttpClientFactory benefits. PUT /api/agents/{agentId} silently reconciles mismatched AgentIds (should 400). CORS AllowAnyMethod in production is too permissive. Copilot conformance tests duplicate OpenAI without explanation.
+- Carried resolved: Path.HasExtension auth bypass ✅, SessionReplayBuffer extraction ✅.
+- Carried forward: StreamAsync task leak, SessionHistoryResponse location.
+
+**Decision written to:** `.squad/decisions/inbox/leela-phase9-design-review.md`
+
+## Learnings — Phase 9 Design Review (2026-04-06)
+
+1. **Default interface methods are a good OCP pattern** — `IAgentRegistry.Update` uses a default implementation that throws `NotSupportedException`. This extends the interface without breaking existing implementations. Prefer this over separate interfaces when the new method is logically part of the same contract.
+2. **Singleton bridge over IHttpClientFactory is transitional debt** — Registering `AddSingleton<HttpClient>(sp => factory.CreateClient(...))` keeps backward compatibility but should not be the final state. The proper end-state is injecting `IHttpClientFactory` at call sites.
+3. **Provider conformance tests validate substitutability** — The abstract base + TheoryData + per-provider subclass pattern is an effective way to enforce LSP across provider implementations. This pattern should be replicated for channel adapters.
+4. **SRP extraction with façade preservation is the right refactoring pattern** — SessionReplayBuffer was extracted while keeping GatewaySession's public API intact. This avoids cascading changes in callers. The façade methods can be deprecated later when direct buffer access is adopted.
+5. **CORS middleware order matters** — `UseCors` must come before auth middleware so OPTIONS preflight requests are handled without credentials. The Phase 9 implementation gets this right.
+6. **Silent input reconciliation hides bugs** — The PUT endpoint quietly overrides mismatched AgentIds. Prefer strict validation (return 400) over silent fixup — callers should know when their request is malformed.

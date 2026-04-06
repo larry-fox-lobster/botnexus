@@ -132,7 +132,7 @@ Connect to `ws://localhost:5005/ws?agent={agentId}&session={sessionId}` for real
 - `{ "type": "thinking_delta", "delta": "...", "messageId": "..." }` — Thinking/reasoning content
 - `{ "type": "content_delta", "delta": "..." }` — Streaming content chunk
 - `{ "type": "tool_start", "toolCallId": "...", "toolName": "..." }` — Tool execution started
-- `{ "type": "tool_end", "toolCallId": "...", "toolResult": "..." }` — Tool result received
+- `{ "type": "tool_end", "toolCallId": "...", "toolName": "...", "toolResult": "...", "toolIsError": false }` — Tool result received
 - `{ "type": "message_end", "messageId": "...", "usage": {...} }` — Agent completed
 - `{ "type": "error", "message": "...", "code": "..." }` — Error occurred
 - `{ "type": "pong" }` — Keepalive response

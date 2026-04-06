@@ -197,6 +197,52 @@ Content-Type: application/json
 
 ---
 
+### Update Agent
+
+**Endpoint:** `PUT /api/agents/{agentId}`
+
+**Description:** Update an existing agent descriptor in-place. The agent ID in the URL takes precedence — if the body contains a different `agentId`, it is overwritten with the URL value.
+
+**Parameters:**
+- `agentId` (string, path) — The registered agent ID to update
+
+**Request Body:** Same schema as [Create Agent](#create-agent).
+
+**Request:**
+```http
+PUT /api/agents/my-agent
+X-Api-Key: your-api-key
+Content-Type: application/json
+
+{
+  "agentId": "my-agent",
+  "displayName": "My Updated Agent",
+  "modelId": "claude-sonnet-4-5",
+  "apiProvider": "anthropic",
+  "systemPrompt": "You are a refined assistant"
+}
+```
+
+**Response:** 200 OK
+```json
+{
+  "agentId": "my-agent",
+  "displayName": "My Updated Agent",
+  "modelId": "claude-sonnet-4-5",
+  "apiProvider": "anthropic",
+  "systemPrompt": "You are a refined assistant",
+  "isolationStrategy": "in-process",
+  "toolIds": [],
+  "subAgentIds": [],
+  "maxConcurrentSessions": 0
+}
+```
+
+**Error Responses:**
+- `404 Not Found` — Agent with the given ID is not registered
+
+---
+
 ### Delete Agent
 
 **Endpoint:** `DELETE /api/agents/{agentId}`

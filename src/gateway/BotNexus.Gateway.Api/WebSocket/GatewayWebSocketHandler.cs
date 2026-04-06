@@ -36,7 +36,7 @@ namespace BotNexus.Gateway.Api.WebSocket;
 ///   <item><c>{ "type": "thinking_delta", "delta": "...", "messageId": "..." }</c></item>
 ///   <item><c>{ "type": "content_delta", "delta": "...", "messageId": "..." }</c></item>
 ///   <item><c>{ "type": "tool_start", "toolCallId": "...", "toolName": "...", "messageId": "..." }</c></item>
-///   <item><c>{ "type": "tool_end", "toolCallId": "...", "toolResult": "...", "messageId": "..." }</c></item>
+///   <item><c>{ "type": "tool_end", "toolCallId": "...", "toolName": "...", "toolResult": "...", "toolIsError": false, "messageId": "..." }</c></item>
 ///   <item><c>{ "type": "message_end", "messageId": "...", "usage": { ... } }</c></item>
 ///   <item><c>{ "type": "error", "message": "...", "code": "..." }</c></item>
 ///   <item><c>{ "type": "pong" }</c></item>

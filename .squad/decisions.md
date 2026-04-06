@@ -2,6 +2,47 @@
 
 ## Active Decisions
 
+### Phase 9 Design Review (2026-04-06)
+
+**By:** Leela (Lead/Architect)  
+**Grade:** A-  
+**Status:** Complete
+
+**Summary:** 8 commits reviewed (6c64e39..2a0044d). No P0 issues. 4 P1 items flagged for next sprint: harden PUT /api/agents/{agentId} (input validation, ProducesResponseType), restrict CORS AllowAnyMethod() in production, evolve HttpClient singleton bridge or document as transitional, clarify Copilot vs OpenAI conformance test duplication.
+
+**Standout:** Provider conformance test suite (Template Method pattern, comprehensive contract validation across 4 implementations). SessionReplayBuffer extraction resolves Sprint 7A carry with textbook SRP.
+
+**Carried findings:** 2 of 4 resolved (SessionReplayBuffer SRP, Path.HasExtension auth bypass). 2 remain open (StreamAsync task leak, SessionHistoryResponse model location).
+
+Full review: `.squad/decisions/inbox/leela-phase9-design-review.md`
+
+---
+
+### Phase 9 Consistency Review (2026-04-06)
+
+**By:** Nibbler (Consistency Reviewer)  
+**Grade:** Good  
+**Status:** Complete
+
+**Summary:** Reviewed 7 commits across conformance, agent update, CORS, replay buffer extraction, WebUI, dev docs, HttpClient migration.
+
+**P1 Fixed Directly (3):**
+1. Added PUT /api/agents/{agentId} to api-reference.md with request/response examples
+2. Updated README WebSocket protocol — added toolName and toolIsError to tool_end event
+3. Updated GatewayWebSocketHandler XML docs — tool_end shape includes new fields
+
+**P2 Logged for Backlog (4):**
+1. CORS configuration undocumented — add section to configuration.md and example JSON
+2. Conformance test project missing from dev-loop.md and dev-guide.md test tables
+3. BotNexus.Cli inconsistent — still uses `new HttpClient()`, while Gateway.Api uses IHttpClientFactory
+4. configuration.md Gateway port stale — shows 18790 instead of actual 5005
+
+**Pattern:** Code quality strong; cross-document updates lag when features touch protocol surface.
+
+Full review: `.squad/decisions/inbox/nibbler-phase9-consistency.md`
+
+---
+
 ### Extract SessionReplayBuffer from GatewaySession (2026-04-06)
 
 **By:** Farnsworth  
