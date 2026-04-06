@@ -1,6 +1,8 @@
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace BotNexus.Gateway.Agents;
 
@@ -13,6 +15,7 @@ public sealed class DefaultAgentCommunicator : IAgentCommunicator
     private readonly IAgentRegistry _registry;
     private readonly IAgentSupervisor _supervisor;
     private readonly ILogger<DefaultAgentCommunicator> _logger;
+    private readonly IOptions<GatewayOptions> _options;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DefaultAgentCommunicator"/> class.
@@ -23,11 +26,21 @@ public sealed class DefaultAgentCommunicator : IAgentCommunicator
     public DefaultAgentCommunicator(
         IAgentRegistry registry,
         IAgentSupervisor supervisor,
+        IOptions<GatewayOptions> options,
         ILogger<DefaultAgentCommunicator> logger)
     {
         _registry = registry;
         _supervisor = supervisor;
+        _options = options;
         _logger = logger;
+    }
+
+    public DefaultAgentCommunicator(
+        IAgentRegistry registry,
+        IAgentSupervisor supervisor,
+        ILogger<DefaultAgentCommunicator> logger)
+        : this(registry, supervisor, Options.Create(new GatewayOptions()), logger)
+    {
     }
 
     /// <summary>
@@ -46,7 +59,7 @@ public sealed class DefaultAgentCommunicator : IAgentCommunicator
         string message,
         CancellationToken cancellationToken = default)
     {
-        using var callScope = EnterCallChain(parentAgentId, childAgentId);
+        using var callScope = EnterCallChain(parentAgentId, childAgentId, _options.Value.MaxCallChainDepth);
         var childSessionId = $"{parentSessionId}::sub::{childAgentId}";
         _logger.LogInformation(
             "Sub-agent call from '{ParentAgentId}' session '{ParentSessionId}' to '{ChildAgentId}' session '{ChildSessionId}'",
@@ -78,7 +91,7 @@ public sealed class DefaultAgentCommunicator : IAgentCommunicator
         string message,
         CancellationToken cancellationToken = default)
     {
-        using var callScope = EnterCallChain(sourceAgentId, targetAgentId);
+        using var callScope = EnterCallChain(sourceAgentId, targetAgentId, _options.Value.MaxCallChainDepth);
         if (!string.IsNullOrWhiteSpace(targetEndpoint))
         {
             throw new NotSupportedException(
@@ -100,8 +113,11 @@ public sealed class DefaultAgentCommunicator : IAgentCommunicator
         return await handle.PromptAsync(message, cancellationToken);
     }
 
-    private static IDisposable EnterCallChain(string sourceAgentId, string targetAgentId)
+    private static IDisposable EnterCallChain(string sourceAgentId, string targetAgentId, int maxCallChainDepth)
     {
+        if (maxCallChainDepth <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxCallChainDepth), "Max call chain depth must be greater than zero.");
+
         var path = ActiveCallPath.Value;
         if (path is null)
         {
@@ -123,6 +139,16 @@ public sealed class DefaultAgentCommunicator : IAgentCommunicator
         }
 
         path.Add(targetAgentId);
+        var depth = path.Count - 1;
+        if (depth > maxCallChainDepth)
+        {
+            var chain = string.Join(" -> ", path);
+            ResetPath(path, entryCount);
+
+            throw new InvalidOperationException(
+                $"Cross-agent call chain depth {depth} exceeded maximum configured depth {maxCallChainDepth}. Active chain: {chain}");
+        }
+
         return new CallChainScope(path, entryCount);
     }
 

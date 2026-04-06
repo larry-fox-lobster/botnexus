@@ -3,8 +3,10 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
+using BotNexus.Gateway.Configuration;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace BotNexus.Gateway.Tests;
@@ -164,6 +166,34 @@ public sealed class DefaultAgentCommunicatorTests
         seenSessionIds.Distinct(StringComparer.Ordinal).Should().HaveCount(20);
         seenSessionIds.Should().OnlyContain(sessionId => sessionId.StartsWith("caller-agent::cross::target-agent::", StringComparison.Ordinal));
         results.Select(response => response.Content).Distinct(StringComparer.Ordinal).Should().HaveCount(20);
+    }
+
+    [Fact]
+    public async Task CallCrossAgentAsync_WhenDepthExceedsConfiguredMaximum_ThrowsInvalidOperationException()
+    {
+        var registry = new Mock<IAgentRegistry>();
+        registry.Setup(r => r.Contains(It.IsAny<string>())).Returns(true);
+
+        var supervisor = new Mock<IAgentSupervisor>();
+        DefaultAgentCommunicator? communicator = null;
+        supervisor
+            .Setup(s => s.GetOrCreateAsync("agent-b", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(async () =>
+            {
+                await communicator!.CallCrossAgentAsync("agent-b", string.Empty, "agent-c", "loop");
+                return CreateHandle("agent-b").Object;
+            });
+
+        communicator = new DefaultAgentCommunicator(
+            registry.Object,
+            supervisor.Object,
+            Options.Create(new GatewayOptions { MaxCallChainDepth = 1 }),
+            NullLogger<DefaultAgentCommunicator>.Instance);
+
+        var act = () => communicator.CallCrossAgentAsync("agent-a", string.Empty, "agent-b", "hello");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*exceeded maximum configured depth*");
     }
 
     private static AgentDescriptor CreateDescriptor(string agentId)
