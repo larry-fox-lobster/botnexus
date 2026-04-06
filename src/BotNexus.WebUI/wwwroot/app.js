@@ -104,6 +104,7 @@
     const elSidebarOverlay = $('#sidebar-overlay');
     const elSidebar = $('#sidebar');
     const elChannelsList = $('#channels-list');
+    const elExtensionsList = $('#extensions-list');
     const elBtnSendMode = $('#btn-send-mode');
     const elFollowUpIndicator = $('#followup-indicator');
     const elProcessingStatus = $('#processing-status');
@@ -349,6 +350,7 @@
             startPing();
             if (wasReconnect) {
                 loadChannels();
+                loadExtensions();
                 reloadCurrentSessionHistory().then((msgCount) => {
                     const countStr = msgCount > 0 ? ` Loaded ${msgCount} previous messages.` : '';
                     showConnectionBanner(`✅ Reconnected to gateway.${countStr}`, 'success');
@@ -1482,6 +1484,41 @@
     }
 
     // =========================================================================
+    // Extensions
+    // =========================================================================
+
+    async function loadExtensions() {
+        elExtensionsList.innerHTML = '<div class="loading">Loading...</div>';
+        const extensions = await fetchJson('/extensions');
+        if (!extensions || extensions.length === 0) {
+            elExtensionsList.innerHTML = '<div class="empty-state">No extensions loaded</div>';
+            return;
+        }
+        // Group by extension name
+        const groups = {};
+        for (const ext of extensions) {
+            const key = ext.name || 'Unknown';
+            if (!groups[key]) groups[key] = { version: ext.version, types: [] };
+            groups[key].types.push(ext.type || 'unknown');
+        }
+        elExtensionsList.innerHTML = '';
+        for (const [name, info] of Object.entries(groups)) {
+            const el = document.createElement('div');
+            el.className = 'list-item';
+            el.setAttribute('role', 'listitem');
+            const typeBadges = info.types.map(t => `<span class="extension-type-badge">${escapeHtml(t)}</span>`).join(' ');
+            el.innerHTML = `
+                <div class="list-item-row">
+                    <span class="item-title">${escapeHtml(name)}</span>
+                    <span class="item-meta" style="font-size:0.68rem;">v${escapeHtml(info.version || '?')}</span>
+                </div>
+                <div style="margin-top:2px;">${typeBadges}</div>
+            `;
+            elExtensionsList.appendChild(el);
+        }
+    }
+
+    // =========================================================================
     // Agents
     // =========================================================================
 
@@ -1844,6 +1881,7 @@
 
         $('#btn-refresh-sessions').addEventListener('click', (e) => { e.stopPropagation(); loadSessions(); });
         $('#btn-refresh-channels').addEventListener('click', (e) => { e.stopPropagation(); loadChannels(); });
+        $('#btn-refresh-extensions').addEventListener('click', (e) => { e.stopPropagation(); loadExtensions(); });
         $('#btn-refresh-agents').addEventListener('click', (e) => { e.stopPropagation(); loadAgents(); });
 
         // Delegated click handlers for dynamic chat content
@@ -1991,6 +2029,7 @@
         initEventListeners();
         loadSessions();
         loadChannels();
+        loadExtensions();
         loadAgents();
         scheduleChannelsRefresh();
         setStatus('disconnected');
