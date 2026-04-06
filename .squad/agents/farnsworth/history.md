@@ -145,6 +145,9 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+- 2026-04-06: `scripts/dev-loop.ps1` now supports `-SkipBuild`/`-SkipTests`, catches failures with clear terminal errors, and starts Gateway through `start-gateway.ps1 -SkipBuild` to avoid duplicate rebuild/file-lock issues.
+- 2026-04-06: `scripts/start-gateway.ps1` now performs a preflight TCP port check and returns a friendly actionable error when the port is already in use.
+- 2026-04-06: `GatewayAuthManager` now accepts local-repo fallback credentials from `./.botnexus-agent/auth.json` and maps provider key `copilot` to auth entry `github-copilot` for compatibility.
 - 2026-04-06: `BotNexus.Gateway.Api` is now a runnable ASP.NET Core host (`Program.cs`) that wires `AddBotNexusGateway`, `AddPlatformConfiguration`, `AddBotNexusGatewayApi`, WebSocket `/ws`, static WebUI assets, and `/health`.
 - 2026-04-06: Gateway auth now supports multi-tenant API keys from platform config (`gateway.apiKeys` or root `apiKeys`), mapping each key to tenant ID, permissions, allowed agents, and caller identity.
 - 2026-04-06: Gateway exposes `GET /api/config/validate` to validate `~/.botnexus/config.json` (or explicit path), returning actionable field-level errors for missing required config values.

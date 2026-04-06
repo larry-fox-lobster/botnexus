@@ -2,22 +2,73 @@
   "gateway": {
     "listenUrl": "http://localhost:5005",
     "defaultAgentId": "assistant",
-    "sessionsDirectory": "workspace\\sessions"
+    "agentsDirectory": "C:\\Users\\you\\.botnexus\\agents",
+    "sessionsDirectory": "C:\\Users\\you\\.botnexus\\sessions",
+    "logLevel": "Information"
   },
   "agents": {
     "assistant": {
       "provider": "copilot",
       "model": "gpt-4.1",
-      "systemPromptFile": "prompts\\assistant.txt",
+      "isolationStrategy": "in-process",
+      "enabled": true
+    },
+    "analyst": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-5",
       "isolationStrategy": "in-process",
       "enabled": true
     }
   },
   "providers": {
     "copilot": {
-      "apiKey": "copilot",
-      "baseUrl": "https://api.githubcopilot.com",
+      "apiKey": "auth:github-copilot",
+      "baseUrl": "https://api.enterprise.githubcopilot.com",
       "defaultModel": "gpt-4.1"
+    },
+    "anthropic": {
+      "apiKey": "ANTHROPIC_API_KEY",
+      "baseUrl": "https://api.anthropic.com",
+      "defaultModel": "claude-sonnet-4-5"
+    },
+    "openai": {
+      "apiKey": "OPENAI_API_KEY",
+      "baseUrl": "https://api.openai.com",
+      "defaultModel": "gpt-4.1"
+    }
+  },
+  "channels": {
+    "web": {
+      "type": "websocket",
+      "enabled": true,
+      "settings": {
+        "path": "/ws"
+      }
+    },
+    "telegram": {
+      "type": "telegram",
+      "enabled": false,
+      "settings": {
+        "botToken": "TELEGRAM_BOT_TOKEN",
+        "webhookPath": "/telegram/webhook"
+      }
+    }
+  },
+  "apiKeys": {
+    "tenant-demo": {
+      "apiKey": "bnx_demo_key_change_me",
+      "tenantId": "tenant-demo",
+      "callerId": "local-dev",
+      "displayName": "Tenant Demo Key",
+      "allowedAgents": [
+        "assistant",
+        "analyst"
+      ],
+      "permissions": [
+        "chat:send",
+        "sessions:read"
+      ],
+      "isAdmin": false
     }
   }
 }

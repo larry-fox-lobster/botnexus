@@ -15,6 +15,7 @@ public sealed class GatewayAuthManager
     private readonly PlatformConfig _platformConfig;
     private readonly ILogger<GatewayAuthManager> _logger;
     private readonly string _authFilePath;
+    private readonly string _legacyAuthFilePath;
     private readonly object _sync = new();
     private Dictionary<string, AuthEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
     private bool _loaded;
@@ -24,6 +25,7 @@ public sealed class GatewayAuthManager
         _platformConfig = platformConfig;
         _logger = logger;
         _authFilePath = Path.Combine(PlatformConfigLoader.DefaultConfigDirectory, AuthFileName);
+        _legacyAuthFilePath = Path.Combine(Environment.CurrentDirectory, ".botnexus-agent", AuthFileName);
     }
 
     /// <summary>
@@ -163,7 +165,9 @@ public sealed class GatewayAuthManager
     {
         lock (_sync)
         {
-            return _entries.TryGetValue(provider, out entry!);
+            return _entries.TryGetValue(provider, out entry!) ||
+                   (string.Equals(provider, "copilot", StringComparison.OrdinalIgnoreCase) &&
+                    _entries.TryGetValue("github-copilot", out entry!));
         }
     }
 
@@ -185,23 +189,27 @@ public sealed class GatewayAuthManager
                 return;
             }
 
-            if (!File.Exists(_authFilePath))
+            _entries = new Dictionary<string, AuthEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var candidatePath in new[] { _legacyAuthFilePath, _authFilePath })
             {
-                _loaded = true;
-                return;
-            }
+                if (!File.Exists(candidatePath))
+                    continue;
 
-            try
-            {
-                var json = File.ReadAllText(_authFilePath);
-                var deserialized = JsonSerializer.Deserialize<Dictionary<string, AuthEntry>>(json, JsonOptions) ??
-                    new Dictionary<string, AuthEntry>();
-                _entries = new Dictionary<string, AuthEntry>(deserialized, StringComparer.OrdinalIgnoreCase);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to parse auth file '{AuthPath}'.", _authFilePath);
-                _entries = new Dictionary<string, AuthEntry>(StringComparer.OrdinalIgnoreCase);
+                try
+                {
+                    var json = File.ReadAllText(candidatePath);
+                    var deserialized = JsonSerializer.Deserialize<Dictionary<string, AuthEntry>>(json, JsonOptions) ??
+                        new Dictionary<string, AuthEntry>();
+
+                    foreach (var (key, value) in deserialized)
+                    {
+                        _entries[key] = value;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to parse auth file '{AuthPath}'.", candidatePath);
+                }
             }
 
             _loaded = true;

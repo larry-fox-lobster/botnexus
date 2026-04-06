@@ -2,9 +2,14 @@
 
 A modular, extensible AI agent execution platform built in C#/.NET. BotNexus enables running multiple AI agents concurrently, each powered by configurable LLM providers, receiving messages from multiple channels, and executing tools dynamically.
 
-## 📖 [Getting Started Guide →](docs/getting-started.md)
+## 📖 Getting Started
 
-New to BotNexus? The **Getting Started** guide walks you from clone → build → running with AI agents in minutes. If you're migrating from OpenClaw, it covers that too.
+| Guide | Audience |
+|-------|----------|
+| **[Getting Started →](docs/getting-started.md)** | First-time users — clone to running in minutes |
+| **[Developer Guide →](docs/dev-guide.md)** | Developers and agents — build, test, run locally |
+| **[API Reference →](docs/api-reference.md)** | REST and WebSocket endpoint documentation |
+| **[Architecture →](docs/architecture.md)** | System design, components, and extension points |
 
 ---
 
@@ -50,12 +55,17 @@ The **BotNexus Gateway** is the central hub for multi-agent orchestration. It pr
 dotnet build BotNexus.slnx
 
 # Run the Gateway (port 5005 by default)
-# Option 1: PowerShell dev script
+# Option 1: PowerShell dev script (build + test + run)
+.\scripts\dev-loop.ps1
+
+# Option 2: Start gateway only
 .\scripts\start-gateway.ps1
 
-# Option 2: Direct dotnet command
+# Option 3: Direct dotnet command
 dotnet run --project src/gateway/BotNexus.Gateway.Api
 ```
+
+Open `http://localhost:5005/webui` for the real-time chat dashboard. See the [Developer Guide](docs/dev-guide.md) for the full workflow.
 
 ### Configuration
 
@@ -79,7 +89,7 @@ Edit `~/.botnexus/config.json` to configure:
   },
   "providers": {
     "copilot": {
-      "apiKey": "copilot",
+      "apiKey": "auth:github-copilot",
       "baseUrl": "https://api.githubcopilot.com",
       "defaultModel": "gpt-4.1"
     }
@@ -249,13 +259,15 @@ See [Architecture Guide](docs/architecture.md#provider-architecture-pi-style) an
 
 
 - **[Getting Started](docs/getting-started.md)** ← Start here
-- [API Reference](docs/api-reference.md) — REST API endpoints (agents, sessions, system)
+- [Developer Guide](docs/dev-guide.md) — Build, test, and run locally
+- [API Reference](docs/api-reference.md) — REST and WebSocket endpoints
+- [Architecture Overview](docs/architecture.md) — System design and components
 - [Development Workflow](docs/development-workflow.md) — Build, test, and deploy with dev-loop script
-- [Architecture Overview](docs/architecture.md)
-- [Configuration Guide](docs/configuration.md)
-- [Extension Development](docs/extension-development.md)
-- [Workspace & Memory](docs/workspace-and-memory.md)
-- [Cron & Scheduling](docs/cron-and-scheduling.md)
+- [Configuration Guide](docs/configuration.md) — Complete configuration reference
+- [Extension Development](docs/extension-development.md) — Build custom providers, channels, and tools
+- [Workspace & Memory](docs/workspace-and-memory.md) — Agent workspace and memory system
+- [Cron & Scheduling](docs/cron-and-scheduling.md) — Scheduled tasks and heartbeats
+- [Skills Guide](docs/skills.md) — Modular knowledge packages for agents
 
 ## Project Structure
 

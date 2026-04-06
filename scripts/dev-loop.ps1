@@ -7,7 +7,13 @@ param(
     [int]$Port = 5005,
 
     [Parameter()]
-    [switch]$Watch
+    [switch]$Watch,
+
+    [Parameter()]
+    [switch]$SkipBuild,
+
+    [Parameter()]
+    [switch]$SkipTests
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,17 +27,28 @@ $gatewayUrl = "http://localhost:$Port"
 
 Push-Location $repoRoot
 try {
-    Write-Host "🔧 Building full solution..."
-    dotnet build $solutionPath --nologo --tl:off
-    if ($LASTEXITCODE -ne 0) {
-        throw "Solution build failed."
+    if ($SkipBuild) {
+        Write-Host "⏭️  Skipping solution build (-SkipBuild)."
+    }
+    else {
+        Write-Host "🔧 Building full solution..."
+        dotnet build $solutionPath --nologo --tl:off
+        if ($LASTEXITCODE -ne 0) {
+            throw "Solution build failed."
+        }
     }
 
-    Write-Host ""
-    Write-Host "🧪 Running Gateway tests..."
-    dotnet test $gatewayTestsPath --nologo --tl:off
-    if ($LASTEXITCODE -ne 0) {
-        throw "Gateway tests failed. Not starting Gateway."
+    if ($SkipTests) {
+        Write-Host ""
+        Write-Host "⏭️  Skipping Gateway tests (-SkipTests)."
+    }
+    else {
+        Write-Host ""
+        Write-Host "🧪 Running Gateway tests..."
+        dotnet test $gatewayTestsPath --nologo --tl:off
+        if ($LASTEXITCODE -ne 0) {
+            throw "Gateway tests failed. Not starting Gateway."
+        }
     }
 
     if ($Watch) {
@@ -44,9 +61,20 @@ try {
         dotnet watch --project $gatewayProject run --no-launch-profile
     }
     else {
-        & $startScript -Port $Port
+        & $startScript -Port $Port -SkipBuild
     }
+}
+catch {
+    Write-Error "❌ Dev loop failed: $($_.Exception.Message)"
+    exit 1
 }
 finally {
     Pop-Location
+}
+
+if (-not $Watch) {
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host ""
+        Write-Host "✅ Dev loop completed."
+    }
 }

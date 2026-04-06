@@ -9,6 +9,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
 {
     private readonly string _rootPath;
     private readonly string _authFilePath;
+    private readonly string _legacyAuthFilePath;
     private readonly Dictionary<string, string?> _originalEnvironmentVariables = new(StringComparer.Ordinal);
 
     public GatewayAuthManagerTests()
@@ -16,6 +17,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
         _rootPath = Path.Combine(Path.GetTempPath(), "botnexus-gateway-auth-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_rootPath);
         _authFilePath = Path.Combine(_rootPath, "auth.json");
+        _legacyAuthFilePath = Path.Combine(_rootPath, "legacy-auth.json");
     }
 
     [Fact]
@@ -38,6 +40,50 @@ public sealed class GatewayAuthManagerTests : IDisposable
         var apiKey = await manager.GetApiKeyAsync("openai");
 
         apiKey.Should().Be("auth-access-key");
+    }
+
+    [Fact]
+    public async Task GetApiKeyAsync_WhenCopilotUsesGithubCopilotEntry_ReturnsAccessToken()
+    {
+        await File.WriteAllTextAsync(_authFilePath, """
+                                             {
+                                               "github-copilot": {
+                                                 "type": "oauth",
+                                                 "refresh": "unused",
+                                                 "access": "copilot-access-key",
+                                                 "expires": 4102444800000,
+                                                 "endpoint": "https://api.enterprise.githubcopilot.com"
+                                               }
+                                             }
+                                             """);
+
+        var manager = CreateManager(new PlatformConfig());
+
+        var apiKey = await manager.GetApiKeyAsync("copilot");
+
+        apiKey.Should().Be("copilot-access-key");
+    }
+
+    [Fact]
+    public async Task GetApiKeyAsync_WhenHomeAuthMissing_UsesLegacyRepoAuthFile()
+    {
+        await File.WriteAllTextAsync(_legacyAuthFilePath, """
+                                                   {
+                                                     "openai": {
+                                                       "type": "token",
+                                                       "refresh": "unused",
+                                                       "access": "legacy-auth-access-key",
+                                                       "expires": 4102444800000,
+                                                       "endpoint": "https://api.openai.test"
+                                                     }
+                                                   }
+                                                   """);
+
+        var manager = CreateManager(new PlatformConfig(), usePrimaryAuthPath: false);
+
+        var apiKey = await manager.GetApiKeyAsync("openai");
+
+        apiKey.Should().Be("legacy-auth-access-key");
     }
 
     [Fact]
@@ -172,12 +218,15 @@ public sealed class GatewayAuthManagerTests : IDisposable
             Directory.Delete(_rootPath, recursive: true);
     }
 
-    private GatewayAuthManager CreateManager(PlatformConfig platformConfig)
+    private GatewayAuthManager CreateManager(PlatformConfig platformConfig, bool usePrimaryAuthPath = true)
     {
         var manager = new GatewayAuthManager(platformConfig, NullLogger<GatewayAuthManager>.Instance);
         var authPathField = typeof(GatewayAuthManager).GetField("_authFilePath", BindingFlags.NonPublic | BindingFlags.Instance);
+        var legacyAuthPathField = typeof(GatewayAuthManager).GetField("_legacyAuthFilePath", BindingFlags.NonPublic | BindingFlags.Instance);
         authPathField.Should().NotBeNull();
-        authPathField!.SetValue(manager, _authFilePath);
+        legacyAuthPathField.Should().NotBeNull();
+        authPathField!.SetValue(manager, usePrimaryAuthPath ? _authFilePath : Path.Combine(_rootPath, "missing-auth.json"));
+        legacyAuthPathField!.SetValue(manager, _legacyAuthFilePath);
         return manager;
     }
 

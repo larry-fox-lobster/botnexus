@@ -259,7 +259,8 @@ Controls how the Gateway authenticates with upstream LLM providers (Copilot, Ope
 
 #### Resolution Order
 
-1. **auth.json** — `~/.botnexus/auth.json` (OAuth tokens, enterprise endpoints)
+1. **auth.json** — `~/.botnexus/auth.json` (OAuth tokens, enterprise endpoints).  
+   For local repo-driven development, `./.botnexus-agent/auth.json` is also accepted as a fallback.
 2. **Environment Variables** — `BOTNEXUS_COPILOT_APIKEY`, `BOTNEXUS_OPENAI_APIKEY`, etc.
 3. **Platform Config** — `config.json` provider section (`apiKey` field)
 
@@ -268,7 +269,7 @@ Controls how the Gateway authenticates with upstream LLM providers (Copilot, Ope
 Store in `~/.botnexus/auth.json`:
 ```json
 {
-  "copilot": {
+  "github-copilot": {
     "type": "oauth",
     "access": "ghu_...",
     "refresh": "ghr_...",
@@ -283,7 +284,7 @@ Then in `config.json`:
 {
   "providers": {
     "copilot": {
-      "apiKey": "auth:copilot",  // Reference to auth.json entry
+      "apiKey": "auth:github-copilot",  // Reference to auth.json entry
       "baseUrl": "https://api.githubcopilot.com"
     }
   }
@@ -908,6 +909,7 @@ src/gateway/
 
 ## Further Reading
 
+- [Developer Guide](../../docs/dev-guide.md) — Local development setup and workflow
 - [BotNexus Architecture Overview](../../docs/architecture.md)
 - [Configuration Guide](../../docs/configuration.md)
 - [Extension Development](../../docs/extension-development.md)

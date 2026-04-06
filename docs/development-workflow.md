@@ -27,6 +27,9 @@ The `scripts/dev-loop.ps1` script automates build + test + Gateway startup for r
 
 # Watch source changes and restart gateway automatically
 .\scripts\dev-loop.ps1 -Watch
+
+# Fast loop for iterative agent/human checks (skip rebuild/test when already done)
+.\scripts\dev-loop.ps1 -SkipBuild -SkipTests
 ```
 
 ### What It Does
@@ -178,7 +181,7 @@ Or specify a custom path:
 .\scripts\dev-loop.ps1
 
 # Then in another terminal, open WebUI
-start http://localhost:18790
+start http://localhost:5005/webui
 ```
 
 ### Add a New Agent
@@ -261,14 +264,14 @@ botnexus config init
 
 ### Port Already in Use
 
-If port 18790 is already in use:
+If port 5005 is already in use:
 
 ```powershell
-# Find process using port 18790
-netstat -ano | findstr :18790
+# Find process using port 5005
+netstat -ano | findstr :5005
 
-# Kill the process
-taskkill /PID <PID> /F
+# Stop by PID
+Stop-Process -Id <PID>
 
 # Or use a different port in config.json
 ```

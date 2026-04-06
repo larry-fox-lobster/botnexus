@@ -32,6 +32,19 @@ static async Task<int> ValidateLocalAsync(bool verbose, CancellationToken cancel
     Console.WriteLine($"BotNexus config validation (local)");
     Console.WriteLine($"Config path: {configPath}");
 
+    if (!File.Exists(configPath))
+    {
+        PrintResult(
+            valid: false,
+            warnings: [],
+            errors:
+            [
+                $"Config file not found at '{configPath}'.",
+                "Create ~/.botnexus/config.json (or set BOTNEXUS_HOME) and retry."
+            ]);
+        return 1;
+    }
+
     PlatformConfig config;
     try
     {
