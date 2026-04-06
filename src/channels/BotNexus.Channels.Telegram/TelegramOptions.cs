@@ -24,4 +24,19 @@ public sealed class TelegramOptions
     /// Gets the allow-list of Telegram chat IDs that can interact with this bot.
     /// </summary>
     public ICollection<long> AllowedChatIds { get; } = [];
+
+    /// <summary>
+    /// Gets or sets the long polling timeout, in seconds, for <c>getUpdates</c>.
+    /// </summary>
+    public int PollingTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Gets or sets the flush interval, in milliseconds, for buffered streaming deltas.
+    /// </summary>
+    public int StreamingBufferMs { get; set; } = 500;
+
+    /// <summary>
+    /// Gets or sets the maximum Telegram message length before payload splitting.
+    /// </summary>
+    public int MaxMessageLength { get; set; } = 4096;
 }
