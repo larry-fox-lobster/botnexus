@@ -11,6 +11,50 @@
 
 ---
 
+## 2026-04-06T08:20:00Z — Phase 11 Wave 3 Consistency Review (12 P1 fixes)
+
+**Timestamp:** 2026-04-06T08:20:00Z  
+**Wave:** 3 of Phase 11 — Reviews + Tests  
+**Status:** ✅ Complete  
+**Grade: Good**
+
+**Scope:** Post-wave consistency audit of Phase 11 implementations (code ↔ docs, docs ↔ docs, README ↔ implementation).
+
+**12 P1 Fixes Applied:**
+1. **CLI README** — Corrected inverted --enabled default claim (said "off by default", actually true by default)
+2. **Gateway README** — Removed false claim about GatewayHostBuilder on IHostBuilder (actual: AddBotNexusGateway on IServiceCollection)
+3. **Gateway README** — Removed false claim about ReaderWriterLockSlim (actual: C# 13 Lock type used)
+4. **Gateway.Api README** — Fixed WS activity path documentation (/api/activity → /ws/activity)
+5. **Gateway.Api README** — Removed documentation of non-existent query param auth
+6. **cli-reference.md** — Updated stale provider default ("github-copilot" → "copilot", matching Phase 10 code fix)
+7. **Telegram README** — Removed stale "Stub" label, updated to reflect full Bot API implementation
+8. **Telegram README** — Added TelegramBotApiClient documentation
+9. **sample-config.json** — Added missing extensions section
+10. **config.example.json** — Added missing extensions section
+11. **configuration.md** — Added JSON schema validation documentation
+12. **All new module READMEs** — Cross-validated 6 new README files (Gateway, Gateway.Api, CLI modules) for accuracy
+
+**5 P2s Identified (Phase 12 backlog):**
+1. **extension-development.md** — References completely fictional IExtensionRegistrar interface — needs full rewrite
+2. **Config file automation gap** — Manual drift detection insufficient, need CI sweep check
+3. **Protocol field additions** — Still bypass README updates (tool_end toolName/toolIsError pattern repeating)
+4. **Cross-document updates** — Require stronger automation (features ship but docs lag 1-2 phases)
+5. **Test helper duplication** — 3 files share ToAsyncEnumerable/RecordingActivityBroadcaster (acceptable for Phase 11, extract at 15+ tests)
+
+**Quality Metrics:**
+- **Code-level consistency:** 0 issues (excellent engineering discipline)
+- **Documentation consistency:** 12 P1s fixed, 5 P2s noted
+- **XML doc coverage:** 100% across 22 new public interfaces + 9+ classes
+- **Overall consistency:** Good (maintained from Phase 10)
+
+**Key Learning:**
+Pattern reinforced: Code quality excellent, documentation updates require separate pass. Config example files silently drift because never compiled/validated. Recommend Phase 12 CI enhancement: JSON schema validation gate for config files.
+
+**Commit:** b5188bc  
+**Orchestration Log:** `.squad/orchestration-log/2026-04-06T08-20-00Z-Nibbler.md`
+
+---
+
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->

@@ -1702,6 +1702,40 @@ Participated in design review ceremony for Phase 3 architecture. All ADs approve
 
 - **The audit ceremony pipeline is proven.** Three phases, same structure each time: audit → design review → AD decisions → parallel sprint → consistency review → retro. The pipeline is repeatable and produces consistent results. 43 commits, 17 ADs, 415 tests across all three phases. This is the model for future feature work, not just audits.
 
+## 2026-04-06T08:20:00Z — Phase 11 Wave 3 Design Review (Architecture validation)
+
+**Timestamp:** 2026-04-06T08:20:00Z  
+**Wave:** 3 of Phase 11 — Reviews + Tests  
+**Status:** ✅ Complete  
+**Grade: A-**
+
+**Scope:** Comprehensive architecture review of Phase 11 implementations (CLI decomposition, extension security, Telegram streaming).
+
+**Reviewed:**
+1. **CLI command handler decomposition** — Bender's refactor of Program.cs into handler classes. Clean separation, no SRP violations, error propagation clear.
+2. **Extension security model** — Dynamic loader + namespace isolation + registry validation. Threat model sound, no escape paths identified.
+3. **Telegram streaming implementation** — TelegramBotApiClient (polling-based, rate-limit aware). Message ordering preserved, pagination tokens validated.
+
+**Findings:**
+- P0: None.
+- P1 (6 items, documentation-only): Config examples missing extensions section, CLI README --enabled default inverted, Gateway README GatewayHostBuilder claim, Telegram README stale "Stub" label, api-reference.md endpoint mismatch, cli-reference.md provider naming drift.
+- P2 (5 items, noted for Phase 12): extension-development.md needs rewrite (references fictional IExtensionRegistrar), config drift automation gap, protocol field additions bypass docs, test helper duplication acceptable for Phase 11.
+
+**Quality Metrics:**
+| Area | Grade |
+|------|-------|
+| SOLID Compliance | A |
+| Extension Model | A |
+| API Design | A- |
+| Thread Safety | A |
+| Test Quality | A- |
+| Documentation | A- |
+
+**Decision:** Architecture APPROVED for merge. All P1s documentation-only and handled by Nibbler wave. Design patterns solid foundation for Phase 12.
+
+**Commit:** f866313  
+**Orchestration Log:** `.squad/orchestration-log/2026-04-06T08-20-00Z-Leela.md`
+
 - **YAGNI discipline prevents speculative code.** AD-13 (OpenRouter routing types) was correctly deferred. The team resisted the temptation to build types for a provider that doesn't exist. This saved a commit, avoided dead code, and kept the architecture honest.
 
 - **Test growth tracks feature growth.** 43 new tests in Phase 3 (372 → 415). Tests were written alongside features, not backfilled. This pattern — enforced by the build-before-commit rule — keeps the test suite meaningful rather than ceremonial.
