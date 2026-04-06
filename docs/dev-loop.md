@@ -103,6 +103,7 @@ Tests use an isolated `BOTNEXUS_HOME` so they don't touch your real `~/.botnexus
 | `tests/BotNexus.AgentCore.Tests` | Agent core logic, tool execution |
 | `tests/BotNexus.CodingAgent.Tests` | Coding agent behaviors |
 | `tests/BotNexus.Providers.Core.Tests` | Provider core abstractions |
+| `tests/BotNexus.Providers.Conformance.Tests` | Provider contract conformance across implementations |
 | `tests/BotNexus.Providers.Copilot.Tests` | Copilot provider specifics |
 | `tests/BotNexus.Providers.OpenAI.Tests` | OpenAI provider |
 | `tests/BotNexus.Providers.Anthropic.Tests` | Anthropic provider |
