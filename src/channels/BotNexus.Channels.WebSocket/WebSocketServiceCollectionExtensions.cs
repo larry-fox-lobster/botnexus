@@ -10,7 +10,7 @@ public static class WebSocketServiceCollectionExtensions
     {
         services.TryAddSingleton<WebSocketChannelAdapter>();
         services.TryAddSingleton<IGatewayWebSocketChannelAdapter>(provider => provider.GetRequiredService<WebSocketChannelAdapter>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IChannelAdapter, WebSocketChannelAdapter>());
+        services.AddSingleton<IChannelAdapter>(provider => provider.GetRequiredService<WebSocketChannelAdapter>());
 
         return services;
     }
