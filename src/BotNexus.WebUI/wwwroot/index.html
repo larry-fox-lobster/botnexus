@@ -8,6 +8,10 @@
 </head>
 <body>
     <div id="app">
+        <!-- Mobile sidebar toggle -->
+        <button id="btn-sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="true">☰</button>
+        <div id="sidebar-overlay" class="sidebar-overlay hidden" aria-hidden="true"></div>
+
         <!-- Sidebar -->
         <aside id="sidebar">
             <div class="sidebar-header">
@@ -124,6 +128,7 @@
                 </div>
                 <div id="chat-messages" class="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
                 </div>
+                <button id="btn-scroll-bottom" class="scroll-to-bottom hidden" aria-label="Scroll to bottom" title="Scroll to bottom">↓</button>
                 <div class="chat-input-area">
                     <div id="queue-status" class="queue-status hidden" aria-live="polite">
                         <span class="queue-icon" aria-hidden="true">📨</span>
@@ -132,9 +137,13 @@
                     <div class="input-row">
                         <label for="chat-input" class="sr-only">Type a message</label>
                         <textarea id="chat-input" placeholder="Type a message... (Enter to send, Shift+Enter for newline)" rows="1" aria-label="Chat message input"></textarea>
-                        <button id="btn-send" class="btn btn-primary" disabled aria-label="Send message">Send</button>
+                        <div class="send-group">
+                            <button id="btn-send" class="btn btn-primary" disabled aria-label="Send message">Send</button>
+                            <button id="btn-send-mode" class="btn-send-mode hidden" aria-label="Toggle send mode" title="Switch between Steer and Follow-up">▾</button>
+                        </div>
                     </div>
                     <div id="steer-indicator" class="steer-indicator hidden" aria-live="polite">Steering...</div>
+                    <div id="followup-indicator" class="followup-indicator hidden" aria-live="polite">Follow-up queued</div>
                 </div>
             </div>
         </main>

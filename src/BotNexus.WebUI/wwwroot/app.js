@@ -51,6 +51,12 @@
     let messageQueueCount = 0;
     /** @type {number} */
     let toolCallDepth = 0;
+    /** @type {boolean} */
+    let sendModeFollowUp = false;
+    /** @type {WebSocket|null} */
+    let activityWs = null;
+    let activityReconnectTimer = null;
+    let userScrolledUp = false;
 
     // --- DOM refs ---
     const $ = (sel) => document.querySelector(sel);
@@ -90,6 +96,12 @@
     const elActivityItems = $('#activity-items');
     const elActivityFilterAgent = $('#activity-filter-agent');
     const elActivityFilterType = $('#activity-filter-type');
+    const elScrollBottom = $('#btn-scroll-bottom');
+    const elSidebarToggle = $('#btn-sidebar-toggle');
+    const elSidebarOverlay = $('#sidebar-overlay');
+    const elSidebar = $('#sidebar');
+    const elBtnSendMode = $('#btn-send-mode');
+    const elFollowUpIndicator = $('#followup-indicator');
 
     // =========================================================================
     // Markdown rendering
@@ -145,8 +157,19 @@
         } catch { return ''; }
     }
 
-    function scrollToBottom() {
-        requestAnimationFrame(() => { elChatMessages.scrollTop = elChatMessages.scrollHeight; });
+    function scrollToBottom(force) {
+        if (force || !userScrolledUp) {
+            requestAnimationFrame(() => { elChatMessages.scrollTop = elChatMessages.scrollHeight; });
+        }
+        updateScrollButton();
+    }
+
+    function updateScrollButton() {
+        if (!elScrollBottom) return;
+        const threshold = 80;
+        const atBottom = elChatMessages.scrollHeight - elChatMessages.scrollTop - elChatMessages.clientHeight < threshold;
+        userScrolledUp = !atBottom;
+        elScrollBottom.classList.toggle('hidden', atBottom);
     }
 
     function autoResize(el) {
@@ -185,6 +208,11 @@
         }, 1500);
     }
 
+    function showFollowUpIndicator() {
+        elFollowUpIndicator.classList.remove('hidden');
+        setTimeout(() => { elFollowUpIndicator.classList.add('hidden'); }, 1500);
+    }
+
     function updateSendButtonState() {
         const hasText = !!elChatInput.value.trim();
         if (isRestRequestInFlight) {
@@ -193,15 +221,27 @@
         }
         if (isStreaming && ws && ws.readyState === WebSocket.OPEN) {
             elBtnSend.disabled = !hasText;
-            elBtnSend.textContent = '🧭 Steer';
-            elBtnSend.classList.add('btn-steer');
-            elChatInput.placeholder = 'Steer the agent... (Enter to send)';
+            if (sendModeFollowUp) {
+                elBtnSend.textContent = '📨 Follow-up';
+                elBtnSend.classList.remove('btn-steer');
+                elBtnSend.classList.add('btn-followup');
+                elChatInput.placeholder = 'Queue a follow-up message...';
+            } else {
+                elBtnSend.textContent = '🧭 Steer';
+                elBtnSend.classList.add('btn-steer');
+                elBtnSend.classList.remove('btn-followup');
+                elChatInput.placeholder = 'Steer the agent... (Enter to send)';
+            }
+            elBtnSendMode.classList.remove('hidden');
+            elBtnSendMode.classList.toggle('followup-mode', sendModeFollowUp);
             return;
         }
-        elBtnSend.classList.remove('btn-steer');
+        elBtnSend.classList.remove('btn-steer', 'btn-followup');
         elBtnSend.textContent = 'Send';
         elChatInput.placeholder = 'Type a message... (Enter to send, Shift+Enter for newline)';
         elBtnSend.disabled = !hasText || !elChatView || elChatView.classList.contains('hidden');
+        elBtnSendMode.classList.add('hidden');
+        sendModeFollowUp = false;
     }
 
     function setSendingState(isSending) {
@@ -274,7 +314,6 @@
             const wasReconnect = reconnectAttempts > 0;
             reconnectAttempts = 0;
             startPing();
-            if (isActivitySubscribed) sendWs({ type: 'subscribe' });
             if (wasReconnect) {
                 reloadCurrentSessionHistory().then((msgCount) => {
                     const countStr = msgCount > 0 ? ` Loaded ${msgCount} previous messages.` : '';
@@ -422,6 +461,9 @@
             case 'activity':
                 handleActivityEvent(msg);
                 break;
+            case 'history':
+                handleHistoryMessage(msg);
+                break;
             case 'pong':
                 break;
         }
@@ -488,6 +530,19 @@
                 thinkingEl.querySelector('.thinking-chevron').textContent = '▸';
             }
         }
+    }
+
+    // =========================================================================
+    // History message from WebSocket
+    // =========================================================================
+
+    function handleHistoryMessage(msg) {
+        if (!msg.entries || !Array.isArray(msg.entries)) return;
+        elChatMessages.innerHTML = '';
+        for (const entry of msg.entries) renderHistoryEntry(entry);
+        const msgCount = msg.entries.length;
+        elChatMeta.textContent = `Agent: ${currentAgentId || 'unknown'} · ${msgCount} messages`;
+        scrollToBottom(true);
     }
 
     // =========================================================================
@@ -709,7 +764,9 @@
             streaming.classList.remove('message-streaming');
             const deltaEl = streaming.querySelector('.delta-content');
             if (deltaEl) {
-                deltaEl.innerHTML = renderMarkdown(deltaEl.textContent);
+                const rawText = deltaEl.textContent;
+                streaming.dataset.rawContent = rawText;
+                deltaEl.innerHTML = renderMarkdown(rawText);
             }
             const timeEl = streaming.querySelector('.msg-time');
             if (timeEl) timeEl.textContent = formatTime(new Date().toISOString());
@@ -777,9 +834,11 @@
             <div class="msg-header">
                 <span class="msg-role">${escapeHtml(role.toUpperCase())}</span>
                 <span class="msg-time">${now}</span>
+                <button class="btn-copy-msg" title="Copy message" aria-label="Copy message">📋</button>
             </div>
             <div class="msg-content">${contentHtml}</div>
         `;
+        div.dataset.rawContent = content;
         elChatMessages.appendChild(div);
         scrollToBottom();
     }
@@ -817,6 +876,7 @@
                 <div class="msg-header">
                     <span class="msg-role">ASSISTANT</span>
                     <span class="msg-time">streaming...</span>
+                    <button class="btn-copy-msg" title="Copy message" aria-label="Copy message">📋</button>
                 </div>
                 <div class="msg-content"><span class="delta-content"></span></div>
             `;
@@ -917,10 +977,18 @@
         updateSendButtonState();
 
         if (isStreaming && ws && ws.readyState === WebSocket.OPEN) {
-            sendWs({ type: 'steer', content: text });
-            showSteerIndicator();
-            appendSystemMessage(`🧭 Steering: ${text}`);
-            trackActivity('message', currentAgentId, `Steer: ${text.substring(0, 60)}`);
+            if (sendModeFollowUp) {
+                sendWs({ type: 'follow_up', content: text });
+                showFollowUpIndicator();
+                appendSystemMessage(`📨 Follow-up queued: ${text}`);
+                trackActivity('message', currentAgentId, `Follow-up: ${text.substring(0, 60)}`);
+                incrementQueue();
+            } else {
+                sendWs({ type: 'steer', content: text });
+                showSteerIndicator();
+                appendSystemMessage(`🧭 Steering: ${text}`);
+                trackActivity('message', currentAgentId, `Steer: ${text.substring(0, 60)}`);
+            }
             return;
         }
 
@@ -1294,10 +1362,17 @@
         let cssClass = 'activity-item';
         const eventType = evt.eventType || evt.event || 'unknown';
         let filterType = '';
-        if (eventType.includes('Error') || eventType === 'error') { cssClass += ' error'; filterType = 'error'; }
-        else if (eventType.includes('Response') || eventType.includes('Sent')) { cssClass += ' response-sent'; filterType = 'response'; }
-        else if (eventType.includes('Tool')) { cssClass += ' msg-received'; filterType = 'tool'; }
-        else if (eventType.includes('Message') || eventType.includes('Received')) { cssClass += ' msg-received'; filterType = 'message'; }
+        let badgeClass = 'system';
+        let icon = '📌';
+        if (eventType.includes('Error') || eventType === 'error') {
+            cssClass += ' error'; filterType = 'error'; badgeClass = 'error'; icon = '❌';
+        } else if (eventType.includes('Response') || eventType.includes('Sent')) {
+            cssClass += ' response-sent'; filterType = 'response'; badgeClass = 'response'; icon = '✅';
+        } else if (eventType.includes('Tool')) {
+            cssClass += ' msg-received'; filterType = 'tool'; badgeClass = 'tool'; icon = '🔧';
+        } else if (eventType.includes('Message') || eventType.includes('Received')) {
+            cssClass += ' msg-received'; filterType = 'message'; badgeClass = 'message'; icon = '💬';
+        }
         el.className = cssClass;
         el.dataset.agent = evt.agentId || evt.agent || '';
         el.dataset.eventCategory = filterType;
@@ -1308,7 +1383,8 @@
         el.innerHTML = `
             <span class="activity-time">${time}</span>
             ${channel ? `<span class="activity-channel">[${escapeHtml(channel)}]</span>` : ''}
-            <strong>${escapeHtml(eventType)}</strong>${preview ? ': ' + escapeHtml(preview) : ''}${(evt.content || evt.message || '').length > 80 ? '...' : ''}
+            <span class="activity-type-badge ${badgeClass}">${icon} ${escapeHtml(eventType)}</span>
+            ${preview ? escapeHtml(preview) : ''}${(evt.content || evt.message || '').length > 80 ? '...' : ''}
         `;
         elActivityItems.insertBefore(el, elActivityItems.firstChild);
         while (elActivityItems.children.length > MAX_ACTIVITY_ITEMS) {
@@ -1377,11 +1453,51 @@
     function toggleActivity() {
         isActivitySubscribed = elToggleActivity.checked;
         if (isActivitySubscribed) {
-            sendWs({ type: 'subscribe' });
+            connectActivityWs();
             elActivityFeed.classList.remove('collapsed');
         } else {
+            disconnectActivityWs();
             elActivityFeed.classList.add('collapsed');
         }
+    }
+
+    // =========================================================================
+    // Activity WebSocket (separate connection)
+    // =========================================================================
+
+    function connectActivityWs() {
+        if (activityWs && (activityWs.readyState === WebSocket.OPEN || activityWs.readyState === WebSocket.CONNECTING)) return;
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const url = `${proto}//${location.host}/ws/activity`;
+        activityWs = new WebSocket(url);
+
+        activityWs.onopen = () => {
+            console.log('Activity WebSocket connected');
+        };
+
+        activityWs.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'activity' || msg.eventType) {
+                    handleActivityEvent(msg);
+                }
+            } catch (e) {
+                console.error('Activity WS parse error:', e);
+            }
+        };
+
+        activityWs.onclose = () => {
+            if (isActivitySubscribed) {
+                activityReconnectTimer = setTimeout(connectActivityWs, 5000);
+            }
+        };
+
+        activityWs.onerror = () => {};
+    }
+
+    function disconnectActivityWs() {
+        if (activityReconnectTimer) { clearTimeout(activityReconnectTimer); activityReconnectTimer = null; }
+        if (activityWs) { activityWs.onclose = null; activityWs.close(); activityWs = null; }
     }
 
     // =========================================================================
@@ -1443,6 +1559,14 @@
 
         // Delegated click handlers for dynamic chat content
         elChatMessages.addEventListener('click', (e) => {
+            // Copy message button
+            const copyBtn = e.target.closest('.btn-copy-msg');
+            if (copyBtn) {
+                const msgEl = copyBtn.closest('.message');
+                if (msgEl) copyMessageContent(msgEl, copyBtn);
+                return;
+            }
+
             const toggle = e.target.closest('.thinking-toggle');
             if (toggle) {
                 const block = toggle.closest('.thinking-block');
@@ -1458,11 +1582,14 @@
 
             const toolCall = e.target.closest('.tool-call');
             if (toolCall) {
-                // Toggle inline inspector on click
                 toolCall.classList.toggle('expanded');
                 return;
             }
         });
+
+        // Scroll-to-bottom button
+        elScrollBottom.addEventListener('click', () => scrollToBottom(true));
+        elChatMessages.addEventListener('scroll', updateScrollButton);
 
         // Reconnect button
         elBtnReconnect.addEventListener('click', manualReconnect);
@@ -1493,14 +1620,66 @@
         $('#btn-confirm-cancel').addEventListener('click', closeConfirm);
         elConfirmDialog.querySelector('.confirm-overlay').addEventListener('click', closeConfirm);
 
-        // Global escape
+        // Send mode toggle (steer vs follow-up)
+        elBtnSendMode.addEventListener('click', () => {
+            sendModeFollowUp = !sendModeFollowUp;
+            updateSendButtonState();
+        });
+
+        // Mobile sidebar toggle
+        elSidebarToggle.addEventListener('click', toggleSidebar);
+        elSidebarOverlay.addEventListener('click', closeSidebar);
+
+        // Global keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                if (!elToolModal.classList.contains('hidden')) closeToolModal();
-                else if (!elAgentFormModal.classList.contains('hidden')) closeAgentForm();
-                else if (!elConfirmDialog.classList.contains('hidden')) closeConfirm();
+                // Escape to abort if streaming and no modals open
+                if (!elToolModal.classList.contains('hidden')) { closeToolModal(); return; }
+                if (!elAgentFormModal.classList.contains('hidden')) { closeAgentForm(); return; }
+                if (!elConfirmDialog.classList.contains('hidden')) { closeConfirm(); return; }
+                if (isStreaming) { abortRequest(); return; }
             }
         });
+    }
+
+    // =========================================================================
+    // Copy message content
+    // =========================================================================
+
+    function copyMessageContent(msgEl, btn) {
+        const raw = msgEl.dataset.rawContent;
+        const text = raw || msgEl.querySelector('.msg-content')?.textContent || '';
+        navigator.clipboard.writeText(text).then(() => {
+            btn.textContent = '✅';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copied'); }, 1200);
+        }).catch(() => {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;opacity:0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            btn.textContent = '✅';
+            setTimeout(() => { btn.textContent = '📋'; }, 1200);
+        });
+    }
+
+    // =========================================================================
+    // Mobile sidebar
+    // =========================================================================
+
+    function toggleSidebar() {
+        const isCollapsed = elSidebar.classList.toggle('collapsed');
+        elSidebarOverlay.classList.toggle('hidden', isCollapsed);
+        elSidebarToggle.setAttribute('aria-expanded', !isCollapsed);
+    }
+
+    function closeSidebar() {
+        elSidebar.classList.add('collapsed');
+        elSidebarOverlay.classList.add('hidden');
+        elSidebarToggle.setAttribute('aria-expanded', 'false');
     }
 
     // =========================================================================
@@ -1515,6 +1694,11 @@
         loadAgents();
         setStatus('disconnected');
         updateSendButtonState();
+        // Collapse sidebar on mobile by default
+        if (window.innerWidth <= 768) {
+            elSidebar.classList.add('collapsed');
+            elSidebarOverlay.classList.add('hidden');
+        }
     }
 
     if (document.readyState === 'loading') {

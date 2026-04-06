@@ -5,6 +5,36 @@
 - **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI), Session, Tools.GitHub, WebUI
 - **Created:** 2026-04-01
 
+## Learnings
+
+### WebUI Production Enhancement Sprint
+
+**Timestamp:** 2026-04-06
+**Status:** ✅ Complete
+**Scope:** 8 feature areas enhanced across index.html, styles.css, app.js
+
+**Deliverables:**
+1. **Follow-Up Message Queuing** — Steer/Follow-up mode toggle during streaming, sends `follow_up` or `steer` WebSocket messages, visual indicators for both modes
+2. **Copy Message Button** — Clipboard copy on every message (user + assistant), with fallback for older browsers, stores raw content for accurate markdown copy
+3. **Scroll-to-Bottom Button** — Floating ↓ button appears when user scrolls up, smart auto-scroll respects user scroll position, disappears at bottom
+4. **History WebSocket Handler** — Handles `history` message type from server, replays full session history on reconnect
+5. **Separate Activity WebSocket** — Dedicated connection to `ws://host/ws/activity` endpoint with independent reconnection, event type badges with icons (💬/✅/🔧/❌)
+6. **Escape-to-Abort** — Escape key aborts streaming when no modals are open, modal close priority maintained
+7. **Mobile Responsive Sidebar** — Hamburger toggle, overlay backdrop, sidebar collapse/expand with CSS transform animation, auto-collapse on mobile viewports
+8. **Visual Polish** — Follow-up/steer CSS variants, send-mode dropdown toggle, improved responsive breakpoints, activity type badges
+
+**Files Changed:** 3 files (index.html, app.js, styles.css)
+**No backend changes** — pure frontend, no files touched outside wwwroot/
+
+**Key Design Decisions:**
+- Separate activity WebSocket rather than multiplexing over main connection (cleaner separation of concerns)
+- Steer vs Follow-up as toggle on send button during streaming (discoverable but unobtrusive)
+- Smart scroll: auto-scroll only when user is near bottom, manual button when scrolled up
+- Copy stores raw markdown content in dataset attribute for accurate clipboard copy
+- Mobile sidebar uses CSS transform for smooth 60fps animation
+
+---
+
 ## 2026-04-03T17:45:00Z — System Messages Sprint (Team Sync)
 
 ### WebUI Enhancements Sprint — P1 Features
