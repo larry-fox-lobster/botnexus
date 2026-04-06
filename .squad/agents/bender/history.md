@@ -845,3 +845,10 @@ Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
 - `src\gateway\BotNexus.Gateway.Abstractions\Agents\IAgentCommunicator.cs` now documents local-first cross-agent behavior (remote endpoint still unsupported), including updated exception contracts.
 - `src\channels\BotNexus.Channels.Tui\TuiChannelAdapter.cs` now implements `IStreamEventChannelAdapter` and renders thinking/tool/error events so `SupportsThinkingDisplay`/`SupportsToolDisplay` behavior matches runtime output.
 - `src\channels\BotNexus.Channels.Telegram\TelegramChannelAdapter.cs` now explicitly declares steering/follow-up unsupported capability flags; `tests\BotNexus.Gateway.Tests\ChannelCapabilityTests.cs` and `DefaultAgentCommunicatorTests.cs` were updated to lock these contracts.
+
+### 2026-04-06 — Sprint 7A session reconnect + queueing runtime controls
+- `GatewayWebSocketHandler` now uses `IGatewayWebSocketChannelAdapter` + `ISessionStore`, sequences every outbound frame with `sequenceId`, records replay payloads in session state, and supports `{"type":"reconnect","sessionKey":"...","lastSeqId":N}` with bounded replay (`GatewayWebSocketOptions.ReplayWindowSize`, default 1000).
+- `GatewaySession` now persists WebSocket replay state (`NextSequenceId`, `StreamEventLog`) with helper APIs (`AllocateSequenceId`, `AddStreamEvent`, `GetStreamEventsAfter`), and `FileSessionStore` now round-trips that state through `.meta.json`.
+- `SessionsController` now exposes `PATCH /api/sessions/{id}/suspend` and `PATCH /api/sessions/{id}/resume` with 404/409 semantics; `GatewayHost` rejects non-active sessions before prompt execution.
+- `GatewayHost` now runs per-session bounded queues (`System.Threading.Channels`) with busy backpressure responses and tracked worker lifecycle on shutdown; control metadata `control=steer` routes to `IAgentHandle.SteerAsync` instead of normal prompt flow.
+- `TuiChannelAdapter` now advertises `SupportsSteering = true`, parses `/steer <message>`, dispatches steer control metadata, and prints steering acknowledgment in console output.
