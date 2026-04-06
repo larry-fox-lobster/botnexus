@@ -1993,3 +1993,40 @@ Phase 9 delivered 8 commits across 6 agents: IHttpClientFactory migration, WebUI
 4. **SRP extraction with façade preservation is the right refactoring pattern** — SessionReplayBuffer was extracted while keeping GatewaySession's public API intact. This avoids cascading changes in callers. The façade methods can be deprecated later when direct buffer access is adopted.
 5. **CORS middleware order matters** — `UseCors` must come before auth middleware so OPTIONS preflight requests are handled without credentials. The Phase 9 implementation gets this right.
 6. **Silent input reconciliation hides bugs** — The PUT endpoint quietly overrides mismatched AgentIds. Prefer strict validation (return 400) over silent fixup — callers should know when their request is malformed.
+
+## 2026-04-06T05:46:00Z — Phase 10 Design Review (Lead)
+
+**Timestamp:** 2026-04-06T05:46:00Z  
+**Status:** ✅ Complete  
+**Requested by:** Jon Bullen (via Copilot)  
+**Scope:** Architectural review of Phase 10 (6 commits, 3 agents)
+
+**Context:**
+Phase 10 delivered 6 commits across 3 agents: PUT AgentId validation fix, CORS verb restriction, WebSocket handler SRP decomposition, CLI parity commands (init, agent, config), and deployment validation test harness.
+
+**Grade: A-**
+
+| Area | Grade |
+|------|-------|
+| SOLID Compliance | A |
+| Architecture Alignment | A |
+| API Design | A |
+| Security | A- |
+| Test Quality | A- |
+
+**Key Findings:**
+- P0: None.
+- P1: CLI Program.cs is 850+ lines of monolithic top-level statements — needs decomposition into command handler classes. CLI config get/set reflection has no test coverage.
+- P2: SequenceAndPersistPayloadAsync double-serialization persists (carried). Dispatcher takes concrete WebSocketConnectionManager. CORS missing PATCH. Deployment test env var locking scope limited.
+- Phase 9 P1s resolved: AgentId validation ✅, CORS verb restriction ✅, WebSocket handler decomposition ✅.
+- Carried forward: StreamAsync task leak, SessionHistoryResponse location, Copilot conformance test duplication.
+
+**Decision written to:** `.squad/decisions/inbox/leela-phase10-design-review.md`
+
+## Learnings — Phase 10 Design Review (2026-04-06)
+
+1. **WebSocket handler decomposition is textbook SRP** — Splitting orchestration (handler), admission (connection manager), and routing (dispatcher) into separate classes with preserved endpoint contracts demonstrates the right way to decompose a God class. The key: keep the orchestrator thin, let extracted classes own their state.
+2. **Top-level statements don't scale past ~200 lines** — System.CommandLine's compositional model invites putting everything in Program.cs. Beyond a few commands, extract handler classes. The CLI needs the same treatment the WebSocket handler just received.
+3. **Save-then-reload-and-validate is a good CLI pattern** — The CLI writes config, reloads it, and validates. This catches serialization/deserialization drift and ensures the file is well-formed. Worth replicating in other config-writing tools.
+4. **Deployment tests with isolated BOTNEXUS_HOME are effective** — Using `WebApplicationFactory<Program>` + temp root + env var override gives realistic integration testing without touching real user state. The SemaphoreSlim lock prevents parallel test interference.
+5. **Reflection-based config traversal needs tests** — dotted-path property lookup via reflection is inherently fragile. Any rename or structural change in PlatformConfig silently breaks CLI config get/set. This must be test-covered.
