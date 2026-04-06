@@ -517,6 +517,16 @@ Version: {assembly version}
 
 XML documentation comments are included when the `BotNexus.Gateway.Api.xml` doc file is present (generated during build).
 
+### Exported OpenAPI Specification
+
+A version-controlled copy of the spec lives at [`docs/api/openapi.json`](../../docs/api/openapi.json). To regenerate it after API changes:
+
+```powershell
+./scripts/export-openapi.ps1
+```
+
+The script builds the Gateway, starts it on a temporary port, fetches `/swagger/v1/swagger.json`, and saves to `docs/api/openapi.json`. Use `-SkipBuild` if already built, or `-Port 15200` to change the temp port.
+
 ## API Endpoints
 
 ### Health
@@ -914,3 +924,4 @@ src/gateway/
 - [Configuration Guide](../../docs/configuration.md)
 - [Extension Development](../../docs/extension-development.md)
 - [API Reference](../../docs/api-reference.md)
+- [OpenAPI Spec](../../docs/api/openapi.json) — Machine-readable API specification
