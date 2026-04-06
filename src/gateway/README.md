@@ -82,6 +82,12 @@ public interface IChannelAdapter
     string DisplayName { get; }
     bool SupportsStreaming { get; }
     bool IsRunning { get; }
+
+    // Capability flags — declare what your channel supports
+    bool SupportsSteering { get; }          // Can inject mid-run steering messages
+    bool SupportsFollowUp { get; }          // Can queue follow-up messages
+    bool SupportsThinkingDisplay { get; }   // Can render thinking/reasoning deltas
+    bool SupportsToolDisplay { get; }       // Can render tool call start/end events
     
     Task StartAsync(IChannelDispatcher dispatcher, CancellationToken ct = default);
     Task StopAsync(CancellationToken ct = default);
@@ -89,6 +95,20 @@ public interface IChannelAdapter
     Task SendStreamDeltaAsync(string conversationId, string delta, CancellationToken ct = default);
 }
 ```
+
+#### Channel Capability Flags
+
+Channels declare which interaction features they support. The Gateway uses these flags to decide what events to send:
+
+| Flag | Purpose | Example |
+|------|---------|---------|
+| `SupportsStreaming` | Real-time token streaming | WebSocket: ✅, REST: ❌ |
+| `SupportsSteering` | Mid-run steering injection | WebUI: ✅, Telegram: ❌ |
+| `SupportsFollowUp` | Queued follow-up messages | WebUI: ✅, Slack: ✅ |
+| `SupportsThinkingDisplay` | Display agent reasoning | WebUI: ✅, Discord: ❌ |
+| `SupportsToolDisplay` | Display tool call events | WebUI: ✅, SMS: ❌ |
+
+If a channel sets `SupportsThinkingDisplay = false`, the Gateway suppresses `thinking_delta` events for that channel. The same applies to tool events and steering support.
 
 **To add a custom channel:**
 1. Implement `IChannelAdapter` with your protocol (e.g., Slack Events API)
@@ -231,15 +251,19 @@ The Gateway prefers the nested `gateway` section if both exist.
 
 ## Authentication
 
-The Gateway provides **optional API key authentication** via the `GatewayAuthManager`.
+The Gateway has two authentication layers: **provider authentication** (how the Gateway authenticates with upstream LLM APIs) and **gateway endpoint protection** (how callers authenticate with the Gateway itself).
 
-### Resolution Order (for Provider API Keys)
+### Provider Authentication
+
+Controls how the Gateway authenticates with upstream LLM providers (Copilot, OpenAI, etc.).
+
+#### Resolution Order
 
 1. **auth.json** — `~/.botnexus/auth.json` (OAuth tokens, enterprise endpoints)
 2. **Environment Variables** — `BOTNEXUS_COPILOT_APIKEY`, `BOTNEXUS_OPENAI_APIKEY`, etc.
 3. **Platform Config** — `config.json` provider section (`apiKey` field)
 
-### Example: Copilot OAuth
+#### Example: Copilot OAuth
 
 Store in `~/.botnexus/auth.json`:
 ```json
@@ -268,9 +292,41 @@ Then in `config.json`:
 
 The `GatewayAuthManager` auto-refreshes expired OAuth tokens when needed.
 
-### API Key Validation (Optional)
+### Gateway Endpoint Protection (Auth Middleware)
 
-Enable per-request API key validation by setting `apiKeys` in config:
+The `GatewayAuthMiddleware` protects the Gateway's HTTP and WebSocket endpoints. It delegates validation to `ApiKeyGatewayAuthHandler`.
+
+#### How It Works
+
+1. Every incoming request passes through `GatewayAuthMiddleware`
+2. The middleware checks for an API key via `X-Api-Key` header or `Authorization: Bearer {key}`
+3. Valid keys map to a caller identity with tenant ID, allowed agents, and permissions
+4. Invalid or missing keys receive a `401 Unauthorized` response
+
+#### Excluded Endpoints
+
+These paths bypass authentication entirely:
+
+| Path | Reason |
+|------|--------|
+| `/health` | Health checks for load balancers and monitoring |
+| `/webui` | Browser-based UI (served as static files) |
+| `/swagger` | API documentation browser |
+| Static files (paths with file extensions) | CSS, JS, images for the WebUI |
+
+#### Development Mode
+
+When **no API keys are configured** in `gateway.apiKeys`, the middleware operates in development mode:
+
+- All requests are allowed without authentication
+- Every caller receives an admin-level identity
+- No `X-Api-Key` or `Authorization` header is required
+
+This lets you develop locally without configuring keys. Add at least one key to activate enforcement.
+
+#### Multi-Tenant API Keys
+
+Configure per-caller API keys with granular permissions:
 
 ```json
 {
@@ -278,14 +334,187 @@ Enable per-request API key validation by setting `apiKeys` in config:
     "apiKeys": {
       "key-1": {
         "apiKey": "sk-...",
+        "tenantId": "tenant-1",
+        "displayName": "User #1 API Key",
         "allowedAgents": ["assistant"],
-        "permissions": ["chat:send"],
+        "permissions": ["chat:send", "sessions:read"],
         "isAdmin": false
       }
     }
   }
 }
 ```
+
+| Field | Purpose |
+|-------|---------|
+| `apiKey` | The secret key callers provide |
+| `tenantId` | Logical grouping for multi-tenant deployments |
+| `displayName` | Human-readable label for logs |
+| `allowedAgents` | Restrict which agents this key can access |
+| `permissions` | Granular operation scopes |
+| `isAdmin` | Full access when `true` |
+
+## Session Lifecycle
+
+Sessions track conversation state between callers and agents. Each session has a status that progresses through a defined lifecycle.
+
+### Session Status
+
+| Status | Meaning |
+|--------|---------|
+| `Active` | Session is in use and accepting messages |
+| `Suspended` | Temporarily paused (e.g., user idle) |
+| `Expired` | TTL exceeded — no longer accepting new messages |
+| `Closed` | Explicitly ended by user or system |
+
+### Session Cleanup Service
+
+The `SessionCleanupService` runs as a background hosted service. It periodically scans sessions and transitions expired ones.
+
+**Default behavior:**
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `CheckInterval` | 5 minutes | How often the cleanup service runs |
+| `SessionTtl` | 24 hours | Time-to-live for active sessions |
+| `ClosedSessionRetention` | `null` (keep forever) | Optional: auto-delete closed sessions after this period |
+
+Configure via the `gateway` section in `config.json`:
+
+```json
+{
+  "gateway": {
+    "sessionCleanup": {
+      "checkInterval": "00:05:00",
+      "sessionTtl": "1.00:00:00",
+      "closedSessionRetention": "7.00:00:00"
+    }
+  }
+}
+```
+
+### Session Locking (WebSocket)
+
+Each session allows **one active WebSocket connection** at a time. When a second WebSocket attempts to connect to the same session:
+
+1. The duplicate connection is accepted briefly
+2. Immediately closed with status code **4409** and message `"Session already has an active connection"`
+3. The original connection continues unaffected
+
+This prevents race conditions from multiple browser tabs or clients writing to the same session simultaneously.
+
+### MaxConcurrentSessions
+
+Each agent can limit how many sessions run concurrently. Set `maxConcurrentSessions` in the agent config:
+
+```json
+{
+  "agents": {
+    "assistant": {
+      "maxConcurrentSessions": 10
+    }
+  }
+}
+```
+
+When the limit is reached:
+- REST API returns **HTTP 429 Too Many Requests**
+- Error message: `"Agent '{agentId}' has reached MaxConcurrentSessions ({limit})."`
+
+Set to `0` (default) for unlimited concurrent sessions.
+
+## Agent Workspace
+
+Each agent gets a persistent workspace directory at `~/.botnexus/agents/{name}/`. The workspace is created automatically the first time an agent is referenced.
+
+### Directory Structure
+
+```
+~/.botnexus/agents/{agent-name}/
+├── SOUL.md           # Core personality and values
+├── IDENTITY.md       # Role, style, and behavioral constraints
+├── USER.md           # User-specific preferences
+└── MEMORY.md         # Long-term distilled knowledge
+```
+
+### How Context Is Built
+
+When an agent starts a conversation, the Gateway reads these workspace files and injects them into the system prompt:
+
+1. **SOUL.md** — Loaded first. Defines who the agent *is* at its core.
+2. **IDENTITY.md** — Role-specific instructions, interaction style, constraints.
+3. **USER.md** — Preferences about the user (timezone, communication style, etc.).
+4. **MEMORY.md** — Accumulated knowledge from past conversations.
+
+Files are created empty on first use. Edit them to customize agent behavior — changes take effect on the **next conversation** without requiring a Gateway restart.
+
+### Isolation Strategy Validation
+
+When an agent is created or loaded, the Gateway validates that its `isolationStrategy` matches a registered strategy. If it doesn't, the agent fails fast with a descriptive error:
+
+```
+Isolation strategy 'kubernetes' is not registered for agent 'assistant'.
+Available strategies: container, in-process, remote, sandbox.
+```
+
+This prevents silent misconfiguration.
+
+## Configuration Hot Reload
+
+The Gateway watches `~/.botnexus/config.json` for changes and automatically reloads configuration without restarting.
+
+### How It Works
+
+1. `PlatformConfigLoader` sets up a `FileSystemWatcher` on `config.json`
+2. When a change is detected, a **500ms debounce timer** starts
+3. After 500ms of no further changes, the config is reloaded
+4. Updated agent definitions, provider settings, and channel configurations take effect immediately
+
+The debounce prevents rapid-fire reloads when editors write files in multiple steps (e.g., write temp file → rename).
+
+> **Note:** Agent configuration files (`FileAgentConfigurationSource`) use a separate watcher with a 250ms debounce.
+
+### What Reloads Automatically
+
+- Agent definitions (new agents, updated models, disabled agents)
+- Provider configuration (API keys, base URLs, model defaults)
+- Channel settings (enabled/disabled, connection parameters)
+- Gateway settings (API keys, default agent)
+
+### What Requires a Restart
+
+- Changes to `listenUrl` (port binding)
+- New isolation strategy registrations
+- Extension DLL additions
+
+## OpenAPI / Swagger
+
+The Gateway exposes an interactive API documentation browser at `/swagger`.
+
+### Accessing Swagger
+
+Start the Gateway and navigate to:
+
+```
+http://localhost:5005/swagger
+```
+
+The Swagger UI lets you:
+- Browse all REST API endpoints
+- View request/response schemas
+- Send test requests directly from the browser
+- See XML documentation comments from source code
+
+### Configuration
+
+Swagger is enabled automatically. The API title and version are pulled from the assembly metadata:
+
+```
+Title:   BotNexus Gateway
+Version: {assembly version}
+```
+
+XML documentation comments are included when the `BotNexus.Gateway.Api.xml` doc file is present (generated during build).
 
 ## API Endpoints
 
@@ -474,17 +703,47 @@ dotnet build src/gateway/BotNexus.Gateway.Api/BotNexus.Gateway.Api.csproj
 
 ### Run the Dev Server
 ```bash
-# Option 1: PowerShell script (Windows)
+# Option 1: Full dev loop (build + test + run)
+.\scripts\dev-loop.ps1
+
+# Option 2: Dev loop with watch mode (auto-rebuild on changes)
+.\scripts\dev-loop.ps1 -Watch
+
+# Option 3: Start gateway only (skips tests)
 .\scripts\start-gateway.ps1
 
-# Option 2: Direct dotnet
-dotnet run --project src/gateway/BotNexus.Gateway.Api
-
-# Option 3: With custom port
+# Option 4: Start on a custom port
 .\scripts\start-gateway.ps1 -Port 8080
+
+# Option 5: Direct dotnet
+dotnet run --project src/gateway/BotNexus.Gateway.Api
 ```
 
-The Gateway starts on `http://localhost:5005` by default. Access the WebUI at `http://localhost:5005/webui`.
+The Gateway starts on `http://localhost:5005` by default.
+
+### Set Up Authentication
+
+In development mode (no API keys configured), all endpoints are open. To enable auth:
+
+1. Add API keys to `~/.botnexus/config.json`:
+   ```json
+   {
+     "gateway": {
+       "apiKeys": {
+         "dev-key": {
+           "apiKey": "sk-dev-secret",
+           "isAdmin": true,
+           "displayName": "Dev API Key"
+         }
+       }
+     }
+   }
+   ```
+
+2. Include the key in requests:
+   ```bash
+   curl -H "X-Api-Key: sk-dev-secret" http://localhost:5005/api/agents
+   ```
 
 ### Create a Test Agent
 Edit `~/.botnexus/config.json`:
@@ -529,6 +788,12 @@ wscat -c "ws://localhost:5005/ws?agent=test-agent&session=test-session-1"
 # Type: { "type": "message", "content": "Hello!" }
 ```
 
+### Explore the API
+
+- **WebUI:** `http://localhost:5005/webui` — Real-time chat dashboard
+- **Swagger:** `http://localhost:5005/swagger` — Interactive API docs
+- **Health:** `http://localhost:5005/health` — Status check (no auth required)
+
 ### Run Tests
 ```bash
 dotnet test tests/BotNexus.Gateway.Api.Tests/BotNexus.Gateway.Api.Tests.csproj
@@ -543,9 +808,10 @@ src/gateway/
 │   │   ├── IAgentConfigurationSource.cs
 │   │   ├── IAgentRegistry.cs
 │   │   ├── IAgentSupervisor.cs
+│   │   ├── AgentConcurrencyLimitExceededException.cs
 │   │   └── ...
 │   ├── Channels/
-│   │   ├── IChannelAdapter.cs
+│   │   ├── IChannelAdapter.cs         # Includes capability flags
 │   │   └── IChannelManager.cs
 │   ├── Isolation/
 │   │   └── IIsolationStrategy.cs
@@ -554,28 +820,37 @@ src/gateway/
 │   ├── Models/
 │   │   ├── AgentDescriptor.cs
 │   │   ├── GatewaySession.cs
+│   │   ├── SessionStatus.cs           # Active/Suspended/Expired/Closed
 │   │   └── ...
 │   └── ...
 ├── BotNexus.Gateway/
 │   ├── Configuration/
 │   │   ├── PlatformConfig.cs
-│   │   ├── PlatformConfigLoader.cs
-│   │   └── GatewayAuthManager.cs
+│   │   ├── PlatformConfigLoader.cs    # Hot reload with 500ms debounce
+│   │   ├── GatewayAuthManager.cs
+│   │   ├── BotNexusHome.cs            # Home dir + agent workspace scaffolding
+│   │   ├── SessionCleanupOptions.cs
+│   │   └── ...
 │   ├── Agents/
-│   │   ├── AgentSupervisor.cs
-│   │   └── AgentRegistry.cs
+│   │   ├── DefaultAgentSupervisor.cs  # MaxConcurrentSessions enforcement
+│   │   ├── AgentRegistry.cs
+│   │   └── AgentDescriptorValidator.cs # Isolation strategy validation
 │   ├── Channels/
 │   │   └── ChannelManager.cs
+│   ├── Security/
+│   │   └── ApiKeyGatewayAuthHandler.cs
+│   ├── SessionCleanupService.cs       # Background TTL cleanup
 │   └── ...
 ├── BotNexus.Gateway.Api/
-│   ├── Program.cs
+│   ├── Program.cs                     # Swagger/OpenAPI setup
+│   ├── GatewayAuthMiddleware.cs       # Auth pipeline middleware
 │   ├── Controllers/
-│   │   ├── ChatController.cs
+│   │   ├── ChatController.cs          # 429 handling for concurrency limits
 │   │   ├── AgentsController.cs
 │   │   ├── SessionsController.cs
 │   │   └── ConfigController.cs
 │   ├── WebSocket/
-│   │   └── GatewayWebSocketHandler.cs
+│   │   └── GatewayWebSocketHandler.cs # Session locking (4409)
 │   └── wwwroot/
 │       ├── index.html
 │       ├── app.js
@@ -593,21 +868,43 @@ src/gateway/
 1. Check `~/.botnexus/config.json` is valid JSON
 2. Verify providers have valid credentials (check `~/.botnexus/auth.json`)
 3. Check the port is not in use: `netstat -an | grep 5005`
+4. Check for isolation strategy errors — an unknown strategy causes a fail-fast exit
 
 ### Agent not responding
 1. Confirm agent is registered: `curl http://localhost:5005/api/agents`
 2. Check provider credentials: `curl http://localhost:5005/api/config/providers`
 3. Verify LLM provider is accessible (check firewall, VPN, etc.)
 
+### 401 Unauthorized on API calls
+1. Check if API keys are configured in `gateway.apiKeys` — if yes, include `X-Api-Key` header
+2. In dev mode (no keys configured), all requests should pass — verify your config
+3. Endpoints `/health`, `/webui`, `/swagger`, and static files are always exempt
+
+### 429 Too Many Requests
+1. Agent has reached its `maxConcurrentSessions` limit
+2. Wait for existing sessions to complete, or increase the limit in agent config
+3. Set `maxConcurrentSessions: 0` for unlimited
+
+### WebSocket 4409 (Session Already Connected)
+1. Another WebSocket client is already connected to this session
+2. Close the existing connection first, or use a different session ID
+3. Each session allows exactly one active WebSocket connection
+
 ### Session history lost
 1. Verify `sessionsDirectory` is writable
 2. Check disk space availability
 3. Confirm `ISessionStore` is not in-memory for production
+4. Check if `SessionCleanupService` TTL is too aggressive — default is 24 hours
 
 ### WebSocket connection drops
 1. Check browser WebSocket support (console for errors)
 2. Verify firewall allows WebSocket connections
 3. Check Gateway logs for timeout or protocol errors
+
+### Config changes not taking effect
+1. Verify the file was saved (some editors use write-rename which the watcher detects)
+2. Check Gateway logs for reload messages
+3. Changes to `listenUrl` require a full restart — hot reload doesn't rebind ports
 
 ## Further Reading
 
