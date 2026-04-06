@@ -581,3 +581,17 @@ Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
 - Added five new Gateway test suites to pre-stage expected behaviors for auth middleware, session lifecycle, channel capabilities, max concurrent sessions, and per-session WebSocket locking.
 - Where implementation types are not landed yet, tests are intentionally marked with explicit `[Fact(Skip = "...")]` reasons plus TODO notes so they can be unskipped as features merge without rethinking test intent.
 - Kept currently-implementable assertions active (dev-mode auth bypass, capability defaults via reflection fallback, and unlimited-session behavior when no max is configured) and verified `dotnet build --no-restore` plus `dotnet test --no-build` on `BotNexus.Gateway.Tests`.
+
+### 2026-04-06T01:45Z — Gateway Phase 6 Batch 1: 14 New Tests (225 total)
+
+**Cross-Agent Coordination Notes:**
+- Implemented **CrossAgentCallTests** validating Bender's cross-agent calling feature (`{sourceAgentId}::cross::{targetAgentId}` scoping + IAgentRegistry validation)
+- Implemented **LiveGatewayIntegrationTests** with WebApplicationFactory covering:
+  - Health endpoints (liveness, readiness)
+  - REST endpoints (agents, sessions, stop, config/validate, instances)
+  - Main WebSocket handshake and chat streaming
+  - Activity WebSocket subscription endpoint (`/ws/activity` for Fry's WebUI)
+  - Follow-up message type support (`{"type": "follow_up", "content": "..."}`for Fry's queued messages)
+- Copilot streaming tests (opt-in: `BOTNEXUS_RUN_COPILOT_INTEGRATION=1`)
+- **Observed Issues:** CodingAgent.Tests hangs in test environment; needs owner triage. MSB1003 error when testing directory instead of project file.
+- Total gateway tests now: 225. Build clean, 0 failures. Commit: 9c3bfd3

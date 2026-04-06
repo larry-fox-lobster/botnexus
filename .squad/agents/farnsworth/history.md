@@ -614,3 +614,25 @@ Team outcomes synced:
 - Hermes: 7 live integration tests (Copilot provider), graceful skip patterns for CI stability. Full suite 684 tests, 0 failures.
 
 Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
+
+## 2026-04-06T01:45Z — Gateway Phase 6 Batch 1: Dev-Loop Reliability + Cross-Agent Coordination
+
+**Status:** ✅ Complete. Commit: 974d91c
+
+**Deliverables:**
+- Standardized `dev-loop.ps1` → `start-gateway.ps1 -SkipBuild` flow to eliminate duplicate Gateway builds and file-lock failures
+- TCP port pre-check in `start-gateway.ps1` for fail-fast behavior on port collisions
+- `-SkipBuild` and `-SkipTests` flags for faster iterative loops
+- Configuration validation for end-to-end gateway startup
+- Sample config file for local testing
+
+**Cross-Agent Notes:**
+- **Fry's WebUI** now separates activity feed to dedicated `ws://host/ws/activity` WebSocket endpoint
+  - **Action Required:** Ensure `/ws/activity` endpoint is available and serves activity events independently of main `/ws`
+  - Activity feed will silently fail/retry if endpoint unavailable; monitor logs
+- **Fry's new message type:** WebUI sends `{"type": "follow_up", "content": "..."}` for queued messages during streaming
+  - **Action Required:** Ensure Gateway/runtime handles `follow_up` message type alongside existing `steer` type
+- **Hermes' tests** now validate both endpoints (main WebSocket + activity WebSocket) end-to-end with LiveGatewayIntegrationTests
+
+**Owner Review Required:** Squad should not implement follow-on provider changes without explicit approval.
+

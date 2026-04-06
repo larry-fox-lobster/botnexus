@@ -1756,3 +1756,44 @@ Design review filtered 14 audit findings down to 6 real fixes (5 already impleme
 
 ### Key File Paths
 - Review: .squad/decisions/inbox/leela-phase5-design-review.md
+
+## 2026-04-04T09:00:00Z — Phase 6 Design Review (Lead)
+
+**Timestamp:** 2026-04-04T09:00:00Z  
+**Status:** ✅ Complete  
+**Requested by:** Jon Bullen  
+**Scope:** Architecture review of Gateway Phase 6 — completion sprint (cross-agent calling, WebUI, dev scripts, integration tests, docs)
+
+**Reviewed Changes:**
+1. Cross-agent calling (Bender, commit 2da5dbf) — DefaultAgentCommunicator.CallCrossAgentAsync with registry → supervisor → isolation strategy pipeline, AsyncLocal recursion detection
+2. WebUI enhancement (Fry, commit 465f64f) — 1710-line production dashboard with session mgmt, agent selection, thinking/tool display, steering/follow-up, activity feed, responsive design
+3. Dev loop scripts (Farnsworth, commit 974d91c) — SkipBuild/SkipTests params, config validation E2E
+4. Integration tests (Hermes, commit 9c3bfd3) — 14 new tests: cross-agent calling, live gateway integration, WebSocket connection
+5. Documentation (Kif, commit 61852d1) — Dev guide, architecture doc, API reference
+
+**Verification:** Build 0 errors, 0 warnings | Tests 225 passed, 0 failed
+
+**Key Findings:**
+1. **Overall grade: A** — Most cohesive delivery yet. Five parallel workstreams converge cleanly. No P0 issues. Cross-agent recursion guard resolves Phase 3 P1.
+2. **P1: No configurable max call chain depth** — Recursion guard detects cycles but not depth. Acyclic chain of 50 agents proceeds without limit.
+3. **P1: Dev guide missing SkipBuild/SkipTests documentation** — Script tables don't document new parameters.
+4. **P1: Cross-agent call has no default timeout** — handle.PromptAsync blocks indefinitely if target hangs.
+5. **P2: WebUI app.js single 1710-line file** — approaching module-splitting threshold.
+6. **P2: escapeHtml DOM creation per call** — suboptimal during streaming; regex replacer preferred.
+7. **P2: API reference base URL shows port 18790 not 5005** — pre-existing doc drift.
+8. **SOLID score: 4.5/5** — Same DIP deduction as Phase 5 (GatewayWebSocketHandler concrete dependency). No new violations.
+
+### Learnings
+- **AsyncLocal + IDisposable scope** is the correct pattern for tracking async call chains in .NET. The `EnterCallChain`/`CallChainScope` implementation handles concurrent calls, async continuations, and exception cleanup correctly.
+- **Session scoping conventions matter** — Sub-agent `{parent}::sub::{child}` (deterministic, reusable) vs cross-agent `{source}::cross::{target}::{GUID}` (unique, isolated) are intentionally different. Both are correct for their use case.
+- **Channel capability flags as virtual bool properties** (default false) is textbook OCP. New capabilities never break existing adapters. Pattern confirmed across TUI, Telegram, and WebSocket adapters.
+- **DOMPurify + marked** for WebUI markdown rendering provides proper XSS protection. The sanitization pipeline: `marked.parse(text)` → `DOMPurify.sanitize(html)`.
+- **Exponential backoff reconnection** in WebUI with `RECONNECT_MAX_ATTEMPTS=10` and `RECONNECT_MAX_MS=30000` is production-grade.
+- **Integration tests with WebApplicationFactory** — `LiveGatewayIntegrationTests` demonstrates how to test the full HTTP+WebSocket stack with mock services injected via `ConfigureTestServices`.
+
+### Key File Paths
+- Review: .squad/decisions/inbox/leela-phase6-design-review.md
+- Cross-agent communicator: src/gateway/BotNexus.Gateway/Agents/DefaultAgentCommunicator.cs
+- Cross-agent tests: tests/BotNexus.Gateway.Tests/CrossAgentCallingTests.cs
+- Live integration tests: tests/BotNexus.Gateway.Tests/Integration/LiveGatewayIntegrationTests.cs
+- WebUI: src/BotNexus.WebUI/wwwroot/app.js
