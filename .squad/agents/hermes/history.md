@@ -101,6 +101,12 @@
 Baseline: build is clean, all 124 tests pass. Ready for implementation.
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+### 2026-04-06 — Gateway deployment validation coverage pattern
+
+- Added `tests/BotNexus.Gateway.Tests/Integration/GatewayStartupAndConfigurationTests.cs` as the deployment validation harness for startup + config layering. It uses `WebApplicationFactory<Program>` with isolated `BOTNEXUS_HOME` temp roots and validates `/health`, `/webui`, `/swagger`, and `/api/config/validate`.
+- Config layering checks are now explicit for `BotNexus:ConfigPath` precedence (env var `BotNexus__ConfigPath` over configured path) and fallback to default `~/.botnexus/config.json` behavior.
+- Provider bootstrap expectation is now test-backed: `github-copilot` models are present in `ModelRegistry`, but runtime API providers are registered by protocol (`anthropic-messages`, `openai-completions`, `openai-responses`, `openai-compat`) rather than a standalone `github-copilot` provider implementation.
+
 ### 2026-04-01 — Extension Loading E2E Test Harness
 
 - Added `BotNexus.Tests.Extensions.E2E` fixture assembly with lightweight dynamic extensions (`FixtureChannel`, `FixtureLlmProvider`, `FixtureEchoTool`) so extension-loading flows can be validated without external services.

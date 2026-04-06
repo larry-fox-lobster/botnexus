@@ -162,6 +162,38 @@ public sealed class GatewayAuthManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetApiKeyAsync_WhenPlatformConfigUsesAuthCopilotPrefix_ResolvesGithubCopilotEntry()
+    {
+        SetEnvironmentVariable("OPENAI_API_KEY", null);
+        await File.WriteAllTextAsync(_authFilePath, """
+                                             {
+                                               "github-copilot": {
+                                                 "type": "token",
+                                                 "refresh": "unused",
+                                                 "access": "copilot-auth-access-key",
+                                                 "expires": 4102444800000,
+                                                 "endpoint": "https://copilot.test"
+                                               }
+                                             }
+                                             """);
+
+        var manager = CreateManager(new PlatformConfig
+        {
+            Providers = new Dictionary<string, ProviderConfig>
+            {
+                ["openai"] = new()
+                {
+                    ApiKey = "auth:copilot"
+                }
+            }
+        });
+
+        var apiKey = await manager.GetApiKeyAsync("openai");
+
+        apiKey.Should().Be("copilot-auth-access-key");
+    }
+
+    [Fact]
     public async Task GetApiKeyAsync_WhenProviderIsNull_ReturnsNull()
     {
         var manager = CreateManager(new PlatformConfig());

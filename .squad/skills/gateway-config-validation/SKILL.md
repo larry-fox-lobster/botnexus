@@ -17,3 +17,8 @@
 ## Notes
 - Error messages should name exact field paths (e.g., `gateway.apiKeys.tenant-a.permissions`).
 - Keep root-level legacy fields working while migrating to sectioned schema.
+- For deployment validation, use `WebApplicationFactory<Program>` + isolated `BOTNEXUS_HOME` temp roots so startup tests never touch real `~/.botnexus` state.
+- Add layering checks for `BotNexus:ConfigPath` precedence:
+  - `BotNexus__ConfigPath` env var wins
+  - configured path is next
+  - default path falls back to `<BOTNEXUS_HOME|~/.botnexus>/config.json`
