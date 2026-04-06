@@ -47,6 +47,10 @@
     let thinkingBuffer = '';
     /** @type {function|null} */
     let confirmCallback = null;
+    /** @type {number} */
+    let messageQueueCount = 0;
+    /** @type {number} */
+    let toolCallDepth = 0;
 
     // --- DOM refs ---
     const $ = (sel) => document.querySelector(sel);
@@ -77,6 +81,15 @@
     const elAgentFormModal = $('#agent-form-modal');
     const elAgentForm = $('#agent-form');
     const elConfirmDialog = $('#confirm-dialog');
+    const elBtnReconnect = $('#btn-reconnect');
+    const elConnectionBannerText = $('#connection-banner-text');
+    const elSessionIdDisplay = $('#session-id-display');
+    const elSessionIdText = $('#session-id-text');
+    const elQueueStatus = $('#queue-status');
+    const elQueueCount = $('#queue-count');
+    const elActivityItems = $('#activity-items');
+    const elActivityFilterAgent = $('#activity-filter-agent');
+    const elActivityFilterType = $('#activity-filter-type');
 
     // =========================================================================
     // Markdown rendering
@@ -151,14 +164,16 @@
         elStatusText.textContent = labels[state] || state;
     }
 
-    function showConnectionBanner(text, level = 'warning') {
+    function showConnectionBanner(text, level = 'warning', showReconnectBtn = false) {
         elConnectionBanner.className = `connection-banner ${level}`;
-        elConnectionBanner.textContent = text;
+        elConnectionBannerText.textContent = text;
+        elBtnReconnect.classList.toggle('hidden', !showReconnectBtn);
     }
 
     function hideConnectionBanner() {
         elConnectionBanner.className = 'connection-banner hidden';
-        elConnectionBanner.textContent = '';
+        elConnectionBannerText.textContent = '';
+        elBtnReconnect.classList.add('hidden');
     }
 
     function showSteerIndicator() {
@@ -261,9 +276,11 @@
             startPing();
             if (isActivitySubscribed) sendWs({ type: 'subscribe' });
             if (wasReconnect) {
-                showConnectionBanner('✅ Reconnected to gateway.', 'success');
-                setTimeout(() => hideConnectionBanner(), 1400);
-                reloadCurrentSessionHistory();
+                reloadCurrentSessionHistory().then((msgCount) => {
+                    const countStr = msgCount > 0 ? ` Loaded ${msgCount} previous messages.` : '';
+                    showConnectionBanner(`✅ Reconnected to gateway.${countStr}`, 'success');
+                    setTimeout(() => hideConnectionBanner(), 3000);
+                });
             } else {
                 hideConnectionBanner();
             }
@@ -276,7 +293,7 @@
             stopPing();
             if (!shouldReconnect) return;
             if (!connectionHadOpen && reconnectAttempts === 0) {
-                showConnectionBanner(`❌ Cannot connect to Gateway at ${currentWsUrl}. Check that the server is running.`, 'error');
+                showConnectionBanner(`❌ Cannot connect to Gateway at ${currentWsUrl}. Check that the server is running.`, 'error', true);
             } else {
                 showConnectionBanner('⚠️ Connection lost. Reconnecting...', 'warning');
             }
@@ -313,7 +330,7 @@
         if (reconnectTimer) return;
         if (reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
             setStatus('disconnected');
-            showConnectionBanner('❌ Unable to reconnect after multiple attempts. Check Gateway health and reconnect manually.', 'error');
+            showConnectionBanner('❌ Unable to reconnect after multiple attempts. Check Gateway health and reconnect manually.', 'error', true);
             return;
         }
 
@@ -338,14 +355,15 @@
     }
 
     async function reloadCurrentSessionHistory() {
-        if (!currentSessionId) return;
+        if (!currentSessionId) return 0;
         const session = await fetchJson(`/sessions/${encodeURIComponent(currentSessionId)}`);
-        if (!session || !session.history) return;
+        if (!session || !session.history) return 0;
         elChatMessages.innerHTML = '';
         for (const entry of session.history) renderHistoryEntry(entry);
         const msgCount = session.history.length || session.messageCount || 0;
         elChatMeta.textContent = `Agent: ${currentAgentId || 'unknown'} · ${msgCount} messages`;
         scrollToBottom();
+        return msgCount;
     }
 
     // =========================================================================
@@ -356,7 +374,10 @@
         switch (msg.type) {
             case 'connected':
                 connectionId = msg.connectionId;
-                if (msg.sessionId) currentSessionId = msg.sessionId;
+                if (msg.sessionId) {
+                    currentSessionId = msg.sessionId;
+                    updateSessionIdDisplay();
+                }
                 break;
             case 'message_start':
                 activeMessageId = msg.messageId;
@@ -364,15 +385,18 @@
                 setSendingState(false);
                 activeToolCount = 0;
                 thinkingBuffer = '';
+                toolCallDepth = 0;
                 toolStartTimes = {};
                 elBtnAbort.classList.remove('hidden');
                 showStreamingIndicator();
                 startResponseTimeout();
                 updateSendButtonState();
+                decrementQueue();
                 break;
             case 'content_delta':
                 removeStreamingIndicator();
                 markResponseReceived();
+                autoCollapseThinking();
                 appendDelta(msg.delta);
                 break;
             case 'thinking_delta':
@@ -380,16 +404,19 @@
                 break;
             case 'tool_start':
                 handleToolStart(msg);
+                trackActivity('tool', currentAgentId, `🔧 ${msg.toolName || 'tool'} started`);
                 break;
             case 'tool_end':
                 handleToolEnd(msg);
                 break;
             case 'message_end':
                 markResponseReceived();
+                trackActivity('response', currentAgentId, 'Response complete');
                 finalizeMessage(msg);
                 break;
             case 'error':
                 markResponseReceived();
+                trackActivity('error', currentAgentId, msg.message || 'Error');
                 handleError(msg);
                 break;
             case 'activity':
@@ -442,7 +469,101 @@
             thinkingEl.querySelector('.thinking-label').textContent = `Thought process${charCount}`;
             thinkingEl.querySelector('.thinking-stats').textContent = '';
             thinkingEl.classList.add('complete');
+            thinkingEl.classList.add('collapsed');
+            const toggle = thinkingEl.querySelector('.thinking-toggle');
+            if (toggle) {
+                toggle.setAttribute('aria-expanded', 'false');
+                thinkingEl.querySelector('.thinking-chevron').textContent = '▸';
+            }
         }
+    }
+
+    function autoCollapseThinking() {
+        const thinkingEl = elChatMessages.querySelector('.thinking-block:not(.complete)');
+        if (thinkingEl && !thinkingEl.classList.contains('collapsed')) {
+            thinkingEl.classList.add('collapsed');
+            const toggle = thinkingEl.querySelector('.thinking-toggle');
+            if (toggle) {
+                toggle.setAttribute('aria-expanded', 'false');
+                thinkingEl.querySelector('.thinking-chevron').textContent = '▸';
+            }
+        }
+    }
+
+    // =========================================================================
+    // Session ID display
+    // =========================================================================
+
+    function updateSessionIdDisplay() {
+        if (currentSessionId) {
+            const truncated = currentSessionId.length > 12
+                ? currentSessionId.substring(0, 12) + '...'
+                : currentSessionId;
+            elSessionIdText.textContent = `Session: ${truncated}`;
+            elSessionIdText.title = currentSessionId;
+            elSessionIdDisplay.classList.remove('hidden');
+        } else {
+            elSessionIdDisplay.classList.add('hidden');
+        }
+    }
+
+    function copySessionId() {
+        if (!currentSessionId) return;
+        navigator.clipboard.writeText(currentSessionId).then(() => {
+            const btn = $('#btn-copy-session-id');
+            btn.textContent = '✅';
+            btn.classList.add('copy-flash');
+            setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copy-flash'); }, 1200);
+        }).catch(() => {
+            // Fallback for older browsers
+            const ta = document.createElement('textarea');
+            ta.value = currentSessionId;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        });
+    }
+
+    // =========================================================================
+    // Queue management
+    // =========================================================================
+
+    function incrementQueue() {
+        messageQueueCount++;
+        updateQueueDisplay();
+    }
+
+    function decrementQueue() {
+        if (messageQueueCount > 0) messageQueueCount--;
+        updateQueueDisplay();
+    }
+
+    function resetQueue() {
+        messageQueueCount = 0;
+        updateQueueDisplay();
+    }
+
+    function updateQueueDisplay() {
+        if (messageQueueCount > 0) {
+            elQueueStatus.classList.remove('hidden');
+            elQueueCount.textContent = `${messageQueueCount} message${messageQueueCount > 1 ? 's' : ''} queued`;
+        } else {
+            elQueueStatus.classList.add('hidden');
+        }
+    }
+
+    // =========================================================================
+    // Reconnect action
+    // =========================================================================
+
+    function manualReconnect() {
+        reconnectAttempts = 0;
+        connectionHadOpen = false;
+        hideConnectionBanner();
+        if (currentAgentId) connectWebSocket();
     }
 
     // =========================================================================
@@ -457,13 +578,15 @@
         const callId = msg.toolCallId || `tc-${Date.now()}`;
         activeToolCount++;
         toolStartTimes[callId] = Date.now();
+        const depth = msg.depth || toolCallDepth;
         activeToolCalls[callId] = {
             toolName: msg.toolName || 'unknown',
             args: msg.toolArgs || '',
             result: '',
-            status: 'running'
+            status: 'running',
+            depth: depth
         };
-        appendToolCall(callId, msg.toolName, 'running');
+        appendToolCall(callId, msg.toolName, 'running', msg.toolArgs, depth);
         startToolElapsedTimer();
     }
 
@@ -475,27 +598,43 @@
         }
         const elapsed = toolStartTimes[callId] ? Math.round((Date.now() - toolStartTimes[callId]) / 1000) : 0;
         delete toolStartTimes[callId];
-        updateToolCallStatus(callId, 'complete', elapsed);
+        updateToolCallStatus(callId, 'complete', elapsed, msg.toolResult);
         if (Object.keys(toolStartTimes).length === 0) stopToolElapsedTimer();
     }
 
-    function appendToolCall(callId, toolName, status) {
+    function appendToolCall(callId, toolName, status, toolArgs, depth) {
+        const depthClass = depth > 0 ? ` tool-call-depth-${Math.min(depth, 3)}` : '';
         const div = document.createElement('div');
-        div.className = `message tool-call tool-${status}${showTools ? '' : ' hidden'}`;
+        div.className = `message tool-call tool-${status}${showTools ? '' : ' hidden'}${depthClass}`;
         div.dataset.callId = callId;
         div.dataset.toolName = toolName;
         div.setAttribute('role', 'status');
+
+        const argsStr = typeof toolArgs === 'string' ? toolArgs : JSON.stringify(toolArgs || {}, null, 2);
+        const argsPreview = formatToolArgsPreview({ args: toolArgs });
+
         div.innerHTML = `
             <span class="tool-icon" aria-hidden="true">🔧</span>
             <span class="tool-name">${escapeHtml(toolName)}</span>
+            <span class="tool-args-preview">${escapeHtml(argsPreview)}</span>
             <span class="tool-elapsed" aria-live="polite"></span>
             <span class="tool-status-badge ${status}">${status === 'running' ? '⏳ Running' : '✓ Done'}</span>
+            <div class="tool-call-inspector">
+                <div class="tool-inspector-section">
+                    <div class="tool-inspector-label">Arguments</div>
+                    <pre class="tool-inspector-code">${escapeHtml(argsStr !== '{}' ? argsStr : '(none)')}</pre>
+                </div>
+                <div class="tool-inspector-section tool-result-section">
+                    <div class="tool-inspector-label">Result</div>
+                    <pre class="tool-inspector-code tool-result-code">⏳ Running...</pre>
+                </div>
+            </div>
         `;
         elChatMessages.appendChild(div);
         scrollToBottom();
     }
 
-    function updateToolCallStatus(callId, status, elapsed) {
+    function updateToolCallStatus(callId, status, elapsed, result) {
         const el = elChatMessages.querySelector(`.tool-call[data-call-id="${callId}"]`);
         if (!el) return;
         el.classList.remove('tool-running');
@@ -504,10 +643,19 @@
         if (badge) {
             const elapsedStr = elapsed > 0 ? ` ${elapsed}s` : '';
             badge.className = `tool-status-badge ${status}`;
-            badge.textContent = status === 'error' ? `✗ Error${elapsedStr}` : `✓ Done${elapsedStr}`;
+            badge.textContent = status === 'error' ? `❌ Error${elapsedStr}` : `✅ Done${elapsedStr}`;
         }
         const elapsedEl = el.querySelector('.tool-elapsed');
         if (elapsedEl) elapsedEl.textContent = '';
+
+        // Update inline inspector result
+        const resultCode = el.querySelector('.tool-result-code');
+        if (resultCode && result !== undefined) {
+            const resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+            resultCode.textContent = resultStr || '(no result)';
+        } else if (resultCode) {
+            resultCode.textContent = status === 'error' ? '(error)' : '(no result)';
+        }
         el.style.cursor = 'pointer';
     }
 
@@ -583,11 +731,14 @@
 
         activeToolCalls = {};
         activeToolCount = 0;
+        toolCallDepth = 0;
         toolStartTimes = {};
         stopToolElapsedTimer();
         thinkingBuffer = '';
+        resetQueue();
         setSendingState(false);
         updateSendButtonState();
+        updateSessionIdDisplay();
         loadSessions();
         scrollToBottom();
     }
@@ -697,17 +848,29 @@
         div.dataset.callId = callId;
         const toolName = tc.toolName || tc.name || 'unknown';
         const argsPreview = formatToolArgsPreview(tc);
+        const argsStr = JSON.stringify(tc.arguments || tc.args || {}, null, 2);
+        const resultStr = tc.content || tc.output || tc.result || '(no result)';
         div.innerHTML = `
             <span class="tool-icon" aria-hidden="true">🔧</span>
             <span class="tool-name">${escapeHtml(toolName)}</span>
             <span class="tool-args-preview">${escapeHtml(argsPreview)}</span>
-            <span class="tool-status-badge complete">✓ Done</span>
+            <span class="tool-status-badge complete">✅ Done</span>
+            <div class="tool-call-inspector">
+                <div class="tool-inspector-section">
+                    <div class="tool-inspector-label">Arguments</div>
+                    <pre class="tool-inspector-code">${escapeHtml(argsStr !== '{}' ? argsStr : '(none)')}</pre>
+                </div>
+                <div class="tool-inspector-section">
+                    <div class="tool-inspector-label">Result</div>
+                    <pre class="tool-inspector-code">${escapeHtml(resultStr)}</pre>
+                </div>
+            </div>
         `;
         div.style.cursor = 'pointer';
         activeToolCalls[callId] = {
             toolName,
-            args: JSON.stringify(tc.arguments || tc.args || {}, null, 2),
-            result: tc.content || tc.output || tc.result || '(no result)',
+            args: argsStr,
+            result: resultStr,
             status: 'complete'
         };
         elChatMessages.appendChild(div);
@@ -757,12 +920,15 @@
             sendWs({ type: 'steer', content: text });
             showSteerIndicator();
             appendSystemMessage(`🧭 Steering: ${text}`);
+            trackActivity('message', currentAgentId, `Steer: ${text.substring(0, 60)}`);
             return;
         }
 
         appendChatMessage('user', text);
+        trackActivity('message', currentAgentId, text.substring(0, 60));
         setSendingState(true);
         isStreaming = true;
+        incrementQueue();
         startResponseTimeout();
 
         if (ws && ws.readyState === WebSocket.OPEN) {
@@ -822,6 +988,7 @@
         elBtnAbort.classList.add('hidden');
         removeStreamingIndicator();
         setSendingState(false);
+        resetQueue();
         updateSendButtonState();
         appendSystemMessage('Request aborted.');
     }
@@ -832,14 +999,17 @@
         activeMessageId = null;
         activeToolCalls = {};
         activeToolCount = 0;
+        toolCallDepth = 0;
         thinkingBuffer = '';
         clearResponseTimeout();
+        resetQueue();
 
         elWelcome.classList.add('hidden');
         elChatView.classList.remove('hidden');
         elChatTitle.textContent = 'New Chat';
         elChatMeta.textContent = `Agent: ${elAgentSelect.value || 'default'} · Session will be created on first message`;
         elChatMessages.innerHTML = '';
+        elSessionIdDisplay.classList.add('hidden');
         setSendingState(false);
         elAgentSelect.disabled = false;
         elSessionsList.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
@@ -945,6 +1115,7 @@
         elChatTitle.textContent = agentId || 'Chat';
         elChatMessages.innerHTML = '<div class="loading">Loading messages...</div>';
         setSendingState(false);
+        updateSessionIdDisplay();
 
         if (agentId) elAgentSelect.value = agentId;
         elAgentSelect.disabled = true;
@@ -986,12 +1157,14 @@
             const name = a.name || a.agentId || a.id || 'unknown';
             const model = a.model || a.defaultModel || '';
             const statusClass = a.status === 'error' ? 'error' : (a.status === 'busy' ? 'warning' : 'success');
+            const statusLabel = a.status || 'ready';
             el.innerHTML = `
                 <div class="list-item-row">
                     <span class="item-title">
                         <span class="agent-status-dot ${statusClass}" aria-hidden="true"></span>
                         ${escapeHtml(name)}
                     </span>
+                    <span class="item-meta" style="font-size:0.68rem;">${escapeHtml(statusLabel)}</span>
                 </div>
                 <span class="item-meta">${model ? 'Model: ' + escapeHtml(model) : ''}</span>
             `;
@@ -999,6 +1172,7 @@
             elAgentsList.appendChild(el);
         }
         populateAgentSelect(agents);
+        populateActivityAgentFilter();
         updateSendButtonState();
     }
 
@@ -1119,10 +1293,14 @@
         const el = document.createElement('div');
         let cssClass = 'activity-item';
         const eventType = evt.eventType || evt.event || 'unknown';
-        if (eventType.includes('Error') || eventType === 'error') cssClass += ' error';
-        else if (eventType.includes('Response') || eventType.includes('Sent')) cssClass += ' response-sent';
-        else if (eventType.includes('Message') || eventType.includes('Received')) cssClass += ' msg-received';
+        let filterType = '';
+        if (eventType.includes('Error') || eventType === 'error') { cssClass += ' error'; filterType = 'error'; }
+        else if (eventType.includes('Response') || eventType.includes('Sent')) { cssClass += ' response-sent'; filterType = 'response'; }
+        else if (eventType.includes('Tool')) { cssClass += ' msg-received'; filterType = 'tool'; }
+        else if (eventType.includes('Message') || eventType.includes('Received')) { cssClass += ' msg-received'; filterType = 'message'; }
         el.className = cssClass;
+        el.dataset.agent = evt.agentId || evt.agent || '';
+        el.dataset.eventCategory = filterType;
 
         const time = formatTime(evt.timestamp || new Date().toISOString());
         const channel = evt.channel || evt.source || '';
@@ -1132,10 +1310,45 @@
             ${channel ? `<span class="activity-channel">[${escapeHtml(channel)}]</span>` : ''}
             <strong>${escapeHtml(eventType)}</strong>${preview ? ': ' + escapeHtml(preview) : ''}${(evt.content || evt.message || '').length > 80 ? '...' : ''}
         `;
-        elActivityFeed.insertBefore(el, elActivityFeed.firstChild);
-        while (elActivityFeed.children.length > MAX_ACTIVITY_ITEMS) {
-            elActivityFeed.removeChild(elActivityFeed.lastChild);
+        elActivityItems.insertBefore(el, elActivityItems.firstChild);
+        while (elActivityItems.children.length > MAX_ACTIVITY_ITEMS) {
+            elActivityItems.removeChild(elActivityItems.lastChild);
         }
+        applyActivityFilters();
+    }
+
+    function trackActivity(category, agentId, content) {
+        if (!isActivitySubscribed) return;
+        handleActivityEvent({
+            eventType: category === 'message' ? 'MessageSent' : category === 'response' ? 'ResponseReceived' : category === 'tool' ? 'ToolCall' : 'Error',
+            agentId: agentId || '',
+            content: content || '',
+            timestamp: new Date().toISOString(),
+            channel: 'WebUI'
+        });
+    }
+
+    function applyActivityFilters() {
+        const agentFilter = elActivityFilterAgent.value;
+        const typeFilter = elActivityFilterType.value;
+        elActivityItems.querySelectorAll('.activity-item').forEach(el => {
+            const matchAgent = !agentFilter || el.dataset.agent === agentFilter;
+            const matchType = !typeFilter || el.dataset.eventCategory === typeFilter;
+            el.classList.toggle('filtered-out', !(matchAgent && matchType));
+        });
+    }
+
+    function populateActivityAgentFilter() {
+        const current = elActivityFilterAgent.value;
+        elActivityFilterAgent.innerHTML = '<option value="">All Agents</option>';
+        for (const a of agentsCache) {
+            const name = a.name || a.agentId || a.id || 'unknown';
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            elActivityFilterAgent.appendChild(opt);
+        }
+        if (current) elActivityFilterAgent.value = current;
     }
 
     // =========================================================================
@@ -1203,7 +1416,20 @@
         });
 
         elAgentSelect.addEventListener('change', () => {
-            currentAgentId = elAgentSelect.value;
+            const newAgent = elAgentSelect.value;
+            if (currentSessionId && currentAgentId && newAgent !== currentAgentId) {
+                showConfirm(
+                    `Switch to agent "${newAgent}"? This will start a new session.`,
+                    'Switch Agent',
+                    () => {
+                        currentAgentId = newAgent;
+                        startNewChat();
+                    }
+                );
+                elAgentSelect.value = currentAgentId;
+                return;
+            }
+            currentAgentId = newAgent;
             if (!currentSessionId && ws) { disconnectWebSocket(); connectWebSocket(); }
             updateSendButtonState();
         });
@@ -1231,12 +1457,22 @@
             }
 
             const toolCall = e.target.closest('.tool-call');
-            if (toolCall && !toolCall.classList.contains('tool-running')) {
-                const callId = toolCall.dataset.callId;
-                const data = callId && activeToolCalls[callId];
-                if (data) openToolModal(data);
+            if (toolCall) {
+                // Toggle inline inspector on click
+                toolCall.classList.toggle('expanded');
+                return;
             }
         });
+
+        // Reconnect button
+        elBtnReconnect.addEventListener('click', manualReconnect);
+
+        // Session ID copy
+        $('#btn-copy-session-id').addEventListener('click', copySessionId);
+
+        // Activity filters
+        elActivityFilterAgent.addEventListener('change', applyActivityFilters);
+        elActivityFilterType.addEventListener('change', applyActivityFilters);
 
         // Tool modal
         elModalClose.addEventListener('click', closeToolModal);

@@ -59,6 +59,19 @@
                     </label>
                 </div>
                 <div id="activity-feed" class="section-content activity-feed collapsed" role="log" aria-live="polite">
+                    <div class="activity-filters">
+                        <select id="activity-filter-agent" class="filter-select" aria-label="Filter by agent">
+                            <option value="">All Agents</option>
+                        </select>
+                        <select id="activity-filter-type" class="filter-select" aria-label="Filter by event type">
+                            <option value="">All Events</option>
+                            <option value="message">Messages</option>
+                            <option value="response">Responses</option>
+                            <option value="tool">Tool Calls</option>
+                            <option value="error">Errors</option>
+                        </select>
+                    </div>
+                    <div id="activity-items"></div>
                 </div>
             </div>
 
@@ -69,7 +82,10 @@
 
         <!-- Main content -->
         <main id="main-content">
-            <div id="connection-banner" class="connection-banner hidden" role="status" aria-live="polite"></div>
+            <div id="connection-banner" class="connection-banner hidden" role="status" aria-live="polite">
+                <span id="connection-banner-text"></span>
+                <button id="btn-reconnect" class="btn btn-reconnect hidden" aria-label="Reconnect">🔄 Reconnect</button>
+            </div>
             <!-- Welcome screen -->
             <div id="welcome-screen" class="welcome">
                 <div class="welcome-inner">
@@ -85,6 +101,10 @@
                     <div class="chat-info">
                         <h2 id="chat-title">Chat</h2>
                         <span id="chat-meta" class="text-muted"></span>
+                        <div id="session-id-display" class="session-id-display hidden">
+                            <span id="session-id-text" class="session-id-text"></span>
+                            <button id="btn-copy-session-id" class="btn-icon-sm" title="Copy session ID" aria-label="Copy session ID">📋</button>
+                        </div>
                     </div>
                     <div class="chat-header-controls">
                         <label for="agent-select" class="select-label">Agent:</label>
@@ -105,6 +125,10 @@
                 <div id="chat-messages" class="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
                 </div>
                 <div class="chat-input-area">
+                    <div id="queue-status" class="queue-status hidden" aria-live="polite">
+                        <span class="queue-icon" aria-hidden="true">📨</span>
+                        <span id="queue-count"></span>
+                    </div>
                     <div class="input-row">
                         <label for="chat-input" class="sr-only">Type a message</label>
                         <textarea id="chat-input" placeholder="Type a message... (Enter to send, Shift+Enter for newline)" rows="1" aria-label="Chat message input"></textarea>

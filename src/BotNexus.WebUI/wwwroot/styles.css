@@ -515,9 +515,105 @@ body {
     .chat-messages { padding: 12px; }
     .chat-input-area { padding: 8px 12px 12px; }
     .modal-content { width: 95%; }
+    .session-id-display { flex-wrap: wrap; }
+    .activity-filters { flex-direction: column; }
 }
 
 @media (max-width: 480px) {
     #sidebar { width: 200px; min-width: 200px; }
     .chat-header-controls { flex-wrap: wrap; }
+}
+
+/* === Session ID display === */
+.session-id-display {
+    display: flex; align-items: center; gap: 4px; margin-top: 2px;
+}
+.session-id-text {
+    font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted);
+    cursor: default; letter-spacing: 0.02em;
+}
+.btn-icon-sm {
+    background: none; border: none; cursor: pointer; font-size: 0.7rem;
+    padding: 1px 4px; border-radius: 3px; color: var(--text-muted); line-height: 1;
+}
+.btn-icon-sm:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+.copy-flash { animation: copyFlash 0.5s ease-out; }
+@keyframes copyFlash { 0% { color: var(--success); } 100% { color: var(--text-muted); } }
+
+/* === Reconnect button === */
+.btn-reconnect {
+    background: var(--accent); color: white; font-size: 0.8rem;
+    padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer;
+    margin-left: 12px; white-space: nowrap;
+}
+.btn-reconnect:hover { background: var(--accent-hover); }
+.connection-banner { display: flex; align-items: center; justify-content: space-between; }
+.connection-banner.hidden { display: none !important; }
+.reconnected-badge {
+    display: inline-block; background: rgba(76,175,80,0.15); color: var(--success);
+    border: 1px solid rgba(76,175,80,0.3); border-radius: 999px;
+    font-size: 0.75rem; padding: 3px 10px; margin-bottom: 4px;
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* === Tool call inline inspector === */
+.tool-call-inspector {
+    display: none; width: 100%; margin-top: 6px; padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.tool-call.expanded .tool-call-inspector { display: block; }
+.tool-call.expanded {
+    flex-wrap: wrap; max-width: 85%;
+    background: rgba(30,46,30,0.8); border: 1px solid rgba(76,175,80,0.15);
+}
+.tool-inspector-section { margin-bottom: 8px; }
+.tool-inspector-section:last-child { margin-bottom: 0; }
+.tool-inspector-label {
+    font-size: 0.68rem; font-weight: 600; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px;
+}
+.tool-inspector-code {
+    background: rgba(0,0,0,0.25); border-radius: 4px; padding: 6px 8px;
+    font-family: var(--font-mono); font-size: 0.72rem; line-height: 1.45;
+    overflow-x: auto; max-height: 180px; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word; color: var(--text-primary);
+}
+.tool-call-depth-1 { margin-left: 20px; }
+.tool-call-depth-2 { margin-left: 40px; }
+.tool-call-depth-3 { margin-left: 60px; }
+
+/* === Activity feed filters === */
+.activity-filters {
+    display: flex; gap: 6px; padding: 4px 0 8px; border-bottom: 1px solid var(--border);
+    margin-bottom: 6px;
+}
+.filter-select {
+    flex: 1; background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 3px 6px; font-size: 0.72rem; font-family: var(--font-mono);
+    cursor: pointer;
+}
+.filter-select:focus { outline: none; border-color: var(--accent); }
+.activity-item.filtered-out { display: none; }
+
+/* === Queue status === */
+.queue-status {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 8px; margin-bottom: 6px;
+    font-size: 0.75rem; color: var(--warning);
+    background: rgba(255,152,0,0.08); border: 1px solid rgba(255,152,0,0.2);
+    border-radius: 6px;
+}
+.queue-icon { font-size: 0.8rem; }
+
+/* === Thinking animated dots === */
+.thinking-block:not(.complete) .thinking-label::after {
+    content: ''; display: inline-block; width: 12px;
+    animation: thinkingDots 1.4s steps(4, end) infinite;
+}
+@keyframes thinkingDots {
+    0% { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
 }
