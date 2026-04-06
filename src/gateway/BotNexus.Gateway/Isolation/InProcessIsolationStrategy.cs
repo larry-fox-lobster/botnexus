@@ -46,6 +46,11 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         var model = _llmClient.Models.GetModel(descriptor.ApiProvider, descriptor.ModelId)
             ?? throw new InvalidOperationException($"Model '{descriptor.ModelId}' for provider '{descriptor.ApiProvider}' is not registered.");
 
+        // Override model BaseUrl from auth endpoint or provider config (e.g., enterprise Copilot)
+        var apiEndpoint = _authManager.GetApiEndpoint(descriptor.ApiProvider);
+        if (!string.IsNullOrWhiteSpace(apiEndpoint))
+            model = model with { BaseUrl = apiEndpoint };
+
         var options = new AgentOptions(
             InitialState: new AgentInitialState(
                 SystemPrompt: descriptor.SystemPrompt,

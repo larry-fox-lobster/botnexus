@@ -27,6 +27,28 @@ public sealed class GatewayAuthManager
     }
 
     /// <summary>
+    /// Returns the API endpoint override for a provider from auth.json or platform config.
+    /// Used to override model BaseUrl (e.g., enterprise vs individual Copilot endpoints).
+    /// </summary>
+    public string? GetApiEndpoint(string provider)
+    {
+        if (string.IsNullOrWhiteSpace(provider))
+            return null;
+
+        LoadAuthEntries();
+
+        if (TryGetAuthEntry(provider, out var entry) && !string.IsNullOrWhiteSpace(entry.Endpoint))
+            return entry.Endpoint;
+
+        if (_platformConfig.Providers is not null &&
+            TryGetProviderConfig(_platformConfig.Providers, provider, out var providerConfig) &&
+            !string.IsNullOrWhiteSpace(providerConfig?.BaseUrl))
+            return providerConfig.BaseUrl;
+
+        return null;
+    }
+
+    /// <summary>
     /// Resolves an API key from <c>~/.botnexus/auth.json</c>, environment variables, or platform config.
     /// </summary>
     public async Task<string?> GetApiKeyAsync(string provider, CancellationToken ct = default)
