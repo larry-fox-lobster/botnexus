@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using BotNexus.AgentCore.Tools;using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Models;
@@ -40,9 +41,16 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
                 ["assistant"] = new()
                 {
                     Provider = "copilot",
+                    DisplayName = "Assistant",
+                    Description = "Helpful assistant",
                     Model = "gpt-4.1",
+                    AllowedModels = ["gpt-4.1", "gpt-4o"],
                     SystemPromptFile = @"prompts\assistant.txt",
+                    SubAgents = ["helper-agent"],
                     IsolationStrategy = "remote",
+                    MaxConcurrentSessions = 3,
+                    Metadata = JsonSerializer.Deserialize<JsonElement>("{\"owner\":\"team-gateway\"}"),
+                    IsolationOptions = JsonSerializer.Deserialize<JsonElement>("{\"timeoutMs\":1000}"),
                     Enabled = true
                 },
                 ["disabled-agent"] = new()
@@ -62,10 +70,16 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
         var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
 
         descriptor.AgentId.Should().Be("assistant");
-        descriptor.DisplayName.Should().Be("assistant");
+        descriptor.DisplayName.Should().Be("Assistant");
+        descriptor.Description.Should().Be("Helpful assistant");
         descriptor.ApiProvider.Should().Be("copilot");
         descriptor.ModelId.Should().Be("gpt-4.1");
+        descriptor.AllowedModelIds.Should().Equal(["gpt-4.1", "gpt-4o"]);
+        descriptor.SubAgentIds.Should().Equal(["helper-agent"]);
         descriptor.IsolationStrategy.Should().Be("remote");
+        descriptor.MaxConcurrentSessions.Should().Be(3);
+        descriptor.Metadata.Should().ContainKey("owner").WhoseValue.Should().Be("team-gateway");
+        descriptor.IsolationOptions.Should().ContainKey("timeoutMs").WhoseValue.Should().Be(1000L);
         descriptor.SystemPrompt.Should().Be("You are helpful.");
     }
 
@@ -147,14 +161,16 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
     }
 
     [Fact]
-    public void Watch_ReturnsNull()
+    public void Watch_ReturnsSubscription()
     {
         var source = new PlatformConfigAgentSource(
             Options.Create(new PlatformConfig()),
             _configDirectory,
             new ListLogger<PlatformConfigAgentSource>());
 
-        source.Watch(_ => { }).Should().BeNull();
+        using var subscription = source.Watch(_ => { });
+
+        subscription.Should().NotBeNull();
     }
 
     public void Dispose()

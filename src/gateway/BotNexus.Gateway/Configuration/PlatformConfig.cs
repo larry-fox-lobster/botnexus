@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace BotNexus.Gateway.Configuration;
@@ -103,6 +104,9 @@ public sealed class PlatformConfig
 /// <summary>Provider-specific configuration.</summary>
 public sealed class ProviderConfig
 {
+    /// <summary>Whether this provider is enabled. Disabled providers are hidden from API.</summary>
+    public bool Enabled { get; set; } = true;
+
     /// <summary>API key or reference to auth.json entry.</summary>
     public string? ApiKey { get; set; }
 
@@ -111,6 +115,9 @@ public sealed class ProviderConfig
 
     /// <summary>Default model for this provider.</summary>
     public string? DefaultModel { get; set; }
+
+    /// <summary>Allowed model IDs for this provider. Null means all models, empty means none.</summary>
+    public List<string>? Models { get; set; }
 }
 
 /// <summary>Gateway runtime configuration.</summary>
@@ -174,14 +181,28 @@ public sealed class AgentDefinitionConfig
 {
     /// <summary>Provider name (e.g. 'copilot').</summary>
     public string? Provider { get; set; }
+    /// <summary>Human-readable display name.</summary>
+    public string? DisplayName { get; set; }
+    /// <summary>Description of the agent's purpose.</summary>
+    public string? Description { get; set; }
     /// <summary>Model identifier (e.g. 'gpt-4.1').</summary>
     public string? Model { get; set; }
+    /// <summary>Model IDs this agent is allowed to use. Null means unrestricted within provider allowlist.</summary>
+    public List<string>? AllowedModels { get; set; }
     /// <summary>Optional path to an external system prompt file.</summary>
     public string? SystemPromptFile { get; set; }
     /// <summary>Tool identifiers this agent has access to.</summary>
     public List<string>? ToolIds { get; set; }
+    /// <summary>Agent IDs this agent can call as sub-agents.</summary>
+    public List<string>? SubAgents { get; set; }
     /// <summary>Isolation strategy name (e.g. 'in-process').</summary>
     public string? IsolationStrategy { get; set; }
+    /// <summary>Maximum concurrent sessions for this agent.</summary>
+    public int? MaxConcurrentSessions { get; set; }
+    /// <summary>Agent-level metadata.</summary>
+    public JsonElement? Metadata { get; set; }
+    /// <summary>Strategy-specific isolation options.</summary>
+    public JsonElement? IsolationOptions { get; set; }
     /// <summary>Whether this agent is enabled.</summary>
     public bool Enabled { get; set; } = true;
 }

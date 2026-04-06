@@ -43,6 +43,11 @@ public sealed record AgentDescriptor
     public IReadOnlyList<string> ToolIds { get; init; } = [];
 
     /// <summary>
+    /// Model IDs this agent is allowed to use. Empty means unrestricted within provider allowlist.
+    /// </summary>
+    public IReadOnlyList<string> AllowedModelIds { get; init; } = [];
+
+    /// <summary>
     /// Agent IDs this agent can call as sub-agents.
     /// </summary>
     public IReadOnlyList<string> SubAgentIds { get; init; } = [];

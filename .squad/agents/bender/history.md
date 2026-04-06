@@ -1056,3 +1056,11 @@ Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
 
 
 
+
+### 2026-04-06T16:37:00Z — Unified Config Phase A (Provider + Agent schema)
+- Expanded ProviderConfig with Enabled (default 	rue) and Models allowlist support.
+- Expanded AgentDefinitionConfig with display/description metadata, AllowedModels, SubAgents, MaxConcurrentSessions, Metadata, and IsolationOptions.
+- Updated PlatformConfigAgentSource mapping to flow all new fields into AgentDescriptor, including JSON object conversion for metadata/isolation options and display-name fallback to agent ID.
+- Implemented PlatformConfigAgentSource.Watch() by subscribing to PlatformConfigLoader.ConfigChanged and returning a disposable subscription.
+- Added AllowedModelIds to AgentDescriptor and updated gateway tests for new mapping + watch behavior.
+- Validation: dotnet build Q:\repos\botnexus\BotNexus.slnx ✅; dotnet test Q:\repos\botnexus\tests\BotNexus.Gateway.Tests --no-restore --verbosity minimal ✅ (passed after retrying transient flaky test).

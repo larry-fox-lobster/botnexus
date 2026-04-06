@@ -3,6 +3,7 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace BotNexus.Gateway.Configuration;
 
@@ -21,8 +22,35 @@ public sealed class PlatformConfigAgentSource(
     /// <inheritdoc />
     public async Task<IReadOnlyList<AgentDescriptor>> LoadAsync(CancellationToken cancellationToken = default)
     {
+        return await LoadFromConfigAsync(_configOptions.Value, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public IDisposable? Watch(Action<IReadOnlyList<AgentDescriptor>> onChanged)
+    {
+        ArgumentNullException.ThrowIfNull(onChanged);
+
+        Action<PlatformConfig> onPlatformConfigChanged = config =>
+        {
+            try
+            {
+                var descriptors = LoadFromConfigAsync(config, CancellationToken.None).GetAwaiter().GetResult();
+                onChanged(descriptors);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to reload platform-config agents after config change notification.");
+            }
+        };
+
+        PlatformConfigLoader.ConfigChanged += onPlatformConfigChanged;
+        return new Subscription(() => PlatformConfigLoader.ConfigChanged -= onPlatformConfigChanged);
+    }
+
+    private async Task<IReadOnlyList<AgentDescriptor>> LoadFromConfigAsync(PlatformConfig platformConfig, CancellationToken cancellationToken)
+    {
         List<AgentDescriptor> descriptors = [];
-        var agents = _configOptions.Value.Agents;
+        var agents = platformConfig.Agents;
         if (agents is null || agents.Count == 0)
             return descriptors;
 
@@ -36,13 +64,19 @@ public sealed class PlatformConfigAgentSource(
             var descriptor = new AgentDescriptor
             {
                 AgentId = agentId,
-                DisplayName = agentId,
+                DisplayName = agentConfig.DisplayName ?? agentId,
+                Description = agentConfig.Description,
                 ModelId = agentConfig.Model ?? string.Empty,
                 ApiProvider = agentConfig.Provider ?? string.Empty,
                 ToolIds = agentConfig.ToolIds?.ToArray() ?? [],
+                AllowedModelIds = agentConfig.AllowedModels?.ToArray() ?? [],
+                SubAgentIds = agentConfig.SubAgents?.ToArray() ?? [],
                 IsolationStrategy = string.IsNullOrWhiteSpace(agentConfig.IsolationStrategy)
                     ? "in-process"
-                    : agentConfig.IsolationStrategy
+                    : agentConfig.IsolationStrategy,
+                MaxConcurrentSessions = agentConfig.MaxConcurrentSessions ?? 0,
+                Metadata = ConvertObject(agentConfig.Metadata),
+                IsolationOptions = ConvertObject(agentConfig.IsolationOptions)
             };
 
             var validationErrors = AgentDescriptorValidator.Validate(descriptor);
@@ -73,9 +107,35 @@ public sealed class PlatformConfigAgentSource(
         return descriptors;
     }
 
-    /// <inheritdoc />
-    public IDisposable? Watch(Action<IReadOnlyList<AgentDescriptor>> onChanged)
-        => null;
+    private static IReadOnlyDictionary<string, object?> ConvertObject(JsonElement? element)
+    {
+        if (element is null || element.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            return new Dictionary<string, object?>();
+
+        if (element.Value.ValueKind != JsonValueKind.Object)
+            return new Dictionary<string, object?>();
+
+        Dictionary<string, object?> result = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in element.Value.EnumerateObject())
+            result[property.Name] = ConvertElement(property.Value);
+
+        return result;
+    }
+
+    private static object? ConvertElement(JsonElement element)
+        => element.ValueKind switch
+        {
+            JsonValueKind.Object => element.EnumerateObject()
+                .ToDictionary(p => p.Name, p => ConvertElement(p.Value), StringComparer.OrdinalIgnoreCase),
+            JsonValueKind.Array => element.EnumerateArray().Select(ConvertElement).ToArray(),
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number when element.TryGetInt64(out var integer) => integer,
+            JsonValueKind.Number when element.TryGetDouble(out var @double) => @double,
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null => null,
+            _ => element.GetRawText()
+        };
 
     private async Task<string?> TryLoadSystemPromptFromFileAsync(
         string agentId,
@@ -105,5 +165,20 @@ public sealed class PlatformConfigAgentSource(
         }
 
         return await File.ReadAllTextAsync(resolvedPath, cancellationToken);
+    }
+
+    private sealed class Subscription(Action disposeAction) : IDisposable
+    {
+        private readonly Action _disposeAction = disposeAction;
+        private bool _disposed;
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            _disposeAction();
+        }
     }
 }
