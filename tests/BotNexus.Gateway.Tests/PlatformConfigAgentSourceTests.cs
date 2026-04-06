@@ -132,6 +132,7 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
         var strategy = new InProcessIsolationStrategy(
             new LlmClient(new ApiProviderRegistry(), modelRegistry),
             CreateGatewayAuthManagerWithTempAuthPath(),
+            new PassthroughContextBuilder(),
             NullLogger<InProcessIsolationStrategy>.Instance);
 
         var handle = await strategy.CreateAsync(
@@ -184,6 +185,12 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
     }
 
     private sealed record LogEntry(LogLevel Level, string Message, Exception? Exception);
+
+    private sealed class PassthroughContextBuilder : IContextBuilder
+    {
+        public Task<string> BuildSystemPromptAsync(AgentDescriptor descriptor, CancellationToken ct = default)
+            => Task.FromResult(descriptor.SystemPrompt ?? string.Empty);
+    }
 
     private sealed class NullScope : IDisposable
     {

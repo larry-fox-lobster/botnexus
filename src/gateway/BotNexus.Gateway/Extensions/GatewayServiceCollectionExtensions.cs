@@ -42,6 +42,9 @@ public static class GatewayServiceCollectionExtensions
         services.AddOptions<SessionCleanupOptions>();
         if (configure is not null)
             services.Configure(configure);
+        services.TryAddSingleton<BotNexusHome>();
+        services.AddSingleton<IAgentWorkspaceManager, FileAgentWorkspaceManager>();
+        services.AddSingleton<IContextBuilder, WorkspaceContextBuilder>();
 
         // Core services
         services.AddSingleton<IAgentRegistry, DefaultAgentRegistry>();

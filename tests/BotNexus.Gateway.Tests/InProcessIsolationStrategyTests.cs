@@ -1,4 +1,5 @@
 using BotNexus.Gateway.Abstractions.Isolation;
+using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Isolation;
@@ -31,6 +32,7 @@ public sealed class InProcessIsolationStrategyTests
         var strategy = new InProcessIsolationStrategy(
             llmClient,
             new GatewayAuthManager(new PlatformConfig(), NullLogger<GatewayAuthManager>.Instance),
+            new PassthroughContextBuilder(),
             NullLogger<InProcessIsolationStrategy>.Instance);
 
         var act = () => strategy.CreateAsync(
@@ -80,6 +82,7 @@ public sealed class InProcessIsolationStrategyTests
         return new InProcessIsolationStrategy(
             llmClient,
             new GatewayAuthManager(new PlatformConfig(), NullLogger<GatewayAuthManager>.Instance),
+            new PassthroughContextBuilder(),
             NullLogger<InProcessIsolationStrategy>.Instance);
     }
 
@@ -92,4 +95,10 @@ public sealed class InProcessIsolationStrategyTests
             ApiProvider = "test-provider",
             SystemPrompt = "You are a test agent."
         };
+
+    private sealed class PassthroughContextBuilder : IContextBuilder
+    {
+        public Task<string> BuildSystemPromptAsync(AgentDescriptor descriptor, CancellationToken ct = default)
+            => Task.FromResult(descriptor.SystemPrompt ?? string.Empty);
+    }
 }

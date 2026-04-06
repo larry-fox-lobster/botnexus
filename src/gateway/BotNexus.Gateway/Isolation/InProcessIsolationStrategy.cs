@@ -25,15 +25,18 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
 {
     private readonly LlmClient _llmClient;
     private readonly GatewayAuthManager _authManager;
+    private readonly IContextBuilder _contextBuilder;
     private readonly ILogger<InProcessIsolationStrategy> _logger;
 
     public InProcessIsolationStrategy(
         LlmClient llmClient,
         GatewayAuthManager authManager,
+        IContextBuilder contextBuilder,
         ILogger<InProcessIsolationStrategy> logger)
     {
         _llmClient = llmClient;
         _authManager = authManager;
+        _contextBuilder = contextBuilder;
         _logger = logger;
     }
 
@@ -41,7 +44,7 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
     public string Name => "in-process";
 
     /// <inheritdoc />
-    public Task<IAgentHandle> CreateAsync(AgentDescriptor descriptor, AgentExecutionContext context, CancellationToken cancellationToken = default)
+    public async Task<IAgentHandle> CreateAsync(AgentDescriptor descriptor, AgentExecutionContext context, CancellationToken cancellationToken = default)
     {
         var model = _llmClient.Models.GetModel(descriptor.ApiProvider, descriptor.ModelId)
             ?? throw new InvalidOperationException($"Model '{descriptor.ModelId}' for provider '{descriptor.ApiProvider}' is not registered.");
@@ -51,9 +54,11 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         if (!string.IsNullOrWhiteSpace(apiEndpoint))
             model = model with { BaseUrl = apiEndpoint };
 
+        var enrichedSystemPrompt = await _contextBuilder.BuildSystemPromptAsync(descriptor, cancellationToken);
+
         var options = new AgentOptions(
             InitialState: new AgentInitialState(
-                SystemPrompt: descriptor.SystemPrompt,
+                SystemPrompt: enrichedSystemPrompt,
                 Model: model),
             Model: model,
             LlmClient: _llmClient,
@@ -75,7 +80,7 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
 
         _logger.LogDebug("Created in-process agent handle for '{AgentId}' session '{SessionId}'", descriptor.AgentId, context.SessionId);
 
-        return Task.FromResult(handle);
+        return handle;
     }
 }
 
