@@ -802,3 +802,4 @@ Validation: `dotnet build src\gateway\BotNexus.Cli\BotNexus.Cli.csproj --nologo 
 - Added GET /api/channels via ChannelsController, returning ChannelAdapterResponse with { Name, DisplayName, IsRunning, SupportsStreaming, SupportsSteering, SupportsFollowUp, SupportsThinking, SupportsToolDisplay } mapped from IChannelManager.Adapters.
 - Added GET /api/extensions via ExtensionsController, returning ExtensionResponse rows with { Name, Version, Type, AssemblyPath } from IExtensionLoader.GetLoaded() (one row per declared extension type).
 - Moved SessionHistoryResponse into BotNexus.Gateway.Abstractions.Models for reuse across API/test surfaces.
+- 2026-04-06: Gateway Wave 2 aligned SupportsThinkingDisplay naming in channel DTOs, added session metadata GET/PATCH endpoints with null-removal merge semantics, and introduced config ersion warning handling for schema evolution.

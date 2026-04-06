@@ -997,3 +997,8 @@ Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
 - Hardened GatewayAuthMiddleware.ShouldSkipAuth to a route-based allowlist (/health, /swagger*, /webui*) plus explicit static-file detection through IWebHostEnvironment.WebRootFileProvider.
 - Added an API guard (/api/* never bypasses) so extension-like API routes such as /api/agents.json always require auth.
 - Route/file-provider checks are safer than extension-based checks because they only bypass known public surfaces instead of trusting path shape.
+
+### 2026-04-06 — Gateway middleware Wave 2 (auth DI + rate limit + correlation IDs)
+- Refactored GatewayAuthMiddleware to take IWebHostEnvironment in the constructor and removed per-request service locator calls from static file auth bypass checks.
+- Added RateLimitingMiddleware with per-client fixed-window throttling (caller identity preferred, IP fallback), default 60 requests per 60 seconds, /health bypass, and HTTP 429 + Retry-After on limit hits.
+- Added CorrelationIdMiddleware that propagates or generates X-Correlation-Id, writes it to response headers, and stores it in HttpContext.Items["CorrelationId"] before downstream middleware executes.
