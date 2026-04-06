@@ -31,15 +31,127 @@ New to BotNexus? The **Getting Started** guide walks you from clone → build �
 - **Config Audit** — Config changes backed up to `.bak`, OAuth token operations logged
 - **Agent Templates** — Auto-bootstrapped workspace with SOUL.md, IDENTITY.md, USER.md, HEARTBEAT.md, MEMORY.md
 
-## Quick Start
+## Gateway Service
+
+The **BotNexus Gateway** is the central hub for multi-agent orchestration. It provides:
+
+- **REST API** — Agents, sessions, chat, configuration endpoints
+- **WebSocket** — Real-time streaming with agents
+- **Multi-agent routing** — Route messages to different agents by ID
+- **Session persistence** — Durable conversation history (JSONL)
+- **Hot reload** — Edit `config.json` and changes apply live (no restart)
+- **Health checks** — Built-in `/health` endpoint for monitoring
+- **WebUI** — Real-time chat dashboard at `/webui`
+
+### Quick Start
 
 ```bash
 # Build the solution
 dotnet build BotNexus.slnx
 
-# Run the Gateway
-dotnet run --project src/BotNexus.Gateway
+# Run the Gateway (port 5005 by default)
+# Option 1: PowerShell dev script
+.\scripts\start-gateway.ps1
+
+# Option 2: Direct dotnet command
+dotnet run --project src/gateway/BotNexus.Gateway.Api
 ```
+
+### Configuration
+
+Edit `~/.botnexus/config.json` to configure:
+
+```json
+{
+  "gateway": {
+    "listenUrl": "http://localhost:5005",
+    "defaultAgentId": "assistant",
+    "sessionsDirectory": "workspace/sessions"
+  },
+  "agents": {
+    "assistant": {
+      "provider": "copilot",
+      "model": "gpt-4.1",
+      "systemPromptFile": "prompts/assistant.txt",
+      "isolationStrategy": "in-process",
+      "enabled": true
+    }
+  },
+  "providers": {
+    "copilot": {
+      "apiKey": "copilot",
+      "baseUrl": "https://api.githubcopilot.com",
+      "defaultModel": "gpt-4.1"
+    }
+  }
+}
+```
+
+### Key API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/health` | GET | Health check status |
+| `/api/agents` | GET | List all agents |
+| `/api/agents` | POST | Register a new agent |
+| `/api/agents/{id}` | GET | Get agent details |
+| `/api/agents/{id}/sessions/{sid}/status` | GET | Check agent instance status |
+| `/api/chat` | POST | Send a message to an agent |
+| `/api/chat/steer` | POST | Inject steering message into active run |
+| `/api/chat/follow-up` | POST | Queue follow-up for next run |
+| `/api/sessions` | GET | List sessions |
+| `/api/sessions/{id}` | GET | Get session history |
+| `/api/sessions/{id}` | DELETE | Delete a session |
+| `/ws` | WebSocket | Real-time streaming with agents |
+| `/webui` | GET | Interactive WebUI dashboard |
+
+### WebSocket Protocol
+
+Connect to `ws://localhost:5005/ws?agent={agentId}&session={sessionId}` for real-time streaming.
+
+**Client → Server message types:**
+- `{ "type": "message", "content": "..." }` — Send message to agent
+- `{ "type": "abort" }` — Abort current execution
+- `{ "type": "steer", "content": "..." }` — Inject steering message
+- `{ "type": "follow_up", "content": "..." }` — Queue follow-up
+- `{ "type": "ping" }` — Keepalive
+
+**Server → Client message types:**
+- `{ "type": "connected", "connectionId": "...", "sessionId": "..." }` — Connection established
+- `{ "type": "message_start", "messageId": "..." }` — Agent started processing
+- `{ "type": "content_delta", "delta": "..." }` — Streaming content chunk
+- `{ "type": "tool_start", "toolCallId": "...", "toolName": "..." }` — Tool execution started
+- `{ "type": "tool_end", "toolCallId": "...", "toolResult": "..." }` — Tool result received
+- `{ "type": "message_end", "messageId": "...", "usage": {...} }` — Agent completed
+- `{ "type": "error", "message": "...", "code": "..." }` — Error occurred
+- `{ "type": "pong" }` — Keepalive response
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Gateway.Api (ASP.NET)                │
+│  [REST Controllers] [WebSocket Handler] [WebUI Files]   │
+└────────────┬──────────────────────────────┬─────────────┘
+             │                              │
+        Message Bus                  Session Persistence
+             │                              │
+┌────────────▼──────────────────────────────▼─────────────┐
+│                   BotNexus.Gateway                       │
+│  [Agent Router] [Hot Reload] [Channel Manager]          │
+└────────────┬────────────────────────────────────────────┘
+             │
+        Extension Points
+             │
+    ┌────────┼────────┐
+    │        │        │
+   [IIsolationStrategy]  [IChannelAdapter]  [ISessionStore]
+   (in-process/sandbox)  (Discord/Slack)    (File/Memory/Redis)
+```
+
+### For More Details
+
+👉 **Read [src/gateway/README.md](src/gateway/README.md)** for detailed architecture, configuration, and development guide.
 
 ### CLI Tool
 
