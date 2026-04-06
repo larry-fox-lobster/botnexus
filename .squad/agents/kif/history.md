@@ -98,6 +98,45 @@
 **Team Outcomes:**
 - **Farnsworth (Platform):** Ported Pi provider architecture — ModelDefinition, CopilotModels registry (30+ models), 3 API format handlers, rewrote CopilotProvider. 3 commits.
 - **Bender (Runtime):** Verified AgentLoop + Gateway integration — no changes needed. Commit e916394.
+
+---
+
+## 2026-04-XX — Gateway Service Documentation Update
+
+**Sprint Status:** ✅ Complete
+
+**Work Completed:**
+- Audited documentation against current Gateway implementation
+- Updated `getting-started-dev.md` (8 sections, ~400 lines)
+  - Fixed port references: 18790 → 5005 (verified in `start-gateway.ps1` defaults)
+  - Simplified config structure: removed "BotNexus" wrapper, "isolationStrategy", and outdated CLI installation steps
+  - Clarified OAuth token storage: auth.json (not tokens/copilot.json)
+  - Updated WebUI URL to http://localhost:5005/ with fallback
+  - Removed outdated Copilot provider config format
+- Updated `dev-loop.md` (3 sections, ~100 lines)
+  - Fixed API key config schema: removed `isAdmin` field, added query param auth
+  - Simplified provider auth documentation
+  - Updated config validation endpoint reference
+  - Removed legacy extensions path references
+- Updated `getting-started.md` (1 section)
+  - Clarified "Install from Release" path availability
+  - Corrected prerequisites text
+- **Source code verification:** All claims audited against:
+  - `src/gateway/BotNexus.Gateway.Api/Program.cs` — /health endpoint, WebUI fallback
+  - `src/gateway/BotNexus.Gateway/Configuration/BotNexusHome.cs` — directory structure
+  - `src/gateway/BotNexus.Gateway/Configuration/PlatformConfig.cs` — config schema
+  - `src/gateway/BotNexus.Cli/Program.cs` — default port 5005
+  - `scripts/start-gateway.ps1` and `scripts/dev-loop.ps1` — script defaults
+- **Build verified:** 0 errors, solution builds cleanly
+- **Gateway tests:** 276 tests pass ✅
+- **Commit:** 38b632e — `docs: Update dev setup guide for Gateway Service`
+
+**Key Findings:**
+- Port 5005 is the runtime default (not built-in config); scripts set it as `-Port` parameter default
+- Config doesn't require BotNexus wrapper at top level; nested `gateway` section optional
+- OAuth device code flow is automatic on first message; tokens stored in `~/.botnexus/auth.json`
+- `/health` returns `{"status":"ok"}` (not full health checks)
+- Hot-reload works for all config except `gateway.listenUrl` (requires restart for port changes)
 - **Hermes (Tester):** 72 new tests for model registry, handler routing, format handlers. 494 total tests passing. Commit 5d293d4.
 
 **Cross-Team Decisions Merged:**

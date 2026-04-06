@@ -1,13 +1,15 @@
 ---
-updated_at: 2026-04-06T02:33:00Z
-focus_area: Gateway Phase 7 — Sprint 7A (Foundation & Reconnection)
-active_issues: [P0 session reconnection, P0 WS reconnection replay, P1 max-call-depth, P1 cross-agent-timeout, P1 history-pagination, P1 session-store-config, P1 TUI-steering, P1 channel-queuing, P1 OpenAPI-spec, P2 decisions.md archival]
-status: phase7_sprint7a_in_progress
+updated_at: 2026-04-06T04:39:00Z
+focus_area: Gateway Phase 8 — Integration Validation Complete
+active_issues: [P1 extract-replay-buffer, P1 IHttpClientFactory, P1 decompose-ws-handler, P1 provider-conformance-tests, P1 CLI-parity]
+status: phase8_complete
 ---
 
 # What We're Focused On
 
-**Gateway Phase 7 started.** Leela completed gap analysis: 6 requirements at 61% overall (2 P0, 16 P1, 14 P2). Sprint 7A targets P0 session reconnection + critical P1s across 3 parallel tracks.
+**Gateway Phase 8 complete.** Integration validation with live Copilot provider verified. Design review A-. 276 gateway tests, 0 failures. 7 commits this sprint. All docs updated.
+
+**Previous:** Gateway Phase 7 complete. Sprint 7A foundation & reconnection done. 264 tests.
 
 **Previous:** Gateway Phase 6 complete. Design review A. 225 gateway tests, 0 failures.
 
