@@ -3,6 +3,7 @@ using BotNexus.Gateway.Api.Controllers;
 using BotNexus.Gateway.Sessions;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -191,5 +192,64 @@ public sealed class SessionsControllerTests
         var result = await controller.Resume("missing", CancellationToken.None);
 
         result.Result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task GetMetadata_WithExistingSession_ReturnsMetadata()
+    {
+        var store = new InMemorySessionStore();
+        var session = await store.GetOrCreateAsync("s1", "agent-a");
+        session.Metadata["tenantId"] = "tenant-a";
+        var controller = new SessionsController(store);
+
+        var result = await controller.GetMetadata("s1", CancellationToken.None);
+
+        var payload = (result.Result as OkObjectResult)?.Value as Dictionary<string, object?>;
+        payload.Should().NotBeNull();
+        payload.Should().ContainKey("tenantId");
+        payload!["tenantId"].Should().Be("tenant-a");
+    }
+
+    [Fact]
+    public async Task GetMetadata_WithUnknownSession_ReturnsNotFound()
+    {
+        var controller = new SessionsController(new InMemorySessionStore());
+
+        var result = await controller.GetMetadata("missing", CancellationToken.None);
+
+        result.Result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task PatchMetadata_WithObjectBody_MergesAndRemovesKeys()
+    {
+        var store = new InMemorySessionStore();
+        var session = await store.GetOrCreateAsync("s1", "agent-a");
+        session.Metadata["removeMe"] = "x";
+        var controller = new SessionsController(store);
+        using var patchDocument = JsonDocument.Parse("""{"theme":"dark","removeMe":null,"nested":{"key":"value"}}""");
+
+        var result = await controller.PatchMetadata("s1", patchDocument.RootElement.Clone(), CancellationToken.None);
+
+        var payload = (result.Result as OkObjectResult)?.Value as Dictionary<string, object?>;
+        payload.Should().NotBeNull();
+        payload.Should().ContainKey("theme");
+        payload!["theme"].Should().Be("dark");
+        payload.Should().NotContainKey("removeMe");
+        payload.Should().ContainKey("nested");
+        ((Dictionary<string, object?>)payload["nested"]!).Should().Contain("key", "value");
+    }
+
+    [Fact]
+    public async Task PatchMetadata_WithNonObjectBody_ReturnsBadRequest()
+    {
+        var store = new InMemorySessionStore();
+        await store.GetOrCreateAsync("s1", "agent-a");
+        var controller = new SessionsController(store);
+        using var patchDocument = JsonDocument.Parse("""["not","an","object"]""");
+
+        var result = await controller.PatchMetadata("s1", patchDocument.RootElement.Clone(), CancellationToken.None);
+
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
     }
 }

@@ -8,10 +8,12 @@ Complete reference for BotNexus REST API endpoints, including agents, sessions, 
 2. [Authentication](#authentication)
 3. [Agent Management](#agent-management)
 4. [Skills Management](#skills-management)
-5. [Chat](#chat)
-6. [Session Management](#session-management)
-7. [System & Status](#system--status)
-8. [Error Handling](#error-handling)
+5. [Channels Management](#channels-management)
+6. [Extensions Management](#extensions-management)
+7. [Chat](#chat)
+8. [Session Management](#session-management)
+9. [System & Status](#system--status)
+10. [Error Handling](#error-handling)
 
 ---
 
@@ -462,6 +464,112 @@ X-Api-Key: your-api-key
 - Agent skills override global skills with the same name
 - Use `DisabledSkills` in agent config to exclude specific skills or patterns
 - See [Skills Guide: Disabling Skills](./skills.md#disabling-skills) for pattern syntax
+
+---
+
+## Channels Management
+
+> **Added in Wave 1.** Channels are adapter plugins that connect BotNexus to external surfaces (WebSocket, Telegram, TUI, etc.).
+
+### List Channel Adapters
+
+**Endpoint:** `GET /api/channels`
+
+**Description:** List all registered channel adapters and their runtime capabilities.
+
+**Request:**
+```http
+GET /api/channels
+X-Api-Key: your-api-key
+```
+
+**Response:** 200 OK
+```json
+[
+  {
+    "name": "websocket",
+    "displayName": "WebSocket",
+    "isRunning": true,
+    "supportsStreaming": true,
+    "supportsSteering": true,
+    "supportsFollowUp": true,
+    "supportsThinking": true,
+    "supportsToolDisplay": true
+  },
+  {
+    "name": "telegram",
+    "displayName": "Telegram",
+    "isRunning": false,
+    "supportsStreaming": false,
+    "supportsSteering": false,
+    "supportsFollowUp": false,
+    "supportsThinking": false,
+    "supportsToolDisplay": false
+  }
+]
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Channel type identifier (e.g., `"websocket"`, `"telegram"`, `"tui"`) |
+| `displayName` | string | Human-readable channel name |
+| `isRunning` | boolean | Whether the adapter is currently active |
+| `supportsStreaming` | boolean | Whether the adapter supports streamed content deltas |
+| `supportsSteering` | boolean | Whether the adapter supports real-time steering messages |
+| `supportsFollowUp` | boolean | Whether the adapter supports follow-up message queuing |
+| `supportsThinking` | boolean | Whether the adapter renders thinking/progress output |
+| `supportsToolDisplay` | boolean | Whether the adapter renders tool call activity |
+
+---
+
+## Extensions Management
+
+> **Added in Wave 1.** Extensions are assembly-based plugins loaded at runtime from `~/.botnexus/extensions/`.
+
+### List Loaded Extensions
+
+**Endpoint:** `GET /api/extensions`
+
+**Description:** List all loaded runtime extensions and their declared types.
+
+**Request:**
+```http
+GET /api/extensions
+X-Api-Key: your-api-key
+```
+
+**Response:** 200 OK
+```json
+[
+  {
+    "name": "GitHub Tools",
+    "version": "1.0.0",
+    "type": "tool",
+    "assemblyPath": "BotNexus.Extensions.GitHub.dll"
+  },
+  {
+    "name": "Custom Provider",
+    "version": "0.5.0",
+    "type": "provider",
+    "assemblyPath": "MyCustomProvider.dll"
+  }
+]
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Extension display name from the manifest |
+| `version` | string | Extension version from the manifest |
+| `type` | string | Extension type (e.g., `"tool"`, `"provider"`, `"channel"`, `"unknown"`) |
+| `assemblyPath` | string | Entry assembly filename (not full path) |
+
+**Notes:**
+- An extension that declares multiple types appears once per type in the response.
+- Extensions with no declared types use `"unknown"` as the type.
 
 ---
 
@@ -1210,7 +1318,7 @@ ws://localhost:5005/ws?agent={agentId}&session={sessionId}
 
 **Tool result received:**
 ```json
-{ "type": "tool_end", "toolCallId": "call_...", "toolResult": "4", "messageId": "uuid-..." }
+{ "type": "tool_end", "toolCallId": "call_...", "toolName": "calculate", "toolResult": "4", "toolIsError": false, "messageId": "uuid-..." }
 ```
 
 **Agent completed:**
@@ -1228,6 +1336,13 @@ ws://localhost:5005/ws?agent={agentId}&session={sessionId}
 { "type": "pong" }
 ```
 
+**Reconnect acknowledgement:**
+```json
+{ "type": "reconnect_ack", "sessionKey": "def456", "replayed": 3, "lastSeqId": 42 }
+```
+
+> **Sequence IDs:** All server → client messages include a `sequenceId` (integer) for replay tracking. Clients should store the last received `sequenceId` and pass it as `lastSeqId` when reconnecting to avoid missing events.
+
 #### WebSocket Message Flow
 
 ```
@@ -1243,6 +1358,33 @@ Client                          Server
   │◄──── { type: tool_end }       │
   │◄──── { type: content_delta }  │  (post-tool response)
   │◄──── { type: message_end }    │
+  │                               │
+```
+
+#### Reconnection Flow
+
+When a client disconnects unexpectedly, missed events can be replayed:
+
+1. Client stores `sequenceId` from the last received server message.
+2. Client reconnects to `ws://host/ws?agent={agentId}&session={sessionId}`.
+3. Client sends: `{ "type": "reconnect", "sessionKey": "{sessionId}", "lastSeqId": {lastSequenceId} }`.
+4. Server replays all buffered events with `sequenceId > lastSeqId` (up to `ReplayWindowSize`, default 1000).
+5. Server sends: `{ "type": "reconnect_ack", "sessionKey": "...", "replayed": N, "lastSeqId": ... }`.
+
+```
+Client                          Server
+  │  (connection dropped)         │
+  │                               │
+  │──── [new WebSocket] ─────────►│
+  │◄──── { type: "connected" } ───│
+  │                               │
+  │──── { type: "reconnect",      │
+  │       sessionKey: "...",      │
+  │       lastSeqId: 42 } ──────►│
+  │                               │
+  │◄──── (replayed event seqId 43)│
+  │◄──── (replayed event seqId 44)│
+  │◄──── { type: "reconnect_ack" }│
   │                               │
 ```
 
@@ -1266,6 +1408,50 @@ ws://localhost:5005/ws/activity?agent={agentFilter}
 - Events are JSON-serialized with `camelCase` naming
 - Connection stays open until the client disconnects or the server shuts down
 - When an `agent` filter is provided, only events for that agent are sent
+
+**Activity Event Schema:**
+```json
+{
+  "eventId": "a1b2c3d4e5f6",
+  "type": "AgentProcessing",
+  "agentId": "assistant",
+  "sessionId": "abc123",
+  "channelType": "websocket",
+  "message": "Agent started processing request",
+  "timestamp": "2026-01-15T10:30:00Z",
+  "data": { "model": "gpt-4.1" }
+}
+```
+
+**Event Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `eventId` | string | Unique event identifier |
+| `type` | string | Activity type (see table below) |
+| `agentId` | string? | Agent involved, if any |
+| `sessionId` | string? | Session involved, if any |
+| `channelType` | string? | Channel involved, if any |
+| `message` | string? | Human-readable summary |
+| `timestamp` | string | ISO 8601 timestamp |
+| `data` | object? | Extensible payload data |
+
+**Activity Types:**
+
+| Type | Description |
+|------|-------------|
+| `MessageReceived` | A message was received from a channel |
+| `ResponseSent` | A response was sent to a channel |
+| `StreamDelta` | A streaming delta was sent to a channel |
+| `AgentProcessing` | An agent started processing a request |
+| `AgentCompleted` | An agent completed processing |
+| `ToolExecutionStarted` | A tool execution started |
+| `ToolExecutionCompleted` | A tool execution completed |
+| `AgentStarted` | An agent instance was created |
+| `AgentStopped` | An agent instance was stopped |
+| `SessionCreated` | A session was created |
+| `Error` | An error occurred |
+| `System` | A system-level informational event |
 
 ---
 

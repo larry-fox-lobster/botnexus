@@ -1,6 +1,8 @@
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace BotNexus.Gateway.Api.Controllers;
 
@@ -59,6 +61,60 @@ public sealed class SessionsController : ControllerBase
         return Ok(new SessionHistoryResponse(offset, boundedLimit, totalCount, entries));
     }
 
+    /// <summary>
+    /// Gets metadata for a specific session.
+    /// </summary>
+    /// <param name="sessionId">Session identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Session metadata key-value pairs.</returns>
+    [HttpGet("{sessionId}/metadata")]
+    [ProducesResponseType(typeof(Dictionary<string, object?>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<Dictionary<string, object?>>> GetMetadata(string sessionId, CancellationToken cancellationToken)
+    {
+        var session = await _sessions.GetAsync(sessionId, cancellationToken);
+        return session is not null ? Ok(session.Metadata) : NotFound();
+    }
+
+    /// <summary>
+    /// Merges metadata entries into a specific session.
+    /// </summary>
+    /// <param name="sessionId">Session identifier.</param>
+    /// <param name="metadataPatch">JSON object containing metadata keys to add/update. Keys with null values are removed.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Updated session metadata key-value pairs.</returns>
+    [HttpPatch("{sessionId}/metadata")]
+    [ProducesResponseType(typeof(Dictionary<string, object?>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<Dictionary<string, object?>>> PatchMetadata(
+        string sessionId,
+        [FromBody] JsonElement metadataPatch,
+        CancellationToken cancellationToken)
+    {
+        if (metadataPatch.ValueKind != JsonValueKind.Object)
+            return BadRequest(new { error = "Metadata patch body must be a JSON object." });
+
+        var session = await _sessions.GetAsync(sessionId, cancellationToken);
+        if (session is null)
+            return NotFound();
+
+        foreach (var property in metadataPatch.EnumerateObject())
+        {
+            if (property.Value.ValueKind == JsonValueKind.Null)
+            {
+                session.Metadata.Remove(property.Name);
+                continue;
+            }
+
+            session.Metadata[property.Name] = ConvertJsonElement(property.Value);
+        }
+
+        session.UpdatedAt = DateTimeOffset.UtcNow;
+        await _sessions.SaveAsync(session, cancellationToken);
+        return Ok(session.Metadata);
+    }
+
     /// <summary>Deletes a session.</summary>
     [HttpDelete("{sessionId}")]
     public async Task<ActionResult> Delete(string sessionId, CancellationToken cancellationToken)
@@ -100,4 +156,22 @@ public sealed class SessionsController : ControllerBase
         await _sessions.SaveAsync(session, cancellationToken);
         return Ok(session);
     }
+
+    private static object? ConvertJsonElement(JsonElement element)
+        => element.ValueKind switch
+        {
+            JsonValueKind.Object => element.EnumerateObject()
+                .ToDictionary(property => property.Name, property => ConvertJsonElement(property.Value)),
+            JsonValueKind.Array => element.EnumerateArray()
+                .Select(ConvertJsonElement)
+                .ToList(),
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Number when element.TryGetInt64(out var intValue) => intValue,
+            JsonValueKind.Number when element.TryGetDecimal(out var decimalValue) => decimalValue,
+            JsonValueKind.Number => element.GetDouble(),
+            JsonValueKind.Null => null,
+            _ => null
+        };
 }
