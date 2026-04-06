@@ -7,21 +7,54 @@
 
 ## Core Context
 
-**Phases 1-6 Complete.** Build green (0 errors), 225 tests passing, Phase 6 grade A. Core systems operational:
-- Agent registry, supervisor, cross-agent calling with recursion guard
-- WebSocket, TUI, Telegram channel adapters
-- File and in-memory session stores
+**Phases 1-6 Complete. Sprint 7A Complete.** Build green (0 errors), 264 tests passing (up from 225), Sprint 7A grade A-. Core systems operational:
+- Agent registry, supervisor, cross-agent calling with recursion guard + depth limits + timeout
+- WebSocket (with reconnect replay + sequence IDs), TUI (with steering), Telegram channel adapters
+- File and in-memory session stores (configurable via platform config)
+- Session suspend/resume, paginated history, bounded message queuing with backpressure
 - OAuth + API key auth
 - Provider abstraction: OpenAI, Anthropic, Copilot
 - WebUI dashboard with thinking/tool display, reconnection, activity feed
-- Comprehensive integration tests
+- DIP fix: GatewayWebSocketHandler now uses IGatewayWebSocketChannelAdapter interface
+- OpenAPI spec export
+- Comprehensive integration tests (39 new tests in Sprint 7A)
 
-**Phase 5-6 Carried Findings:**
-- DIP violation: `GatewayWebSocketHandler` takes concrete `WebSocketChannelAdapter`, not interface
+**Carried Findings (Sprint 7B):**
 - `Path.HasExtension` auth bypass in `GatewayAuthMiddleware`
 - StreamAsync background task leak in providers
+- SessionHistoryResponse should move to Abstractions.Models
+- Monitor GatewaySession SRP — extract replay buffer if it grows further
 
 **Phase 7 Focus:** Resilience (reconnection, pagination, queueing), channel consolidation, test hardening, observability.
+
+---
+
+## 2026-04-06T03:00:00Z — Sprint 7A Design Review (Lead)
+
+**Timestamp:** 2026-04-06T03:00:00Z  
+**Status:** ✅ Complete  
+**Requested by:** Jon Bullen (via Copilot)  
+**Scope:** Architectural review of all Sprint 7A implementations
+
+**Context:**
+Sprint 7A delivered 8 features across 11 commits (Bender ×4, Farnsworth ×4, Kif ×2, Hermes ×1). Build green, 264 tests passing (39 new). Reviewed: session reconnection protocol, suspend/resume, TUI steering, message queuing, DIP fix, history pagination, max call chain depth, cross-agent timeout, configurable session store, OpenAPI export.
+
+**Grade: A-**
+
+| Area | Grade |
+|------|-------|
+| SOLID Compliance | A |
+| Extension Model | A |
+| API Design | A- |
+| Thread Safety | A |
+| Test Quality | A- |
+
+**Key Findings:**
+- P0: None.
+- P1: SessionHistoryResponse should move to Abstractions. GatewaySession accumulating replay concern alongside history — monitor SRP. SequenceAndPersistPayloadAsync has unnecessary double-serialization. Reconnect replay bypasses payloadMutator (needs documenting comment).
+- Carried: Path.HasExtension auth bypass, StreamAsync task leak (both from Phase 5/6, Sprint 7B).
+
+**Decision written to:** `.squad/decisions/inbox/leela-sprint7a-review.md`
 
 ---
 
