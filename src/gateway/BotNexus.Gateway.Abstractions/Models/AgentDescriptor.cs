@@ -37,6 +37,13 @@ public sealed record AgentDescriptor
     public string? SystemPromptFile { get; init; }
 
     /// <summary>
+    /// Ordered list of system prompt file paths to load and concatenate.
+    /// Resolved relative to the agent's workspace directory.
+    /// If empty, uses default load order: AGENTS.md, SOUL.md, TOOLS.md, BOOTSTRAP.md, IDENTITY.md, USER.md.
+    /// </summary>
+    public IReadOnlyList<string> SystemPromptFiles { get; init; } = [];
+
+    /// <summary>
     /// Tool identifiers this agent has access to.
     /// Resolved through the tool registry at agent creation time.
     /// </summary>

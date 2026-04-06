@@ -22,12 +22,6 @@ internal static class AgentDescriptorValidator
         if (string.IsNullOrWhiteSpace(descriptor.ApiProvider))
             errors.Add("ApiProvider is required.");
 
-        if (!string.IsNullOrWhiteSpace(descriptor.SystemPrompt) &&
-            !string.IsNullOrWhiteSpace(descriptor.SystemPromptFile))
-        {
-            errors.Add("SystemPrompt and SystemPromptFile are mutually exclusive.");
-        }
-
         if (descriptor.MaxConcurrentSessions < 0)
             errors.Add("MaxConcurrentSessions must be >= 0.");
 

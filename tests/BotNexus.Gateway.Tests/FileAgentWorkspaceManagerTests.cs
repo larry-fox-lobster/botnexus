@@ -21,16 +21,19 @@ public sealed class FileAgentWorkspaceManagerTests : IDisposable
         var workspace = await _workspaceManager.LoadWorkspaceAsync("farnsworth");
 
         workspace.AgentName.Should().Be("farnsworth");
-        workspace.Soul.Should().BeEmpty();
-        workspace.Identity.Should().BeEmpty();
-        workspace.User.Should().BeEmpty();
+        workspace.Soul.Should().Contain("# Soul");
+        workspace.Identity.Should().Contain("# Identity");
+        workspace.User.Should().Contain("# User");
         workspace.Memory.Should().BeEmpty();
 
         var workspacePath = _workspaceManager.GetWorkspacePath("farnsworth");
+        File.Exists(Path.Combine(workspacePath, "AGENTS.md")).Should().BeTrue();
         File.Exists(Path.Combine(workspacePath, "SOUL.md")).Should().BeTrue();
+        File.Exists(Path.Combine(workspacePath, "TOOLS.md")).Should().BeTrue();
+        File.Exists(Path.Combine(workspacePath, "BOOTSTRAP.md")).Should().BeTrue();
         File.Exists(Path.Combine(workspacePath, "IDENTITY.md")).Should().BeTrue();
         File.Exists(Path.Combine(workspacePath, "USER.md")).Should().BeTrue();
-        File.Exists(Path.Combine(workspacePath, "MEMORY.md")).Should().BeTrue();
+        File.Exists(Path.Combine(workspacePath, "MEMORY.md")).Should().BeFalse();
     }
 
     [Fact]

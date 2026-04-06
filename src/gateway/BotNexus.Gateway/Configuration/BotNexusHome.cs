@@ -16,9 +16,17 @@ public sealed class BotNexusHome(string? homePath = null)
 
     private static readonly string[] WorkspaceScaffoldFiles =
     [
+        "AGENTS.md",
         "SOUL.md",
+        "TOOLS.md",
+        "BOOTSTRAP.md",
         "IDENTITY.md",
-        "USER.md",
+        "USER.md"
+    ];
+
+    private static readonly string[] LegacyWorkspaceFiles =
+    [
+        .. WorkspaceScaffoldFiles,
         "MEMORY.md"
     ];
 
@@ -69,11 +77,29 @@ public sealed class BotNexusHome(string? homePath = null)
         var workspacePath = Path.Combine(agentDirectory, "workspace");
         Directory.CreateDirectory(workspacePath);
         Directory.CreateDirectory(Path.Combine(agentDirectory, "data", "sessions"));
+
+        var assembly = typeof(BotNexusHome).Assembly;
         foreach (var file in WorkspaceScaffoldFiles)
         {
             var path = Path.Combine(workspacePath, file);
-            if (!File.Exists(path))
-                File.WriteAllText(path, string.Empty);
+            if (File.Exists(path))
+                continue;
+
+            var resourceName = assembly.GetManifestResourceNames()
+                .FirstOrDefault(n => n.EndsWith($"Templates.{file}", StringComparison.OrdinalIgnoreCase));
+
+            if (resourceName is not null)
+            {
+                using var stream = assembly.GetManifestResourceStream(resourceName);
+                if (stream is not null)
+                {
+                    using var reader = new StreamReader(stream);
+                    File.WriteAllText(path, reader.ReadToEnd());
+                    continue;
+                }
+            }
+
+            File.WriteAllText(path, string.Empty);
         }
     }
 
@@ -83,7 +109,7 @@ public sealed class BotNexusHome(string? homePath = null)
         if (Directory.Exists(workspacePath))
             return;
 
-        var hasLegacyFiles = WorkspaceScaffoldFiles
+        var hasLegacyFiles = LegacyWorkspaceFiles
             .Any(f => File.Exists(Path.Combine(agentDirectory, f)));
         if (!hasLegacyFiles)
         {
@@ -93,7 +119,7 @@ public sealed class BotNexusHome(string? homePath = null)
 
         Directory.CreateDirectory(workspacePath);
         Directory.CreateDirectory(Path.Combine(agentDirectory, "data", "sessions"));
-        foreach (var file in WorkspaceScaffoldFiles)
+        foreach (var file in LegacyWorkspaceFiles)
         {
             var src = Path.Combine(agentDirectory, file);
             var dst = Path.Combine(workspacePath, file);

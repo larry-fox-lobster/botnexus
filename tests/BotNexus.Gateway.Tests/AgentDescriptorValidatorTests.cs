@@ -57,7 +57,7 @@ public sealed class AgentDescriptorValidatorTests
     }
 
     [Fact]
-    public void Validate_WithSystemPromptAndSystemPromptFile_ReturnsMutualExclusionError()
+    public void Validate_WithSystemPromptAndSystemPromptFile_ReturnsNoPromptErrors()
     {
         var descriptor = CreateValidDescriptor() with
         {
@@ -67,7 +67,7 @@ public sealed class AgentDescriptorValidatorTests
 
         var errors = AgentDescriptorValidator.Validate(descriptor);
 
-        errors.Should().Contain("SystemPrompt and SystemPromptFile are mutually exclusive.");
+        errors.Should().NotContain(error => error.Contains("SystemPrompt", StringComparison.Ordinal));
     }
 
     [Fact]

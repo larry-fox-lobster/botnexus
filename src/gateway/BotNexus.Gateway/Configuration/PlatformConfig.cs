@@ -189,7 +189,9 @@ public sealed class AgentDefinitionConfig
     public string? Model { get; set; }
     /// <summary>Model IDs this agent is allowed to use. Null means unrestricted within provider allowlist.</summary>
     public List<string>? AllowedModels { get; set; }
-    /// <summary>Optional path to an external system prompt file.</summary>
+    /// <summary>Ordered list of files to load as the system prompt. Empty = default order.</summary>
+    public List<string>? SystemPromptFiles { get; set; }
+    /// <summary>Path to a single system prompt file (legacy, prefer SystemPromptFiles).</summary>
     public string? SystemPromptFile { get; set; }
     /// <summary>Tool identifiers this agent has access to.</summary>
     public List<string>? ToolIds { get; set; }

@@ -28,12 +28,8 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
     }
 
     [Fact]
-    public async Task LoadAsync_WithEnabledAgents_MapsDescriptorAndLoadsSystemPromptFile()
+    public async Task LoadAsync_WithEnabledAgents_MapsDescriptorAndPromptFiles()
     {
-        var promptPath = Path.Combine(_configDirectory, "prompts", "assistant.txt");
-        Directory.CreateDirectory(Path.GetDirectoryName(promptPath)!);
-        await File.WriteAllTextAsync(promptPath, "You are helpful.");
-
         var config = new PlatformConfig
         {
             Agents = new Dictionary<string, AgentDefinitionConfig>
@@ -45,7 +41,7 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
                     Description = "Helpful assistant",
                     Model = "gpt-4.1",
                     AllowedModels = ["gpt-4.1", "gpt-4o"],
-                    SystemPromptFile = @"prompts\assistant.txt",
+                    SystemPromptFiles = ["AGENTS.md", "SOUL.md"],
                     SubAgents = ["helper-agent"],
                     IsolationStrategy = "remote",
                     MaxConcurrentSessions = 3,
@@ -80,13 +76,13 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
         descriptor.MaxConcurrentSessions.Should().Be(3);
         descriptor.Metadata.Should().ContainKey("owner").WhoseValue.Should().Be("team-gateway");
         descriptor.IsolationOptions.Should().ContainKey("timeoutMs").WhoseValue.Should().Be(1000L);
-        descriptor.SystemPrompt.Should().Be("You are helpful.");
+        descriptor.SystemPrompt.Should().BeNull();
+        descriptor.SystemPromptFiles.Should().Equal(["AGENTS.md", "SOUL.md"]);
     }
 
     [Fact]
-    public async Task LoadAsync_WithMissingSystemPromptFile_SkipsDescriptor()
+    public async Task LoadAsync_WithLegacySystemPromptFile_MapsSinglePromptFile()
     {
-        var logger = new ListLogger<PlatformConfigAgentSource>();
         var config = new PlatformConfig
         {
             Agents = new Dictionary<string, AgentDefinitionConfig>
@@ -100,14 +96,12 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
             }
         };
 
-        var source = new PlatformConfigAgentSource(Options.Create(config), _configDirectory, logger);
+        var source = new PlatformConfigAgentSource(Options.Create(config), _configDirectory, new ListLogger<PlatformConfigAgentSource>());
 
-        var descriptors = await source.LoadAsync();
+        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
 
-        descriptors.Should().BeEmpty();
-        logger.Entries.Should().Contain(e =>
-            e.Level == LogLevel.Warning &&
-            e.Message.Contains("was not found", StringComparison.Ordinal));
+        descriptor.SystemPromptFile.Should().Be(@"prompts\missing.txt");
+        descriptor.SystemPromptFiles.Should().Equal([@"prompts\missing.txt"]);
     }
 
     [Fact]

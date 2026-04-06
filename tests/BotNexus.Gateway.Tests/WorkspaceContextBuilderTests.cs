@@ -8,67 +8,94 @@ namespace BotNexus.Gateway.Tests;
 public sealed class WorkspaceContextBuilderTests
 {
     [Fact]
-    public async Task BuildSystemPromptAsync_WhenSoulExists_ComposesAllSections()
+    public async Task BuildSystemPromptAsync_WithExplicitPromptFiles_LoadsInOrderAndDeletesBootstrap()
     {
-        var manager = new StubWorkspaceManager(new AgentWorkspace(
-            "farnsworth",
-            Soul: "SOUL",
-            Identity: "IDENTITY",
-            User: "USER",
-            Memory: "MEMORY"));
-        var builder = new WorkspaceContextBuilder(manager);
-
-        var result = await builder.BuildSystemPromptAsync(new AgentDescriptor
+        var workspacePath = CreateWorkspace(
+            ("AGENTS.md", "AGENTS"),
+            ("SOUL.md", "SOUL"),
+            ("TOOLS.md", "TOOLS"),
+            ("BOOTSTRAP.md", "BOOTSTRAP"));
+        try
         {
-            AgentId = "farnsworth",
-            DisplayName = "Farnsworth",
-            ModelId = "test-model",
-            ApiProvider = "test-provider",
-            SystemPrompt = "CONFIG"
-        });
+            var manager = new StubWorkspaceManager(workspacePath);
+            var builder = new WorkspaceContextBuilder(manager);
 
-        result.Should().Be("SOUL\n\n---\n\nIDENTITY\n\n---\n\nCONFIG\n\n---\n\nUSER");
+            var result = await builder.BuildSystemPromptAsync(new AgentDescriptor
+            {
+                AgentId = "farnsworth",
+                DisplayName = "Farnsworth",
+                ModelId = "test-model",
+                ApiProvider = "test-provider",
+                SystemPromptFiles = ["AGENTS.md", "BOOTSTRAP.md", "TOOLS.md"]
+            });
+
+            result.Should().Be("AGENTS\n\nBOOTSTRAP\n\nTOOLS");
+            File.Exists(Path.Combine(workspacePath, "BOOTSTRAP.md")).Should().BeFalse();
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(workspacePath)!, recursive: true);
+        }
     }
 
     [Fact]
-    public async Task BuildSystemPromptAsync_WhenSoulMissing_UsesDescriptorSystemPrompt()
+    public async Task BuildSystemPromptAsync_WhenPromptFilesEmpty_UsesDefaultOrderAndPrependsInlinePrompt()
     {
-        var manager = new StubWorkspaceManager(new AgentWorkspace(
-            "farnsworth",
-            Soul: "",
-            Identity: "IDENTITY",
-            User: "USER",
-            Memory: "MEMORY"));
-        var builder = new WorkspaceContextBuilder(manager);
-
-        var result = await builder.BuildSystemPromptAsync(new AgentDescriptor
+        var workspacePath = CreateWorkspace(
+            ("AGENTS.md", "AGENTS"),
+            ("SOUL.md", "SOUL"),
+            ("IDENTITY.md", "IDENTITY"),
+            ("USER.md", "USER"));
+        try
         {
-            AgentId = "farnsworth",
-            DisplayName = "Farnsworth",
-            ModelId = "test-model",
-            ApiProvider = "test-provider",
-            SystemPrompt = "CONFIG"
-        });
+            var manager = new StubWorkspaceManager(workspacePath);
+            var builder = new WorkspaceContextBuilder(manager);
 
-        result.Should().Be("CONFIG");
+            var result = await builder.BuildSystemPromptAsync(new AgentDescriptor
+            {
+                AgentId = "farnsworth",
+                DisplayName = "Farnsworth",
+                ModelId = "test-model",
+                ApiProvider = "test-provider",
+                SystemPrompt = "INLINE"
+            });
+
+            result.Should().Be("INLINE\n\nAGENTS\n\nSOUL\n\nIDENTITY\n\nUSER");
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(workspacePath)!, recursive: true);
+        }
     }
 
     private sealed class StubWorkspaceManager : IAgentWorkspaceManager
     {
-        private readonly AgentWorkspace _workspace;
+        private readonly string _workspacePath;
 
-        public StubWorkspaceManager(AgentWorkspace workspace)
+        public StubWorkspaceManager(string workspacePath)
         {
-            _workspace = workspace;
+            _workspacePath = workspacePath;
         }
 
         public Task<AgentWorkspace> LoadWorkspaceAsync(string agentName, CancellationToken ct = default)
-            => Task.FromResult(_workspace);
+            => Task.FromResult(new AgentWorkspace(agentName, Soul: string.Empty, Identity: string.Empty, User: string.Empty, Memory: string.Empty));
 
         public Task SaveMemoryAsync(string agentName, string content, CancellationToken ct = default)
             => Task.CompletedTask;
 
         public string GetWorkspacePath(string agentName)
-            => string.Empty;
+            => _workspacePath;
+    }
+
+    private static string CreateWorkspace(params (string FileName, string Content)[] files)
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), "botnexus-workspace-context-tests", Guid.NewGuid().ToString("N"));
+        var workspacePath = Path.Combine(rootPath, "workspace");
+        Directory.CreateDirectory(workspacePath);
+
+        foreach (var (fileName, content) in files)
+            File.WriteAllText(Path.Combine(workspacePath, fileName), content);
+
+        return workspacePath;
     }
 }

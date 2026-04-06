@@ -20,9 +20,9 @@ public sealed class PlatformConfigAgentSource(
     private readonly ILogger<PlatformConfigAgentSource> _logger = logger;
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<AgentDescriptor>> LoadAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<AgentDescriptor>> LoadAsync(CancellationToken cancellationToken = default)
     {
-        return await LoadFromConfigAsync(_configOptions.Value, cancellationToken);
+        return Task.FromResult(LoadFromConfig(_configOptions.Value, cancellationToken));
     }
 
     /// <inheritdoc />
@@ -34,12 +34,15 @@ public sealed class PlatformConfigAgentSource(
         {
             try
             {
-                var descriptors = LoadFromConfigAsync(config, CancellationToken.None).GetAwaiter().GetResult();
+                var descriptors = LoadFromConfig(config, CancellationToken.None);
                 onChanged(descriptors);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to reload platform-config agents after config change notification.");
+                _logger.LogWarning(
+                    ex,
+                    "Failed to reload platform-config agents after config change notification for config directory '{ConfigDirectory}'.",
+                    _configDirectory);
             }
         };
 
@@ -47,7 +50,7 @@ public sealed class PlatformConfigAgentSource(
         return new Subscription(() => PlatformConfigLoader.ConfigChanged -= onPlatformConfigChanged);
     }
 
-    private async Task<IReadOnlyList<AgentDescriptor>> LoadFromConfigAsync(PlatformConfig platformConfig, CancellationToken cancellationToken)
+    private IReadOnlyList<AgentDescriptor> LoadFromConfig(PlatformConfig platformConfig, CancellationToken cancellationToken)
     {
         List<AgentDescriptor> descriptors = [];
         var agents = platformConfig.Agents;
@@ -68,6 +71,8 @@ public sealed class PlatformConfigAgentSource(
                 Description = agentConfig.Description,
                 ModelId = agentConfig.Model ?? string.Empty,
                 ApiProvider = agentConfig.Provider ?? string.Empty,
+                SystemPromptFile = agentConfig.SystemPromptFile,
+                SystemPromptFiles = ResolveSystemPromptFiles(agentConfig),
                 ToolIds = agentConfig.ToolIds?.ToArray() ?? [],
                 AllowedModelIds = agentConfig.AllowedModels?.ToArray() ?? [],
                 SubAgentIds = agentConfig.SubAgents?.ToArray() ?? [],
@@ -89,22 +94,21 @@ public sealed class PlatformConfigAgentSource(
                 continue;
             }
 
-            if (!string.IsNullOrWhiteSpace(agentConfig.SystemPromptFile))
-            {
-                var systemPrompt = await TryLoadSystemPromptFromFileAsync(agentId, agentConfig.SystemPromptFile, cancellationToken);
-                if (systemPrompt is null)
-                    continue;
-
-                descriptor = descriptor with
-                {
-                    SystemPrompt = systemPrompt
-                };
-            }
-
             descriptors.Add(descriptor);
         }
 
         return descriptors;
+    }
+
+    private static IReadOnlyList<string> ResolveSystemPromptFiles(AgentDefinitionConfig agentConfig)
+    {
+        if (agentConfig.SystemPromptFiles is { Count: > 0 })
+            return agentConfig.SystemPromptFiles.ToArray();
+
+        if (!string.IsNullOrWhiteSpace(agentConfig.SystemPromptFile))
+            return [agentConfig.SystemPromptFile];
+
+        return [];
     }
 
     private static IReadOnlyDictionary<string, object?> ConvertObject(JsonElement? element)
@@ -136,36 +140,6 @@ public sealed class PlatformConfigAgentSource(
             JsonValueKind.Null => null,
             _ => element.GetRawText()
         };
-
-    private async Task<string?> TryLoadSystemPromptFromFileAsync(
-        string agentId,
-        string systemPromptFile,
-        CancellationToken cancellationToken)
-    {
-        var resolvedPath = Path.GetFullPath(Path.Combine(_configDirectory, systemPromptFile));
-        var configDirectoryPrefix = _configDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-
-        if (!resolvedPath.StartsWith(configDirectoryPrefix, StringComparison.OrdinalIgnoreCase) &&
-            !resolvedPath.Equals(_configDirectory, StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogWarning(
-                "System prompt file '{SystemPromptFile}' for platform-config agent '{AgentId}' resolves outside the config directory. Path traversal blocked.",
-                systemPromptFile,
-                agentId);
-            return null;
-        }
-
-        if (!File.Exists(resolvedPath))
-        {
-            _logger.LogWarning(
-                "System prompt file '{SystemPromptFile}' was not found for platform-config agent '{AgentId}'.",
-                resolvedPath,
-                agentId);
-            return null;
-        }
-
-        return await File.ReadAllTextAsync(resolvedPath, cancellationToken);
-    }
 
     private sealed class Subscription(Action disposeAction) : IDisposable
     {
