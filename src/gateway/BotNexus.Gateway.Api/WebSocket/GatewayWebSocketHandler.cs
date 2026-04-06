@@ -50,6 +50,7 @@ public sealed class GatewayWebSocketHandler
     private readonly IOptions<GatewayWebSocketOptions> _webSocketOptions;
     private readonly ILogger<GatewayWebSocketHandler> _logger;
     private readonly ConcurrentDictionary<string, ConnectionAttemptWindow> _connectionAttempts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, string> _activeSessionConnections = new(StringComparer.OrdinalIgnoreCase);
     private long _connectionAttemptUpdates;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -86,6 +87,8 @@ public sealed class GatewayWebSocketHandler
     /// </summary>
     public async Task HandleAsync(HttpContext context, CancellationToken cancellationToken)
     {
+        const int SessionAlreadyConnectedCloseCode = 4409;
+
         if (!context.WebSockets.IsWebSocketRequest)
         {
             context.Response.StatusCode = 400;
@@ -115,16 +118,24 @@ public sealed class GatewayWebSocketHandler
             return;
         }
 
-        using var socket = await context.WebSockets.AcceptWebSocketAsync();
         var connectionId = Guid.NewGuid().ToString("N");
+        if (!_activeSessionConnections.TryAdd(sessionId, connectionId))
+        {
+            using var duplicateSocket = await context.WebSockets.AcceptWebSocketAsync();
+            await duplicateSocket.CloseAsync(
+                (WebSocketCloseStatus)SessionAlreadyConnectedCloseCode,
+                "Session already has an active connection",
+                cancellationToken);
+            return;
+        }
 
-        _logger.LogInformation("WebSocket connected: {ConnectionId} agent={AgentId} session={SessionId}", connectionId, agentId, sessionId);
-
-        // Send connected message
-        await SendJsonAsync(socket, new { type = "connected", connectionId, sessionId }, cancellationToken);
-
+        System.Net.WebSockets.WebSocket? socket = null;
         try
         {
+            socket = await context.WebSockets.AcceptWebSocketAsync();
+            _logger.LogInformation("WebSocket connected: {ConnectionId} agent={AgentId} session={SessionId}", connectionId, agentId, sessionId);
+
+            await SendJsonAsync(socket, new { type = "connected", connectionId, sessionId }, cancellationToken);
             await ProcessMessagesAsync(socket, agentId, sessionId, cancellationToken);
         }
         catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
@@ -137,6 +148,8 @@ public sealed class GatewayWebSocketHandler
         }
         finally
         {
+            socket?.Dispose();
+            _activeSessionConnections.TryRemove(new KeyValuePair<string, string>(sessionId, connectionId));
             _logger.LogInformation("WebSocket disconnected: {ConnectionId}", connectionId);
         }
     }

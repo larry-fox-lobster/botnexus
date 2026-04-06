@@ -122,6 +122,42 @@ public sealed class GatewayWebSocketHandlerTests
         handle.Verify(h => h.FollowUpAsync("next", It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task HandleAsync_WithDuplicateSessionConnection_ClosesSecondSocket()
+    {
+        var handler = CreateHandler();
+
+        var firstContext = new DefaultHttpContext();
+        firstContext.Request.QueryString = new QueryString("?agent=agent-a&session=session-123");
+        var firstSocket = new BlockingWebSocket();
+        firstContext.Features.Set<IHttpWebSocketFeature>(new TestWebSocketFeature
+        {
+            IsWebSocketRequest = true,
+            Socket = firstSocket
+        });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var firstConnectionTask = handler.HandleAsync(firstContext, cts.Token);
+        await firstSocket.ReceiveStarted.Task.WaitAsync(cts.Token);
+
+        var secondContext = new DefaultHttpContext();
+        secondContext.Request.QueryString = new QueryString("?agent=agent-a&session=session-123");
+        var secondSocket = new TestWebSocket();
+        secondContext.Features.Set<IHttpWebSocketFeature>(new TestWebSocketFeature
+        {
+            IsWebSocketRequest = true,
+            Socket = secondSocket
+        });
+
+        await handler.HandleAsync(secondContext, cts.Token);
+
+        secondSocket.LastCloseStatus.Should().Be((WebSocketCloseStatus)4409);
+        secondSocket.LastCloseDescription.Should().Be("Session already has an active connection");
+
+        firstSocket.AllowClose();
+        await firstConnectionTask;
+    }
+
     private static GatewayWebSocketHandler CreateHandler(IAgentSupervisor? supervisor = null)
         => new(
             supervisor ?? Mock.Of<IAgentSupervisor>(),
@@ -145,6 +181,8 @@ public sealed class GatewayWebSocketHandlerTests
         private readonly Queue<byte[]> _incomingMessages = new();
 
         public List<byte[]> SentMessages { get; } = [];
+        public WebSocketCloseStatus? LastCloseStatus { get; private set; }
+        public string? LastCloseDescription { get; private set; }
 
         public void QueueIncomingText(string text)
             => _incomingMessages.Enqueue(Encoding.UTF8.GetBytes(text));
@@ -159,6 +197,8 @@ public sealed class GatewayWebSocketHandlerTests
 
         public override Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
         {
+            LastCloseStatus = closeStatus;
+            LastCloseDescription = statusDescription;
             _state = WebSocketState.Closed;
             return Task.CompletedTask;
         }
@@ -187,6 +227,50 @@ public sealed class GatewayWebSocketHandlerTests
             SentMessages.Add(buffer.ToArray());
             return Task.CompletedTask;
         }
+
+        public override void Dispose()
+            => _state = WebSocketState.Closed;
+    }
+
+    private sealed class BlockingWebSocket : WebSocket
+    {
+        private WebSocketState _state = WebSocketState.Open;
+        private readonly TaskCompletionSource _allowClose = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource<bool> ReceiveStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void AllowClose() => _allowClose.TrySetResult();
+
+        public override WebSocketCloseStatus? CloseStatus => null;
+        public override string? CloseStatusDescription => null;
+        public override WebSocketState State => _state;
+        public override string? SubProtocol => null;
+
+        public override void Abort()
+            => _state = WebSocketState.Aborted;
+
+        public override Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
+        {
+            _state = WebSocketState.Closed;
+            return Task.CompletedTask;
+        }
+
+        public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
+        {
+            _state = WebSocketState.CloseSent;
+            return Task.CompletedTask;
+        }
+
+        public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
+        {
+            ReceiveStarted.TrySetResult(true);
+            await _allowClose.Task.WaitAsync(cancellationToken);
+            _state = WebSocketState.CloseReceived;
+            return new WebSocketReceiveResult(0, WebSocketMessageType.Close, true);
+        }
+
+        public override Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
+            => Task.CompletedTask;
 
         public override void Dispose()
             => _state = WebSocketState.Closed;
