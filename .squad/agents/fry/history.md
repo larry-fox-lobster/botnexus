@@ -59,7 +59,37 @@
 
 ## Learnings
 
-### Phase 12 Wave 2 — Channels & Extensions Panels
+### Phase 12 Wave 1 — ProvidersController & Alphabetical Sorting (Continuation)
+
+**Timestamp:** 2026-04-06T20:12:15Z  
+**Status:** ✅ Complete  
+**Commits:** 811a9a7 (Farnsworth), b4cc4be (Fry), 6fe9ba5 (Hermes), ad8e5ba (Coordinator)  
+
+**Deliverables:**
+- GET /api/providers endpoint from Farnsworth — unblocks provider dropdown
+- ModelsController alphabetical sorting — consistent with WebUI sorts
+- WebUI dropdown updates (provider, model, header) now sorted alphabetically:
+  - openAddAgentForm() — provider dropdown sorted
+  - loadModelsForProvider() — model dropdown sorted
+  - loadChatHeaderModels() — header model selector sorted
+- Test coverage: 6 new tests (ProvidersControllerTests + ModelsControllerTests)
+
+**Sync Points:**
+- Backend models sorted → WebUI dropdowns sort → consistent UX across platform
+- New tests validate both endpoint responses and sort order
+- No regressions — 442 gateway tests passing
+
+**Cross-Agent Impact:**
+- Farnsworth: Provided ProvidersController + sort logic
+- Fry: Matched WebUI sort order for data consistency
+- Hermes: Validated through ProvidersControllerTests + ModelsControllerTests
+- Coordinator: Fixed XML doc warnings on constructors
+
+**Reference:** Orchestration logs at `.squad/orchestration-log/2026-04-06T20-12-15Z-*.md`
+
+---
+
+### Phase 12 Wave 1 — Channels & Extensions Panels
 
 **Timestamp:** 2026-04-06  
 **Status:** ✅ Complete  
@@ -727,3 +757,10 @@ See decisions.md "Part 4: Implementation Phases & Work Items" for full roadmap w
 - `toolStartTimes` map + `setInterval` for live elapsed tracking, cleared on tool_end or abort
 - `updateSendButtonState()` manages send button label/style based on `isStreaming` state
 - CSS `.btn-steer` class for orange steering mode visual feedback
+
+## Cross-Agent Update (2026-04-06 — Scribe orchestration)
+
+**From:** Leela (Lead)  
+**Impact:** Observability proposal (Phase 13) establishes framework for future instrumentation. Fry's WebUI work (Phase 12 Wave 1) already uses correct logging patterns (M.E.L abstractions). No changes needed for Wave 1. Will integrate OTel spans in later waves if tracing becomes requirement for WebUI debugging.
+
+**Action:** None for current sprint. Monitor observability roadmap for Wave 3+ impact on WebSocket/channel layers.

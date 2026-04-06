@@ -97,6 +97,37 @@
 
 ---
 
+### 2026-04-06T20:12:15Z — ProvidersController & Alphabetical Model Sorting
+
+**Status:** ✅ Complete  
+**Commits:** 811a9a7 (ProvidersController + ModelsController sort), 6fe9ba5 (Test coverage), ad8e5ba (XML doc fixes)  
+**Tests:** ✅ 442 gateway tests passing
+
+**Deliverables:**
+1. ✅ GET /api/providers endpoint (ProvidersController)
+   - Returns list of available providers for UI dropdown population
+   - Commit: 811a9a7
+2. ✅ ModelsController alphabetical sort
+   - Models now sorted alphabetically by name for consistent dropdown UX
+   - Synchronized with Fry's WebUI sorting for data consistency
+   - Commit: 811a9a7
+3. ✅ XML doc fixes on controller constructors
+   - CS1591 warnings eliminated on both ProvidersController and ModelsController
+   - Commit: ad8e5ba
+
+**Test Coverage:**
+- ProvidersControllerTests.cs: 3 tests (empty state, populated state, sorting)
+- ModelsControllerTests.cs: 3 tests (empty state, populated state, sorting)
+- All tests passing, no regressions
+
+**Cross-Agent Sync:**
+- **Fry:** WebUI dropdowns (provider, model, header) sorted to match backend (b4cc4be)
+- **Hermes:** Test coverage validates both ProvidersController and ModelsController (6fe9ba5)
+
+**Reference:** Orchestration logs at `.squad/orchestration-log/2026-04-06T20-12-15Z-*.md`, session log at `.squad/log/2026-04-06T20-12-15Z-providers-endpoint-fix.md`.
+
+---
+
 ### 2026-04-03 — Nullable Generation Settings Implementation
 
 **Session:** Sprint 4 config work  

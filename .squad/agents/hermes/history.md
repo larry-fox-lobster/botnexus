@@ -55,14 +55,16 @@
 
 **Wave 1 Test Coverage Areas:**
 1. Security: Auth bypass fix regression tests (Bender's 4 tests) — /api/agents.json, /api/agents, /health, /swagger, static files
-2. Endpoints: Channel/extensions endpoints with DTO validation (Farnsworth's tests)
-3. Command Palette: Client-side execution pattern validation (Fry's tests)
-4. Config Path: CLI command behavior with edge cases (Hermes' tests)
-5. Documentation: WebSocket README examples validation (Kif's reference tests)
+2. Endpoints: Channel/extensions/providers endpoints with DTO validation (Farnsworth's tests)
+3. Dropdowns: Alphabetical sort validation for provider/model dropdowns (Hermes' + Fry's tests)
+4. Command Palette: Client-side execution pattern validation (Fry's tests)
+5. Config Path: CLI command behavior with edge cases (Hermes' tests)
+6. Documentation: WebSocket README examples validation (Kif's reference tests)
 
 **Test Strategy:**
 - CliConfigFixture spawns actual CLI processes with isolated BOTNEXUS_HOME (end-to-end without mocks)
 - GatewayAuthMiddlewareTests verifies route+file allowlist behavior
+- ProvidersControllerTests, ModelsControllerTests validate sort order consistency
 - ChannelsController, ExtensionsController test DTO shapes and response format
 - CommandPaletteTests validate autocomplete, keyboard navigation, execution
 - WebSocketTests verify protocol examples from README
@@ -73,11 +75,44 @@
 
 **Cross-Agent Dependencies:**
 - Bender's regression tests ready for merge
-- Farnsworth's endpoint tests ready for implementation
-- Fry's palette tests ready for implementation
+- Farnsworth's endpoint + sort tests ready for implementation (811a9a7 + 6fe9ba5)
+- Fry's palette tests ready for implementation (b4cc4be validates sort)
 - Kif's documentation examples ready for reference validation
 
-**Reference:** Orchestration log at `.squad/orchestration-log/2026-04-06T09-44-00Z-hermes.md`, config test approach decision at `.squad/decisions.md`.
+**Reference:** Orchestration log at `.squad/orchestration-log/2026-04-06T20-12-15Z-Hermes.md`, test coverage summary at `.squad/log/2026-04-06T20-12-15Z-providers-endpoint-fix.md`
+
+---
+
+### 2026-04-06T20:12:15Z — ProvidersController & ModelsController Test Coverage
+
+**Timestamp:** 2026-04-06T20:12:15Z  
+**Status:** ✅ Complete  
+**Commits:** 811a9a7 (ProvidersController), 6fe9ba5 (ProvidersControllerTests + ModelsControllerTests)  
+**Tests:** ✅ 442 gateway tests passing
+
+**Test Deliverables:**
+1. ProvidersControllerTests.cs (3 tests)
+   - GetProviders_Empty_ReturnsEmptyList() — validates empty state handling
+   - GetProviders_WithProviders_ReturnsAll() — validates data returned accurately
+   - GetProviders_Alphabetical_ReturnsSorted() — validates alphabetical order maintained
+
+2. ModelsControllerTests.cs (3 tests)
+   - GetModels_Empty_ReturnsEmptyList() — validates empty state handling
+   - GetModels_WithModels_ReturnsAll() — validates data returned accurately
+   - GetModels_Alphabetical_ReturnsSorted() — validates alphabetical order maintained
+
+**Test Design:**
+- Follows existing gateway test patterns for consistency
+- Tests validate both endpoint responses AND sort order contract
+- No mocks of business logic — test external behavior
+- Regression tests prevent sort order regression
+
+**Cross-Agent Validation:**
+- Tests confirm Farnsworth's ProvidersController and ModelsController sort implementations
+- Sort order tested matches Fry's WebUI dropdown sorts (b4cc4be)
+- Ensures data consistency across UI and API layers
+
+**Reference:** Commit 6fe9ba5, orchestration log at `.squad/orchestration-log/2026-04-06T20-12-15Z-Hermes.md`
 
 ---
 

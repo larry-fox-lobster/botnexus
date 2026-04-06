@@ -2245,3 +2245,11 @@ Wave 3 delivered 5 code commits + docs across 3 agents (Bender ×2, Farnsworth �
 4. **Serilog packages belong in the host only** — Library projects must never reference Serilog directly. `Serilog.AspNetCore` + sinks go in `Gateway.Api`; everything else stays on pure `Microsoft.Extensions.Logging.Abstractions`. This preserves the DIP boundary and keeps libraries portable.
 5. **`Console.WriteLine` in CLI tools is intentional UX, not a logging gap** — The 120+ `Console.Write*` calls in CLI/TUI projects are user-facing output, not diagnostic logging. These should NOT be migrated to Serilog. The CodingAgent's `NullLogger` is similarly intentional.
 6. **`OpenTelemetry.Api` is the lightweight library package** — Only the host needs the full SDK + exporters. Library projects that define `ActivitySource` spans only need `OpenTelemetry.Api` (~50 KB), keeping the dependency graph lean.
+
+## Cross-Agent Update (2026-04-06 — Scribe orchestration)
+
+**From:** Fry (Web Dev)  
+**Commit:** ab4dafa — Agent creation form fix (property name mapping)  
+**Impact:** Phase 12 Wave 1 continuation unblocked. Form now sends correct API contract (agentId, displayName, modelId, apiProvider). Fry will proceed with channels panel, extensions panel, and model selector in Wave 1 continuation.
+
+**Action:** None required from Leela. OTel proposal draft remains in inbox awaiting team decision.

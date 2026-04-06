@@ -1856,3 +1856,70 @@ None.
 4. Address carried Phase 5/6 findings (auth bypass, task leak) in Sprint 7B.
 5. Overall: Sprint 7A is solid work. Clean architecture, good test coverage, correct thread-safety patterns. The team delivered 8 features in 4+4+2+1 commits with zero regressions and 39 new tests. Grade: **A-** (minor structural nits prevent a clean A).
 
+
+---
+
+## Phase 13: Observability — OpenTelemetry + Serilog Foundation
+
+**2026-04-06 — Proposal by Leela (Lead)**
+
+### User Request (Jon Bullen — 2026-04-06T13:20:19Z)
+
+Platform should adopt **OpenTelemetry** and **Serilog** for structured logging and message traceability with spans and traces.
+
+### Executive Summary
+
+**Current State:** 73 log call sites, zero OTel, zero Serilog. Logging is non-structured, non-correlated, and platform lacks end-to-end tracing.
+
+**Proposal:** Adopt OTel + Serilog in 4 waves:
+- **Wave 1 (Low risk):** Serilog + OTel SDK wiring in Gateway.Api host
+- **Wave 2 (Medium risk):** Core tracing spans (Gateway, Providers, Agents)
+- **Wave 3 (Low risk):** Channel + Session spans
+- **Wave 4 (Low risk):** Tests, docs, hardening
+
+**Architecture:**
+1. Application code uses `Microsoft.Extensions.Logging` abstractions only (no vendor lock-in)
+2. Host-level Serilog integration via `UseSerilog()` replaces default provider
+3. OTel traces via `System.Diagnostics.Activity` (vendor-agnostic)
+4. CorrelationIdMiddleware evolves to map X-Correlation-Id <-> Activity.TraceId
+5. Four ActivitySource layers: Gateway, Providers, Channels, Agents
+
+**Packages:** Serilog suite + OpenTelemetry SDK/API/exporters in Gateway.Api; OpenTelemetry.Api in library layers.
+
+**Key Span Attributes:**
+- `botnexus.session.id`, `botnexus.agent.id`, `botnexus.channel.type`
+- `botnexus.provider.name`, `botnexus.model`, `botnexus.correlation.id`
+
+**Assignments:**
+- Wave 1-2: Bender (owner)
+- Wave 2 (providers): Farnsworth
+- Wave 3 (channels/sessions): Kif
+- Wave 4 (docs): Hermes
+
+**Status:** Draft — awaiting team decision.
+
+**Reference:** Full proposal in .squad/decisions/inbox/leela-otel-serilog-proposal.md
+
+---
+
+## Phase 12 Wave 1 — Agent Creation Form Fix
+
+**2026-04-06 — Fixed by Fry (Web Dev)**
+
+### Decision: Form Property Mapping Correction
+
+Agent creation form in WebUI was sending incorrect property names to AgentDescriptor API, causing validation failures.
+
+| Field | Bug | Fix | API Expected |
+|-------|-----|-----|--------------|
+| Agent name | Sent `name` | Send `displayName` | `displayName` |
+| Model | Sent display string | Send `modelId` | `modelId` |
+| Provider | (none) | Send `apiProvider` | `apiProvider` |
+
+**Solution:** Updated form submission handler in `app.js` to map form fields -> correct API contract.
+
+**Commit:** ab4dafa
+
+**Impact:** Agent creation form now functional. Unblocks Phase 12 Wave 1 continuation (channels panel, extensions panel, model selector).
+
+**Status:** ✅ Complete
