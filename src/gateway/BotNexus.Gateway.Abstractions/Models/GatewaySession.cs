@@ -27,6 +27,12 @@ public sealed class GatewaySession
     /// <summary>When the session was last active.</summary>
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    /// <summary>Current lifecycle status of the session.</summary>
+    public SessionStatus Status { get; set; } = SessionStatus.Active;
+
+    /// <summary>Timestamp when this session expires, if known.</summary>
+    public DateTimeOffset? ExpiresAt { get; set; }
+
     /// <summary>
     /// Conversation history as serializable entries.
     /// This is the Gateway-level view; the AgentCore maintains its own message timeline.

@@ -39,6 +39,7 @@ public static class GatewayServiceCollectionExtensions
     public static IServiceCollection AddBotNexusGateway(this IServiceCollection services, Action<GatewayOptions>? configure = null)
     {
         services.AddOptions<GatewayOptions>();
+        services.AddOptions<SessionCleanupOptions>();
         if (configure is not null)
             services.Configure(configure);
 
@@ -60,6 +61,7 @@ public static class GatewayServiceCollectionExtensions
 
         // Gateway host
         services.AddHostedService<GatewayHost>();
+        services.AddHostedService<SessionCleanupService>();
 
         var defaultAgentConfigPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "agents"));
         if (Directory.Exists(defaultAgentConfigPath) &&

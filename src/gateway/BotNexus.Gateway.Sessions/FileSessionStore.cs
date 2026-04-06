@@ -142,7 +142,9 @@ public sealed class FileSessionStore : ISessionStore
             ChannelType = meta.ChannelType,
             CallerId = meta.CallerId,
             CreatedAt = meta.CreatedAt,
-            UpdatedAt = meta.UpdatedAt
+            UpdatedAt = meta.UpdatedAt,
+            Status = meta.Status,
+            ExpiresAt = meta.ExpiresAt
         };
 
         var historyPath = GetHistoryPath(sessionId);
@@ -174,7 +176,14 @@ public sealed class FileSessionStore : ISessionStore
 
         // Write metadata sidecar
         var metaPath = GetMetaPath(session.SessionId);
-        var meta = new SessionMeta(session.AgentId, session.ChannelType, session.CallerId, session.CreatedAt, session.UpdatedAt);
+        var meta = new SessionMeta(
+            session.AgentId,
+            session.ChannelType,
+            session.CallerId,
+            session.CreatedAt,
+            session.UpdatedAt,
+            session.Status,
+            session.ExpiresAt);
         var metaJson = JsonSerializer.Serialize(meta, JsonOptions);
         await File.WriteAllTextAsync(metaPath, metaJson, cancellationToken).ConfigureAwait(false);
     }
@@ -189,5 +198,7 @@ public sealed class FileSessionStore : ISessionStore
         string? ChannelType,
         string? CallerId,
         DateTimeOffset CreatedAt,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        SessionStatus Status = SessionStatus.Active,
+        DateTimeOffset? ExpiresAt = null);
 }
