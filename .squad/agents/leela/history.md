@@ -2253,3 +2253,12 @@ Wave 3 delivered 5 code commits + docs across 3 agents (Bender ×2, Farnsworth �
 **Impact:** Phase 12 Wave 1 continuation unblocked. Form now sends correct API contract (agentId, displayName, modelId, apiProvider). Fry will proceed with channels panel, extensions panel, and model selector in Wave 1 continuation.
 
 **Action:** None required from Leela. OTel proposal draft remains in inbox awaiting team decision.
+
+## Learnings — Provider/Model Configuration Proposal (2026-04-08)
+
+1. **BuiltInModels registers 29 models across 3 providers unconditionally** — `RegisterAll()` populates github-copilot (20), anthropic (4), and openai (5) models with no filtering. The `ModelRegistry` has no concept of active/inactive and no allowlist mechanism. Both `ProvidersController` and `ModelsController` return everything unfiltered.
+2. **ProviderConfig already exists but is minimal** — `PlatformConfig.Providers` is a `Dictionary<string, ProviderConfig>` with only `ApiKey`, `BaseUrl`, and `DefaultModel`. No `Enabled` flag, no `Models` allowlist. Adding these fields is backward-compatible since both default safely (`Enabled = true`, `Models = null` = all).
+3. **Decorator/wrapper beats mutation for model filtering** — Don't modify `ModelRegistry` contents to filter. Introduce `IModelFilter` that wraps the full registry and applies config-based filtering. The full registry stays available for admin/diagnostics. Controllers switch from `ModelRegistry` to `IModelFilter`.
+4. **AgentDescriptor has no model restriction concept** — Only `ModelId` (single default) and `ApiProvider` exist. Adding `AllowedModelIds` as an `IReadOnlyList<string>` with empty = unrestricted semantics maintains backward compat and follows the same pattern as `ToolIds` and `SubAgentIds`.
+5. **3-layer filtering composes cleanly** — Layer 1 (platform config: enabled + allowlist) → Layer 2 (API endpoints: return filtered) → Layer 3 (per-agent: intersection with agent's AllowedModelIds). Each layer is independent and testable.
+6. **GatewayAuthManager already has provider config lookup** — The auth resolution chain (auth.json → env vars → PlatformConfig) and `TryGetProviderConfig()` helper mean the `Enabled` flag can integrate naturally into the auth flow. A disabled provider could short-circuit auth resolution.
