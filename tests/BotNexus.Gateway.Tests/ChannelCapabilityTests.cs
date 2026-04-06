@@ -7,6 +7,7 @@ using BotNexus.Gateway.Abstractions.Models;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using System.Net.Http;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -49,16 +50,25 @@ public sealed class ChannelCapabilityTests
     }
 
     [Fact]
-    public void TelegramAdapter_NoAdvancedCapabilities()
+    public void TelegramAdapter_SupportsStreamingThinkingAndToolDisplay()
     {
+        using var httpClient = new HttpClient();
+        var options = Options.Create(new TelegramOptions { BotToken = "token" });
+        var apiClient = new TelegramBotApiClient(
+            httpClient,
+            options,
+            NullLogger<TelegramBotApiClient>.Instance);
         var adapter = new TelegramChannelAdapter(
             NullLogger<TelegramChannelAdapter>.Instance,
-            Options.Create(new TelegramOptions()));
+            options,
+            apiClient);
 
+        adapter.SupportsStreaming.Should().BeTrue();
         adapter.SupportsSteering.Should().BeFalse();
         adapter.SupportsFollowUp.Should().BeFalse();
-        adapter.SupportsThinkingDisplay.Should().BeFalse();
-        adapter.SupportsToolDisplay.Should().BeFalse();
+        adapter.SupportsThinkingDisplay.Should().BeTrue();
+        adapter.SupportsToolDisplay.Should().BeTrue();
+        adapter.Should().BeAssignableTo<IStreamEventChannelAdapter>();
     }
 
     [Fact]
