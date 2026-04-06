@@ -33,6 +33,18 @@ All REST endpoints are in the `/api/` path and require authentication (if config
 | `POST` | `/api/chat/steer` | Inject a steering message into an active agent run |
 | `POST` | `/api/chat/follow-up` | Queue a follow-up message for an active agent session |
 
+#### Channels (`/api/channels`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/channels` | List registered channel adapters and their capabilities |
+
+#### Extensions (`/api/extensions`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/extensions` | List loaded runtime extensions and their declared types |
+
 #### Sessions (`/api/sessions`)
 
 | Method | Path | Description |
@@ -83,7 +95,14 @@ Subscribes to real-time activity events (agent started, tool called, streaming e
 
 ### Authentication (`GatewayAuthMiddleware`)
 
-Validates all requests (except health, WebUI, Swagger) using:
+Validates all requests using a route-based allowlist. The following paths skip authentication:
+
+- `/health` — Health check endpoint
+- `/webui/**` — Built-in web interface
+- `/swagger/**` — OpenAPI documentation
+- Static files in `wwwroot` — GET/HEAD requests for files that exist in the web root (excludes `/api/**` paths)
+
+All other requests require:
 
 1. **API Key header:** `X-Api-Key: <key>`
 2. **Bearer token:** `Authorization: Bearer <token>`
@@ -101,9 +120,11 @@ Development mode allows any origin. Production mode restricts to origins configu
 | Type | Namespace | Description |
 |------|-----------|-------------|
 | `AgentsController` | Controllers | Agent registration and lifecycle endpoints |
+| `ChannelsController` | Controllers | Channel adapter introspection endpoint |
 | `ChatController` | Controllers | Chat and message steering endpoints |
-| `SessionsController` | Controllers | Session management endpoints |
 | `ConfigController` | Controllers | Configuration validation endpoint (`/api/config/validate`) |
+| `ExtensionsController` | Controllers | Loaded extension introspection endpoint |
+| `SessionsController` | Controllers | Session management endpoints |
 
 ### Models
 
@@ -112,7 +133,9 @@ Development mode allows any origin. Production mode restricts to origins configu
 | `ChatRequest` | Controllers | Request to `/api/chat` — agent ID, message, optional session ID |
 | `ChatResponse` | Controllers | Response from `/api/chat` — session ID, content, usage |
 | `AgentControlRequest` | Controllers | Request to `/api/chat/steer` or `/follow-up` — agent ID, session ID, message |
-| `SessionHistoryResponse` | Controllers | Paginated history response — offset, limit, total count, entries |
+| `ChannelAdapterResponse` | Controllers | Channel adapter capability and status DTO |
+| `ExtensionResponse` | Controllers | Loaded extension metadata DTO |
+| `SessionHistoryResponse` | Abstractions.Models | Paginated history response — offset, limit, total count, entries |
 
 ### Middleware & Security
 
