@@ -1,5 +1,231 @@
 # Decisions Log
 
+## Active Decisions
+
+### Phase 9 Wave 2 — CORS, Agent Update, Replay Buffer, Conformance Tests
+
+**2026-04-06 — Merged from inbox (7 decisions)**
+
+#### 1. CORS Policy + Agent Update Endpoint (Bender)
+
+**Date:** 2026-04-06  
+**Owner:** Bender (Runtime)  
+
+**Decisions:**
+
+1. **CORS policy source**
+   - Added a named CORS policy in `Program.cs`
+   - Development environment allows all origins/headers/methods for local iteration
+   - Non-development reads `allowedOrigins` from platform config (`gateway.cors` preferred, root `cors` legacy fallback)
+   - If no origins configured, fallback to `http://localhost:5005` for local WebUI interoperability
+
+2. **CORS placement**
+   - Inserted `UseCors` before `GatewayAuthMiddleware` for correct preflight/browser request handling
+
+3. **Agent update semantics**
+   - Added `PUT /api/agents/{agentId}` and `IAgentRegistry.Update`
+   - Agent identity route-owned; updates preserve agentId and modify descriptor fields in-place
+   - Registry update returns 404 when target registration does not exist
+
+**Files touched:** `src\gateway\BotNexus.Gateway.Api\Program.cs`, `AgentsController.cs`, `IAgentRegistry.cs`, `DefaultAgentRegistry.cs`, `PlatformConfig.cs`, `PlatformConfigLoader.cs`, `GatewayServiceCollectionExtensions.cs`
+
+**Commits:** cc99842, 4a842e7
+
+---
+
+#### 2. HttpClient Registration via IHttpClientFactory (Bender)
+
+**Date:** 2026-04-05  
+**Owner:** Bender (Runtime)  
+
+**Context:** Gateway DI used raw singleton `HttpClient` with 10-minute timeout. Pattern vulnerable to stale DNS and socket exhaustion.
+
+**Decision:** Use `IHttpClientFactory` with named client:
+1. Register factory services with `AddHttpClient()`
+2. Register named client `"BotNexus"` with `Timeout = TimeSpan.FromMinutes(10)`
+3. Register `HttpClient` singleton via `factory.CreateClient("BotNexus")` so frozen provider constructors remain unchanged
+
+**Consequences:** Existing provider APIs unchanged (`HttpClient` constructor injection still works). Gateway runtime aligns with resilient HttpClient lifecycle. Current timeout semantics maintained while removing singleton anti-pattern.
+
+**Status:** Complete (Commit 4a842e7)
+
+---
+
+#### 3. Session Replay Buffer Extraction (Farnsworth)
+
+**Date:** 2026-04-06  
+**Owner:** Farnsworth (Platform)  
+
+**Decision:** Replay sequencing and replay-window storage belong to a dedicated `SessionReplayBuffer` abstraction, while `GatewaySession` remains responsible for session history and lifecycle metadata.
+
+**Rationale:** `GatewaySession` had separate lock domains (history + replay), indicating two independent responsibilities. Extracting replay keeps lock ownership local to replay operations and leaves `GatewaySession` focused on conversation/session concerns.
+
+**Compatibility:** Keep `GatewaySession` replay-facing APIs as wrappers so existing persistence and call sites continue to work; newer paths can call `session.ReplayBuffer` directly.
+
+**Status:** Complete (Commit def9a4a) — SRP fix, 279 Gateway tests passing
+
+---
+
+#### 4. Provider Conformance Test Architecture (Hermes)
+
+**Date:** 2026-04-06  
+**Owner:** Hermes (Tester)  
+
+**Decision:** Implement provider normalization conformance as a shared abstract test base in a dedicated helper project (`tests/BotNexus.Providers.Conformance.Tests`), with each provider test project inheriting and providing provider-specific SSE fixture payload builders.
+
+**Rationale:** Keeps conformance assertions in one place while preserving provider-specific wire-format setup locally. Minimizes maintenance drift, ensures every provider runs identical contract assertions, avoids coupling frozen production provider code to test-only abstractions.
+
+**Compatibility:** Helper project marked `IsTestProject=false` and consumed via project references, so provider suites execute inherited tests while `dotnet test` does not run the helper assembly directly.
+
+**Status:** Complete (Commit 2a0044d) — Wired into Anthropic, OpenAI, OpenAICompat, Copilot test projects
+
+---
+
+#### 5. Dev Loop Documentation Overhaul (Kif)
+
+**Date:** 2026-04-06  
+**Owner:** Kif (Documentation)  
+**Status:** Implemented
+
+**Context:** Dev loop docs accumulated accuracy issues: broken pre-commit hook path, references to non-existent scripts (`pack.ps1`, `install.ps1`), phantom test project names, missing script parameters, gap in section numbering.
+
+**Decisions:**
+
+1. **Pre-commit hook targets Gateway tests, not unit tests** — No `BotNexus.Tests.Unit` project exists. Pre-commit hook now runs `tests/BotNexus.Gateway.Tests` for fast feedback.
+
+2. **Removed phantom script references** — `scripts/pack.ps1` and `scripts/install.ps1` don't exist. Documentation now references only 4 actual scripts: `dev-loop.ps1`, `start-gateway.ps1`, `export-openapi.ps1`, `install-pre-commit-hook.ps1`.
+
+3. **`dev-loop.md` is canonical dev loop reference** — Restructured as single authoritative source for the edit→build→test→run→verify cycle, including live Copilot testing and auth.json setup.
+
+**Rationale:** Docs referencing non-existent paths create friction for human developers and AI agents. Accuracy over completeness.
+
+---
+
+#### 6. Phase 9 Full Gateway Design Review — Grade A- (Leela)
+
+**Date:** 2026-04-06  
+**By:** Leela (Lead/Architect)
+
+**Status:** Complete
+
+**Scope:** Comprehensive design review of Gateway service (Abstractions, Core, API, Sessions, Channels) after 7+ phases of development.
+
+**Grade:** A-  
+**SOLID Score:** 24/25  
+**Tests Passing:** 276 Gateway + 35 support = 311 total  
+**Build:** 0 errors, 31 CS1591 warnings (missing XML docs)  
+**P0 Issues:** None  
+**P1 Items Identified:** 6 (replay buffer extraction, WS handler decomposition, IHttpClientFactory, StreamAsync leak, WebSocket payload validation, SessionHistoryResponse relocation)
+
+**Key Recommendations:**
+1. Extract replay buffer (SRP violation in GatewaySession dual-lock pattern)
+2. Adopt IHttpClientFactory (socket exhaustion risk in singleton pattern)
+3. Decompose WebSocket handler (458 lines, 5 responsibilities)
+
+**Architecture Assessment:**
+- ✅ Clean contract interfaces
+- ✅ Ship-ready for current scope
+- ✅ P1 items are refinements, not structural problems
+- ⚠️ 6 P1 items for Sprint 7B (now Sprint 9A/B)
+
+**Full review:** `.squad/sessions/2026-04-06T04-design-review.md`
+
+---
+
+#### 7. Phase 9 Gateway Requirements Gap Analysis (Leela)
+
+**Date:** 2026-04-06  
+**Author:** Leela (Lead/Architect)  
+**Baseline:** Build 0 errors/31 CS1591 warnings, 811 tests (276 Gateway), Phase 8 Grade A-
+
+**Requirement Scorecard:**
+
+| # | Requirement | Status | Score |
+|---|-------------|--------|-------|
+| 1 | Agent Management | ✅ Complete | 100% |
+| 2 | Isolation Strategies | ⚠️ Partial | 35% |
+| 3 | Channel Adapters | ⚠️ Partial | 70% |
+| 4 | Session Management | ✅ Complete | 95% |
+| 5 | API Surface | ⚠️ Partial | 85% |
+| 6 | Platform Configuration | ⚠️ Partial | 65% |
+
+**P1 Items (Prioritized Backlog):**
+
+| ID | Gap | Requirement | Effort | Status |
+|----|-----|-------------|--------|--------|
+| P1-1 | Dynamic extension loading | Req 6 + User Directive 2a | L | —  |
+| P1-2 | CORS configuration | Req 3, 5 | S | ✅ Complete |
+| P1-3 | `botnexus init` command | Req 6 | M | —  |
+| P1-4 | JSON Schema generation | Req 6 | M | —  |
+| P1-5 | CLI agent management | Req 6 | M | —  |
+| P1-6 | Agent update endpoint | Req 5 | S | ✅ Complete |
+| P1-7 | Telegram Bot API | Req 3 | L | —  |
+| P1-C1 | Extract replay buffer | Req 4 (SRP) | M | ✅ Complete |
+| P1-C2 | IHttpClientFactory | Quality | S | ✅ Complete |
+| P1-C3 | Decompose WS handler | Quality (SRP) | M | —  |
+| P1-C4 | Provider conformance tests | Quality | M | ✅ Complete |
+
+**P2 Items (Important polish):**
+
+- P2-1/2/3: Isolation strategy implementations (XL)
+- P2-4: Multi-tenant session isolation (L)
+- P2-5: Fix 31 CS1591 warnings (S)
+- P2-6: Correlation/request IDs (S)
+- P2-7: Channel health endpoint (S)
+- P2-8: WebUI framework (L)
+- P2-9: Extension signing (M)
+- P2-10: Config set/get CLI (S)
+- P2-11: OAuth on Gateway API (M)
+
+**Frozen Code Proposals:**
+
+1. **FROZEN-1: IHttpClientFactory in Providers** (P1-C2 — ✅ Approved Wave 2)
+   - Affects: OpenAI, Anthropic, Copilot providers
+   - Low risk — method signatures unchanged
+   - Recommendation: Approved (Commit 4a842e7)
+
+2. **FROZEN-2: Provider Conformance Tests** (P1-C4 — ✅ Approved Wave 2)
+   - Affects: All provider test projects
+   - Zero risk — tests only, no production changes
+   - Recommendation: Approved (Commit 2a0044d)
+
+3. **FROZEN-3: StreamAsync Background Task Leak** (Deferred Phase 10)
+   - Affects: Provider streaming implementations
+   - Medium risk — requires streaming internals review
+   - Recommendation: Defer unless observed
+
+**Sprint Recommendations:**
+
+**Sprint 9A — Foundation (3-4 days):**
+- P1-1: Dynamic extension loading (Farnsworth, 2d)
+- P1-2: CORS configuration (Bender, 0.5d) ✅ **Complete**
+- P1-6: PUT /api/agents/{id} (Bender, 0.5d) ✅ **Complete**
+- P1-C1: Extract SessionReplayBuffer (Farnsworth, 1d) ✅ **Complete**
+- P1-C3: Decompose GatewayWebSocketHandler (Bender, 1d)
+
+**Sprint 9B — CLI & Config (3-4 days):**
+- P1-3: `botnexus init` (Fry, 1d)
+- P1-4: JSON Schema generation (Fry, 1d)
+- P1-5: CLI agent management (Fry, 1.5d)
+- P2-5: Fix CS1591 warnings (Any, 0.5d)
+- P2-6: Correlation IDs (Bender, 0.5d)
+
+**Sprint 9C — Channel & Quality (3-4 days):**
+- P1-7: Telegram Bot API (Farnsworth, 2d)
+- FROZEN-2: Provider conformance tests (Hermes, 1.5d) ✅ **Complete**
+- FROZEN-1: IHttpClientFactory (Farnsworth, 0.5d) ✅ **Complete**
+
+**Deferred to Phase 10+:**
+- Isolation strategy implementations (Sandbox, Container, Remote)
+- Multi-tenant session isolation
+- WebUI framework + build pipeline
+- OAuth on Gateway API
+- StreamAsync task leak
+
+---
+
+---
+
 ## Retrospective — Port Audit Phase 3
 
 **Facilitator:** Leela (Lead/Architect)  
