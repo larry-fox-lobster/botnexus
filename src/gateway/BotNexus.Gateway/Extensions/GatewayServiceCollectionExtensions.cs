@@ -185,7 +185,20 @@ public static class GatewayServiceCollectionExtensions
             return;
         }
 
-        throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), ["gateway.sessionStore.type must be either 'InMemory' or 'File'."]);
+        if (resolvedType.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
+        {
+            var connectionString = sessionStore?.ConnectionString;
+            if (string.IsNullOrWhiteSpace(connectionString))
+                throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), ["gateway.sessionStore.connectionString is required when gateway.sessionStore.type is 'Sqlite'."]);
+
+            services.Replace(ServiceDescriptor.Singleton<ISessionStore>(serviceProvider =>
+                new SqliteSessionStore(
+                    connectionString,
+                    serviceProvider.GetRequiredService<ILogger<SqliteSessionStore>>())));
+            return;
+        }
+
+        throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), ["gateway.sessionStore.type must be either 'InMemory', 'File', or 'Sqlite'."]);
     }
 
     /// <summary>

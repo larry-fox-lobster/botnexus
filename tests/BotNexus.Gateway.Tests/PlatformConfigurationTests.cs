@@ -352,6 +352,17 @@ public sealed class PlatformConfigurationTests
     }
 
     [Fact]
+    public void PlatformConfigLoader_Validate_WithSqliteSessionStoreMissingConnectionString_ReturnsActionableError()
+    {
+        var errors = PlatformConfigLoader.Validate(new PlatformConfig
+        {
+            SessionStore = new SessionStoreConfig { Type = "Sqlite" }
+        });
+
+        errors.Should().ContainSingle(e => e.Contains("gateway.sessionStore.connectionString", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void AddPlatformConfiguration_WithInMemorySessionStore_RegistersInMemorySessionStore()
     {
         using var fixture = new PlatformConfigFixture(new PlatformConfig
@@ -392,6 +403,28 @@ public sealed class PlatformConfigurationTests
         using var provider = services.BuildServiceProvider();
         var sessionStore = provider.GetRequiredService<ISessionStore>();
         sessionStore.Should().BeOfType<FileSessionStore>();
+    }
+
+    [Fact]
+    public void AddPlatformConfiguration_WithSqliteSessionStore_RegistersSqliteSessionStore()
+    {
+        using var fixture = new PlatformConfigFixture(new PlatformConfig
+        {
+            SessionStore = new SessionStoreConfig
+            {
+                Type = "Sqlite",
+                ConnectionString = "Data Source=sessions.db"
+            }
+        });
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddBotNexusGateway();
+        services.AddPlatformConfiguration(fixture.ConfigPath);
+
+        using var provider = services.BuildServiceProvider();
+        var sessionStore = provider.GetRequiredService<ISessionStore>();
+        sessionStore.Should().BeOfType<SqliteSessionStore>();
     }
 
     [Fact]

@@ -198,10 +198,12 @@ public sealed class ChannelConfig
 /// <summary>Session store implementation configuration.</summary>
 public sealed class SessionStoreConfig
 {
-    /// <summary>Store type. Supported values: InMemory or File.</summary>
+    /// <summary>Store type. Supported values: InMemory, File, or Sqlite.</summary>
     public string? Type { get; set; }
     /// <summary>Path used by file-based session store implementation.</summary>
     public string? FilePath { get; set; }
+    /// <summary>Connection string used by SQLite session store implementation.</summary>
+    public string? ConnectionString { get; set; }
 }
 
 /// <summary>API key entry used for multi-tenant gateway auth.</summary>

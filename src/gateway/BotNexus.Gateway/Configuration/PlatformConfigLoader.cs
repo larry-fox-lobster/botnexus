@@ -333,7 +333,15 @@ public static class PlatformConfigLoader
             return;
         }
 
-        errors.Add("gateway.sessionStore.type must be either 'InMemory' or 'File'.");
+        if (configuredType.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(sessionStore.ConnectionString))
+                errors.Add("gateway.sessionStore.connectionString is required when gateway.sessionStore.type is 'Sqlite'.");
+
+            return;
+        }
+
+        errors.Add("gateway.sessionStore.type must be either 'InMemory', 'File', or 'Sqlite'.");
     }
 
     private static void ValidateCors(CorsConfig? cors, List<string> errors)
