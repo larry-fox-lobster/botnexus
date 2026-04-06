@@ -2,7 +2,9 @@ using System.Text;
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Api;
 using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -22,6 +24,7 @@ public sealed class GatewayAuthMiddlewareRuntimeTests
                 return Task.CompletedTask;
             },
             authHandler.Object,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -42,6 +45,7 @@ public sealed class GatewayAuthMiddlewareRuntimeTests
         var middleware = new GatewayAuthMiddleware(
             _ => Task.CompletedTask,
             authHandler.Object,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -72,6 +76,7 @@ public sealed class GatewayAuthMiddlewareRuntimeTests
         var middleware = new GatewayAuthMiddleware(
             _ => Task.CompletedTask,
             authHandler.Object,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -86,4 +91,12 @@ public sealed class GatewayAuthMiddlewareRuntimeTests
 
         context.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
     }
+
+    private static IWebHostEnvironment CreateWebHostEnvironment()
+    {
+        var webHostEnvironment = new Mock<IWebHostEnvironment>(MockBehavior.Strict);
+        webHostEnvironment.SetupGet(environment => environment.WebRootFileProvider).Returns(new NullFileProvider());
+        return webHostEnvironment.Object;
+    }
 }
+

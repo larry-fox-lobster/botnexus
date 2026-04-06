@@ -5,7 +5,6 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -26,6 +25,7 @@ public sealed class GatewayAuthMiddlewareTests
                 return Task.CompletedTask;
             },
             handler,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -45,6 +45,7 @@ public sealed class GatewayAuthMiddlewareTests
         var middleware = new GatewayAuthMiddleware(
             _ => Task.CompletedTask,
             handler,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -63,6 +64,7 @@ public sealed class GatewayAuthMiddlewareTests
         var middleware = new GatewayAuthMiddleware(
             _ => Task.CompletedTask,
             handler,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -87,6 +89,7 @@ public sealed class GatewayAuthMiddlewareTests
                 return Task.CompletedTask;
             },
             authHandler.Object,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -111,6 +114,7 @@ public sealed class GatewayAuthMiddlewareTests
                 return Task.CompletedTask;
             },
             authHandler.Object,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -133,6 +137,7 @@ public sealed class GatewayAuthMiddlewareTests
                 return Task.CompletedTask;
             },
             authHandler.Object,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -167,6 +172,7 @@ public sealed class GatewayAuthMiddlewareTests
         var middleware = new GatewayAuthMiddleware(
             _ => Task.CompletedTask,
             handler,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -191,6 +197,7 @@ public sealed class GatewayAuthMiddlewareTests
                 return Task.CompletedTask;
             },
             handler,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -219,6 +226,7 @@ public sealed class GatewayAuthMiddlewareTests
                 return Task.CompletedTask;
             },
             handler,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -246,6 +254,7 @@ public sealed class GatewayAuthMiddlewareTests
                 return Task.CompletedTask;
             },
             authHandler.Object,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -263,6 +272,7 @@ public sealed class GatewayAuthMiddlewareTests
         var middleware = new GatewayAuthMiddleware(
             _ => Task.CompletedTask,
             handler,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -280,6 +290,7 @@ public sealed class GatewayAuthMiddlewareTests
         var middleware = new GatewayAuthMiddleware(
             _ => Task.CompletedTask,
             handler,
+            CreateWebHostEnvironment(),
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
@@ -297,23 +308,16 @@ public sealed class GatewayAuthMiddlewareTests
     public async Task StaticFileUnderApiPath_DoesNotSkipAuth()
     {
         var handler = new ApiKeyGatewayAuthHandler(apiKey: "test-key", NullLogger<ApiKeyGatewayAuthHandler>.Instance);
-        var middleware = new GatewayAuthMiddleware(
-            _ => Task.CompletedTask,
-            handler,
-            NullLogger<GatewayAuthMiddleware>.Instance);
-
         var fileProvider = new Mock<IFileProvider>(MockBehavior.Strict);
         var webHostEnvironment = new Mock<IWebHostEnvironment>(MockBehavior.Strict);
         webHostEnvironment.SetupGet(environment => environment.WebRootFileProvider).Returns(fileProvider.Object);
+        var middleware = new GatewayAuthMiddleware(
+            _ => Task.CompletedTask,
+            handler,
+            webHostEnvironment.Object,
+            NullLogger<GatewayAuthMiddleware>.Instance);
 
-        var services = new ServiceCollection()
-            .AddSingleton<IWebHostEnvironment>(webHostEnvironment.Object)
-            .BuildServiceProvider();
-
-        var context = new DefaultHttpContext
-        {
-            RequestServices = services
-        };
+        var context = new DefaultHttpContext();
         context.Request.Method = HttpMethods.Get;
         context.Request.Path = "/api/agents.css";
         context.Response.Body = new MemoryStream();
@@ -328,23 +332,16 @@ public sealed class GatewayAuthMiddlewareTests
     public async Task NonGetStaticFileRequest_DoesNotSkipAuth()
     {
         var handler = new ApiKeyGatewayAuthHandler(apiKey: "test-key", NullLogger<ApiKeyGatewayAuthHandler>.Instance);
-        var middleware = new GatewayAuthMiddleware(
-            _ => Task.CompletedTask,
-            handler,
-            NullLogger<GatewayAuthMiddleware>.Instance);
-
         var fileProvider = new Mock<IFileProvider>(MockBehavior.Strict);
         var webHostEnvironment = new Mock<IWebHostEnvironment>(MockBehavior.Strict);
         webHostEnvironment.SetupGet(environment => environment.WebRootFileProvider).Returns(fileProvider.Object);
+        var middleware = new GatewayAuthMiddleware(
+            _ => Task.CompletedTask,
+            handler,
+            webHostEnvironment.Object,
+            NullLogger<GatewayAuthMiddleware>.Instance);
 
-        var services = new ServiceCollection()
-            .AddSingleton<IWebHostEnvironment>(webHostEnvironment.Object)
-            .BuildServiceProvider();
-
-        var context = new DefaultHttpContext
-        {
-            RequestServices = services
-        };
+        var context = new DefaultHttpContext();
         context.Request.Method = HttpMethods.Post;
         context.Request.Path = "/styles.css";
         context.Response.Body = new MemoryStream();
@@ -360,15 +357,6 @@ public sealed class GatewayAuthMiddlewareTests
     {
         var authHandler = new Mock<IGatewayAuthHandler>(MockBehavior.Strict);
         var nextCalled = false;
-        var middleware = new GatewayAuthMiddleware(
-            _ =>
-            {
-                nextCalled = true;
-                return Task.CompletedTask;
-            },
-            authHandler.Object,
-            NullLogger<GatewayAuthMiddleware>.Instance);
-
         var fileProvider = new Mock<IFileProvider>(MockBehavior.Strict);
         var fileInfo = new Mock<IFileInfo>(MockBehavior.Strict);
         fileInfo.SetupGet(info => info.Exists).Returns(true);
@@ -379,21 +367,30 @@ public sealed class GatewayAuthMiddlewareTests
 
         var webHostEnvironment = new Mock<IWebHostEnvironment>(MockBehavior.Strict);
         webHostEnvironment.SetupGet(environment => environment.WebRootFileProvider).Returns(fileProvider.Object);
+        var middleware = new GatewayAuthMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            authHandler.Object,
+            webHostEnvironment.Object,
+            NullLogger<GatewayAuthMiddleware>.Instance);
 
-        var services = new ServiceCollection()
-            .AddSingleton<IWebHostEnvironment>(webHostEnvironment.Object)
-            .BuildServiceProvider();
-
-        var context = new DefaultHttpContext
-        {
-            RequestServices = services
-        };
+        var context = new DefaultHttpContext();
         context.Request.Method = HttpMethods.Get;
         context.Request.Path = "/app.js";
 
         await middleware.InvokeAsync(context);
 
         nextCalled.Should().BeTrue();
+    }
+
+    private static IWebHostEnvironment CreateWebHostEnvironment()
+    {
+        var webHostEnvironment = new Mock<IWebHostEnvironment>(MockBehavior.Strict);
+        webHostEnvironment.SetupGet(environment => environment.WebRootFileProvider).Returns(new NullFileProvider());
+        return webHostEnvironment.Object;
     }
 
     private sealed class StubWebSocketFeature : IHttpWebSocketFeature
@@ -404,3 +401,6 @@ public sealed class GatewayAuthMiddlewareTests
             => throw new NotSupportedException();
     }
 }
+
+
+

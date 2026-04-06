@@ -2,7 +2,7 @@ using System.Text.Json;
 using BotNexus.Gateway.Abstractions.Security;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 
 namespace BotNexus.Gateway.Api;
@@ -19,6 +19,7 @@ public sealed class GatewayAuthMiddleware
 
     private readonly RequestDelegate _next;
     private readonly IGatewayAuthHandler _authHandler;
+    private readonly IFileProvider? _webRootFileProvider;
     private readonly ILogger<GatewayAuthMiddleware> _logger;
 
     /// <summary>
@@ -26,14 +27,17 @@ public sealed class GatewayAuthMiddleware
     /// </summary>
     /// <param name="next">The next middleware in the pipeline.</param>
     /// <param name="authHandler">The authentication handler for verifying caller credentials.</param>
+    /// <param name="webHostEnvironment">The host environment used for web-root static file checks.</param>
     /// <param name="logger">The logger instance for diagnostic output.</param>
     public GatewayAuthMiddleware(
         RequestDelegate next,
         IGatewayAuthHandler authHandler,
+        IWebHostEnvironment webHostEnvironment,
         ILogger<GatewayAuthMiddleware> logger)
     {
         _next = next;
         _authHandler = authHandler;
+        _webRootFileProvider = webHostEnvironment.WebRootFileProvider;
         _logger = logger;
     }
 
@@ -45,7 +49,7 @@ public sealed class GatewayAuthMiddleware
     /// <returns>A task that represents the asynchronous middleware operation.</returns>
     public async Task InvokeAsync(HttpContext context)
     {
-        if (ShouldSkipAuth(context.Request))
+        if (ShouldSkipAuth(context.Request, _webRootFileProvider))
         {
             await _next(context);
             return;
@@ -93,16 +97,16 @@ public sealed class GatewayAuthMiddleware
         await _next(context);
     }
 
-    private static bool ShouldSkipAuth(HttpRequest request)
+    private static bool ShouldSkipAuth(HttpRequest request, IFileProvider? webRootFileProvider)
     {
         var path = request.Path;
         return path.Equals("/health", StringComparison.OrdinalIgnoreCase) ||
                path.StartsWithSegments("/webui", StringComparison.OrdinalIgnoreCase) ||
                path.StartsWithSegments("/swagger", StringComparison.OrdinalIgnoreCase) ||
-               IsStaticWebRootFile(request);
+               IsStaticWebRootFile(request, webRootFileProvider);
     }
 
-    private static bool IsStaticWebRootFile(HttpRequest request)
+    private static bool IsStaticWebRootFile(HttpRequest request, IFileProvider? webRootFileProvider)
     {
         if (!HttpMethods.IsGet(request.Method) && !HttpMethods.IsHead(request.Method))
             return false;
@@ -110,9 +114,6 @@ public sealed class GatewayAuthMiddleware
         if (request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        var webRootFileProvider = request.HttpContext.RequestServices
-            .GetService<IWebHostEnvironment>()?
-            .WebRootFileProvider;
         if (webRootFileProvider is null)
             return false;
 
