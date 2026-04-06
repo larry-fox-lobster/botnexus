@@ -44,6 +44,8 @@ public sealed record LoadedExtension
     public required string Name { get; init; }
     public required string Version { get; init; }
     public required string DirectoryPath { get; init; }
+    public required string EntryAssemblyPath { get; init; }
+    public IReadOnlyList<string> ExtensionTypes { get; init; } = [];
     public required DateTimeOffset LoadedAtUtc { get; init; }
     public IReadOnlyList<string> RegisteredServices { get; init; } = [];
 }

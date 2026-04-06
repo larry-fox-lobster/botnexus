@@ -130,6 +130,8 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
                 Name = extension.Manifest.Name,
                 Version = extension.Manifest.Version,
                 DirectoryPath = extension.DirectoryPath,
+                EntryAssemblyPath = extension.EntryAssemblyPath,
+                ExtensionTypes = extension.Manifest.ExtensionTypes,
                 LoadedAtUtc = DateTimeOffset.UtcNow,
                 RegisteredServices = registeredServiceNames
             };
