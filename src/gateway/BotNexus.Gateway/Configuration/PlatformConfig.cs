@@ -38,6 +38,9 @@ public sealed class PlatformConfig
     /// <summary>Session store selection and configuration (legacy root-level form).</summary>
     public SessionStoreConfig? SessionStore { get; set; }
 
+    /// <summary>CORS settings (legacy root-level form).</summary>
+    public CorsConfig? Cors { get; set; }
+
     /// <summary>Logging level.</summary>
     public string? LogLevel { get; set; }
 
@@ -68,6 +71,10 @@ public sealed class PlatformConfig
     /// <summary>Returns configured session store settings, preferring the nested Gateway section.</summary>
     public SessionStoreConfig? GetSessionStore()
         => Gateway?.SessionStore ?? SessionStore;
+
+    /// <summary>Returns configured CORS settings, preferring the nested Gateway section.</summary>
+    public CorsConfig? GetCors()
+        => Gateway?.Cors ?? Cors;
 }
 
 /// <summary>Provider-specific configuration.</summary>
@@ -96,10 +103,19 @@ public sealed class GatewaySettingsConfig
     public string? SessionsDirectory { get; set; }
     /// <summary>Session store selection and configuration.</summary>
     public SessionStoreConfig? SessionStore { get; set; }
+    /// <summary>CORS settings for browser-based clients.</summary>
+    public CorsConfig? Cors { get; set; }
     /// <summary>Logging level override.</summary>
     public string? LogLevel { get; set; }
     /// <summary>Multi-tenant API keys keyed by key ID.</summary>
     public Dictionary<string, ApiKeyConfig>? ApiKeys { get; set; }
+}
+
+/// <summary>CORS settings for gateway HTTP endpoints.</summary>
+public sealed class CorsConfig
+{
+    /// <summary>Explicit origins allowed to access the gateway from browsers.</summary>
+    public List<string>? AllowedOrigins { get; set; }
 }
 
 /// <summary>Agent definition in platform config.</summary>

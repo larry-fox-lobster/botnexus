@@ -115,6 +115,7 @@ public static class PlatformConfigLoader
         ValidatePath(config.GetAgentsDirectory(), "gateway.agentsDirectory", errors);
         ValidatePath(config.GetSessionsDirectory(), "gateway.sessionsDirectory", errors);
         ValidateSessionStore(config.GetSessionStore(), errors);
+        ValidateCors(config.GetCors(), errors);
 
         var logLevel = config.GetLogLevel();
         if (!string.IsNullOrWhiteSpace(logLevel) &&
@@ -296,6 +297,29 @@ public static class PlatformConfigLoader
         }
 
         errors.Add("gateway.sessionStore.type must be either 'InMemory' or 'File'.");
+    }
+
+    private static void ValidateCors(CorsConfig? cors, List<string> errors)
+    {
+        if (cors?.AllowedOrigins is null)
+            return;
+
+        for (var i = 0; i < cors.AllowedOrigins.Count; i++)
+        {
+            var origin = cors.AllowedOrigins[i];
+            var field = $"gateway.cors.allowedOrigins[{i}]";
+            if (string.IsNullOrWhiteSpace(origin))
+            {
+                errors.Add($"{field} must be a non-empty absolute URL.");
+                continue;
+            }
+
+            if (!Uri.TryCreate(origin, UriKind.Absolute, out var originUri) ||
+                (originUri.Scheme != Uri.UriSchemeHttp && originUri.Scheme != Uri.UriSchemeHttps))
+            {
+                errors.Add($"{field} must be a valid http or https absolute URL.");
+            }
+        }
     }
 
     private sealed class PlatformConfigWatcher : IDisposable

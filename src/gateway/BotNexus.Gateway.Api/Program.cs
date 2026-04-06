@@ -10,15 +10,46 @@ using BotNexus.Providers.OpenAICompat;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 
+const string GatewayCorsPolicy = "GatewayCorsPolicy";
+
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
     WebRootPath = Path.Combine(AppContext.BaseDirectory, "wwwroot")
 });
 
+var platformConfigPath = builder.Configuration["BotNexus:ConfigPath"];
+var startupPlatformConfig = PlatformConfigLoader.Load(platformConfigPath, validateOnLoad: false);
+
 builder.Services.AddBotNexusGateway();
-builder.Services.AddPlatformConfiguration(builder.Configuration["BotNexus:ConfigPath"]);
+builder.Services.AddPlatformConfiguration(platformConfigPath);
 builder.Services.AddBotNexusGatewayApi();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(GatewayCorsPolicy, policy =>
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+            return;
+        }
+
+        var configuredOrigins = startupPlatformConfig.GetCors()?.AllowedOrigins?
+            .Where(origin => !string.IsNullOrWhiteSpace(origin))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var allowedOrigins = configuredOrigins is { Length: > 0 }
+            ? configuredOrigins
+            : ["http://localhost:5005"];
+
+        policy.WithOrigins(allowedOrigins)
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -75,6 +106,7 @@ if (!string.IsNullOrWhiteSpace(listenUrl))
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
+app.UseCors(GatewayCorsPolicy);
 app.UseMiddleware<GatewayAuthMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI();
