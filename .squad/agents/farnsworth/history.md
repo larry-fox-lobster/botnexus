@@ -151,6 +151,9 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+- 2026-04-06: `AgentsController.Update` now rejects route/body `AgentId` mismatches with HTTP 400; if payload `AgentId` is empty, the route `agentId` is injected before registry update.
+- 2026-04-06: Gateway API CORS now keeps `AllowAnyMethod()` only for Development; non-development policy explicitly allows `GET, POST, PUT, DELETE, OPTIONS`.
+- 2026-04-06: Gateway WebSocket responsibilities are now split across `GatewayWebSocketHandler` (orchestration), `WebSocketConnectionManager` (admission/session locks/ping), and `WebSocketMessageDispatcher` (message routing + replay sequencing persistence).
 - 2026-04-06: `GatewaySession` now composes replay behavior through `SessionReplayBuffer`, keeping `NextSequenceId`/`StreamEventLog` compatibility accessors while centralizing replay lock, bounded trimming, and replay-state restore in one class.
 - 2026-04-06: `scripts/dev-loop.ps1` now supports `-SkipBuild`/`-SkipTests`, catches failures with clear terminal errors, and starts Gateway through `start-gateway.ps1 -SkipBuild` to avoid duplicate rebuild/file-lock issues.
 - 2026-04-06: `scripts/start-gateway.ps1` now performs a preflight TCP port check and returns a friendly actionable error when the port is already in use.
