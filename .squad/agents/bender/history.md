@@ -789,3 +789,11 @@ Team outcomes synced:
 - Hermes: 7 live integration tests (Copilot provider), graceful skip patterns for CI stability. Full suite 684 tests, 0 failures.
 
 Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
+
+## Learnings
+
+### 2026-04-06 — Platform-config agent auto-registration + local gateway scripts
+- `src\gateway\BotNexus.Gateway\Configuration\PlatformConfigAgentSource.cs` now maps `PlatformConfig.Agents` entries into `AgentDescriptor` records, loads `SystemPromptFile` from the platform config directory, skips disabled agents, and exposes no watcher (`Watch()` returns `null`).
+- `src\gateway\BotNexus.Gateway\Extensions\GatewayServiceCollectionExtensions.cs` now registers platform-config and file-based agent sources together in `AddPlatformConfiguration`, so platform-config-defined agents are loaded at startup.
+- Added developer entry points: `scripts\start-gateway.ps1` (build + run gateway API with `ASPNETCORE_ENVIRONMENT=Development`, `-Port`) and `scripts\dev-loop.ps1` (solution build + gateway tests + run/watch gateway).
+- Key docs for onboarding this flow: `docs\sample-config.json`, `docs\sample-config.md`, and updated `docs\development-workflow.md`.

@@ -177,6 +177,7 @@
 - 2026-04-06: Gateway now ships `DefaultAgentCommunicator` (sub-agent sessions scoped as `{parentSessionId}::sub::{childAgentId}` with Phase 2 cross-agent stub) and default `ApiKeyGatewayAuthHandler` registration in `AddBotNexusGateway`.
 - 2026-04-06: Gateway now supports AD-20 JSON agent configuration via `IAgentConfigurationSource`, `FileAgentConfigurationSource` (with watcher hot-reload), and hosted merge loading where code-registered agents always override config-sourced descriptors.
 - 2026-04-06: `AgentDescriptor` now includes `SubAgentIds`, `SystemPromptFile`, and `IsolationOptions`; file-backed prompts are loaded relative to each agent config file and validated through `AgentDescriptorValidator`.
+- 2026-04-06: Gateway LLM execution now depends on startup provider wiring in `BotNexus.Gateway.Api/Program.cs` (shared `HttpClient`, Anthropic/OpenAI/OpenAICompat registrations) and runtime API-key resolution via `GatewayAuthManager` (`auth.json` → env vars → `providers.{name}.apiKey`).
 
 ## Sprint 1 Summary — 2026-04-01T17:33Z
 
