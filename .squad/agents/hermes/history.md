@@ -72,6 +72,12 @@
 
 ## Learnings
 
+### 2026-04-06 — Cross-agent + live gateway integration test expansion
+
+- Extended `DefaultAgentCommunicatorTests` to cover cross-agent lifecycle assertions: registry/supervisor/isolation routing, recursion cycle detection (`A→B→A`), not-registered and creation-failure propagation, scoped cross-session IDs, and concurrent-call session isolation.
+- Added `Integration/LiveGatewayIntegrationTests` using `WebApplicationFactory<Program>` to validate `/health`, REST management endpoints (`/api/agents`, `/api/sessions`, `/api/config/validate`), `/ws` connected handshake, `/ws/activity` subscription, and opt-in live Copilot streaming over WebSocket.
+- `dotnet test Q:\repos\botnexus\tests --no-build -v normal` currently fails as a command-shape issue (`MSB1003` on directory target). Project-level test execution remains green for Gateway + provider + agent-core suites; `BotNexus.CodingAgent.Tests` appears to hang in this environment and should be triaged separately.
+
 ### 2026-04-06 — Phase 5 gateway QA activation
 
 - Activated anticipatory Gateway tests for auth middleware and max-concurrency enforcement so they validate real implementations instead of skipped placeholders.
