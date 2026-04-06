@@ -613,3 +613,9 @@ Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
 - Added Gateway WebSocket protocol tests for `abort`, `ping/pong`, steer-without-session error, and reconnect rejection when agent/session mismatch to harden reconnect and control-flow semantics.
 - Added Gateway host lifecycle coverage to validate channel adapter start/stop orchestration under startup failures, plus platform config watch error-callback coverage for invalid hot-reload payloads.
 - Extended auth and concurrency tests for invalid `auth.json` fallback behavior and same-session reuse at max concurrency; suite now passes with 274 Gateway tests.
+
+### 2026-04-06 — Provider normalization conformance suite
+
+- Added a shared abstract test base at `tests/BotNexus.Providers.Conformance.Tests/StreamingProviderConformanceTests.cs` that enforces data-driven conformance checks for normalized content extraction, tool-call parsing, finish reason mapping, token-count mapping, and streaming event sequence.
+- Wired provider-specific inheritors in Anthropic, OpenAI, OpenAICompat, and Copilot test projects so the same normalization scenarios now run across each provider surface.
+- The shared conformance helper project is intentionally marked `IsTestProject=false` and referenced by provider test projects to avoid standalone execution while centralizing contract assertions.
