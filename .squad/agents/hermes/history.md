@@ -72,6 +72,12 @@
 
 ## Learnings
 
+### 2026-04-06 — Phase 5 gateway QA activation
+
+- Activated anticipatory Gateway tests for auth middleware and max-concurrency enforcement so they validate real implementations instead of skipped placeholders.
+- Added `Phase5IntegrationTests` to cover auth+API access, session lifecycle cleanup behavior, TUI capability verification, config validation endpoint behavior, and opt-in live Copilot streaming validation.
+- Live Copilot integration is intentionally gated behind `BOTNEXUS_RUN_COPILOT_INTEGRATION=1` plus auth-file presence to keep regular CI stable while preserving executable live coverage.
+
 ### 2026-04-01 — Architecture Review: Auth & Channel Gaps (from Leela)
 
 **Critical findings affecting your work:**

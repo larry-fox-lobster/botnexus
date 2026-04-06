@@ -1,36 +1,142 @@
 using BotNexus.Gateway.Abstractions.Security;
+using BotNexus.Gateway.Api;
 using BotNexus.Gateway.Security;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 
 namespace BotNexus.Gateway.Tests;
 
-// TODO: This test suite will fully light up once GatewayAuthMiddleware is implemented.
 public sealed class GatewayAuthMiddlewareTests
 {
-    [Fact(Skip = "Awaiting GatewayAuthMiddleware implementation.")]
-    public Task AuthenticatedRequest_WithValidApiKey_ReturnsSuccess()
-        => Task.CompletedTask;
+    [Fact]
+    public async Task AuthenticatedRequest_WithValidApiKey_ReturnsSuccess()
+    {
+        var handler = new ApiKeyGatewayAuthHandler(apiKey: "test-key", NullLogger<ApiKeyGatewayAuthHandler>.Instance);
+        var nextCalled = false;
+        var middleware = new GatewayAuthMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            handler,
+            NullLogger<GatewayAuthMiddleware>.Instance);
 
-    [Fact(Skip = "Awaiting GatewayAuthMiddleware implementation.")]
-    public Task UnauthenticatedRequest_Returns401()
-        => Task.CompletedTask;
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/agents";
+        context.Request.Headers["X-Api-Key"] = "test-key";
 
-    [Fact(Skip = "Awaiting GatewayAuthMiddleware implementation.")]
-    public Task InvalidApiKey_Returns401()
-        => Task.CompletedTask;
+        await middleware.InvokeAsync(context);
 
-    [Fact(Skip = "Awaiting GatewayAuthMiddleware implementation.")]
-    public Task HealthEndpoint_SkipsAuth()
-        => Task.CompletedTask;
+        nextCalled.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+    }
 
-    [Fact(Skip = "Awaiting GatewayAuthMiddleware implementation.")]
-    public Task SwaggerEndpoint_SkipsAuth()
-        => Task.CompletedTask;
+    [Fact]
+    public async Task UnauthenticatedRequest_Returns401()
+    {
+        var handler = new ApiKeyGatewayAuthHandler(apiKey: "test-key", NullLogger<ApiKeyGatewayAuthHandler>.Instance);
+        var middleware = new GatewayAuthMiddleware(
+            _ => Task.CompletedTask,
+            handler,
+            NullLogger<GatewayAuthMiddleware>.Instance);
 
-    [Fact(Skip = "Awaiting GatewayAuthMiddleware implementation.")]
-    public Task WebUIEndpoint_SkipsAuth()
-        => Task.CompletedTask;
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/agents";
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context);
+
+        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+    }
+
+    [Fact]
+    public async Task InvalidApiKey_Returns401()
+    {
+        var handler = new ApiKeyGatewayAuthHandler(apiKey: "test-key", NullLogger<ApiKeyGatewayAuthHandler>.Instance);
+        var middleware = new GatewayAuthMiddleware(
+            _ => Task.CompletedTask,
+            handler,
+            NullLogger<GatewayAuthMiddleware>.Instance);
+
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/agents";
+        context.Request.Headers["X-Api-Key"] = "wrong-key";
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context);
+
+        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+    }
+
+    [Fact]
+    public async Task HealthEndpoint_SkipsAuth()
+    {
+        var authHandler = new Mock<IGatewayAuthHandler>(MockBehavior.Strict);
+        var nextCalled = false;
+        var middleware = new GatewayAuthMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            authHandler.Object,
+            NullLogger<GatewayAuthMiddleware>.Instance);
+
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/health";
+
+        await middleware.InvokeAsync(context);
+
+        nextCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SwaggerEndpoint_SkipsAuth()
+    {
+        var authHandler = new Mock<IGatewayAuthHandler>(MockBehavior.Strict);
+        var nextCalled = false;
+        var middleware = new GatewayAuthMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            authHandler.Object,
+            NullLogger<GatewayAuthMiddleware>.Instance);
+
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/swagger/v1/swagger.json";
+
+        await middleware.InvokeAsync(context);
+
+        nextCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task WebUIEndpoint_SkipsAuth()
+    {
+        var authHandler = new Mock<IGatewayAuthHandler>(MockBehavior.Strict);
+        var nextCalled = false;
+        var middleware = new GatewayAuthMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            authHandler.Object,
+            NullLogger<GatewayAuthMiddleware>.Instance);
+
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/webui/index.html";
+
+        await middleware.InvokeAsync(context);
+
+        nextCalled.Should().BeTrue();
+    }
 
     [Fact]
     public async Task DevModeBypass_WhenNoKeysConfigured_AllowsAll()
@@ -49,7 +155,30 @@ public sealed class GatewayAuthMiddlewareTests
         result.IsAuthenticated.Should().BeTrue();
     }
 
-    [Fact(Skip = "Awaiting GatewayAuthMiddleware implementation.")]
-    public Task WebSocketEndpoint_RequiresAuth()
-        => Task.CompletedTask;
+    [Fact]
+    public async Task WebSocketEndpoint_RequiresAuth()
+    {
+        var handler = new ApiKeyGatewayAuthHandler(apiKey: "test-key", NullLogger<ApiKeyGatewayAuthHandler>.Instance);
+        var middleware = new GatewayAuthMiddleware(
+            _ => Task.CompletedTask,
+            handler,
+            NullLogger<GatewayAuthMiddleware>.Instance);
+
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/ws";
+        context.Features.Set<IHttpWebSocketFeature>(new StubWebSocketFeature { IsWebSocketRequest = true });
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context);
+
+        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+    }
+
+    private sealed class StubWebSocketFeature : IHttpWebSocketFeature
+    {
+        public bool IsWebSocketRequest { get; init; }
+
+        public Task<System.Net.WebSockets.WebSocket> AcceptAsync(WebSocketAcceptContext context)
+            => throw new NotSupportedException();
+    }
 }

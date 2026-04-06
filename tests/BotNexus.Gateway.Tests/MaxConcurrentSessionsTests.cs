@@ -10,9 +10,16 @@ namespace BotNexus.Gateway.Tests;
 
 public sealed class MaxConcurrentSessionsTests
 {
-    [Fact(Skip = "Awaiting max concurrent session enforcement in DefaultAgentSupervisor.")]
-    public Task SupervisorRejectsSession_WhenMaxReached()
-        => Task.CompletedTask;
+    [Fact]
+    public async Task SupervisorRejectsSession_WhenMaxReached()
+    {
+        var supervisor = CreateSupervisor(maxConcurrentSessions: 1);
+
+        await supervisor.GetOrCreateAsync("agent-a", "session-1");
+        var act = () => supervisor.GetOrCreateAsync("agent-a", "session-2");
+
+        await act.Should().ThrowAsync<AgentConcurrencyLimitExceededException>();
+    }
 
     [Fact]
     public async Task SupervisorAllowsSession_WhenUnderLimit()
@@ -24,9 +31,17 @@ public sealed class MaxConcurrentSessionsTests
         handle.Should().NotBeNull();
     }
 
-    [Fact(Skip = "Awaiting max concurrent session configuration in DefaultAgentSupervisor.")]
-    public Task SupervisorAllowsUnlimited_WhenMaxIsZero()
-        => Task.CompletedTask;
+    [Fact]
+    public async Task SupervisorAllowsUnlimited_WhenMaxIsZero()
+    {
+        var supervisor = CreateSupervisor(maxConcurrentSessions: 0);
+
+        var createTasks = Enumerable.Range(1, 20)
+            .Select(i => supervisor.GetOrCreateAsync("agent-a", $"session-{i}"));
+        await Task.WhenAll(createTasks);
+
+        supervisor.GetAllInstances().Should().HaveCount(20);
+    }
 
     [Fact]
     public async Task SupervisorAllowsUnlimited_WhenMaxNotSet()
@@ -40,17 +55,20 @@ public sealed class MaxConcurrentSessionsTests
         supervisor.GetAllInstances().Should().HaveCount(20);
     }
 
-    private static DefaultAgentSupervisor CreateSupervisor()
+    private static DefaultAgentSupervisor CreateSupervisor(int? maxConcurrentSessions = null)
     {
         var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
-        registry.Register(new AgentDescriptor
+        var descriptor = new AgentDescriptor
         {
             AgentId = "agent-a",
             DisplayName = "Agent A",
             ModelId = "test-model",
             ApiProvider = "test-provider",
-            IsolationStrategy = "test"
-        });
+            IsolationStrategy = "test",
+            MaxConcurrentSessions = maxConcurrentSessions ?? 0
+        };
+
+        registry.Register(descriptor);
 
         var strategy = new Mock<IIsolationStrategy>();
         strategy.SetupGet(s => s.Name).Returns("test");
