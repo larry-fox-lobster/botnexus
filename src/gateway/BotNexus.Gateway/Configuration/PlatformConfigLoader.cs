@@ -359,6 +359,12 @@ public static class PlatformConfigLoader
         }
     }
 
+    private static void EmitVersionWarning(PlatformConfig config, string configPath)
+    {
+        foreach (var warning in ValidateWarnings(config))
+            Trace.TraceWarning("Platform config warning for '{0}': {1}", configPath, warning);
+    }
+
     private sealed class PlatformConfigWatcher : IDisposable
     {
         private readonly FileSystemWatcher _watcher;
