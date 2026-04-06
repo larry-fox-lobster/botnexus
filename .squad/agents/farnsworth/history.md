@@ -694,3 +694,23 @@ Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
 
 - 2026-04-06: Gateway config mutation logic moved from CLI inline reflection into IConfigPathResolver + ConfigPathResolver, adding bracket array index support (path[0]) and reusable path discovery for DI consumers.
 - 2026-04-06: Platform config load now runs JSON Schema validation via PlatformConfigSchema with key-casing normalization before existing manual validation, and CLI exposes otnexus config schema --output ... to regenerate docs/botnexus-config.schema.json.
+
+## 2026-04-06T07:50:00Z — Phase 11 Wave 1: Config Schema & Path Resolution
+
+**Status:** ✅ Complete  
+**Agents:** Farnsworth (Config/Schema), Bender (Extension Loading), Hermes (Testing), Kif (Docs)
+
+**Config & Schema Work (Farnsworth):**
+- Extracted IConfigPathResolver/ConfigPathResolver from CLI reflection logic
+- Added JSON schema generation via PlatformConfigSchema
+- Integrated schema validation into PlatformConfigLoader
+- Added otnexus config schema CLI command
+- Generated docs/botnexus-config.schema.json
+- Refactored CLI config get/set to use ConfigPathResolver via DI
+- Commit: e57eae1
+
+**Cross-Team Results:**
+- Bender: Dynamic extension loading (IExtensionLoader, manifest discovery)
+- Hermes: 23 new tests (ConfigPathResolver, SchemaValidation, edge cases)
+- Kif: 14 XML doc comments, 3 module READMEs, 0 warnings
+- **Total:** 891 tests passing (868→891, +23), Build clean, 0 warnings
