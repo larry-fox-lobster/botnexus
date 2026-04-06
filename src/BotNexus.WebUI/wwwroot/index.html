@@ -137,13 +137,14 @@
                 </div>
                 <button id="btn-scroll-bottom" class="scroll-to-bottom hidden" aria-label="Scroll to bottom" title="Scroll to bottom">↓</button>
                 <div class="chat-input-area">
+                    <div id="command-palette" class="command-palette hidden" role="listbox" aria-label="Command palette"></div>
                     <div id="queue-status" class="queue-status hidden" aria-live="polite">
                         <span class="queue-icon" aria-hidden="true">📨</span>
                         <span id="queue-count"></span>
                     </div>
                     <div class="input-row">
                         <label for="chat-input" class="sr-only">Type a message</label>
-                        <textarea id="chat-input" placeholder="Type a message... (Enter to send, Shift+Enter for newline)" rows="1" aria-label="Chat message input"></textarea>
+                        <textarea id="chat-input" placeholder="Type a message... (/ for commands, Enter to send)" rows="1" aria-label="Chat message input"></textarea>
                         <div class="send-group">
                             <button id="btn-send" class="btn btn-primary" disabled aria-label="Send message">Send</button>
                             <button id="btn-send-mode" class="btn-send-mode hidden" aria-label="Toggle send mode" title="Switch between Steer and Follow-up">▾</button>

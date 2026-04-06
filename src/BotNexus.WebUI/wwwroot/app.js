@@ -59,6 +59,7 @@
     let userScrolledUp = false;
     let lastSequenceId = 0;
     let sessionKey = null;
+    let commandPaletteIndex = -1;
 
     // --- DOM refs ---
     const $ = (sel) => document.querySelector(sel);
@@ -107,6 +108,7 @@
     const elProcessingStatus = $('#processing-status');
     const elProcessingStage = $('#processing-stage');
     const elProcessingToolCount = $('#processing-tool-count');
+    const elCommandPalette = $('#command-palette');
 
     // =========================================================================
     // Markdown rendering
@@ -1006,12 +1008,189 @@
     function closeToolModal() { elToolModal.classList.add('hidden'); }
 
     // =========================================================================
+    // Command Palette
+    // =========================================================================
+
+    const COMMANDS = [
+        { name: '/help', description: 'Show available commands' },
+        { name: '/reset', description: 'Clear chat and reset current session' },
+        { name: '/status', description: 'Show gateway health status' },
+        { name: '/agents', description: 'List available agents' },
+    ];
+
+    function showCommandPalette(filter) {
+        const query = filter.toLowerCase();
+        const matches = COMMANDS.filter(c => c.name.startsWith(query));
+        if (matches.length === 0) { hideCommandPalette(); return; }
+        commandPaletteIndex = 0;
+        elCommandPalette.innerHTML = '';
+        for (let i = 0; i < matches.length; i++) {
+            const el = document.createElement('div');
+            el.className = 'command-item' + (i === 0 ? ' active' : '');
+            el.setAttribute('role', 'option');
+            el.dataset.index = i;
+            el.innerHTML = `<span class="command-name">${escapeHtml(matches[i].name)}</span><span class="command-desc">${escapeHtml(matches[i].description)}</span>`;
+            el.addEventListener('click', () => executeCommand(matches[i].name));
+            elCommandPalette.appendChild(el);
+        }
+        const hint = document.createElement('div');
+        hint.className = 'command-palette-hint';
+        hint.textContent = '↑↓ navigate · Tab or Enter to select · Esc to dismiss';
+        elCommandPalette.appendChild(hint);
+        elCommandPalette.classList.remove('hidden');
+    }
+
+    function hideCommandPalette() {
+        elCommandPalette.classList.add('hidden');
+        elCommandPalette.innerHTML = '';
+        commandPaletteIndex = -1;
+    }
+
+    function isCommandPaletteVisible() {
+        return !elCommandPalette.classList.contains('hidden');
+    }
+
+    function navigateCommandPalette(direction) {
+        const items = elCommandPalette.querySelectorAll('.command-item');
+        if (items.length === 0) return;
+        items[commandPaletteIndex]?.classList.remove('active');
+        commandPaletteIndex = (commandPaletteIndex + direction + items.length) % items.length;
+        items[commandPaletteIndex].classList.add('active');
+        items[commandPaletteIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    function acceptCommandPalette() {
+        const active = elCommandPalette.querySelector('.command-item.active .command-name');
+        if (active) executeCommand(active.textContent);
+    }
+
+    function executeCommand(name) {
+        hideCommandPalette();
+        elChatInput.value = '';
+        autoResize(elChatInput);
+        updateSendButtonState();
+
+        switch (name) {
+            case '/help': executeHelp(); break;
+            case '/reset': executeReset(); break;
+            case '/status': executeStatus(); break;
+            case '/agents': executeAgents(); break;
+            default: appendSystemMessage(`Unknown command: ${name}`); break;
+        }
+    }
+
+    function executeHelp() {
+        const lines = COMMANDS.map(c => `  ${c.name.padEnd(12)} ${c.description}`).join('\n');
+        appendCommandResult('📖 Available Commands', lines);
+        appendSystemMessage('Tip: Type / in the input box or press Ctrl+K to open the command palette.');
+    }
+
+    async function executeReset() {
+        if (!currentSessionId) {
+            elChatMessages.innerHTML = '';
+            appendSystemMessage('🧹 Chat cleared (no active session).');
+            return;
+        }
+        const sessionId = currentSessionId;
+        try {
+            const res = await fetch(`${API_BASE}/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+            if (res.ok || res.status === 204) {
+                disconnectWebSocket();
+                currentSessionId = null;
+                activeMessageId = null;
+                activeToolCalls = {};
+                activeToolCount = 0;
+                toolCallDepth = 0;
+                thinkingBuffer = '';
+                elChatMessages.innerHTML = '';
+                elChatTitle.textContent = 'New Chat';
+                elChatMeta.textContent = `Agent: ${elAgentSelect.value || 'default'} · Session will be created on first message`;
+                elSessionIdDisplay.classList.add('hidden');
+                setSendingState(false);
+                elAgentSelect.disabled = false;
+                appendSystemMessage(`🧹 Session ${sessionId.substring(0, 8)}… deleted. Ready for a new chat.`);
+                currentAgentId = elAgentSelect.value || null;
+                if (currentAgentId) connectWebSocket();
+                loadSessions();
+            } else {
+                appendSystemMessage(`❌ Failed to reset session: ${res.status}`, 'error');
+            }
+        } catch (e) {
+            appendSystemMessage(`❌ Failed to reset session: ${e.message}`, 'error');
+        }
+    }
+
+    async function executeStatus() {
+        appendSystemMessage('⏳ Checking gateway status...');
+        try {
+            const res = await fetch('/health');
+            if (res.ok) {
+                const data = await res.json().catch(() => null);
+                if (data) {
+                    const lines = Object.entries(data).map(([k, v]) =>
+                        `  ${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`
+                    ).join('\n');
+                    appendCommandResult('✅ Gateway Status', lines);
+                } else {
+                    appendCommandResult('✅ Gateway Status', `  HTTP ${res.status} — healthy`);
+                }
+            } else {
+                appendCommandResult('⚠️ Gateway Status', `  HTTP ${res.status} — ${res.statusText}`);
+            }
+        } catch (e) {
+            appendCommandResult('❌ Gateway Unreachable', `  ${e.message}`);
+        }
+    }
+
+    async function executeAgents() {
+        appendSystemMessage('⏳ Fetching agents...');
+        const agents = await fetchJson('/agents');
+        if (!agents || agents.length === 0) {
+            appendCommandResult('🧠 Agents', '  No agents configured.');
+            return;
+        }
+        const lines = agents.map(a => {
+            const name = a.name || a.id || 'unnamed';
+            const provider = a.provider || '';
+            const model = a.model || '';
+            const parts = [`  ${name}`];
+            if (provider) parts.push(`provider: ${provider}`);
+            if (model) parts.push(`model: ${model}`);
+            return parts.join(' — ');
+        }).join('\n');
+        appendCommandResult(`🧠 Agents (${agents.length})`, lines);
+    }
+
+    function appendCommandResult(title, body) {
+        const div = document.createElement('div');
+        div.className = 'message system-msg command-result';
+        div.innerHTML = `<div class="command-result-title">${escapeHtml(title)}</div><pre>${escapeHtml(body)}</pre>`;
+        elChatMessages.appendChild(div);
+        scrollToBottom();
+    }
+
+    // =========================================================================
     // Chat actions
     // =========================================================================
 
     function sendMessage() {
         const text = elChatInput.value.trim();
         if (!text) return;
+
+        // Intercept slash commands
+        if (text.startsWith('/')) {
+            const cmd = text.split(/\s/)[0].toLowerCase();
+            const match = COMMANDS.find(c => c.name === cmd);
+            if (match) {
+                elChatInput.value = '';
+                autoResize(elChatInput);
+                updateSendButtonState();
+                hideCommandPalette();
+                executeCommand(match.name);
+                return;
+            }
+        }
+
         elChatInput.value = '';
         autoResize(elChatInput);
         updateSendButtonState();
@@ -1565,11 +1744,23 @@
         elBtnAbort.addEventListener('click', abortRequest);
 
         elChatInput.addEventListener('keydown', (e) => {
+            if (isCommandPaletteVisible()) {
+                if (e.key === 'ArrowDown') { e.preventDefault(); navigateCommandPalette(1); return; }
+                if (e.key === 'ArrowUp') { e.preventDefault(); navigateCommandPalette(-1); return; }
+                if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) { e.preventDefault(); acceptCommandPalette(); return; }
+                if (e.key === 'Escape') { e.preventDefault(); hideCommandPalette(); return; }
+            }
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
         elChatInput.addEventListener('input', () => {
             autoResize(elChatInput);
             updateSendButtonState();
+            const text = elChatInput.value;
+            if (text.startsWith('/') && !text.includes(' ')) {
+                showCommandPalette(text);
+            } else {
+                hideCommandPalette();
+            }
         });
 
         elAgentSelect.addEventListener('change', () => {
@@ -1673,8 +1864,18 @@
 
         // Global keyboard shortcuts
         document.addEventListener('keydown', (e) => {
+            // Ctrl+K / Cmd+K to open command palette
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                if (!elChatView.classList.contains('hidden')) {
+                    elChatInput.focus();
+                    elChatInput.value = '/';
+                    showCommandPalette('/');
+                }
+                return;
+            }
             if (e.key === 'Escape') {
-                // Escape to abort if streaming and no modals open
+                if (isCommandPaletteVisible()) { hideCommandPalette(); return; }
                 if (!elToolModal.classList.contains('hidden')) { closeToolModal(); return; }
                 if (!elAgentFormModal.classList.contains('hidden')) { closeAgentForm(); return; }
                 if (!elConfirmDialog.classList.contains('hidden')) { closeConfirm(); return; }
