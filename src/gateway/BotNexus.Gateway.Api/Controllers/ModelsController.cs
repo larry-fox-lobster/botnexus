@@ -1,4 +1,5 @@
-using BotNexus.Providers.Core.Registry;
+using BotNexus.Gateway.Abstractions.Agents;
+using BotNexus.Gateway.Abstractions.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BotNexus.Gateway.Api.Controllers;
@@ -10,38 +11,74 @@ namespace BotNexus.Gateway.Api.Controllers;
 [Route("api/models")]
 public sealed class ModelsController : ControllerBase
 {
-    private readonly ModelRegistry _modelRegistry;
+    private readonly IModelFilter _modelFilter;
+    private readonly IAgentRegistry _agentRegistry;
 
     /// <inheritdoc cref="ModelsController"/>
-    public ModelsController(ModelRegistry modelRegistry)
+    public ModelsController(IModelFilter modelFilter, IAgentRegistry agentRegistry)
     {
-        _modelRegistry = modelRegistry ?? throw new ArgumentNullException(nameof(modelRegistry));
+        _modelFilter = modelFilter ?? throw new ArgumentNullException(nameof(modelFilter));
+        _agentRegistry = agentRegistry ?? throw new ArgumentNullException(nameof(agentRegistry));
     }
 
     /// <summary>
     /// Get all available models from all registered providers.
     /// </summary>
     [HttpGet]
-    public ActionResult<IEnumerable<ModelInfo>> GetModels()
+    public ActionResult<IEnumerable<ModelInfo>> GetModels([FromQuery] string? provider = null, [FromQuery] string? agentId = null)
     {
-        var providers = _modelRegistry.GetProviders();
-        var models = new List<ModelInfo>();
-
-        foreach (var provider in providers)
+        if (!string.IsNullOrWhiteSpace(agentId))
         {
-            var providerModels = _modelRegistry.GetModels(provider);
-            foreach (var model in providerModels)
-            {
-                models.Add(new ModelInfo(
+            var agent = _agentRegistry.Get(agentId);
+            if (agent is null)
+                return NotFound(new { error = $"Agent '{agentId}' not found." });
+
+            var agentProviders = !string.IsNullOrWhiteSpace(provider)
+                ? new[] { provider }
+                : new[] { agent.ApiProvider };
+
+            var agentModels = agentProviders
+                .SelectMany(currentProvider => _modelFilter.GetModelsForAgent(currentProvider, agent.AllowedModelIds))
+                .Select(model => new ModelInfo(
                     Name: model.Name,
                     ModelId: model.Id,
                     Id: model.Id,
-                    Provider: model.Provider
-                ));
-            }
+                    Provider: model.Provider))
+                .OrderBy(model => model.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return Ok(agentModels);
         }
 
-        return Ok(models.OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).ToList());
+        var providers = !string.IsNullOrWhiteSpace(provider)
+            ? new[] { provider }
+            : _modelFilter.GetProviders();
+
+        var models = providers
+            .SelectMany(currentProvider => _modelFilter.GetModels(currentProvider))
+            .Select(model => new ModelInfo(
+                Name: model.Name,
+                ModelId: model.Id,
+                Id: model.Id,
+                Provider: model.Provider))
+            .OrderBy(model => model.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return Ok(models);
+    }
+
+    /// <summary>
+    /// Get allowed models for a specific agent.
+    /// </summary>
+    [HttpGet("/api/agents/{agentId}/models")]
+    public ActionResult<IEnumerable<ModelInfo>> GetAgentModels(string agentId, [FromQuery] string? provider = null)
+    {
+        var result = GetModels(provider, agentId);
+        if (result.Result is not null)
+            return result.Result;
+
+        var models = result.Value ?? [];
+        return Ok(models);
     }
 }
 

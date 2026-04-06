@@ -1,8 +1,8 @@
 using BotNexus.Gateway.Api.Controllers;
-using BotNexus.Providers.Core.Models;
-using BotNexus.Providers.Core.Registry;
+using BotNexus.Gateway.Abstractions.Models;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using Moq;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -11,7 +11,9 @@ public sealed class ProvidersControllerTests
     [Fact]
     public void GetProviders_WhenNoProvidersRegistered_ReturnsEmptyList()
     {
-        var controller = new ProvidersController(new ModelRegistry());
+        var modelFilter = new Mock<IModelFilter>();
+        modelFilter.Setup(filter => filter.GetProviders()).Returns([]);
+        var controller = new ProvidersController(modelFilter.Object);
 
         var result = controller.GetProviders();
 
@@ -23,10 +25,9 @@ public sealed class ProvidersControllerTests
     [Fact]
     public void GetProviders_WhenProvidersRegistered_ReturnsAllProviders()
     {
-        var registry = new ModelRegistry();
-        registry.Register("openai", CreateModel("openai", "gpt-4o", "GPT-4o"));
-        registry.Register("anthropic", CreateModel("anthropic", "claude-sonnet-4", "Claude Sonnet 4"));
-        var controller = new ProvidersController(registry);
+        var modelFilter = new Mock<IModelFilter>();
+        modelFilter.Setup(filter => filter.GetProviders()).Returns(["openai", "anthropic"]);
+        var controller = new ProvidersController(modelFilter.Object);
 
         var result = controller.GetProviders();
 
@@ -38,11 +39,9 @@ public sealed class ProvidersControllerTests
     [Fact]
     public void GetProviders_ReturnsProvidersSortedAlphabetically()
     {
-        var registry = new ModelRegistry();
-        registry.Register("openai", CreateModel("openai", "gpt-4o", "GPT-4o"));
-        registry.Register("anthropic", CreateModel("anthropic", "claude-sonnet-4", "Claude Sonnet 4"));
-        registry.Register("github-copilot", CreateModel("github-copilot", "copilot-gpt-4o", "Copilot GPT-4o"));
-        var controller = new ProvidersController(registry);
+        var modelFilter = new Mock<IModelFilter>();
+        modelFilter.Setup(filter => filter.GetProviders()).Returns(["anthropic", "github-copilot", "openai"]);
+        var controller = new ProvidersController(modelFilter.Object);
 
         var result = controller.GetProviders();
 
@@ -51,16 +50,4 @@ public sealed class ProvidersControllerTests
         providers!.Select(p => p.Name).Should().Equal("anthropic", "github-copilot", "openai");
     }
 
-    private static LlmModel CreateModel(string provider, string id, string name) =>
-        new(
-            Id: id,
-            Name: name,
-            Api: "test-api",
-            Provider: provider,
-            BaseUrl: "https://example.com",
-            Reasoning: false,
-            Input: ["text"],
-            Cost: new ModelCost(0, 0, 0, 0),
-            ContextWindow: 4096,
-            MaxTokens: 1024);
 }

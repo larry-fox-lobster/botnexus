@@ -1,4 +1,4 @@
-using BotNexus.Providers.Core.Registry;
+using BotNexus.Gateway.Abstractions.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BotNexus.Gateway.Api.Controllers;
@@ -10,12 +10,12 @@ namespace BotNexus.Gateway.Api.Controllers;
 [Route("api/providers")]
 public sealed class ProvidersController : ControllerBase
 {
-    private readonly ModelRegistry _modelRegistry;
+    private readonly IModelFilter _modelFilter;
 
     /// <inheritdoc cref="ProvidersController"/>
-    public ProvidersController(ModelRegistry modelRegistry)
+    public ProvidersController(IModelFilter modelFilter)
     {
-        _modelRegistry = modelRegistry ?? throw new ArgumentNullException(nameof(modelRegistry));
+        _modelFilter = modelFilter ?? throw new ArgumentNullException(nameof(modelFilter));
     }
 
     /// <summary>
@@ -24,8 +24,7 @@ public sealed class ProvidersController : ControllerBase
     [HttpGet]
     public ActionResult<IEnumerable<ProviderInfo>> GetProviders()
     {
-        var providers = _modelRegistry.GetProviders()
-            .OrderBy(provider => provider, StringComparer.OrdinalIgnoreCase)
+        var providers = _modelFilter.GetProviders()
             .Select(provider => new ProviderInfo(
                 Name: provider,
                 ProviderId: provider,
