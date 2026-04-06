@@ -12,11 +12,13 @@ public sealed class RateLimitingMiddleware
 {
     private const int DefaultRequestsPerMinute = 60;
     private const int DefaultWindowSeconds = 60;
+    private static readonly TimeSpan CleanupInterval = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan MinimumRetryAfter = TimeSpan.FromSeconds(1);
 
     private readonly RequestDelegate _next;
     private readonly PlatformConfig _platformConfig;
     private readonly ConcurrentDictionary<string, ClientWindow> _clientWindows = new(StringComparer.Ordinal);
+    private long _lastCleanupTicks;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RateLimitingMiddleware"/> class.
@@ -52,6 +54,7 @@ public sealed class RateLimitingMiddleware
 
         var now = DateTimeOffset.UtcNow;
         var windowLength = TimeSpan.FromSeconds(windowSeconds);
+        TryCleanupStaleEntries(now, windowLength);
         var clientKey = GetClientKey(context);
         var clientWindow = _clientWindows.GetOrAdd(clientKey, _ => new ClientWindow(now));
 
@@ -66,6 +69,7 @@ public sealed class RateLimitingMiddleware
             }
 
             clientWindow.RequestCount++;
+            clientWindow.LastAccessed = now;
             isLimited = clientWindow.RequestCount > requestsPerMinute;
             retryAfter = (clientWindow.WindowStart + windowLength) - now;
             if (retryAfter < MinimumRetryAfter)
@@ -80,6 +84,26 @@ public sealed class RateLimitingMiddleware
         }
 
         await _next(context);
+    }
+
+    private void TryCleanupStaleEntries(DateTimeOffset now, TimeSpan windowLength)
+    {
+        var lastCleanupTicks = Interlocked.Read(ref _lastCleanupTicks);
+        if (lastCleanupTicks > 0 && now - new DateTimeOffset(lastCleanupTicks, TimeSpan.Zero) < CleanupInterval)
+            return;
+
+        var nowTicks = now.UtcTicks;
+        if (Interlocked.CompareExchange(ref _lastCleanupTicks, nowTicks, lastCleanupTicks) != lastCleanupTicks)
+            return;
+
+        var staleThreshold = windowLength + windowLength;
+        foreach (var pair in _clientWindows)
+        {
+            var clientWindow = pair.Value;
+            var lastAccessed = clientWindow.LastAccessed;
+            if (now - lastAccessed > staleThreshold)
+                _clientWindows.TryRemove(pair.Key, out _);
+        }
     }
 
     private static string GetClientKey(HttpContext context)
@@ -99,6 +123,7 @@ public sealed class RateLimitingMiddleware
     {
         public object Sync { get; } = new();
         public DateTimeOffset WindowStart { get; set; } = windowStart;
+        public DateTimeOffset LastAccessed { get; set; } = windowStart;
         public int RequestCount { get; set; }
     }
 }
