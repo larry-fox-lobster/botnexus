@@ -34,5 +34,9 @@
         "path": "/ws"
       }
     }
+  },
+  "extensions": {
+    "path": "C:\\Users\\you\\.botnexus\\extensions",
+    "enabled": true
   }
 }

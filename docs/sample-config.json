@@ -70,5 +70,9 @@
         "webhookPath": "/telegram/webhook"
       }
     }
+  },
+  "extensions": {
+    "path": "C:\\Users\\you\\.botnexus\\extensions",
+    "enabled": true
   }
 }

@@ -9,11 +9,12 @@ BotNexus uses a hierarchical, dictionary-based configuration model with a unifie
 3. [Primary Deployment: ~/.botnexus/](#primary-deployment-botnexus)
 4. [Project Defaults: appsettings.json](#project-defaults-appsettingsjson)
 5. [Configuration Sections](#configuration-sections)
-6. [Hot Reload](#hot-reload)
-7. [Extension Configuration](#extension-configuration)
-8. [Environment Variable Overrides](#environment-variable-overrides)
-9. [Security Best Practices](#security-best-practices)
-10. [Examples](#examples)
+6. [JSON Schema Validation](#json-schema-validation)
+7. [Hot Reload](#hot-reload)
+8. [Extension Configuration](#extension-configuration)
+9. [Environment Variable Overrides](#environment-variable-overrides)
+10. [Security Best Practices](#security-best-practices)
+11. [Examples](#examples)
 
 ---
 
@@ -851,6 +852,32 @@ Configuration for the CodingAgent component (used when running BotNexus as a cod
 ```
 
 **Note:** The `DefaultShellTimeoutSeconds` controls the CodingAgent's `bash` tool timeout. This is separate from `Tools.Exec.Timeout` which controls the Gateway's built-in shell tool. Set to `null` to allow unlimited execution time (process runs until the agent cancels it).
+
+---
+
+## JSON Schema Validation
+
+BotNexus provides a JSON schema for `config.json` at [`docs/botnexus-config.schema.json`](botnexus-config.schema.json). The schema covers all top-level sections (`gateway`, `agents`, `providers`, `channels`, `extensions`, `apiKeys`, `cors`, etc.) and their nested properties.
+
+### Using the Schema
+
+**In your editor:** Add a `$schema` reference to the top of your `config.json` for autocomplete and inline validation:
+
+```json
+{
+  "$schema": "./docs/botnexus-config.schema.json",
+  "gateway": { ... }
+}
+```
+
+**Generating the schema:** Use the CLI to regenerate the schema from the current `PlatformConfig` model:
+
+```powershell
+botnexus config schema
+# Output: docs\botnexus-config.schema.json
+```
+
+**Validating at the gateway:** Use the `POST /api/config/validate` endpoint (or `botnexus validate --remote`) to validate against the running gateway.
 
 ---
 

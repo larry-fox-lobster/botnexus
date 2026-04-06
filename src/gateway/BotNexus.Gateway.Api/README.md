@@ -66,7 +66,7 @@ Responses stream as `GatewayStreamEvent` JSON events:
 }
 ```
 
-**Activity Stream:** `ws://localhost:5005/api/activity?agent=<agentId>`
+**Activity Stream:** `ws://localhost:5005/ws/activity?agent=<agentId>`
 
 Subscribes to real-time activity events (agent started, tool called, streaming ended, etc.).
 
@@ -86,8 +86,7 @@ Subscribes to real-time activity events (agent started, tool called, streaming e
 Validates all requests (except health, WebUI, Swagger) using:
 
 1. **API Key header:** `X-Api-Key: <key>`
-2. **Query parameter:** `?apiKey=<key>`
-3. **Bearer token:** `Authorization: Bearer <token>`
+2. **Bearer token:** `Authorization: Bearer <token>`
 
 Failures return 401 (unauthenticated) or 403 (unauthorized). The middleware also enforces per-caller agent access restrictions.
 
@@ -104,6 +103,7 @@ Development mode allows any origin. Production mode restricts to origins configu
 | `AgentsController` | Controllers | Agent registration and lifecycle endpoints |
 | `ChatController` | Controllers | Chat and message steering endpoints |
 | `SessionsController` | Controllers | Session management endpoints |
+| `ConfigController` | Controllers | Configuration validation endpoint (`/api/config/validate`) |
 
 ### Models
 

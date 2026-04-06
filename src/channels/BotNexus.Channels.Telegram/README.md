@@ -6,13 +6,14 @@
 
 This package provides a Telegram Bot channel adapter that connects the BotNexus Gateway to Telegram's messaging platform. It derives from `ChannelAdapterBase` and supports configuration for bot tokens, webhook URLs, and chat ID allow-lists.
 
-**Status: Stub** — Lifecycle management and logging are implemented. Telegram Bot API integration (sending/receiving messages) is not yet wired up.
+**Status: Implemented** — Full Telegram Bot API integration with outbound message sending, chat ID filtering, and message chunking. Inbound message handling (long polling/webhook) is planned.
 
 ## Key Types
 
 | Type | Kind | Description |
 |------|------|-------------|
-| `TelegramChannelAdapter` | Class | Telegram bot adapter. Logs outbound sends; inbound message handling is pending. |
+| `TelegramChannelAdapter` | Class | Telegram bot adapter. Sends outbound messages via Bot API; inbound webhook handling is planned. |
+| `TelegramBotApiClient` | Class | HTTP client wrapper for Telegram Bot API — handles `sendMessage` and response parsing. |
 | `TelegramOptions` | Class | Configuration options — bot token, webhook URL, and allowed chat IDs. |
 | `TelegramServiceCollectionExtensions` | Static class | DI registration extension method `AddBotNexusTelegramChannel()`. |
 
@@ -21,27 +22,27 @@ This package provides a Telegram Bot channel adapter that connects the BotNexus 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Lifecycle management | ✅ Working | Start/stop with configuration logging |
-| Outbound sends | 🔶 Stub | Logs send intent; does not call Telegram API |
+| Outbound sends | ✅ Working | Sends via `TelegramBotApiClient.SendMessageAsync`; supports message chunking |
 | Inbound messages | ❌ Planned | Long polling or webhook → `InboundMessage` → dispatch |
-| Streaming deltas | ❌ N/A | Telegram is message-based; `SupportsStreaming = false` |
-| Chat ID allow-list | ✅ Configured | `AllowedChatIds` in options (enforcement pending with inbound) |
+| Streaming deltas | ✅ Working | Accumulates deltas and sends as edited messages |
+| Chat ID allow-list | ✅ Working | `AllowedChatIds` enforced on outbound; inbound enforcement pending |
 
 ### What It Does Now
 
 - Registers as channel type `"telegram"` with display name `"Telegram Bot"`
-- Reports `SupportsStreaming = false` (Telegram is message-based, not streaming)
+- Sends outbound messages via `TelegramBotApiClient` using the Telegram Bot API
+- Supports message chunking for messages exceeding `MaxMessageLength`
+- Accumulates streaming deltas and sends/edits Telegram messages as content arrives
+- Reports `SupportsStreaming = true` (pseudo-streaming via message editing)
+- Enforces `AllowedChatIds` on outbound sends
 - On `StartAsync`: logs startup with webhook URL status and allowed chat count
-- On `SendAsync`: logs the outbound message content and conversation ID
 - On `StopAsync`: logs shutdown
 
 ### What's Planned
 
-- Telegram Bot API client integration (via `BotToken`)
 - Long polling or webhook mode for receiving inbound updates
 - Mapping Telegram updates to `InboundMessage` and dispatching through `IChannelDispatcher`
 - Chat ID allow-list enforcement on inbound messages
-- `sendMessage` API calls for outbound delivery
-- Message edit support for pseudo-streaming (editing the last message as content arrives)
 
 ## Usage
 

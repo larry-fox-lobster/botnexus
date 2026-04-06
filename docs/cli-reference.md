@@ -12,7 +12,8 @@ The `botnexus` command-line tool provides quick access to configuration and agen
 6. [agent remove](#agent-remove) — Remove an agent
 7. [config get](#config-get) — Read a config value
 8. [config set](#config-set) — Set a config value
-9. [Examples](#examples)
+9. [config schema](#config-schema) — Generate JSON schema
+10. [Examples](#examples)
 
 ---
 
@@ -163,7 +164,7 @@ Expected output:
 
 ```
 Agents:
-  assistant  provider=github-copilot  model=gpt-4.1  enabled=true
+  assistant  provider=copilot  model=gpt-4.1  enabled=true
   coder      provider=openai           model=gpt-4    enabled=true
   reviewer   provider=anthropic        model=claude-3-sonnet  enabled=false
 ```
@@ -176,7 +177,7 @@ botnexus agent list --verbose
 
 ```
 Agents:
-  assistant  provider=github-copilot  model=gpt-4.1  enabled=true
+  assistant  provider=copilot  model=gpt-4.1  enabled=true
 Loaded from: C:\Users\<YourName>\AppData\Local\BotNexus\config.json
 ```
 
@@ -202,7 +203,7 @@ botnexus agent add <ID> [OPTIONS]
 
 | Option | Default | Description |
 |---|---|---|
-| `--provider` | `github-copilot` | Agent provider name (e.g., `github-copilot`, `openai`, `anthropic`). |
+| `--provider` | `copilot` | Agent provider name (e.g., `copilot`, `openai`, `anthropic`). |
 | `--model` | `gpt-4.1` | Model name for this agent (e.g., `gpt-4o`, `claude-3-sonnet`). |
 | `--enabled` | `true` | Whether the agent is enabled (`true` or `false`). |
 | `--verbose` | — | Show the updated configuration. |
@@ -425,6 +426,45 @@ Output:
 
 ```
 Set agents.reviewer.enabled = false
+```
+
+---
+
+## config schema
+
+Generate a JSON schema file for the platform configuration model.
+
+### Usage
+
+```powershell
+botnexus config schema [OPTIONS]
+```
+
+### Options
+
+| Option | Default | Description |
+|---|---|---|
+| `--output` | `docs\botnexus-config.schema.json` | Output file path for the generated schema. |
+| `--verbose` | — | Show the generated schema content. |
+
+### Examples
+
+**Generate schema (default path):**
+
+```powershell
+botnexus config schema
+```
+
+Output:
+
+```
+Generated schema: docs\botnexus-config.schema.json
+```
+
+**Custom output path:**
+
+```powershell
+botnexus config schema --output my-schema.json
 ```
 
 ---

@@ -25,7 +25,7 @@ This package depends on abstractions, session management, channel adapters, and 
 
 | Type | Namespace | Description |
 |------|-----------|-------------|
-| `GatewayHostBuilder` | Extensions | Extension method on `IHostBuilder` — registers all gateway services and loads platform configuration. |
+| `AddBotNexusGateway` | Extensions | Extension method on `IServiceCollection` — registers all gateway services and loads platform configuration. |
 | `PlatformConfigLoader` | Configuration | Loads `config.json` from `~/.botnexus/` or override location; validates schema; watches for changes. |
 
 ### Models
@@ -81,7 +81,7 @@ The gateway watches `~/.botnexus/config.json` for changes. Most changes (agent d
 
 All gateway services are thread-safe:
 
-- `AgentRegistry` — Uses `ReaderWriterLockSlim` for safe concurrent reads of agent descriptors
+- `AgentRegistry` — Uses `Lock` for safe concurrent access to agent descriptors
 - `AgentSupervisor` — Thread-safe instance tracking with per-agent concurrency limits
 - `SessionStore` — Delegates to underlying storage backend (typically uses file locks or database transactions)
 

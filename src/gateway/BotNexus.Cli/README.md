@@ -96,9 +96,9 @@ Options:
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--provider` | LLM provider name | (required) |
-| `--model` | Model identifier | (required) |
-| `--enabled` | Enable agent immediately | off |
+| `--provider` | LLM provider name | `copilot` |
+| `--model` | Model identifier | `gpt-4.1` |
+| `--enabled` | Enable agent immediately | `true` |
 
 ### `botnexus agent remove`
 
@@ -122,6 +122,17 @@ botnexus config get agents.assistant.model
 # Output: gpt-4.1
 ```
 
+### `botnexus config schema`
+
+Generate JSON schema for the platform configuration.
+
+```powershell
+botnexus config schema
+botnexus config schema --output path/to/schema.json
+```
+
+Generates the JSON schema to `docs\botnexus-config.schema.json` by default.
+
 ### `botnexus config set`
 
 Set a configuration value by dotted path.
@@ -141,7 +152,6 @@ All commands support:
 | Option | Description |
 |--------|-------------|
 | `--verbose` | Print detailed output and stack traces on error |
-| `--home` | Override home directory (default: `~/.botnexus`) |
 
 Example:
 
@@ -153,7 +163,7 @@ botnexus agent list --verbose
 
 | Variable | Description |
 |----------|-------------|
-| `BOTNEXUS_HOME` | Override home directory (same as `--home`) |
+| `BOTNEXUS_HOME` | Override home directory (default: `~/.botnexus`) |
 
 Example:
 
@@ -221,6 +231,20 @@ botnexus config set agents.coder.enabled false
 
 # Gateway watches and picks up changes (no restart needed for these)
 ```
+
+## Project Structure
+
+```
+BotNexus.Cli/
+├── Program.cs              # Entry point — DI setup and command registration (~24 lines)
+├── Commands/
+│   ├── InitCommand.cs      # botnexus init
+│   ├── ValidateCommand.cs  # botnexus validate
+│   ├── AgentCommands.cs    # botnexus agent {list|add|remove}
+│   └── ConfigCommands.cs   # botnexus config {get|set|schema}
+```
+
+Each command handler is a separate class registered via DI and built using `System.CommandLine`.
 
 ## Error Handling
 
