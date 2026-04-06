@@ -336,6 +336,101 @@ public sealed class PlatformConfigurationTests
         }
     }
 
+    [Fact]
+    public async Task PlatformConfigLoader_LoadAsync_WithMissingOptionalSections_UsesDefaultsAndValidates()
+    {
+        using var fixture = new PlatformConfigFixture();
+        var configPath = Path.Combine(fixture.RootPath, "minimal-config.json");
+        await File.WriteAllTextAsync(configPath, """{"gateway":{"listenUrl":"http://localhost:5005"}}""");
+
+        var config = await PlatformConfigLoader.LoadAsync(configPath, validateOnLoad: false);
+        var errors = PlatformConfigLoader.Validate(config);
+
+        config.GetListenUrl().Should().Be("http://localhost:5005");
+        config.Providers.Should().BeNull();
+        config.Channels.Should().BeNull();
+        config.Agents.Should().BeNull();
+        errors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PlatformConfigLoader_LoadAsync_WithEmptyCollections_LoadsWithoutValidationErrors()
+    {
+        using var fixture = new PlatformConfigFixture();
+        var configPath = Path.Combine(fixture.RootPath, "empty-collections.json");
+        await File.WriteAllTextAsync(configPath, """
+                                                 {
+                                                   "providers": {},
+                                                   "channels": {},
+                                                   "agents": {}
+                                                 }
+                                                 """);
+
+        var config = await PlatformConfigLoader.LoadAsync(configPath, validateOnLoad: false);
+        var errors = PlatformConfigLoader.Validate(config);
+
+        config.Providers.Should().NotBeNull().And.BeEmpty();
+        config.Channels.Should().NotBeNull().And.BeEmpty();
+        config.Agents.Should().NotBeNull().And.BeEmpty();
+        errors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void PlatformConfigLoader_Watch_CanBeCreatedAndDisposed()
+    {
+        using var fixture = new PlatformConfigFixture();
+        using var watcher = PlatformConfigLoader.Watch(fixture.ConfigPath);
+
+        watcher.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task PlatformConfigLoader_LoadAsync_WhenReadConcurrently_IsThreadSafe()
+    {
+        using var fixture = new PlatformConfigFixture();
+        var configPath = Path.Combine(fixture.RootPath, "concurrent-read.json");
+        await File.WriteAllTextAsync(configPath, """
+                                                 {
+                                                   "gateway": {
+                                                     "listenUrl": "http://localhost:5005",
+                                                     "defaultAgentId": "assistant"
+                                                   }
+                                                 }
+                                                 """);
+
+        var loads = Enumerable.Range(0, 32)
+            .Select(_ => PlatformConfigLoader.LoadAsync(configPath, validateOnLoad: false))
+            .ToArray();
+
+        var results = await Task.WhenAll(loads);
+
+        results.Should().OnlyContain(config => config.GetListenUrl() == "http://localhost:5005");
+        results.Should().OnlyContain(config => config.GetDefaultAgentId() == "assistant");
+    }
+
+    [Fact]
+    public async Task PlatformConfigLoader_RoundTripSaveLoad_PersistsChanges()
+    {
+        using var fixture = new PlatformConfigFixture();
+        var original = await PlatformConfigLoader.LoadAsync(fixture.ConfigPath, validateOnLoad: false);
+        original.Gateway ??= new GatewaySettingsConfig();
+        original.Gateway.LogLevel = "Warning";
+        original.Providers = new Dictionary<string, ProviderConfig>
+        {
+            ["copilot"] = new()
+            {
+                ApiKey = "updated-key"
+            }
+        };
+
+        await File.WriteAllTextAsync(fixture.ConfigPath, JsonSerializer.Serialize(original));
+        var reloaded = await PlatformConfigLoader.LoadAsync(fixture.ConfigPath, validateOnLoad: false);
+
+        reloaded.GetLogLevel().Should().Be("Warning");
+        reloaded.Providers.Should().ContainKey("copilot");
+        reloaded.Providers!["copilot"].ApiKey.Should().Be("updated-key");
+    }
+
     private sealed class PlatformConfigFixture : IDisposable
     {
         public PlatformConfigFixture(PlatformConfig? configOverride = null)

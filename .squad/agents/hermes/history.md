@@ -635,3 +635,9 @@ Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
 - Added a shared abstract test base at `tests/BotNexus.Providers.Conformance.Tests/StreamingProviderConformanceTests.cs` that enforces data-driven conformance checks for normalized content extraction, tool-call parsing, finish reason mapping, token-count mapping, and streaming event sequence.
 - Wired provider-specific inheritors in Anthropic, OpenAI, OpenAICompat, and Copilot test projects so the same normalization scenarios now run across each provider surface.
 - The shared conformance helper project is intentionally marked `IsTestProject=false` and referenced by provider test projects to avoid standalone execution while centralizing contract assertions.
+
+### 2026-04-06 — Config path + schema validation QA expansion
+
+- Added `tests/BotNexus.Gateway.Tests/Configuration/ConfigPathResolverTests.cs` to validate CLI `config get/set` behavior across top-level and nested paths, case-insensitive lookup, null handling, bool conversion, list JSON assignment, invalid-path failures, and unsupported array-index traversal.
+- Added `tests/BotNexus.Gateway.Tests/Configuration/SchemaValidationTests.cs` covering complete valid config acceptance, required-field validation failures, invalid-type load errors, deferred-validation handling with unknown fields, and nested gateway model-shape compatibility.
+- Extended `PlatformConfigurationTests` with edge-case coverage for missing optional sections, empty collections, concurrent `LoadAsync` access, round-trip save/load persistence, and watcher lifecycle creation/disposal.
