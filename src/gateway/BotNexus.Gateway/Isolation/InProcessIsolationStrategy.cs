@@ -64,7 +64,7 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
             LlmClient: _llmClient,
             ConvertToLlm: null,
             TransformContext: null,
-            GetApiKey: (provider, ct) => _authManager.GetApiKeyAsync(provider, ct),
+            GetApiKey: (provider, cancellationToken) => _authManager.GetApiKeyAsync(provider, cancellationToken),
             GetSteeringMessages: null,
             GetFollowUpMessages: null,
             ToolExecutionMode: ToolExecutionMode.Parallel,
@@ -129,10 +129,10 @@ internal sealed class InProcessAgentHandle : IAgentHandle
     public async IAsyncEnumerable<AgentStreamEvent> StreamAsync(string message, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var messageId = Guid.NewGuid().ToString("N");
-        var tcs = new TaskCompletionSource<IReadOnlyList<AgentMessage>>();
         var events = System.Threading.Channels.Channel.CreateUnbounded<AgentStreamEvent>();
+        using var promptCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        using var subscription = _agent.Subscribe(async (agentEvent, ct) =>
+        using var subscription = _agent.Subscribe(async (agentEvent, cancellationToken) =>
         {
             try
             {
@@ -173,7 +173,7 @@ internal sealed class InProcessAgentHandle : IAgentHandle
                 };
 
                 if (streamEvent is not null)
-                    await events.Writer.WriteAsync(streamEvent, ct);
+                    await events.Writer.WriteAsync(streamEvent, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -185,7 +185,7 @@ internal sealed class InProcessAgentHandle : IAgentHandle
                         Type = AgentStreamEventType.Error,
                         ErrorMessage = $"Internal streaming error: {ex.Message}",
                         MessageId = messageId
-                    }, ct);
+                    }, cancellationToken);
                 }
                 catch
                 {
@@ -196,28 +196,71 @@ internal sealed class InProcessAgentHandle : IAgentHandle
             }
         });
 
-        // Fire prompt on background task
-        _ = Task.Run(async () =>
+        async Task RunPromptAsync()
         {
             try
             {
-                var result = await _agent.PromptAsync(message, cancellationToken);
-                tcs.TrySetResult(result);
+                await _agent.PromptAsync(message, promptCancellation.Token);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (promptCancellation.IsCancellationRequested || cancellationToken.IsCancellationRequested)
             {
-                tcs.TrySetCanceled();
+                _logger.LogDebug("Agent prompt cancelled for '{AgentId}' session '{SessionId}'", AgentId, SessionId);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Agent prompt failed for '{AgentId}' session '{SessionId}'", AgentId, SessionId);
-                tcs.TrySetException(ex);
-            }
-            finally { events.Writer.TryComplete(); }
-        }, cancellationToken);
+                try
+                {
+                    await events.Writer.WriteAsync(new AgentStreamEvent
+                    {
+                        Type = AgentStreamEventType.Error,
+                        ErrorMessage = $"Agent prompt failed: {ex.Message}",
+                        MessageId = messageId
+                    }, CancellationToken.None);
+                }
+                catch
+                {
+                    // Best-effort error notification.
+                }
 
-        await foreach (var evt in events.Reader.ReadAllAsync(cancellationToken))
-            yield return evt;
+                events.Writer.TryComplete(ex);
+                return;
+            }
+            events.Writer.TryComplete();
+        }
+
+        var promptTask = RunPromptAsync();
+
+        try
+        {
+            await foreach (var evt in events.Reader.ReadAllAsync(cancellationToken))
+                yield return evt;
+        }
+        finally
+        {
+            promptCancellation.Cancel();
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await _agent.AbortAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error aborting agent after stream cancellation for '{AgentId}' session '{SessionId}'", AgentId, SessionId);
+                }
+            }
+
+            try
+            {
+                await promptTask;
+            }
+            catch (OperationCanceledException) when (promptCancellation.IsCancellationRequested || cancellationToken.IsCancellationRequested)
+            {
+                // Expected when caller cancels stream.
+            }
+        }
     }
 
     /// <inheritdoc />

@@ -78,14 +78,9 @@ public sealed class GatewayAuthMiddleware
     private static bool ShouldSkipAuth(HttpRequest request)
     {
         var path = request.Path;
-        if (path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase) ||
-            path.StartsWithSegments("/webui", StringComparison.OrdinalIgnoreCase) ||
-            path.StartsWithSegments("/swagger", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return Path.HasExtension(path.Value);
+        return path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase) ||
+               path.StartsWithSegments("/webui", StringComparison.OrdinalIgnoreCase) ||
+               path.StartsWithSegments("/swagger", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsAgentAuthorized(GatewayCallerIdentity identity, string? requestedAgentId)

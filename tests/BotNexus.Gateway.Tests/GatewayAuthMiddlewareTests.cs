@@ -174,6 +174,30 @@ public sealed class GatewayAuthMiddlewareTests
         context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
     }
 
+    [Fact]
+    public async Task ApiPathWithExtension_DoesNotSkipAuth()
+    {
+        var handler = new ApiKeyGatewayAuthHandler(apiKey: "test-key", NullLogger<ApiKeyGatewayAuthHandler>.Instance);
+        var nextCalled = false;
+        var middleware = new GatewayAuthMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            handler,
+            NullLogger<GatewayAuthMiddleware>.Instance);
+
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/agents.json";
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context);
+
+        nextCalled.Should().BeFalse();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+    }
+
     private sealed class StubWebSocketFeature : IHttpWebSocketFeature
     {
         public bool IsWebSocketRequest { get; init; }
