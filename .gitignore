@@ -51,3 +51,4 @@ TestResults/
 # Extension build output
 /extensions/
 .botnexus-agent
+node_modules/

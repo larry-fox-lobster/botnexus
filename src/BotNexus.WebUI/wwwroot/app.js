@@ -79,6 +79,7 @@
     const elBtnSend = $('#btn-send');
     const elBtnAbort = $('#btn-abort');
     const elAgentSelect = $('#agent-select');
+    const elModelSelect = $('#model-select');
     const elToggleTools = $('#toggle-tools');
     const elToggleThinking = $('#toggle-thinking');
     const elToggleActivity = $('#toggle-activity');
@@ -812,6 +813,7 @@
                 const rawText = deltaEl.textContent;
                 streaming.dataset.rawContent = rawText;
                 deltaEl.innerHTML = renderMarkdown(rawText);
+                deltaEl.style.whiteSpace = 'normal';
             }
             const timeEl = streaming.querySelector('.msg-time');
             if (timeEl) timeEl.textContent = formatTime(new Date().toISOString());
@@ -1348,7 +1350,7 @@
             el.setAttribute('role', 'listitem');
             const timeStr = relativeTime(s.updatedAt || s.createdAt);
             const agentName = s.agentId || s.agentName || 'Chat';
-            const msgCount = s.messageCount || 0;
+            const msgCount = (s.history && s.history.length) || 0;
             el.innerHTML = `
                 <div class="list-item-row">
                     <span class="item-title">${escapeHtml(agentName)}</span>
@@ -1427,6 +1429,7 @@
         scrollToBottom();
         elChatInput.focus();
         updateSendButtonState();
+        loadChatHeaderModels();
     }
 
     // =========================================================================
@@ -1666,6 +1669,65 @@
     }
 
     // =========================================================================
+    // Model selector in chat header
+    // =========================================================================
+
+    async function loadChatHeaderModels() {
+        if (!currentAgentId) return;
+        try {
+            const models = await fetchJson('/models');
+            elModelSelect.innerHTML = '<option value="">Select model...</option>';
+            if (models && models.length > 0) {
+                for (const m of models) {
+                    const opt = document.createElement('option');
+                    opt.value = m.name || m.modelId || m.id || 'unknown';
+                    opt.textContent = opt.value;
+                    elModelSelect.appendChild(opt);
+                }
+            }
+            
+            // Set current model from agent
+            const agent = await fetchJson(`/agents/${encodeURIComponent(currentAgentId)}`);
+            if (agent && agent.modelId) {
+                elModelSelect.value = agent.modelId;
+            }
+        } catch (e) {
+            console.error('Failed to load models:', e);
+        }
+    }
+
+    async function handleModelChange() {
+        if (!currentAgentId || !elModelSelect.value) return;
+        
+        const newModel = elModelSelect.value;
+        try {
+            // Get current agent descriptor
+            const agent = await fetchJson(`/agents/${encodeURIComponent(currentAgentId)}`);
+            if (!agent) {
+                appendSystemMessage('❌ Failed to load agent details', 'error');
+                return;
+            }
+            
+            // Update model
+            agent.modelId = newModel;
+            
+            const res = await fetch(`${API_BASE}/agents/${encodeURIComponent(currentAgentId)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(agent)
+            });
+            
+            if (res.ok) {
+                appendSystemMessage(`✅ Model changed to ${newModel}`);
+            } else {
+                appendSystemMessage(`❌ Failed to change model: ${res.status}`, 'error');
+            }
+        } catch (e) {
+            appendSystemMessage(`❌ Failed to change model: ${e.message}`, 'error');
+        }
+    }
+
+    // =========================================================================
     // Activity monitor
     // =========================================================================
 
@@ -1873,6 +1935,7 @@
             currentAgentId = newAgent;
             if (!currentSessionId && ws) { disconnectWebSocket(); connectWebSocket(); }
             updateSendButtonState();
+            if (currentAgentId) loadChatHeaderModels();
         });
 
         elToggleTools.addEventListener('change', toggleToolVisibility);
@@ -1941,6 +2004,9 @@
         $('#form-agent-provider').addEventListener('change', () => { loadModelsForProvider($('#form-agent-provider').value); });
         $('#form-agent-temperature-enabled').addEventListener('change', (e) => { $('#form-agent-temperature').disabled = !e.target.checked; });
         $('#form-agent-max-tokens-enabled').addEventListener('change', (e) => { $('#form-agent-max-tokens').disabled = !e.target.checked; });
+
+        // Model selector in chat header
+        elModelSelect.addEventListener('change', handleModelChange);
 
         // Confirm dialog
         $('#btn-confirm-ok').addEventListener('click', () => { if (confirmCallback) confirmCallback(); closeConfirm(); });
