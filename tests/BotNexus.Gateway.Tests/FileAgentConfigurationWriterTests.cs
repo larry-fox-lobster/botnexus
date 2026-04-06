@@ -29,7 +29,7 @@ public sealed class FileAgentConfigurationWriterTests : IDisposable
         var configPath = Path.Combine(_configDirectory, "nova.json");
         File.Exists(configPath).Should().BeTrue();
         Directory.Exists(Path.Combine(_home.AgentsPath, "nova")).Should().BeTrue();
-        File.Exists(Path.Combine(_home.AgentsPath, "nova", "SOUL.md")).Should().BeTrue();
+        File.Exists(Path.Combine(_home.AgentsPath, "nova", "workspace", "SOUL.md")).Should().BeTrue();
     }
 
     [Fact]

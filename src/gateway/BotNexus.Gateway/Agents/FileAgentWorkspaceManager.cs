@@ -43,7 +43,7 @@ public sealed class FileAgentWorkspaceManager : IAgentWorkspaceManager
     public string GetWorkspacePath(string agentName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(agentName);
-        return _botNexusHome.GetAgentDirectory(agentName.Trim());
+        return Path.Combine(_botNexusHome.GetAgentDirectory(agentName.Trim()), "workspace");
     }
 
     private static async Task<string> ReadFileOrEmptyAsync(string path, CancellationToken cancellationToken)

@@ -839,3 +839,12 @@ Validation: `dotnet build src\gateway\BotNexus.Cli\BotNexus.Cli.csproj --nologo 
 - Added GET /api/extensions via ExtensionsController, returning ExtensionResponse rows with { Name, Version, Type, AssemblyPath } from IExtensionLoader.GetLoaded() (one row per declared extension type).
 - Moved SessionHistoryResponse into BotNexus.Gateway.Abstractions.Models for reuse across API/test surfaces.
 - 2026-04-06: Gateway Wave 2 aligned SupportsThinkingDisplay naming in channel DTOs, added session metadata GET/PATCH endpoints with null-removal merge semantics, and introduced config ersion warning handling for schema evolution.
+
+## 2026-04-06T23:32:48Z — Phase B: Agent Directory Restructure
+
+- Updated BotNexusHome scaffolding to create workspace/ and data/sessions/ per agent.
+- Added legacy auto-migration in GetAgentDirectory() via MigrateLegacyWorkspace() to move flat SOUL.md/IDENTITY.md/USER.md/MEMORY.md files into workspace/.
+- Updated FileAgentWorkspaceManager.GetWorkspacePath() to return {agentDir}/workspace.
+- Reviewed WorkspaceContextBuilder: no direct file path logic; it continues to work through IAgentWorkspaceManager.
+- Updated Gateway tests for new layout and migration behavior (BotNexusHomeTests, FileAgentConfigurationWriterTests).
+- Validation: dotnet build Q:\repos\botnexus\BotNexus.slnx ✅ and dotnet test Q:\repos\botnexus\tests\BotNexus.Gateway.Tests --no-restore --verbosity minimal ✅ (452 passed).

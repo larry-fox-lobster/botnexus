@@ -58,17 +58,47 @@ public sealed class BotNexusHome(string? homePath = null)
 
         if (isFirstCreation)
             ScaffoldAgentWorkspace(agentDirectory);
+        else
+            MigrateLegacyWorkspace(agentDirectory);
 
         return agentDirectory;
     }
 
     private static void ScaffoldAgentWorkspace(string agentDirectory)
     {
+        var workspacePath = Path.Combine(agentDirectory, "workspace");
+        Directory.CreateDirectory(workspacePath);
+        Directory.CreateDirectory(Path.Combine(agentDirectory, "data", "sessions"));
         foreach (var file in WorkspaceScaffoldFiles)
         {
-            var path = Path.Combine(agentDirectory, file);
+            var path = Path.Combine(workspacePath, file);
             if (!File.Exists(path))
                 File.WriteAllText(path, string.Empty);
+        }
+    }
+
+    private static void MigrateLegacyWorkspace(string agentDirectory)
+    {
+        var workspacePath = Path.Combine(agentDirectory, "workspace");
+        if (Directory.Exists(workspacePath))
+            return;
+
+        var hasLegacyFiles = WorkspaceScaffoldFiles
+            .Any(f => File.Exists(Path.Combine(agentDirectory, f)));
+        if (!hasLegacyFiles)
+        {
+            ScaffoldAgentWorkspace(agentDirectory);
+            return;
+        }
+
+        Directory.CreateDirectory(workspacePath);
+        Directory.CreateDirectory(Path.Combine(agentDirectory, "data", "sessions"));
+        foreach (var file in WorkspaceScaffoldFiles)
+        {
+            var src = Path.Combine(agentDirectory, file);
+            var dst = Path.Combine(workspacePath, file);
+            if (File.Exists(src))
+                File.Move(src, dst);
         }
     }
 }
