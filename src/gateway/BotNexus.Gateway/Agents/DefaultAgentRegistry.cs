@@ -38,6 +38,23 @@ public sealed class DefaultAgentRegistry : IAgentRegistry
     }
 
     /// <inheritdoc />
+    public bool Update(string agentId, AgentDescriptor descriptor)
+    {
+        if (!string.Equals(agentId, descriptor.AgentId, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("The descriptor AgentId must match the route agentId.", nameof(descriptor));
+
+        lock (_sync)
+        {
+            if (!_agents.ContainsKey(agentId))
+                return false;
+
+            _agents[agentId] = descriptor;
+            _logger.LogInformation("Updated agent '{AgentId}' ({DisplayName})", descriptor.AgentId, descriptor.DisplayName);
+            return true;
+        }
+    }
+
+    /// <inheritdoc />
     public AgentDescriptor? Get(string agentId)
     {
         lock (_sync) return _agents.GetValueOrDefault(agentId);

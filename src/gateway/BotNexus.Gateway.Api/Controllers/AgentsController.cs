@@ -47,6 +47,21 @@ public sealed class AgentsController : ControllerBase
         }
     }
 
+    /// <summary>Updates an existing agent descriptor by ID.</summary>
+    /// <param name="agentId">The registered agent ID to update.</param>
+    /// <param name="descriptor">The new descriptor payload.</param>
+    /// <returns>The updated descriptor when found; otherwise 404.</returns>
+    [HttpPut("{agentId}")]
+    public ActionResult<AgentDescriptor> Update(string agentId, [FromBody] AgentDescriptor descriptor)
+    {
+        var updatedDescriptor = string.Equals(agentId, descriptor.AgentId, StringComparison.OrdinalIgnoreCase)
+            ? descriptor
+            : descriptor with { AgentId = agentId };
+
+        var wasUpdated = _registry.Update(agentId, updatedDescriptor);
+        return wasUpdated ? Ok(updatedDescriptor) : NotFound();
+    }
+
     /// <summary>Unregisters an agent.</summary>
     [HttpDelete("{agentId}")]
     public ActionResult Unregister(string agentId)

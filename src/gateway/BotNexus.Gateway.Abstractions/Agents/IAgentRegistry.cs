@@ -28,6 +28,16 @@ public interface IAgentRegistry
     void Unregister(string agentId);
 
     /// <summary>
+    /// Updates an existing agent descriptor while preserving registration identity.
+    /// </summary>
+    /// <param name="agentId">The registered agent ID to update.</param>
+    /// <param name="descriptor">The updated descriptor payload.</param>
+    /// <returns><c>true</c> when updated; otherwise <c>false</c> if the agent does not exist.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="descriptor"/> uses a different agent ID.</exception>
+    bool Update(string agentId, AgentDescriptor descriptor)
+        => throw new NotSupportedException("This registry does not support descriptor updates.");
+
+    /// <summary>
     /// Gets an agent descriptor by ID, or <c>null</c> if not registered.
     /// </summary>
     AgentDescriptor? Get(string agentId);
