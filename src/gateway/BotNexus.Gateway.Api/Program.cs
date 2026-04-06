@@ -120,6 +120,7 @@ if (!string.IsNullOrWhiteSpace(listenUrl))
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseCors(GatewayCorsPolicy);
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<GatewayAuthMiddleware>();
 app.UseMiddleware<RateLimitingMiddleware>();
 app.UseSwagger();
