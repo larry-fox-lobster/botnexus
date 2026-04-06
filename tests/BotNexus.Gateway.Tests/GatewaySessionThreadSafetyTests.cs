@@ -107,6 +107,20 @@ public sealed class GatewaySessionThreadSafetyTests
         errors.Should().BeEmpty();
     }
 
+    [Fact]
+    public void GetHistorySnapshot_WithPagination_ReturnsRequestedSegment()
+    {
+        var session = CreateSession();
+        for (var i = 0; i < 10; i++)
+            session.AddEntry(new SessionEntry { Role = "user", Content = $"entry-{i}" });
+
+        var snapshot = session.GetHistorySnapshot(offset: 3, limit: 4);
+
+        snapshot.Should().HaveCount(4);
+        snapshot[0].Content.Should().Be("entry-3");
+        snapshot[^1].Content.Should().Be("entry-6");
+    }
+
     private static GatewaySession CreateSession()
         => new() { SessionId = $"session-{Guid.NewGuid():N}", AgentId = "agent-a" };
 }

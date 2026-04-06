@@ -8,6 +8,7 @@ namespace BotNexus.Gateway.Abstractions.Models;
 public sealed class GatewaySession
 {
     private readonly Lock _historyLock = new();
+    private readonly Lock _streamReplayLock = new();
 
     /// <summary>Unique session identifier.</summary>
     public required string SessionId { get; init; }
@@ -42,6 +43,16 @@ public sealed class GatewaySession
     /// <summary>Session-level metadata for extensibility.</summary>
     public Dictionary<string, object?> Metadata { get; init; } = [];
 
+    /// <summary>
+    /// Next WebSocket outbound sequence ID for reconnect replay.
+    /// </summary>
+    public long NextSequenceId { get; set; } = 1;
+
+    /// <summary>
+    /// Bounded replay log of sequenced outbound WebSocket payloads.
+    /// </summary>
+    public List<GatewaySessionStreamEvent> StreamEventLog { get; init; } = [];
+
     /// <summary>Thread-safe append to conversation history.</summary>
     public void AddEntry(SessionEntry entry)
     {
@@ -70,6 +81,100 @@ public sealed class GatewaySession
             return History.ToList();
         }
     }
+
+    /// <summary>
+    /// Returns a paginated snapshot of the history (safe to iterate).
+    /// </summary>
+    /// <param name="offset">Zero-based offset into history.</param>
+    /// <param name="limit">Maximum number of items to return.</param>
+    public IReadOnlyList<SessionEntry> GetHistorySnapshot(int offset, int limit)
+    {
+        lock (_historyLock)
+        {
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be greater than or equal to zero.");
+            if (limit < 0)
+                throw new ArgumentOutOfRangeException(nameof(limit), "Limit must be greater than or equal to zero.");
+
+            return History
+                .Skip(offset)
+                .Take(limit)
+                .ToList();
+        }
+    }
+
+    /// <summary>
+    /// Atomically allocates and returns the next outbound sequence ID.
+    /// </summary>
+    public long AllocateSequenceId()
+    {
+        lock (_streamReplayLock)
+        {
+            var sequenceId = NextSequenceId;
+            NextSequenceId = sequenceId + 1;
+            UpdatedAt = DateTimeOffset.UtcNow;
+            return sequenceId;
+        }
+    }
+
+    /// <summary>
+    /// Records a sequenced outbound payload into the bounded replay log.
+    /// </summary>
+    public void AddStreamEvent(long sequenceId, string payloadJson, int replayWindowSize)
+    {
+        lock (_streamReplayLock)
+        {
+            StreamEventLog.Add(new GatewaySessionStreamEvent(sequenceId, payloadJson, DateTimeOffset.UtcNow));
+            var max = Math.Max(replayWindowSize, 1);
+            if (StreamEventLog.Count > max)
+            {
+                StreamEventLog.RemoveRange(0, StreamEventLog.Count - max);
+            }
+
+            UpdatedAt = DateTimeOffset.UtcNow;
+        }
+    }
+
+    /// <summary>
+    /// Returns replay entries after <paramref name="lastSequenceId"/>, bounded by <paramref name="maxReplayCount"/>.
+    /// </summary>
+    public IReadOnlyList<GatewaySessionStreamEvent> GetStreamEventsAfter(long lastSequenceId, int maxReplayCount)
+    {
+        lock (_streamReplayLock)
+        {
+            return StreamEventLog
+                .Where(evt => evt.SequenceId > lastSequenceId)
+                .Take(Math.Max(maxReplayCount, 1))
+                .ToList();
+        }
+    }
+
+    /// <summary>
+    /// Returns a safe snapshot of replay entries.
+    /// </summary>
+    public IReadOnlyList<GatewaySessionStreamEvent> GetStreamEventSnapshot()
+    {
+        lock (_streamReplayLock)
+        {
+            return StreamEventLog.ToList();
+        }
+    }
+
+    /// <summary>
+    /// Replaces replay state from persisted storage.
+    /// </summary>
+    public void SetStreamReplayState(long nextSequenceId, IEnumerable<GatewaySessionStreamEvent>? streamEvents)
+    {
+        lock (_streamReplayLock)
+        {
+            NextSequenceId = nextSequenceId <= 0 ? 1 : nextSequenceId;
+            StreamEventLog.Clear();
+            if (streamEvents is not null)
+            {
+                StreamEventLog.AddRange(streamEvents.OrderBy(evt => evt.SequenceId));
+            }
+        }
+    }
 }
 
 /// <summary>
@@ -92,3 +197,11 @@ public sealed record SessionEntry
     /// <summary>Tool call ID for correlating requests and results.</summary>
     public string? ToolCallId { get; init; }
 }
+
+/// <summary>
+/// A sequenced outbound WebSocket payload stored for reconnect replay.
+/// </summary>
+/// <param name="SequenceId">Monotonically increasing sequence ID.</param>
+/// <param name="PayloadJson">Serialized outbound payload.</param>
+/// <param name="Timestamp">When the payload was recorded.</param>
+public sealed record GatewaySessionStreamEvent(long SequenceId, string PayloadJson, DateTimeOffset Timestamp);

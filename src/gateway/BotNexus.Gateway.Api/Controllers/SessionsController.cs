@@ -28,6 +28,33 @@ public sealed class SessionsController : ControllerBase
         return session is not null ? Ok(session) : NotFound();
     }
 
+    /// <summary>
+    /// Gets paginated session history for long-running conversations.
+    /// </summary>
+    [HttpGet("{sessionId}/history")]
+    public async Task<ActionResult<SessionHistoryResponse>> GetHistory(
+        string sessionId,
+        [FromQuery] int offset = 0,
+        [FromQuery] int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        if (offset < 0)
+            return BadRequest(new { error = "offset must be greater than or equal to zero." });
+
+        if (limit <= 0)
+            return BadRequest(new { error = "limit must be greater than zero." });
+
+        var boundedLimit = Math.Min(limit, 200);
+
+        var session = await _sessions.GetAsync(sessionId, cancellationToken);
+        if (session is null)
+            return NotFound();
+
+        var totalCount = session.History.Count;
+        var entries = session.GetHistorySnapshot(offset, boundedLimit);
+        return Ok(new SessionHistoryResponse(offset, boundedLimit, totalCount, entries));
+    }
+
     /// <summary>Deletes a session.</summary>
     [HttpDelete("{sessionId}")]
     public async Task<ActionResult> Delete(string sessionId, CancellationToken cancellationToken)
@@ -36,3 +63,9 @@ public sealed class SessionsController : ControllerBase
         return NoContent();
     }
 }
+
+public sealed record SessionHistoryResponse(
+    int Offset,
+    int Limit,
+    int TotalCount,
+    IReadOnlyList<SessionEntry> Entries);
