@@ -204,6 +204,30 @@ public sealed class GatewayHostTests
         sessions.Verify(s => s.GetOrCreateAsync("web:conv-1:agent-a", "agent-a", It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task DispatchAsync_WithSuspendedSession_RejectsNewMessages()
+    {
+        var router = new Mock<IMessageRouter>();
+        router.Setup(r => r.ResolveAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["agent-a"]);
+        var supervisor = new Mock<IAgentSupervisor>();
+        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a", Status = SessionStatus.Suspended };
+        var sessions = new Mock<ISessionStore>();
+        sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+        var channel = CreateChannelAdapter("web", supportsStreaming: false);
+        var activity = new RecordingActivityBroadcaster();
+        var host = CreateHost(supervisor.Object, router.Object, sessions.Object, activity, CreateChannelManager(channel.Object));
+
+        await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
+
+        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        channel.Verify(c => c.SendAsync(
+                It.Is<OutboundMessage>(m => m.Content.Contains("suspended", StringComparison.OrdinalIgnoreCase)),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     private static Mock<IAgentHandle> CreatePromptHandle(string agentId, string sessionId, string content)
     {
         var handle = new Mock<IAgentHandle>();

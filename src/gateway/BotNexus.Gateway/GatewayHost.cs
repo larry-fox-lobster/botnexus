@@ -119,6 +119,28 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
             // Each agent gets its own session
             var sessionId = message.SessionId ?? $"{message.ChannelType}:{message.ConversationId}:{agentId}";
             var session = await _sessions.GetOrCreateAsync(sessionId, agentId, cancellationToken);
+            if (session.Status == SessionStatus.Suspended)
+            {
+                if (_channelManager.Get(message.ChannelType) is { } suspendedChannel)
+                {
+                    await suspendedChannel.SendAsync(new OutboundMessage
+                    {
+                        ChannelType = message.ChannelType,
+                        ConversationId = message.ConversationId,
+                        Content = "Session is suspended. Resume the session before sending new messages.",
+                        SessionId = sessionId
+                    }, cancellationToken);
+                }
+
+                await _activity.PublishAsync(new GatewayActivity
+                {
+                    Type = GatewayActivityType.Error,
+                    AgentId = agentId,
+                    SessionId = sessionId,
+                    Message = "Session is suspended."
+                }, cancellationToken);
+                continue;
+            }
 
             // Record user message
             session.AddEntry(new SessionEntry { Role = "user", Content = message.Content });

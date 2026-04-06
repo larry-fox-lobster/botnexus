@@ -84,4 +84,68 @@ public sealed class SessionsControllerTests
         response.Entries[0].Content.Should().Be("m-10");
         response.Entries[^1].Content.Should().Be("m-209");
     }
+
+    [Fact]
+    public async Task Suspend_WithActiveSession_TransitionsToSuspended()
+    {
+        var store = new InMemorySessionStore();
+        await store.GetOrCreateAsync("s1", "agent-a");
+        var controller = new SessionsController(store);
+
+        var result = await controller.Suspend("s1", CancellationToken.None);
+
+        var session = (result.Result as OkObjectResult)?.Value as GatewaySession;
+        session.Should().NotBeNull();
+        session!.Status.Should().Be(SessionStatus.Suspended);
+    }
+
+    [Fact]
+    public async Task Suspend_WithMissingSession_ReturnsNotFound()
+    {
+        var controller = new SessionsController(new InMemorySessionStore());
+
+        var result = await controller.Suspend("missing", CancellationToken.None);
+
+        result.Result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task Suspend_WithInvalidState_ReturnsConflict()
+    {
+        var store = new InMemorySessionStore();
+        var session = await store.GetOrCreateAsync("s1", "agent-a");
+        session.Status = SessionStatus.Suspended;
+        var controller = new SessionsController(store);
+
+        var result = await controller.Suspend("s1", CancellationToken.None);
+
+        result.Result.Should().BeOfType<ConflictObjectResult>();
+    }
+
+    [Fact]
+    public async Task Resume_WithSuspendedSession_TransitionsToActive()
+    {
+        var store = new InMemorySessionStore();
+        var session = await store.GetOrCreateAsync("s1", "agent-a");
+        session.Status = SessionStatus.Suspended;
+        var controller = new SessionsController(store);
+
+        var result = await controller.Resume("s1", CancellationToken.None);
+
+        var resumed = (result.Result as OkObjectResult)?.Value as GatewaySession;
+        resumed.Should().NotBeNull();
+        resumed!.Status.Should().Be(SessionStatus.Active);
+    }
+
+    [Fact]
+    public async Task Resume_WithInvalidState_ReturnsConflict()
+    {
+        var store = new InMemorySessionStore();
+        await store.GetOrCreateAsync("s1", "agent-a");
+        var controller = new SessionsController(store);
+
+        var result = await controller.Resume("s1", CancellationToken.None);
+
+        result.Result.Should().BeOfType<ConflictObjectResult>();
+    }
 }

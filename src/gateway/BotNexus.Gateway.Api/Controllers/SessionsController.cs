@@ -62,6 +62,40 @@ public sealed class SessionsController : ControllerBase
         await _sessions.DeleteAsync(sessionId, cancellationToken);
         return NoContent();
     }
+
+    /// <summary>Suspends an active session.</summary>
+    [HttpPatch("{sessionId}/suspend")]
+    public async Task<ActionResult<GatewaySession>> Suspend(string sessionId, CancellationToken cancellationToken)
+    {
+        var session = await _sessions.GetAsync(sessionId, cancellationToken);
+        if (session is null)
+            return NotFound();
+
+        if (session.Status != SessionStatus.Active)
+            return Conflict(new { error = $"Cannot suspend session in '{session.Status}' state." });
+
+        session.Status = SessionStatus.Suspended;
+        session.UpdatedAt = DateTimeOffset.UtcNow;
+        await _sessions.SaveAsync(session, cancellationToken);
+        return Ok(session);
+    }
+
+    /// <summary>Resumes a suspended session.</summary>
+    [HttpPatch("{sessionId}/resume")]
+    public async Task<ActionResult<GatewaySession>> Resume(string sessionId, CancellationToken cancellationToken)
+    {
+        var session = await _sessions.GetAsync(sessionId, cancellationToken);
+        if (session is null)
+            return NotFound();
+
+        if (session.Status != SessionStatus.Suspended)
+            return Conflict(new { error = $"Cannot resume session in '{session.Status}' state." });
+
+        session.Status = SessionStatus.Active;
+        session.UpdatedAt = DateTimeOffset.UtcNow;
+        await _sessions.SaveAsync(session, cancellationToken);
+        return Ok(session);
+    }
 }
 
 public sealed record SessionHistoryResponse(
