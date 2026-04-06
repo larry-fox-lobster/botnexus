@@ -324,6 +324,7 @@
 - 2026-04-06: Session history pagination is exposed via `GET /api/sessions/{sessionId}/history` with `offset`/`limit` query params (default 0/50, max limit 200) and response metadata `{ offset, limit, totalCount, entries }`, backed by `GatewaySession.GetHistorySnapshot(offset, limit)`.
 - 2026-04-06: Cross-agent safety in `DefaultAgentCommunicator` now enforces configurable `GatewayOptions.MaxCallChainDepth` (default 10) and configurable `GatewayOptions.CrossAgentTimeoutSeconds` (default 120), throwing descriptive exceptions on depth overflow or timeout.
 - 2026-04-06: Platform config now supports `gateway.sessionStore` / root `sessionStore` (`Type: InMemory|File`, `FilePath`) with validation in `PlatformConfigLoader.Validate`; DI registration in `AddPlatformConfiguration` selects the correct `ISessionStore` implementation and retains legacy `sessionsDirectory` compatibility.
+- 2026-04-06: API-driven agent mutations now persist through `IAgentConfigurationWriter`; `FileAgentConfigurationWriter` writes camelCase `{agentId}.json` configs to the active agents directory, creates `~/.botnexus/agents/{agentId}/` workspace scaffolding via `BotNexusHome`, and `AgentsController` now saves on register/update and deletes config on unregister.
 
 ## Sprint 1 Summary — 2026-04-01T17:33Z
 

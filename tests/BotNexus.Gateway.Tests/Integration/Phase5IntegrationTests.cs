@@ -371,6 +371,7 @@ public sealed class Phase5IntegrationTests
             builder.WebHost.UseKestrel().UseUrls("http://127.0.0.1:0");
             builder.Services.AddSingleton<IGatewayAuthHandler>(_ => new ApiKeyGatewayAuthHandler(apiKey, NullLogger<ApiKeyGatewayAuthHandler>.Instance));
             builder.Services.AddSingleton<IAgentSupervisor>(_ => Mock.Of<IAgentSupervisor>());
+            builder.Services.AddSingleton<IAgentConfigurationWriter>(_ => new NoOpAgentConfigurationWriter());
             builder.Services.AddSingleton<IAgentRegistry>(_ =>
             {
                 var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);

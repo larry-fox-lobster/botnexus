@@ -278,11 +278,13 @@ public sealed class PlatformConfigurationTests
         var gatewayOptions = provider.GetRequiredService<IOptions<GatewayOptions>>().Value;
         var sessionStore = provider.GetRequiredService<ISessionStore>();
         var agentSources = provider.GetServices<IAgentConfigurationSource>();
+        var configurationWriter = provider.GetRequiredService<IAgentConfigurationWriter>();
 
         gatewayOptions.DefaultAgentId.Should().Be("config-agent");
         sessionStore.Should().BeOfType<FileSessionStore>();
         agentSources.Should().Contain(source => source is FileAgentConfigurationSource);
         agentSources.Should().Contain(source => source is PlatformConfigAgentSource);
+        configurationWriter.Should().BeOfType<FileAgentConfigurationWriter>();
     }
 
     [Fact]

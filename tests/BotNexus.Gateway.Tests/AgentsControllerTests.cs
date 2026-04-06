@@ -2,6 +2,7 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Api.Controllers;
+using BotNexus.Gateway.Configuration;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -16,7 +17,7 @@ public sealed class AgentsControllerTests
     {
         var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
         registry.Register(CreateDescriptor("agent-a"));
-        var controller = new AgentsController(registry, Mock.Of<IAgentSupervisor>());
+        var controller = CreateController(registry);
 
         var result = controller.List();
 
@@ -26,7 +27,7 @@ public sealed class AgentsControllerTests
     [Fact]
     public void Get_WithUnknownAgent_ReturnsNotFound()
     {
-        var controller = new AgentsController(new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance), Mock.Of<IAgentSupervisor>());
+        var controller = CreateController(new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance));
 
         var result = controller.Get("missing");
 
@@ -34,47 +35,47 @@ public sealed class AgentsControllerTests
     }
 
     [Fact]
-    public void Register_WithValidDescriptor_ReturnsCreated()
+    public async Task Register_WithValidDescriptor_ReturnsCreated()
     {
-        var controller = new AgentsController(new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance), Mock.Of<IAgentSupervisor>());
+        var controller = CreateController(new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance));
 
-        var result = controller.Register(CreateDescriptor("agent-a"));
+        var result = await controller.Register(CreateDescriptor("agent-a"), CancellationToken.None);
 
         result.Should().BeOfType<CreatedAtActionResult>();
     }
 
     [Fact]
-    public void Register_WithDuplicateAgent_ReturnsConflict()
+    public async Task Register_WithDuplicateAgent_ReturnsConflict()
     {
-        var controller = new AgentsController(new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance), Mock.Of<IAgentSupervisor>());
-        _ = controller.Register(CreateDescriptor("agent-a"));
+        var controller = CreateController(new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance));
+        _ = await controller.Register(CreateDescriptor("agent-a"), CancellationToken.None);
 
-        var result = controller.Register(CreateDescriptor("agent-a"));
+        var result = await controller.Register(CreateDescriptor("agent-a"), CancellationToken.None);
 
         result.Should().BeOfType<ConflictObjectResult>();
     }
 
     [Fact]
-    public void Update_WithMismatchedRouteAndPayloadAgentId_ReturnsBadRequest()
+    public async Task Update_WithMismatchedRouteAndPayloadAgentId_ReturnsBadRequest()
     {
         var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
         registry.Register(CreateDescriptor("agent-a"));
-        var controller = new AgentsController(registry, Mock.Of<IAgentSupervisor>());
+        var controller = CreateController(registry);
 
-        var result = controller.Update("agent-a", CreateDescriptor("agent-b"));
+        var result = await controller.Update("agent-a", CreateDescriptor("agent-b"), CancellationToken.None);
 
         result.Result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
-    public void Update_WithEmptyPayloadAgentId_UsesRouteAgentId()
+    public async Task Update_WithEmptyPayloadAgentId_UsesRouteAgentId()
     {
         var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
         registry.Register(CreateDescriptor("agent-a"));
-        var controller = new AgentsController(registry, Mock.Of<IAgentSupervisor>());
+        var controller = CreateController(registry);
         var payload = CreateDescriptor("agent-a") with { AgentId = string.Empty };
 
-        var result = controller.Update("agent-a", payload);
+        var result = await controller.Update("agent-a", payload, CancellationToken.None);
         var updated = (result.Result as OkObjectResult)?.Value as AgentDescriptor;
 
         updated.Should().NotBeNull();
@@ -82,11 +83,58 @@ public sealed class AgentsControllerTests
     }
 
     [Fact]
+    public async Task Register_WithValidDescriptor_PersistsConfiguration()
+    {
+        var writer = new Mock<IAgentConfigurationWriter>();
+        var descriptor = CreateDescriptor("agent-a");
+        var controller = new AgentsController(
+            new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance),
+            Mock.Of<IAgentSupervisor>(),
+            writer.Object);
+
+        _ = await controller.Register(descriptor, CancellationToken.None);
+
+        writer.Verify(w => w.SaveAsync(
+            It.Is<AgentDescriptor>(d => d.AgentId == descriptor.AgentId),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Update_WhenSuccessful_PersistsConfiguration()
+    {
+        var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
+        registry.Register(CreateDescriptor("agent-a"));
+        var writer = new Mock<IAgentConfigurationWriter>();
+        var controller = new AgentsController(registry, Mock.Of<IAgentSupervisor>(), writer.Object);
+
+        var result = await controller.Update("agent-a", CreateDescriptor("agent-a") with { DisplayName = "updated" }, CancellationToken.None);
+
+        result.Result.Should().BeOfType<OkObjectResult>();
+        writer.Verify(w => w.SaveAsync(
+            It.Is<AgentDescriptor>(d => d.AgentId == "agent-a" && d.DisplayName == "updated"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Unregister_DeletesPersistedConfiguration()
+    {
+        var writer = new Mock<IAgentConfigurationWriter>();
+        var controller = new AgentsController(
+            new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance),
+            Mock.Of<IAgentSupervisor>(),
+            writer.Object);
+
+        _ = await controller.Unregister("agent-a", CancellationToken.None);
+
+        writer.Verify(w => w.DeleteAsync("agent-a", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task GetHealth_WithNoActiveInstances_ReturnsUnknown()
     {
         var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
         registry.Register(CreateDescriptor("agent-a"));
-        var controller = new AgentsController(registry, Mock.Of<IAgentSupervisor>());
+        var controller = CreateController(registry);
 
         var result = await controller.GetHealth("agent-a", CancellationToken.None);
 
@@ -99,7 +147,7 @@ public sealed class AgentsControllerTests
     [Fact]
     public async Task GetHealth_WithUnknownAgent_ReturnsNotFound()
     {
-        var controller = new AgentsController(new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance), Mock.Of<IAgentSupervisor>());
+        var controller = CreateController(new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance));
 
         var result = await controller.GetHealth("missing", CancellationToken.None);
 
@@ -131,7 +179,7 @@ public sealed class AgentsControllerTests
             .Setup(s => s.GetHandle("agent-a", "s1"))
             .Returns(handle.Object);
 
-        var controller = new AgentsController(registry, supervisor.Object);
+        var controller = CreateController(registry, supervisor.Object);
 
         var result = await controller.GetHealth("agent-a", CancellationToken.None);
 
@@ -169,7 +217,7 @@ public sealed class AgentsControllerTests
             .Setup(s => s.GetHandle("agent-a", "s1"))
             .Returns(handle.Object);
 
-        var controller = new AgentsController(registry, supervisor.Object);
+        var controller = CreateController(registry, supervisor.Object);
 
         var result = await controller.GetHealth("agent-a", CancellationToken.None);
 
@@ -207,7 +255,7 @@ public sealed class AgentsControllerTests
             .Setup(s => s.GetHandle("agent-a", "s1"))
             .Returns(handle.Object);
 
-        var controller = new AgentsController(registry, supervisor.Object);
+        var controller = CreateController(registry, supervisor.Object);
 
         var result = await controller.GetHealth("agent-a", CancellationToken.None);
 
@@ -225,4 +273,7 @@ public sealed class AgentsControllerTests
             ModelId = "test-model",
             ApiProvider = "test-provider"
         };
+
+    private static AgentsController CreateController(IAgentRegistry registry, IAgentSupervisor? supervisor = null)
+        => new(registry, supervisor ?? Mock.Of<IAgentSupervisor>(), new NoOpAgentConfigurationWriter());
 }

@@ -50,6 +50,7 @@ public static class GatewayServiceCollectionExtensions
         services.AddSingleton<IAgentWorkspaceManager, FileAgentWorkspaceManager>();
         services.AddSingleton<IContextBuilder, WorkspaceContextBuilder>();
         services.AddSingleton<IAgentRegistry, DefaultAgentRegistry>();
+        services.TryAddSingleton<IAgentConfigurationWriter, NoOpAgentConfigurationWriter>();
         services.AddSingleton<IAgentSupervisor, DefaultAgentSupervisor>();
         services.AddSingleton<IAgentCommunicator, DefaultAgentCommunicator>();
         services.AddSingleton<IMessageRouter, DefaultMessageRouter>();
@@ -238,17 +239,24 @@ public static class GatewayServiceCollectionExtensions
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-        services.AddSingleton<IAgentConfigurationSource>(serviceProvider =>
+        string ResolvePath(IServiceProvider serviceProvider)
         {
             var hostEnvironment = serviceProvider.GetService<IHostEnvironment>();
-            var resolvedPath = Path.IsPathRooted(path)
+            return Path.IsPathRooted(path)
                 ? path
                 : Path.GetFullPath(Path.Combine(hostEnvironment?.ContentRootPath ?? AppContext.BaseDirectory, path));
+        }
 
+        services.AddSingleton<IAgentConfigurationSource>(serviceProvider =>
+        {
             return new FileAgentConfigurationSource(
-                resolvedPath,
+                ResolvePath(serviceProvider),
                 serviceProvider.GetRequiredService<ILogger<FileAgentConfigurationSource>>());
         });
+        services.Replace(ServiceDescriptor.Singleton<IAgentConfigurationWriter>(serviceProvider =>
+            new FileAgentConfigurationWriter(
+                ResolvePath(serviceProvider),
+                serviceProvider.GetRequiredService<BotNexusHome>())));
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AgentConfigurationHostedService>());
         return services;

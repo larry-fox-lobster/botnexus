@@ -14,16 +14,19 @@ public sealed class AgentsController : ControllerBase
 {
     private readonly IAgentRegistry _registry;
     private readonly IAgentSupervisor _supervisor;
+    private readonly IAgentConfigurationWriter _configurationWriter;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AgentsController"/> class.
     /// </summary>
     /// <param name="registry">The agent registry for accessing registered agents.</param>
     /// <param name="supervisor">The agent supervisor for managing agent instances and their lifecycle.</param>
-    public AgentsController(IAgentRegistry registry, IAgentSupervisor supervisor)
+    /// <param name="configurationWriter">Persists mutable agent configuration changes.</param>
+    public AgentsController(IAgentRegistry registry, IAgentSupervisor supervisor, IAgentConfigurationWriter configurationWriter)
     {
         _registry = registry;
         _supervisor = supervisor;
+        _configurationWriter = configurationWriter;
     }
 
     /// <summary>Lists all registered agents.</summary>
@@ -40,11 +43,12 @@ public sealed class AgentsController : ControllerBase
 
     /// <summary>Registers a new agent.</summary>
     [HttpPost]
-    public ActionResult Register([FromBody] AgentDescriptor descriptor)
+    public async Task<ActionResult> Register([FromBody] AgentDescriptor descriptor, CancellationToken cancellationToken)
     {
         try
         {
             _registry.Register(descriptor);
+            await _configurationWriter.SaveAsync(descriptor, cancellationToken);
             return CreatedAtAction(nameof(Get), new { agentId = descriptor.AgentId }, descriptor);
         }
         catch (InvalidOperationException ex)
@@ -58,6 +62,7 @@ public sealed class AgentsController : ControllerBase
     /// </summary>
     /// <param name="agentId">The route agent identifier.</param>
     /// <param name="descriptor">The descriptor payload to persist.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The updated descriptor when found; otherwise 404.</returns>
     /// <remarks>
     /// If <paramref name="descriptor" /> omits <see cref="AgentDescriptor.AgentId" />, the route value is used.
@@ -67,7 +72,7 @@ public sealed class AgentsController : ControllerBase
     [ProducesResponseType(typeof(AgentDescriptor), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult<AgentDescriptor> Update(string agentId, [FromBody] AgentDescriptor descriptor)
+    public async Task<ActionResult<AgentDescriptor>> Update(string agentId, [FromBody] AgentDescriptor descriptor, CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(descriptor.AgentId) &&
             !string.Equals(agentId, descriptor.AgentId, StringComparison.OrdinalIgnoreCase))
@@ -83,14 +88,19 @@ public sealed class AgentsController : ControllerBase
             : descriptor;
 
         var wasUpdated = _registry.Update(agentId, updatedDescriptor);
-        return wasUpdated ? Ok(updatedDescriptor) : NotFound();
+        if (!wasUpdated)
+            return NotFound();
+
+        await _configurationWriter.SaveAsync(updatedDescriptor, cancellationToken);
+        return Ok(updatedDescriptor);
     }
 
     /// <summary>Unregisters an agent.</summary>
     [HttpDelete("{agentId}")]
-    public ActionResult Unregister(string agentId)
+    public async Task<ActionResult> Unregister(string agentId, CancellationToken cancellationToken)
     {
         _registry.Unregister(agentId);
+        await _configurationWriter.DeleteAsync(agentId, cancellationToken);
         return NoContent();
     }
 
