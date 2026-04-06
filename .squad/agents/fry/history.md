@@ -5,6 +5,28 @@
 - **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI), Session, Tools.GitHub, WebUI
 - **Created:** 2026-04-01
 
+## Cross-Agent Dependencies — Phase 7A Sprint Alerts
+
+### From Bender (Sprint 7A — Reconnection + Suspend/Resume)
+**Date:** 2026-04-06T02:50Z  
+**Impact on Fry:** WebUI infinite scroll feature depends on Bender's reconnection replay.
+
+- `GatewaySession` now persists `NextSequenceId` and `StreamEventLog` for client replay on reconnect.
+- `FileSessionStore` serializes reconnection state in session metadata.
+- WebSocket clients should request history from last known sequence; gateway will fill gaps from `StreamEventLog`.
+- **Action for Fry:** Update WebUI to send `{"type": "history", "lastSeqId": N}` on reconnect to fetch missing messages. Coordinate with Farnsworth's pagination endpoint for large history loads.
+
+### From Farnsworth (Sprint 7A — History Pagination)
+**Date:** 2026-04-06T02:50Z  
+**Impact on Fry:** Infinite scroll feature implementation.
+
+- New paginated endpoint: `GET /api/sessions/{sessionId}/history?offset=0&limit=50` with metadata response.
+- Response includes `offset`, `limit`, `totalCount`, `entries`.
+- Limit bounded to 200 for client safety.
+- **Action for Fry:** WebUI infinite scroll can now use this paginated API instead of loading full history at once. Reduces DOM overhead for large sessions.
+
+---
+
 ## Learnings
 
 ### WebUI Production Enhancement Sprint
