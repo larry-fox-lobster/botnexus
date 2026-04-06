@@ -144,16 +144,16 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
                         _sessions,
                         new StreamingSessionOptions(
                             IncludeErrorsInHistory: true,
-                            OnEventAsync: (evt, ct) =>
+                            OnEventAsync: (evt, cancellationToken) =>
                             {
                                 if (channel is IStreamEventChannelAdapter streamEventChannel)
                                 {
-                                    return new ValueTask(streamEventChannel.SendStreamEventAsync(message.ConversationId, evt, ct));
+                                    return new ValueTask(streamEventChannel.SendStreamEventAsync(message.ConversationId, evt, cancellationToken));
                                 }
 
                                 if (evt.Type == AgentStreamEventType.ContentDelta && evt.ContentDelta is not null)
                                 {
-                                    return new ValueTask(channel.SendStreamDeltaAsync(message.ConversationId, evt.ContentDelta, ct));
+                                    return new ValueTask(channel.SendStreamDeltaAsync(message.ConversationId, evt.ContentDelta, cancellationToken));
                                 }
 
                                 return ValueTask.CompletedTask;

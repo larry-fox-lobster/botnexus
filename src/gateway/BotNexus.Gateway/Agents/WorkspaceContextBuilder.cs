@@ -13,11 +13,11 @@ public sealed class WorkspaceContextBuilder : IContextBuilder
         _workspaceManager = workspaceManager;
     }
 
-    public async Task<string> BuildSystemPromptAsync(AgentDescriptor descriptor, CancellationToken ct = default)
+    public async Task<string> BuildSystemPromptAsync(AgentDescriptor descriptor, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
 
-        var workspace = await _workspaceManager.LoadWorkspaceAsync(descriptor.AgentId, ct);
+        var workspace = await _workspaceManager.LoadWorkspaceAsync(descriptor.AgentId, cancellationToken);
         if (string.IsNullOrWhiteSpace(workspace.Soul))
             return descriptor.SystemPrompt ?? string.Empty;
 

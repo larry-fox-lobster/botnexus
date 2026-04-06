@@ -51,14 +51,14 @@ public sealed class GatewayAuthManager
     /// <summary>
     /// Resolves an API key from <c>~/.botnexus/auth.json</c>, environment variables, or platform config.
     /// </summary>
-    public async Task<string?> GetApiKeyAsync(string provider, CancellationToken ct = default)
+    public async Task<string?> GetApiKeyAsync(string provider, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(provider))
         {
             return null;
         }
 
-        var authKey = await GetApiKeyFromAuthEntryAsync(provider, ct).ConfigureAwait(false);
+        var authKey = await GetApiKeyFromAuthEntryAsync(provider, cancellationToken).ConfigureAwait(false);
         if (!string.IsNullOrWhiteSpace(authKey))
         {
             return authKey;
@@ -70,10 +70,10 @@ public sealed class GatewayAuthManager
             return envKey;
         }
 
-        return await ResolveProviderConfigApiKeyAsync(provider, ct).ConfigureAwait(false);
+        return await ResolveProviderConfigApiKeyAsync(provider, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<string?> ResolveProviderConfigApiKeyAsync(string provider, CancellationToken ct)
+    private async Task<string?> ResolveProviderConfigApiKeyAsync(string provider, CancellationToken cancellationToken)
     {
         if (_platformConfig.Providers is null)
         {
@@ -95,13 +95,13 @@ public sealed class GatewayAuthManager
                 return null;
             }
 
-            return await GetApiKeyFromAuthEntryAsync(referenceProvider, ct).ConfigureAwait(false);
+            return await GetApiKeyFromAuthEntryAsync(referenceProvider, cancellationToken).ConfigureAwait(false);
         }
 
         return providerConfig.ApiKey;
     }
 
-    private async Task<string?> GetApiKeyFromAuthEntryAsync(string provider, CancellationToken ct)
+    private async Task<string?> GetApiKeyFromAuthEntryAsync(string provider, CancellationToken cancellationToken)
     {
         LoadAuthEntries();
 
@@ -117,7 +117,7 @@ public sealed class GatewayAuthManager
 
         try
         {
-            var refreshed = await RefreshEntryAsync(entry, ct).ConfigureAwait(false);
+            var refreshed = await RefreshEntryAsync(entry, cancellationToken).ConfigureAwait(false);
             UpdateEntry(provider, refreshed);
             return refreshed.Access;
         }
@@ -139,7 +139,7 @@ public sealed class GatewayAuthManager
         return nowMs >= entry.Expires - 60_000 || string.IsNullOrWhiteSpace(entry.Endpoint);
     }
 
-    private static async Task<AuthEntry> RefreshEntryAsync(AuthEntry entry, CancellationToken ct)
+    private static async Task<AuthEntry> RefreshEntryAsync(AuthEntry entry, CancellationToken cancellationToken)
     {
         var credentials = new OAuthCredentials(
             AccessToken: entry.Access,
@@ -147,7 +147,7 @@ public sealed class GatewayAuthManager
             ExpiresAt: entry.Expires / 1000,
             ApiEndpoint: entry.Endpoint);
 
-        var refreshed = await CopilotOAuth.RefreshAsync(credentials, ct).ConfigureAwait(false);
+        var refreshed = await CopilotOAuth.RefreshAsync(credentials, cancellationToken).ConfigureAwait(false);
 
         return new AuthEntry
         {

@@ -12,21 +12,21 @@ public sealed class FileAgentWorkspaceManager : IAgentWorkspaceManager
         _botNexusHome = botNexusHome;
     }
 
-    public async Task<AgentWorkspace> LoadWorkspaceAsync(string agentName, CancellationToken ct = default)
+    public async Task<AgentWorkspace> LoadWorkspaceAsync(string agentName, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(agentName);
 
         var workspacePath = GetWorkspacePath(agentName);
 
-        var soul = await ReadFileOrEmptyAsync(Path.Combine(workspacePath, "SOUL.md"), ct);
-        var identity = await ReadFileOrEmptyAsync(Path.Combine(workspacePath, "IDENTITY.md"), ct);
-        var user = await ReadFileOrEmptyAsync(Path.Combine(workspacePath, "USER.md"), ct);
-        var memory = await ReadFileOrEmptyAsync(Path.Combine(workspacePath, "MEMORY.md"), ct);
+        var soul = await ReadFileOrEmptyAsync(Path.Combine(workspacePath, "SOUL.md"), cancellationToken);
+        var identity = await ReadFileOrEmptyAsync(Path.Combine(workspacePath, "IDENTITY.md"), cancellationToken);
+        var user = await ReadFileOrEmptyAsync(Path.Combine(workspacePath, "USER.md"), cancellationToken);
+        var memory = await ReadFileOrEmptyAsync(Path.Combine(workspacePath, "MEMORY.md"), cancellationToken);
 
         return new AgentWorkspace(agentName.Trim(), soul, identity, user, memory);
     }
 
-    public async Task SaveMemoryAsync(string agentName, string content, CancellationToken ct = default)
+    public async Task SaveMemoryAsync(string agentName, string content, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(agentName);
         ArgumentException.ThrowIfNullOrWhiteSpace(content);
@@ -37,7 +37,7 @@ public sealed class FileAgentWorkspaceManager : IAgentWorkspaceManager
             ? content
             : $"{content}{Environment.NewLine}";
 
-        await File.AppendAllTextAsync(memoryPath, memoryEntry, ct);
+        await File.AppendAllTextAsync(memoryPath, memoryEntry, cancellationToken);
     }
 
     public string GetWorkspacePath(string agentName)
@@ -46,11 +46,11 @@ public sealed class FileAgentWorkspaceManager : IAgentWorkspaceManager
         return _botNexusHome.GetAgentDirectory(agentName.Trim());
     }
 
-    private static async Task<string> ReadFileOrEmptyAsync(string path, CancellationToken ct)
+    private static async Task<string> ReadFileOrEmptyAsync(string path, CancellationToken cancellationToken)
     {
         if (!File.Exists(path))
             return string.Empty;
 
-        return await File.ReadAllTextAsync(path, ct);
+        return await File.ReadAllTextAsync(path, cancellationToken);
     }
 }
