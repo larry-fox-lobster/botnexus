@@ -5,7 +5,8 @@
 
 $ErrorActionPreference = "Stop"
 
-$hookPath = Join-Path $PSScriptRoot ".git" "hooks" "pre-commit"
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$hookPath = Join-Path $repoRoot ".git" "hooks" "pre-commit"
 $hookContent = @'
 #!/bin/sh
 # BotNexus pre-commit hook — Prevent broken commits
@@ -25,10 +26,10 @@ fi
 
 echo "✅ Build succeeded."
 
-echo "🧪 Pre-commit: Running unit tests..."
+echo "🧪 Pre-commit: Running Gateway tests..."
 
-# Run unit tests only (not E2E or integration — those are expensive)
-dotnet test tests/BotNexus.Tests.Unit/BotNexus.Tests.Unit.csproj --nologo --verbosity minimal --tl:off --no-build
+# Run Gateway tests (fast feedback loop)
+dotnet test tests/BotNexus.Gateway.Tests --nologo --verbosity minimal --tl:off --no-build
 
 if [ $? -ne 0 ]; then
     echo "❌ Tests failed. Fix failing tests before committing."

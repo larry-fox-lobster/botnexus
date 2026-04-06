@@ -7,8 +7,7 @@ Quick reference for building, testing, and deploying BotNexus during development
 1. [Dev-Loop Script](#dev-loop-script)
 2. [Build Process](#build-process)
 3. [Testing](#testing)
-4. [Installation](#installation)
-5. [Common Tasks](#common-tasks)
+4. [Common Tasks](#common-tasks)
 
 ---
 
@@ -28,7 +27,7 @@ The `scripts/dev-loop.ps1` script automates build + test + Gateway startup for r
 # Watch source changes and restart gateway automatically
 .\scripts\dev-loop.ps1 -Watch
 
-# Fast loop for iterative agent/human checks (skip rebuild/test when already done)
+# Fast loop for iterative checks (skip rebuild/test when already done)
 .\scripts\dev-loop.ps1 -SkipBuild -SkipTests
 ```
 
@@ -36,8 +35,8 @@ The `scripts/dev-loop.ps1` script automates build + test + Gateway startup for r
 
 **3-Step Development Loop:**
 
-1. **Build solution** — runs `dotnet build BotNexus.slnx`
-2. **Run Gateway tests** — runs `dotnet test tests/BotNexus.Gateway.Tests`
+1. **Build solution** — runs `dotnet build BotNexus.slnx --nologo --tl:off`
+2. **Run Gateway tests** — runs `dotnet test tests/BotNexus.Gateway.Tests --nologo --tl:off`
 3. **Start Gateway** — runs `scripts/start-gateway.ps1` (or `dotnet watch ... run` with `-Watch`)
 
 ### Output
@@ -76,32 +75,22 @@ Press Ctrl+C to stop.
 
 **1. Build the entire solution:**
 ```powershell
-dotnet build BotNexus.slnx
+dotnet build BotNexus.slnx --nologo --tl:off
 ```
 
 **2. Run tests:**
 ```powershell
-dotnet test BotNexus.slnx
+dotnet test BotNexus.slnx --nologo --tl:off
 ```
 
-**3. Pack components:**
+**3. Start the Gateway:**
 ```powershell
-.\scripts\pack.ps1
-```
-
-**4. Install extensions:**
-```powershell
-.\scripts\install.ps1 -InstallPath ~/.botnexus/extensions
-```
-
-**5. Start the Gateway:**
-```powershell
-dotnet run --project src\gateway\BotNexus.Gateway.Api\BotNexus.Gateway.Api.csproj
+.\scripts\start-gateway.ps1
 ```
 
 ### Using dev-loop.ps1 (Recommended)
 
-For a single command that does all of the above:
+For a single command that does build + test + run:
 
 ```powershell
 .\scripts\dev-loop.ps1
@@ -114,60 +103,25 @@ For a single command that does all of the above:
 ### Run All Tests
 
 ```powershell
-dotnet test BotNexus.slnx
+dotnet test BotNexus.slnx --nologo --tl:off
 ```
 
 ### Run Tests for a Specific Project
 
 ```powershell
-dotnet test tests/BotNexus.Agent.Tests/
+dotnet test tests\BotNexus.AgentCore.Tests --nologo --tl:off
 ```
 
 ### Run a Specific Test
 
 ```powershell
-dotnet test BotNexus.slnx --filter "FullyQualifiedName=BotNexus.Agent.Tests.AgentLoopTests.TestName"
+dotnet test BotNexus.slnx --nologo --tl:off --filter "FullyQualifiedName~MyTestName"
 ```
 
 ### Watch Mode (Auto-Rerun on File Changes)
 
 ```powershell
-dotnet watch test --project tests/BotNexus.Agent.Tests/
-```
-
----
-
-## Installation
-
-### Install CLI Tool Globally
-
-```powershell
-dotnet tool install --global --add-source ./src/BotNexus.Cli/bin/Release/net10.0 botnexus
-```
-
-### Upgrade CLI Tool
-
-```powershell
-dotnet tool update --global --add-source ./src/BotNexus.Cli/bin/Release/net10.0 botnexus
-```
-
-### Verify Installation
-
-```powershell
-botnexus --version
-botnexus --help
-```
-
-### Install Extensions to Home Directory
-
-```powershell
-.\scripts\install.ps1
-```
-
-Or specify a custom path:
-
-```powershell
-.\scripts\install.ps1 -InstallPath "C:\MyPath\botnexus\extensions"
+dotnet watch test --project tests\BotNexus.Gateway.Tests
 ```
 
 ---
@@ -177,85 +131,66 @@ Or specify a custom path:
 ### Start Development Environment
 
 ```powershell
-# Full build, pack, and start (recommended)
+# Full build + test + start (recommended)
 .\scripts\dev-loop.ps1
 
 # Then in another terminal, open WebUI
 start http://localhost:5005/webui
 ```
 
-### Add a New Agent
-
-```powershell
-# Create agent via API
-$body = @{
-    name = "my-agent"
-    systemPrompt = "You are helpful"
-    model = "gpt-4o"
-    provider = "openai"
-} | ConvertTo-Json
-
-Invoke-RestMethod -Uri "http://localhost:18790/api/agents" `
-  -Method Post `
-  -Body $body `
-  -Headers @{ "X-Api-Key" = "your-key"; "Content-Type" = "application/json" }
-```
-
-Or use CLI (if available):
-
-```powershell
-botnexus agent add --name my-agent --model gpt-4o --provider openai
-```
-
 ### View Gateway Logs
 
 ```powershell
-# View recent logs
-Get-Content ~/.botnexus/logs/gateway.log -Tail 50
+# View recent logs (daily log files)
+Get-Content $env:USERPROFILE\.botnexus\logs\botnexus-*.log -Tail 50
 
 # Follow logs in real-time (requires PowerShell 7+)
-Get-Content ~/.botnexus/logs/gateway.log -Tail 50 -Wait
+Get-Content $env:USERPROFILE\.botnexus\logs\botnexus-*.log -Tail 50 -Wait
 ```
 
 ### Stop the Gateway
 
-```powershell
-# Kill by name
-Stop-Process -Name "dotnet" -ProcessName "*BotNexus.Gateway*"
+Press `Ctrl+C` in the terminal where the Gateway is running, or:
 
-# Or by PID (from dev-loop output)
-Stop-Process -Id 12345
+```powershell
+# Find the process
+Get-Process -Name "dotnet" | Where-Object { $_.CommandLine -like "*BotNexus*" }
+
+# Stop by PID
+Stop-Process -Id <PID>
 ```
 
 ### Clean Build (Remove All Artifacts)
 
 ```powershell
-# Remove bin/ and obj/ folders
-Remove-Item -Path "src/*/bin", "src/*/obj", "tests/*/bin", "tests/*/obj" -Recurse -Force
-
-# Full rebuild
 dotnet clean BotNexus.slnx
-dotnet build BotNexus.slnx
+dotnet build BotNexus.slnx --nologo --tl:off
 ```
 
-### Run Doctor Diagnostics
+### Export OpenAPI Spec
 
 ```powershell
-# Run health checks
-botnexus doctor
-
-# Check specific category
-botnexus doctor --category startup
+.\scripts\export-openapi.ps1
+# Saves to docs/api/openapi.json
 ```
+
+### Install Pre-Commit Hook
+
+```powershell
+.\scripts\install-pre-commit-hook.ps1
+```
+
+This builds and runs Gateway tests before each commit. Bypass with `git commit --no-verify`.
 
 ### Reset Configuration
 
 ```powershell
 # Backup current config
-Copy-Item ~/.botnexus/config.json ~/.botnexus/config.json.backup
+Copy-Item $env:USERPROFILE\.botnexus\config.json $env:USERPROFILE\.botnexus\config.json.backup
 
-# Reinitialize
-botnexus config init
+# Delete and let BotNexus recreate on next run
+Remove-Item $env:USERPROFILE\.botnexus\config.json
+.\scripts\start-gateway.ps1
 ```
 
 ---
@@ -270,48 +205,29 @@ If port 5005 is already in use:
 # Find process using port 5005
 netstat -ano | findstr :5005
 
-# Stop by PID
-Stop-Process -Id <PID>
-
-# Or use a different port in config.json
-```
-
-### CLI Tool Not Found
-
-```powershell
-# Ensure it's installed
-dotnet tool list --global | findstr botnexus
-
-# If missing, reinstall
-dotnet tool install --global --add-source ./src/BotNexus.Cli/bin/Release/net10.0 botnexus
+# Use a different port
+.\scripts\start-gateway.ps1 -Port 8080
 ```
 
 ### Extensions Not Loading
 
 ```powershell
-# Check extension path
-botnexus config show | findstr ExtensionsPath
-
 # Verify extensions are in correct location
-Get-ChildItem ~/.botnexus/extensions/providers/
-Get-ChildItem ~/.botnexus/extensions/channels/
-Get-ChildItem ~/.botnexus/extensions/tools/
+Get-ChildItem $env:USERPROFILE\.botnexus\extensions\
 ```
 
 ### OAuth Token Expired
 
 ```powershell
-# Remove expired token
-Remove-Item ~/.botnexus/tokens/copilot.json
-
-# Next OAuth provider use will re-authenticate
-botnexus login --provider copilot
+# Remove expired token — next request triggers re-auth
+Remove-Item $env:USERPROFILE\.botnexus\tokens\copilot.json
 ```
 
 ---
 
 ## Next Steps
 
+- **[Dev Loop Reference](dev-loop.md)** — Full dev loop with live testing and configuration
 - **[API Reference](api-reference.md)** — REST API endpoints for agents and sessions
 - **[Configuration Guide](configuration.md)** — Detailed configuration options
 - **[Extension Development](extension-development.md)** — Build custom tools and providers

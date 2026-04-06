@@ -115,21 +115,17 @@ export BOTNEXUS_HOME=/custom/botnexus
 
 ---
 
-## 5. Run the Gateway in Dev Mode
+## 4. Run the Gateway in Dev Mode
 
 Start the Gateway directly from the repository:
 
-```bash
-# Windows (PowerShell)
+```powershell
 .\scripts\start-gateway.ps1
-
-# macOS/Linux
-./scripts/start-gateway.ps1
 ```
 
 Or use the full dev loop (build + test + run):
 
-```bash
+```powershell
 .\scripts\dev-loop.ps1
 ```
 
@@ -137,13 +133,13 @@ The Gateway starts at `http://localhost:5005` by default.
 
 **Custom port:**
 
-```bash
+```powershell
 .\scripts\start-gateway.ps1 -Port 8080
 ```
 
 **Watch mode** — auto-recompiles on source changes:
 
-```bash
+```powershell
 .\scripts\dev-loop.ps1 -Watch
 ```
 
@@ -151,7 +147,7 @@ The Gateway starts at `http://localhost:5005` by default.
 
 Check the health endpoint:
 
-```bash
+```powershell
 curl http://localhost:5005/health
 ```
 
@@ -165,7 +161,7 @@ Expected response:
 
 ---
 
-## 6. Configure Your First Provider (Copilot)
+## 5. Configure Your First Provider (Copilot)
 
 Edit `~/.botnexus/config.json` to add the Copilot provider:
 
@@ -206,7 +202,7 @@ The token is cached and refreshed automatically.
 
 ---
 
-## 7. Customize Your Agent (Optional)
+## 6. Customize Your Agent (Optional)
 
 BotNexus creates workspace files for each agent in `~/.botnexus/agents/{agent-name}/`:
 
@@ -242,7 +238,7 @@ Changes take effect on your **next message** — no restart required.
 
 ---
 
-## 8. Open the WebUI
+## 7. Open the WebUI
 
 Open your browser to:
 
@@ -280,7 +276,7 @@ The session is created automatically and persists across Gateway restarts.
 
 ---
 
-## 9. Dev Workflow: Making Changes
+## 8. Dev Workflow: Making Changes
 
 When developing BotNexus, you'll iterate through this cycle:
 
@@ -314,7 +310,7 @@ Or with watch mode for continuous rebuilds:
 
 ---
 
-## 10. Running Tests
+## 9. Running Tests
 
 Run the full test suite:
 
@@ -338,12 +334,12 @@ Tests use an isolated `BOTNEXUS_HOME` so they don't interfere with your developm
 
 ---
 
-## 11. Validate Configuration
+## 10. Validate Configuration
 
-Validate your `config.json` file before running the Gateway:
+Validate your `config.json` against the current schema:
 
-```bash
-dotnet run --project src/gateway/BotNexus.Cli -- validate
+```powershell
+curl http://localhost:5005/api/config/validate
 ```
 
 This checks for syntax errors, missing required fields, and invalid provider configurations.
@@ -359,7 +355,7 @@ This checks for syntax errors, missing required fields, and invalid provider con
 
 ---
 
-## 12. Common Dev Tasks
+## 11. Common Dev Tasks
 
 ### View Gateway logs
 
@@ -399,14 +395,14 @@ Then reinitialize by running the Gateway again.
 
 ---
 
-## 13. Troubleshooting
+## 12. Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
 | `dotnet: command not found` | .NET SDK not installed | Install .NET 10+ from https://dotnet.microsoft.com/download |
 | Build fails | Stale artifacts | `dotnet clean && dotnet build BotNexus.slnx` |
 | Port 5005 already in use | Another process on the port | Use `-Port 8080` or stop the other process |
-| Gateway won't start | Invalid config JSON | Run `dotnet run --project src/gateway/BotNexus.Cli -- validate` |
+| Gateway won't start | Invalid config JSON | Check `~/.botnexus/config.json` syntax; validate via `curl http://localhost:5005/api/config/validate` |
 | WebUI shows "Disconnected" | Gateway crashed or not running | Restart: `.\scripts\start-gateway.ps1` |
 | OAuth code expired | Took too long to authorize | Send another message to trigger a fresh code |
 | Tests fail | Stale build or test isolation | `dotnet clean && dotnet build && dotnet test` |

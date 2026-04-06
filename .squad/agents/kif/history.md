@@ -373,3 +373,24 @@ Participated in design review ceremony for Phase 3 architecture. All ADs approve
 **Build Status:** ✅ All documentation built and validated
 
 **Next Phase:** Documentation ready for release notes and contributor onboarding.
+
+---
+
+## Dev Loop Documentation Overhaul
+
+**Status:** ✅ Complete  
+**Scope:** Full audit and update of dev loop docs, scripts, and getting-started guides.
+
+**Issues Found & Fixed:**
+
+1. **`scripts/install-pre-commit-hook.ps1`** — Path bug: used `$PSScriptRoot` (resolves to `scripts/`) for `.git/hooks/` path, which put the hook in `scripts/.git/hooks/` instead of repo root `.git/hooks/`. Fixed to use `Split-Path -Parent $PSScriptRoot` pattern. Also fixed reference to non-existent `tests/BotNexus.Tests.Unit/` — changed to `tests/BotNexus.Gateway.Tests` which is the actual test project.
+
+2. **`docs/dev-loop.md`** — Rewrote entirely. Added: quick start section, full dev loop diagram (edit→build→test→run→verify), project structure table for edit targets, `-SkipBuild` and `-SkipTests` parameters for `dev-loop.ps1`, `-SkipBuild` for `start-gateway.ps1`, `export-openapi.ps1` reference, live testing with Copilot section (OAuth flow + WebSocket testing), auth.json documentation, environment variables table, expanded troubleshooting.
+
+3. **`docs/development-workflow.md`** — Removed phantom references to `scripts/pack.ps1` and `scripts/install.ps1` (don't exist), fixed `BotNexus.Agent.Tests` → `BotNexus.AgentCore.Tests`, fixed port 18790 → 5005, fixed `gateway.log` → `botnexus-*.log`, removed stale CLI install section.
+
+4. **`docs/getting-started-dev.md`** — Fixed missing section 4 (skipped from 3 to 5), renumbered sections 4–12, fixed `dotnet run --project src/gateway/BotNexus.Cli -- validate` (CLI project is at `src/gateway/BotNexus.Cli/`, but validation via API is more reliable).
+
+5. **`docs/dev-guide.md`** — Added `-SkipBuild` and `-SkipTests` to `dev-loop.ps1` parameter table, added `-SkipBuild` to `start-gateway.ps1` table, added fast restart example.
+
+**Verified:** Build succeeds (0 warnings, 0 errors). All documented file paths confirmed against BotNexus.slnx and actual directory structure.

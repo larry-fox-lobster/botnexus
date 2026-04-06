@@ -119,6 +119,7 @@ Builds and starts the Gateway API.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `-Port` | int | `5005` | HTTP listen port (1–65535) |
+| `-SkipBuild` | switch | off | Skip the build step |
 
 **What it does:**
 1. Builds `src/gateway/BotNexus.Gateway.Api/BotNexus.Gateway.Api.csproj`
@@ -144,6 +145,8 @@ Full build → test → run cycle for rapid development.
 |-----------|------|---------|-------------|
 | `-Port` | int | `5005` | HTTP listen port (1–65535) |
 | `-Watch` | switch | off | Enable watch mode (auto-rebuild on changes) |
+| `-SkipBuild` | switch | off | Skip the solution build step |
+| `-SkipTests` | switch | off | Skip Gateway tests |
 
 **What it does:**
 1. Builds the full solution (`BotNexus.slnx`)
@@ -162,6 +165,9 @@ Full build → test → run cycle for rapid development.
 
 # Watch mode (auto-rebuild)
 .\scripts\dev-loop.ps1 -Watch
+
+# Fast restart (skip rebuild and tests)
+.\scripts\dev-loop.ps1 -SkipBuild -SkipTests
 ```
 
 **Output:**
