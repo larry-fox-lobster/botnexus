@@ -579,6 +579,85 @@ and require target validation through `IAgentRegistry` before supervisor executi
 
 ---
 
+### Gateway Phase 6 — Design Review (2026-04-06, Reviewer: Leela)
+
+**Overall Grade:** A (Most cohesive delivery in project history)
+
+**Build Status:** 0 errors, 0 warnings | Tests: 225 passed, 0 failed
+
+#### Assessment Summary
+
+Five parallel workstreams converge cleanly:
+- **Bender:** Cross-agent calling with AsyncLocal recursion guard + registry validation
+- **Fry:** Production-quality WebUI dashboard with 10 features
+- **Farnsworth:** Dev-loop reliability (standardized flow, port pre-checks)
+- **Hermes:** 14 new integration tests (225 total)
+- **Kif:** Documentation structure + API reference corrections
+
+No P0 issues. Three P1 findings (see below) prevent A+ but are not blocking.
+
+#### SOLID Compliance: 4.5/5
+
+- **SRP:** Each component owns one responsibility cleanly
+- **OCP:** New isolation strategies, channel capabilities pluggable without modification
+- **LSP:** Channel adapters correctly extend base; streaming interface optional
+- **ISP:** Sub-agent and cross-agent calling cleanly separated
+- **DIP:** Depends only on abstractions (−0.5 from Phase 5 pre-existing: `GatewayWebSocketHandler` uses concrete adapter)
+
+#### Architecture Highlights
+
+**Recursion Guard (A+ design):**
+- `AsyncLocal<List<string>>` tracks call chain per async flow
+- `CallChainScope` cleanup guarantees path restoration on exception
+- Detects full cycles (A→B→C→A), not just direct cycles
+- Case-insensitive comparison prevents bypass
+
+**Session Scoping:**
+- Sub-agent: `{parent}::sub::{child}` (reusable)
+- Cross-agent: `{source}::cross::{target}::{GUID}` (unique per call, prevents leakage)
+- Consistent and self-documenting
+
+**Channel Capability Model (OCP-compliant):**
+- `SupportsSteering`, `SupportsFollowUp`, `SupportsThinkingDisplay`, `SupportsToolDisplay`
+- Virtual properties with default `false`; zero risk of breaking existing adapters
+
+**WebUI (Production-Grade):**
+- 1710-line `app.js` with clear section markers
+- Session management, agent selection, thinking/tool display, steering, activity feed
+- DOMPurify for XSS protection
+- Responsive design, reconnection with exponential backoff, accessibility features
+
+#### P1 Issues (Should Fix Soon)
+
+1. **No configurable max call chain depth** — Acyclic chains of 50+ agents would proceed indefinitely, risking resource exhaustion. Fix: Add `MaxCallChainDepth` config (default 10).
+
+2. **Dev guide missing parameter documentation** — `-SkipBuild` and `-SkipTests` flags not documented in `docs/dev-guide.md` script tables. Developers won't discover them.
+
+3. **Cross-agent calls have no default timeout** — `handle.PromptAsync()` blocks indefinitely if target hangs. Fix: Wrap with linked `CancellationTokenSource` (120s default), log warning on timeout.
+
+#### P2 Issues (Nice to Have)
+
+1. **WebUI `app.js` approaching split point** — 1710 lines is manageable but nearing module-split threshold
+2. **`escapeHtml` inefficiency** — Creates DOM element per call; regex replacer would be faster
+3. **API reference base URL drift** — Docs say port 18790; actual default is 5005 (pre-existing, not Phase 6)
+
+#### Test Coverage
+
+✅ **Cross-agent:** Full pipeline, A→B→A detection, unregistered target, session ID format, 16-way concurrency  
+✅ **Integration:** Health, REST API, WebSocket, activity streaming, live Copilot (gated)
+
+⚠️ **Gaps:** No depth-limit test, no timeout test, no concurrent sub-agent+cross-agent test
+
+#### Recommendations
+
+1. Implement max call chain depth (P1-1) before multi-agent workflows run
+2. Add cross-agent timeout (P1-3) to prevent indefinite hangs
+3. Fix doc gaps (P1-2) — high developer trust impact
+4. Consider WebUI module splitting (P2-1) in next batch
+5. Carry forward Phase 5 P1s: `Path.HasExtension` auth bypass and `StreamAsync` background task leak
+
+---
+
 ### 5. Sprint 1 Completion — 7 Foundation Items Done (2026-04-01T17:33Z)
 
 **Status:** Complete  
