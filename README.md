@@ -89,7 +89,7 @@ Edit `~/.botnexus/config.json` to configure:
   },
   "providers": {
     "copilot": {
-      "apiKey": "auth:github-copilot",
+      "apiKey": "auth:copilot",
       "baseUrl": "https://api.githubcopilot.com",
       "defaultModel": "gpt-4.1"
     }
@@ -129,6 +129,7 @@ Connect to `ws://localhost:5005/ws?agent={agentId}&session={sessionId}` for real
 **Server → Client message types:**
 - `{ "type": "connected", "connectionId": "...", "sessionId": "..." }` — Connection established
 - `{ "type": "message_start", "messageId": "..." }` — Agent started processing
+- `{ "type": "thinking_delta", "delta": "...", "messageId": "..." }` — Thinking/reasoning content
 - `{ "type": "content_delta", "delta": "..." }` — Streaming content chunk
 - `{ "type": "tool_start", "toolCallId": "...", "toolName": "..." }` — Tool execution started
 - `{ "type": "tool_end", "toolCallId": "...", "toolResult": "..." }` — Tool result received
@@ -192,20 +193,23 @@ On first run, BotNexus creates `~/.botnexus/` with a default `config.json`. Edit
 
 ```json
 {
-  "BotNexus": {
-    "Agents": {
-      "Model": "gpt-4o"
-    },
-    "Providers": {
-      "copilot": {
-        "Auth": "oauth",
-        "DefaultModel": "gpt-4o",
-        "ApiBase": "https://api.githubcopilot.com"
-      }
-    },
-    "Gateway": {
-      "Host": "0.0.0.0",
-      "Port": 18790
+  "gateway": {
+    "listenUrl": "http://localhost:5005",
+    "defaultAgentId": "assistant"
+  },
+  "agents": {
+    "assistant": {
+      "provider": "copilot",
+      "model": "gpt-4.1",
+      "isolationStrategy": "in-process",
+      "enabled": true
+    }
+  },
+  "providers": {
+    "copilot": {
+      "apiKey": "auth:copilot",
+      "baseUrl": "https://api.githubcopilot.com",
+      "defaultModel": "gpt-4.1"
     }
   }
 }

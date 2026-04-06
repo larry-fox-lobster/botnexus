@@ -8,17 +8,18 @@ Complete reference for BotNexus REST API endpoints, including agents, sessions, 
 2. [Authentication](#authentication)
 3. [Agent Management](#agent-management)
 4. [Skills Management](#skills-management)
-5. [Session Management](#session-management)
-6. [System & Status](#system--status)
-7. [Error Handling](#error-handling)
+5. [Chat](#chat)
+6. [Session Management](#session-management)
+7. [System & Status](#system--status)
+8. [Error Handling](#error-handling)
 
 ---
 
 ## Overview
 
-**Base URL:** `http://localhost:18790/api`
+**Base URL:** `http://localhost:5005/api`
 
-All endpoints follow REST conventions and return JSON responses. The default port is **18790** (configurable via `config.json`).
+All endpoints follow REST conventions and return JSON responses. The default port is **5005** (configurable via `config.json`).
 
 **Authentication:** All endpoints require API key authentication (see [Authentication](#authentication) below).
 
@@ -41,7 +42,7 @@ Or pass it as a query parameter:
 GET /api/agents?apiKey=your-api-key-here
 ```
 
-**Exemptions:** `/health` and `/ready` health check endpoints do not require authentication.
+**Exemptions:** `/health`, `/webui`, and `/swagger` are exempt from authentication.
 
 ---
 
@@ -63,24 +64,26 @@ X-Api-Key: your-api-key
 ```json
 [
   {
-    "name": "assistant",
-    "systemPrompt": "You are a helpful assistant",
-    "model": "gpt-4o",
-    "provider": "openai",
-    "maxTokens": 2000,
-    "temperature": 0.7,
-    "disallowedTools": [],
-    "disabledSkills": []
+    "agentId": "assistant",
+    "displayName": "Assistant",
+    "modelId": "gpt-4.1",
+    "apiProvider": "copilot",
+    "systemPrompt": null,
+    "isolationStrategy": "in-process",
+    "toolIds": [],
+    "subAgentIds": [],
+    "maxConcurrentSessions": 0
   },
   {
-    "name": "analyzer",
-    "systemPrompt": "You are a data analyst",
-    "model": "claude-3-5-sonnet",
-    "provider": "anthropic",
-    "maxTokens": null,
-    "temperature": null,
-    "disallowedTools": ["shell"],
-    "disabledSkills": []
+    "agentId": "analyzer",
+    "displayName": "Analyzer",
+    "modelId": "claude-sonnet-4-5",
+    "apiProvider": "anthropic",
+    "systemPrompt": null,
+    "isolationStrategy": "in-process",
+    "toolIds": [],
+    "subAgentIds": [],
+    "maxConcurrentSessions": 0
   }
 ]
 ```
@@ -105,20 +108,20 @@ X-Api-Key: your-api-key
 **Response:** 200 OK
 ```json
 {
-  "name": "my-agent",
+  "agentId": "my-agent",
+  "displayName": "My Agent",
+  "modelId": "gpt-4.1",
+  "apiProvider": "copilot",
   "systemPrompt": "You are helpful",
-  "model": "gpt-4o",
-  "provider": "openai",
-  "maxTokens": 2000,
-  "temperature": 0.7,
-  "disallowedTools": ["filesystem"],
-  "disabledSkills": []
+  "isolationStrategy": "in-process",
+  "toolIds": [],
+  "subAgentIds": [],
+  "maxConcurrentSessions": 0
 }
 ```
 
 **Error Responses:**
 - `404 Not Found` — Agent does not exist
-- `400 Bad Request` — Invalid agent name
 
 ---
 
@@ -131,25 +134,26 @@ X-Api-Key: your-api-key
 **Request Body:**
 ```json
 {
-  "name": "my-agent",
+  "agentId": "my-agent",
+  "displayName": "My Agent",
+  "modelId": "gpt-4.1",
+  "apiProvider": "copilot",
   "systemPrompt": "You are a helpful assistant",
-  "model": "gpt-4o",
-  "provider": "openai",
-  "maxTokens": 2000,
-  "temperature": 0.7,
-  "disallowedTools": []
+  "isolationStrategy": "in-process"
 }
 ```
 
 **Field Descriptions:**
-- `name` (string, required) — Agent name (will be normalized)
+- `agentId` (string, required) — Unique agent identifier
+- `displayName` (string, required) — Human-readable display name
+- `modelId` (string, required) — Model identifier (e.g., "gpt-4.1", "claude-sonnet-4-5")
+- `apiProvider` (string, required) — Provider name (e.g., "copilot", "openai", "anthropic")
 - `systemPrompt` (string, optional) — System instruction for the agent
-- `model` (string, optional) — Model name (e.g., "gpt-4o", "claude-3-5-sonnet")
-- `provider` (string, optional) — Provider name (e.g., "openai", "anthropic", "copilot")
-- `maxTokens` (integer, optional) — Max tokens per response. When null, provider uses its default
-- `temperature` (number, optional) — Temperature for randomness (0.0-2.0). When null, provider uses its default
-- `disallowedTools` (array of strings, optional) — Tools to disable for this agent (e.g., ["shell", "filesystem"])
-- `disabledSkills` (array of strings, optional) — Skills to disable for this agent (e.g., ["debug-*", "experimental"])
+- `systemPromptFile` (string, optional) — Path to an external system prompt file
+- `isolationStrategy` (string, optional) — Execution strategy (default: "in-process")
+- `toolIds` (array of strings, optional) — Tool identifiers the agent can access
+- `subAgentIds` (array of strings, optional) — Agent IDs this agent can call as sub-agents
+- `maxConcurrentSessions` (integer, optional) — Max concurrent sessions (0 = unlimited)
 
 **Request:**
 ```http
@@ -158,27 +162,27 @@ X-Api-Key: your-api-key
 Content-Type: application/json
 
 {
-  "name": "analyzer",
+  "agentId": "analyzer",
+  "displayName": "Analyzer",
+  "modelId": "gpt-4.1",
+  "apiProvider": "copilot",
   "systemPrompt": "Analyze data professionally",
-  "model": "gpt-4o",
-  "provider": "openai",
-  "maxTokens": 4000,
-  "temperature": 0.5,
-  "disallowedTools": ["shell"]
+  "isolationStrategy": "in-process"
 }
 ```
 
 **Response:** 201 Created
 ```json
 {
-  "name": "analyzer",
+  "agentId": "analyzer",
+  "displayName": "Analyzer",
+  "modelId": "gpt-4.1",
+  "apiProvider": "copilot",
   "systemPrompt": "Analyze data professionally",
-  "model": "gpt-4o",
-  "provider": "openai",
-  "maxTokens": 4000,
-  "temperature": 0.5,
-  "disallowedTools": ["shell"],
-  "disabledSkills": []
+  "isolationStrategy": "in-process",
+  "toolIds": [],
+  "subAgentIds": [],
+  "maxConcurrentSessions": 0
 }
 ```
 
@@ -393,6 +397,129 @@ X-Api-Key: your-api-key
 
 ---
 
+## Chat
+
+### Send Message
+
+**Endpoint:** `POST /api/chat`
+
+**Description:** Send a message to an agent and receive the complete response (non-streaming). For real-time streaming, use the WebSocket endpoint at `/ws`.
+
+**Request Body:**
+```json
+{
+  "agentId": "assistant",
+  "message": "Hello, how can you help?",
+  "sessionId": "optional-session-id"
+}
+```
+
+**Field Descriptions:**
+- `agentId` (string, required) — Target agent ID
+- `message` (string, required) — Message content to send
+- `sessionId` (string, optional) — Session ID to continue a conversation. If omitted, a new session is created.
+
+**Request:**
+```http
+POST /api/chat
+X-Api-Key: your-api-key
+Content-Type: application/json
+
+{
+  "agentId": "assistant",
+  "message": "What is BotNexus?"
+}
+```
+
+**Response:** 200 OK
+```json
+{
+  "sessionId": "abc123",
+  "content": "BotNexus is a modular AI agent execution platform...",
+  "usage": {
+    "inputTokens": 50,
+    "outputTokens": 120
+  }
+}
+```
+
+**Error Responses:**
+- `429 Too Many Requests` — Agent concurrency limit exceeded
+
+---
+
+### Steer Active Run
+
+**Endpoint:** `POST /api/chat/steer`
+
+**Description:** Inject a steering message into an agent's active run. This allows mid-stream guidance without aborting the current response.
+
+**Request Body:**
+```json
+{
+  "agentId": "assistant",
+  "sessionId": "abc123",
+  "message": "Focus on the security aspects"
+}
+```
+
+**Request:**
+```http
+POST /api/chat/steer
+X-Api-Key: your-api-key
+Content-Type: application/json
+
+{
+  "agentId": "assistant",
+  "sessionId": "abc123",
+  "message": "Focus on the security aspects"
+}
+```
+
+**Response:** 202 Accepted
+
+**Error Responses:**
+- `404 Not Found` — Agent session not found
+- `429 Too Many Requests` — Agent concurrency limit exceeded
+
+---
+
+### Queue Follow-Up
+
+**Endpoint:** `POST /api/chat/follow-up`
+
+**Description:** Queue a follow-up message for an active agent session. The follow-up is processed after the current run completes.
+
+**Request Body:**
+```json
+{
+  "agentId": "assistant",
+  "sessionId": "abc123",
+  "message": "Also summarize the key points"
+}
+```
+
+**Request:**
+```http
+POST /api/chat/follow-up
+X-Api-Key: your-api-key
+Content-Type: application/json
+
+{
+  "agentId": "assistant",
+  "sessionId": "abc123",
+  "message": "Also summarize the key points"
+}
+```
+
+**Response:** 202 Accepted
+
+**Error Responses:**
+- `404 Not Found` — Agent session not found
+- `429 Too Many Requests` — Agent concurrency limit exceeded
+
+---
+
 ## Session Management
 
 ### List Sessions
@@ -402,7 +529,7 @@ X-Api-Key: your-api-key
 **Description:** Retrieve all conversation sessions.
 
 **Query Parameters:**
-- `hidden` (boolean, optional) — Filter by hidden status (true/false)
+- `agentId` (string, optional) — Filter sessions by agent ID
 
 **Request:**
 ```http
@@ -415,9 +542,8 @@ X-Api-Key: your-api-key
 [
   {
     "key": "session-abc123",
-    "agentName": "my-agent",
+    "agentName": "assistant",
     "title": "Conversation about AI",
-    "hidden": false,
     "createdAt": "2026-01-15T10:30:00Z",
     "updatedAt": "2026-01-15T11:45:00Z",
     "messageCount": 12
@@ -427,53 +553,44 @@ X-Api-Key: your-api-key
 
 ---
 
-### Hide/Unhide Session
+### Get Session
 
-**Endpoint:** `PATCH /api/sessions/{key}`
+**Endpoint:** `GET /api/sessions/{sessionId}`
 
-**Description:** Hide or unhide a session in the WebUI.
+**Description:** Retrieve a specific session by ID, including conversation history.
 
 **Parameters:**
-- `key` (string, path) — Session key/ID
-
-**Request Body:**
-```json
-{
-  "hidden": true
-}
-```
+- `sessionId` (string, path) — Session ID
 
 **Request:**
 ```http
-PATCH /api/sessions/session-abc123
+GET /api/sessions/session-abc123
 X-Api-Key: your-api-key
-Content-Type: application/json
-
-{
-  "hidden": true
-}
 ```
 
-**Response:** 200 OK
-```json
-{
-  "key": "session-abc123",
-  "agentName": "my-agent",
-  "title": "Conversation about AI",
-  "hidden": true,
-  "createdAt": "2026-01-15T10:30:00Z",
-  "updatedAt": "2026-01-15T11:50:00Z",
-  "messageCount": 12
-}
-```
-
-**Side Effects:**
-- Session is removed from WebUI sidebar when `hidden: true`
-- Session is restored to sidebar when `hidden: false`
+**Response:** 200 OK — Returns the session with full history.
 
 **Error Responses:**
 - `404 Not Found` — Session does not exist
-- `400 Bad Request` — Invalid request
+
+---
+
+### Delete Session
+
+**Endpoint:** `DELETE /api/sessions/{sessionId}`
+
+**Description:** Delete a session and its conversation history.
+
+**Parameters:**
+- `sessionId` (string, path) — Session ID
+
+**Request:**
+```http
+DELETE /api/sessions/session-abc123
+X-Api-Key: your-api-key
+```
+
+**Response:** 204 No Content
 
 ---
 
@@ -536,24 +653,6 @@ X-Api-Key: your-api-key
 - Each agent must have `provider` and `model`
 - Each channel must have a `type`
 - API keys must have `apiKey`, `tenantId`, and at least one permission
-
----
-
-### Readiness Check
-
-**Endpoint:** `GET /ready`
-
-**Description:** Check if the system is ready to accept requests (no authentication required).
-
-**Response:** 200 OK
-```json
-{
-  "ready": true,
-  "agents": 3,
-  "providers": 2,
-  "timestamp": "2026-01-15T11:50:00Z"
-}
-```
 
 ---
 
@@ -674,12 +773,14 @@ To disable specific tools for an agent, add them to the `disallowedTools` array:
 
 **API Example:**
 ```bash
-curl -X POST http://localhost:18790/api/agents \
+curl -X POST http://localhost:5005/api/agents \
   -H "X-Api-Key: your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "secure-agent",
-    "disallowedTools": ["shell", "filesystem"]
+    "agentId": "secure-agent",
+    "displayName": "Secure Agent",
+    "modelId": "gpt-4.1",
+    "apiProvider": "copilot"
   }'
 ```
 
@@ -723,28 +824,23 @@ Configuration is stored in `~/.botnexus/config.json`:
 
 ```json
 {
-  "BotNexus": {
-    "Agents": {
-      "Model": "gpt-4o",
-      "Named": {
-        "my-agent": {
-          "Model": "gpt-4-turbo",
-          "MaxTokens": 4000,
-          "DisallowedTools": ["shell"]
-        }
-      }
-    },
-    "Providers": {
-      "openai": {
-        "Auth": "api-key",
-        "ApiKey": "sk-...",
-        "DefaultModel": "gpt-4o"
-      }
-    },
-    "Tools": {
-      "Exec": {
-        "Enable": true
-      }
+  "gateway": {
+    "listenUrl": "http://localhost:5005",
+    "defaultAgentId": "assistant"
+  },
+  "agents": {
+    "my-agent": {
+      "provider": "openai",
+      "model": "gpt-4.1",
+      "isolationStrategy": "in-process",
+      "enabled": true
+    }
+  },
+  "providers": {
+    "openai": {
+      "apiKey": "sk-...",
+      "baseUrl": "https://api.openai.com/v1",
+      "defaultModel": "gpt-4.1"
     }
   }
 }

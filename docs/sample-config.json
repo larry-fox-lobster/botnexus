@@ -22,8 +22,8 @@
   },
   "providers": {
     "copilot": {
-      "apiKey": "auth:github-copilot",
-      "baseUrl": "https://api.enterprise.githubcopilot.com",
+      "apiKey": "auth:copilot",
+      "baseUrl": "https://api.githubcopilot.com",
       "defaultModel": "gpt-4.1"
     },
     "anthropic": {
