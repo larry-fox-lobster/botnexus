@@ -909,3 +909,4 @@ Result: Phase 3 blockers cleared, build clean, READY FOR RELEASE.
 - `init` now resolves paths from `PlatformConfigLoader.DefaultHomePath` + `DefaultConfigPath`, ensures `~/.botnexus` scaffold directories (`sessions`, `agents`, `logs`, `tokens`, `extensions`), and writes a minimal valid assistant config.
 - Runtime pattern locked: mutate config through PlatformConfig + PlatformConfigLoader load/validate flow, then persist and revalidate to keep CLI behavior aligned with gateway validation rules.
 - Key paths for follow-up runtime work: `src\gateway\BotNexus.Cli\Program.cs`, `src\gateway\BotNexus.Gateway\Configuration\PlatformConfigLoader.cs`, and `src\gateway\BotNexus.Gateway\Configuration\BotNexusHome.cs`.
+- 2026-04-06: Added gateway-level dynamic extension loading contracts and an AssemblyLoadContext loader path using botnexus-extension.json manifests. Startup now discovers/loads extensions before the API host listens.

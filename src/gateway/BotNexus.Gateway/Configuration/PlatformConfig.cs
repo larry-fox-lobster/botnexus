@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace BotNexus.Gateway.Configuration;
 
 /// <summary>
@@ -5,6 +7,10 @@ namespace BotNexus.Gateway.Configuration;
 /// </summary>
 public sealed class PlatformConfig
 {
+    /// <summary>Optional JSON schema reference for editor IntelliSense/validation.</summary>
+    [JsonPropertyName("$schema")]
+    public string? Schema { get; set; }
+
     /// <summary>Gateway-specific settings.</summary>
     public GatewaySettingsConfig? Gateway { get; set; }
 
@@ -16,6 +22,9 @@ public sealed class PlatformConfig
 
     /// <summary>Channel settings keyed by channel name.</summary>
     public Dictionary<string, ChannelConfig>? Channels { get; set; }
+
+    /// <summary>Extensions loading settings (legacy root-level form).</summary>
+    public ExtensionsConfig? Extensions { get; set; }
 
     /// <summary>API key for Gateway authentication (null = dev mode, no auth).</summary>
     public string? ApiKey { get; set; }
@@ -75,6 +84,10 @@ public sealed class PlatformConfig
     /// <summary>Returns configured CORS settings, preferring the nested Gateway section.</summary>
     public CorsConfig? GetCors()
         => Gateway?.Cors ?? Cors;
+
+    /// <summary>Returns configured extensions settings, preferring the nested Gateway section.</summary>
+    public ExtensionsConfig? GetExtensions()
+        => Gateway?.Extensions ?? Extensions;
 }
 
 /// <summary>Provider-specific configuration.</summary>
@@ -109,6 +122,8 @@ public sealed class GatewaySettingsConfig
     public string? LogLevel { get; set; }
     /// <summary>Multi-tenant API keys keyed by key ID.</summary>
     public Dictionary<string, ApiKeyConfig>? ApiKeys { get; set; }
+    /// <summary>Extensions loading settings.</summary>
+    public ExtensionsConfig? Extensions { get; set; }
 }
 
 /// <summary>CORS settings for gateway HTTP endpoints.</summary>
@@ -116,6 +131,20 @@ public sealed class CorsConfig
 {
     /// <summary>Explicit origins allowed to access the gateway from browsers.</summary>
     public List<string>? AllowedOrigins { get; set; }
+}
+
+/// <summary>Configuration for dynamic extension discovery and loading.</summary>
+public sealed class ExtensionsConfig
+{
+    /// <summary>
+    /// Root directory containing extension folders with botnexus-extension.json manifests.
+    /// </summary>
+    public string? Path { get; set; }
+
+    /// <summary>
+    /// Enables or disables dynamic extension loading.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
 }
 
 /// <summary>Agent definition in platform config.</summary>

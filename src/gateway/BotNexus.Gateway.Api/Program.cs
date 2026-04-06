@@ -23,6 +23,7 @@ var startupPlatformConfig = PlatformConfigLoader.Load(platformConfigPath, valida
 
 builder.Services.AddBotNexusGateway();
 builder.Services.AddPlatformConfiguration(platformConfigPath);
+builder.Services.AddExtensionLoading();
 builder.Services.AddBotNexusGatewayApi();
 builder.Services.AddCors(options =>
 {
@@ -95,6 +96,17 @@ builder.Services.AddSingleton<LlmClient>(serviceProvider =>
     return new LlmClient(apiProviders, models);
 });
 
+using (var bootstrapLoggerFactory = LoggerFactory.Create(logging => logging.AddConsole()))
+{
+    var extensionLoadResults = await builder.Services.LoadConfiguredExtensionsAsync(startupPlatformConfig, bootstrapLoggerFactory);
+    if (extensionLoadResults.Any(result => !result.Success))
+    {
+        var failed = string.Join(", ", extensionLoadResults.Where(result => !result.Success).Select(result => result.ExtensionId));
+        bootstrapLoggerFactory.CreateLogger("BotNexus.Gateway.Extensions")
+            .LogWarning("Some extensions failed to load during startup bootstrap: {FailedExtensions}", failed);
+    }
+}
+
 var app = builder.Build();
 
 var platformConfig = app.Services.GetRequiredService<PlatformConfig>();
@@ -120,4 +132,7 @@ app.MapFallbackToFile("index.html");
 
 app.Run();
 
+/// <summary>
+/// Entry point marker for integration testing.
+/// </summary>
 public partial class Program;
