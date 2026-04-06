@@ -319,7 +319,7 @@ body {
     0%, 100% { box-shadow: 0 0 0 rgba(74,158,255,0); }
     50% { box-shadow: 0 0 0 2px rgba(74,158,255,0.2); }
 }
-.delta-content { white-space: pre-wrap; }
+.delta-content { word-break: break-word; }
 
 /* === Tool call messages === */
 .message.tool-call {

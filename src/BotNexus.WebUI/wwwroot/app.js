@@ -119,7 +119,7 @@
 
     function initMarkdown() {
         if (typeof marked !== 'undefined') {
-            marked.setOptions({ breaks: true, gfm: true, headerIds: false, mangle: false });
+            marked.setOptions({ breaks: false, gfm: true, headerIds: false, mangle: false });
         }
     }
 
@@ -193,7 +193,13 @@
 
     function setStatus(state) {
         elConnectionStatus.className = `status ${state}`;
-        const labels = { connected: 'Connected', disconnected: 'Disconnected', connecting: 'Connecting...', reconnecting: 'Reconnecting...' };
+        const labels = { 
+            connected: 'Connected', 
+            disconnected: 'Disconnected', 
+            connecting: 'Connecting...', 
+            reconnecting: 'Reconnecting...',
+            online: 'Gateway Online'
+        };
         elStatusText.textContent = labels[state] || state;
     }
 
@@ -322,6 +328,43 @@
     function closeConfirm() {
         elConfirmDialog.classList.add('hidden');
         confirmCallback = null;
+    }
+
+    // =========================================================================
+    // Gateway health check
+    // =========================================================================
+
+    async function checkGatewayHealth() {
+        try {
+            const response = await fetch('/health');
+            const wasHealthy = gatewayHealthy;
+            gatewayHealthy = response.ok;
+            
+            // Update status if not connected via WebSocket
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                setStatus(gatewayHealthy ? 'online' : 'disconnected');
+            }
+            
+            // If health state changed, show banner
+            if (wasHealthy !== gatewayHealthy) {
+                if (!gatewayHealthy) {
+                    showConnectionBanner('⚠️ Gateway offline', 'warning');
+                } else if (!currentAgentId) {
+                    hideConnectionBanner();
+                }
+            }
+        } catch (e) {
+            gatewayHealthy = false;
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                setStatus('disconnected');
+            }
+        }
+    }
+
+    function startHealthCheck() {
+        if (healthCheckInterval) return;
+        checkGatewayHealth(); // Initial check
+        healthCheckInterval = setInterval(checkGatewayHealth, 15000);
     }
 
     // =========================================================================
@@ -813,7 +856,6 @@
                 const rawText = deltaEl.textContent;
                 streaming.dataset.rawContent = rawText;
                 deltaEl.innerHTML = renderMarkdown(rawText);
-                deltaEl.style.whiteSpace = 'normal';
             }
             const timeEl = streaming.querySelector('.msg-time');
             if (timeEl) timeEl.textContent = formatTime(new Date().toISOString());
@@ -1675,24 +1717,42 @@
     async function loadChatHeaderModels() {
         if (!currentAgentId) return;
         try {
-            const models = await fetchJson('/models');
-            elModelSelect.innerHTML = '<option value="">Select model...</option>';
-            if (models && models.length > 0) {
-                for (const m of models) {
-                    const opt = document.createElement('option');
-                    opt.value = m.name || m.modelId || m.id || 'unknown';
-                    opt.textContent = opt.value;
-                    elModelSelect.appendChild(opt);
-                }
+            // First, get the current model from agent
+            const agent = await fetchJson(`/agents/${encodeURIComponent(currentAgentId)}`);
+            const currentModel = agent?.modelId || '';
+            
+            // Try to fetch models list
+            let models = [];
+            try {
+                models = await fetchJson('/models');
+            } catch (e) {
+                console.warn('Models endpoint not available, showing current model only');
             }
             
-            // Set current model from agent
-            const agent = await fetchJson(`/agents/${encodeURIComponent(currentAgentId)}`);
-            if (agent && agent.modelId) {
-                elModelSelect.value = agent.modelId;
+            elModelSelect.innerHTML = '';
+            
+            if (models && models.length > 0) {
+                // Populate with available models
+                for (const m of models) {
+                    const opt = document.createElement('option');
+                    const modelId = m.name || m.modelId || m.id || 'unknown';
+                    opt.value = modelId;
+                    opt.textContent = modelId;
+                    if (modelId === currentModel) opt.selected = true;
+                    elModelSelect.appendChild(opt);
+                }
+            } else {
+                // Fallback: show at least the current model
+                const opt = document.createElement('option');
+                opt.value = currentModel;
+                opt.textContent = currentModel || 'Unknown model';
+                opt.selected = true;
+                elModelSelect.appendChild(opt);
             }
         } catch (e) {
             console.error('Failed to load models:', e);
+            // Show a placeholder if everything fails
+            elModelSelect.innerHTML = '<option value="">Error loading models</option>';
         }
     }
 
@@ -2098,7 +2158,8 @@
         loadExtensions();
         loadAgents();
         scheduleChannelsRefresh();
-        setStatus('disconnected');
+        startHealthCheck();
+        setStatus('online');
         updateSendButtonState();
         // Collapse sidebar on mobile by default
         if (window.innerWidth <= 768) {
