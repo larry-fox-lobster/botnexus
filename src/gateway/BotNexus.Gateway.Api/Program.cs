@@ -7,6 +7,8 @@ using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Registry;
 using BotNexus.Providers.OpenAI;
 using BotNexus.Providers.OpenAICompat;
+using Microsoft.OpenApi.Models;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -17,6 +19,21 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 builder.Services.AddBotNexusGateway();
 builder.Services.AddPlatformConfiguration(builder.Configuration["BotNexus:ConfigPath"]);
 builder.Services.AddBotNexusGatewayApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    var assembly = typeof(Program).Assembly;
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "BotNexus Gateway",
+        Version = assembly.GetName().Version?.ToString() ?? "1.0.0"
+    });
+
+    var xmlFile = $"{assembly.GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+        options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+});
 builder.Services.AddSingleton<ApiProviderRegistry>();
 builder.Services.AddSingleton<ModelRegistry>();
 builder.Services.AddSingleton<BuiltInModels>();
@@ -50,6 +67,8 @@ if (!string.IsNullOrWhiteSpace(listenUrl))
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseMiddleware<GatewayAuthMiddleware>();
+app.UseSwagger();
+app.UseSwaggerUI();
 app.UseWebSockets();
 
 app.MapControllers();
