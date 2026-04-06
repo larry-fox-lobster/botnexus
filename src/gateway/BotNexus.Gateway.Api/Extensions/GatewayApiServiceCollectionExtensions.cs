@@ -23,6 +23,7 @@ public static class GatewayApiServiceCollectionExtensions
             services.Configure(configure);
 
         services.AddSingleton<GatewayWebSocketHandler>();
+        services.AddSingleton<ActivityWebSocketHandler>();
         services.AddControllers()
             .AddApplicationPart(typeof(GatewayApiServiceCollectionExtensions).Assembly);
 
@@ -38,6 +39,12 @@ public static class GatewayApiServiceCollectionExtensions
         endpoints.Map("/ws", async context =>
         {
             var handler = context.RequestServices.GetRequiredService<GatewayWebSocketHandler>();
+            await handler.HandleAsync(context, context.RequestAborted);
+        });
+
+        endpoints.Map("/ws/activity", async context =>
+        {
+            var handler = context.RequestServices.GetRequiredService<ActivityWebSocketHandler>();
             await handler.HandleAsync(context, context.RequestAborted);
         });
 
