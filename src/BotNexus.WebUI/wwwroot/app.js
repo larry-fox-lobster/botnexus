@@ -1636,6 +1636,7 @@
         const providers = await fetchJson('/providers');
         if (providers && providers.length > 0) {
             providersCache = providers;
+            providers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             for (const p of providers) {
                 const opt = document.createElement('option');
                 opt.value = p.name || p.providerId || p.id || 'unknown';
@@ -1663,6 +1664,11 @@
             const filtered = providerName
                 ? models.filter(m => (m.provider || '').toLowerCase() === providerName.toLowerCase())
                 : models;
+            filtered.sort((a, b) => {
+                const nameA = a.name || a.modelId || a.id || '';
+                const nameB = b.name || b.modelId || b.id || '';
+                return nameA.localeCompare(nameB);
+            });
             for (const m of filtered) {
                 const opt = document.createElement('option');
                 opt.value = m.name || m.modelId || m.id || 'unknown';
@@ -1733,6 +1739,11 @@
             
             if (models && models.length > 0) {
                 // Populate with available models
+                models.sort((a, b) => {
+                    const nameA = a.name || a.modelId || a.id || '';
+                    const nameB = b.name || b.modelId || b.id || '';
+                    return nameA.localeCompare(nameB);
+                });
                 for (const m of models) {
                     const opt = document.createElement('option');
                     const modelId = m.name || m.modelId || m.id || 'unknown';

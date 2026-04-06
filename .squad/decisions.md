@@ -2,6 +2,111 @@
 
 ## Active Decisions
 
+### Cross-Platform Image Handling in ReadTool (2026-04-06)
+
+**Decision Date:** 2026-04-06  
+**Decided By:** Leela (Lead/Architect)  
+**Status:** Implemented
+
+**Context:** `ReadTool.cs` contained platform-specific code using `System.Drawing.Common` for image resizing before base64 encoding. This caused CA1416 warnings and would fail at runtime on Linux and macOS, as `System.Drawing.Common` is Windows-only on .NET 6+.
+
+**Options Considered:**
+1. Remove image resizing entirely — simplest, zero dependencies, consistent cross-platform behavior
+2. Use SkiaSharp — cross-platform, adds NuGet dependency
+3. Use ImageSharp — cross-platform, MIT licensed, pure .NET
+4. Platform guards — only resize on Windows using `OperatingSystem.IsWindows()`, inconsistent behavior
+
+**Decision:** Removed image resizing entirely (Option 1).
+
+**Rationale:**
+1. **Simplicity** — The catch block already falls back to raw encoding without resizing. The resize was defensive optimization, not a requirement.
+2. **Modern AI capability** — Contemporary multimodal models (GPT-4o, Claude 3.5, etc.) handle large images well.
+3. **Zero dependencies** — No additional NuGet packages or platform-specific abstraction layers needed.
+4. **Consistent behavior** — Identical behavior across Windows, Linux, and macOS. No surprises.
+5. **SOLID principles** — Do one thing well. ReadTool reads and encodes files. Image optimization is a separate concern.
+6. **Low risk** — If image sizes become problematic in the future, we can add cross-platform resizing with a proper library.
+
+**Implementation:**
+- Replaced `ResizeAndEncodeImage` with simple `EncodeImage` that returns base64-encoded bytes
+- Removed `SelectImageFormat` helper
+- Removed `System.Drawing` and `System.Drawing.Imaging` using directives
+- Removed `System.Drawing.Common` NuGet package dependency
+- Removed `MaxImageDimension` constant
+
+**Validation:**
+- Build successful: `dotnet build BotNexus.slnx` — no CA1416 warnings
+- No behavior regression: Images are still encoded and passed to agents
+- Cross-platform compatible: No platform-specific APIs remain
+
+**Future Work:**
+If image size optimization becomes necessary:
+- SixLabors.ImageSharp (MIT, pure .NET, excellent cross-platform support)
+- SkiaSharp (Google's Skia graphics library, .NET bindings)
+- Implement server-side resize in the gateway/API layer rather than client-side in the tool
+
+---
+
+### Tool Registry Architecture (2026-04-06)
+
+**Status:** Implemented  
+**Context:** Gateway-hosted agents needed access to tools like read, write, edit, shell, etc.
+
+**Decision:** Wire tools into gateway agents via a tool registry system with extension support.
+
+**Architecture:**
+
+**BotNexus.Tools Shared Library**
+- Created `src/tools/BotNexus.Tools/` as a shared class library
+- Extracted reusable tools from coding-agent:
+  - File tools: ReadTool, WriteTool, EditTool, ListDirectoryTool
+  - Search tools: GrepTool, GlobTool
+  - Execution: ShellTool
+  - Utilities: FileMutationQueue, PathUtils
+- Namespace: `BotNexus.Tools` and `BotNexus.Tools.Utils`
+
+**Tool Registry**
+- `IToolRegistry` interface in `BotNexus.Gateway.Agents`
+- `DefaultToolRegistry` implementation with case-insensitive lookup
+- Registered in DI via `ToolServiceCollectionExtensions.AddBotNexusTools()`
+- Built-in tools use `Environment.CurrentDirectory` as working directory
+
+**Extension Support**
+- `IAgentTool` added to `DiscoverableServiceContracts` in extension loader
+- Extension type `"tool"` added to manifest validation
+- Tools registered with `AddSingleton` to allow multiple implementations
+
+**Agent Integration**
+- `InProcessIsolationStrategy` injects `IToolRegistry`
+- Tools resolved per agent from `AgentDescriptor.ToolIds`
+- **Default behavior**: If `ToolIds` is empty, agent gets ALL registered tools
+- Explicit tool restriction available via `ToolIds` configuration
+
+**Configuration**
+- `AgentDefinitionConfig.ToolIds` property added to platform config
+- `FileAgentConfigurationSource` and `PlatformConfigAgentSource` flow ToolIds to descriptor
+- JSON configuration: `"toolIds": ["read", "write", "shell"]`
+
+**Rationale:**
+1. **Shared Library** — Reduces duplication between coding-agent and gateway-hosted agents
+2. **Registry Pattern** — Provides central discovery and resolution of tools
+3. **Extension System** — Allows third-party tool contributions via extensions
+4. **Default-All Behavior** — Agents are functional out-of-the-box without configuration
+5. **Explicit Restriction** — Security-conscious deployments can limit tool access per agent
+
+**Implementation Notes:**
+- Avoided circular dependency by keeping IToolRegistry in Gateway (not Abstractions)
+- Updated all test namespaces from `BotNexus.CodingAgent.Tools` → `BotNexus.Tools`
+- Tests updated to inject `DefaultToolRegistry` into `InProcessIsolationStrategy`
+- All 869 tests passing after changes
+
+**Future Work:**
+- Consider tool capability negotiation (e.g., read-only vs read-write)
+- Add tool usage metrics and auditing
+- Explore tool chaining and composition patterns
+- Add working directory configuration per agent
+
+---
+
 ### Phase 9 Design Review (2026-04-06)
 
 **By:** Leela (Lead/Architect)  
