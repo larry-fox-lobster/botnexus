@@ -179,6 +179,8 @@
 - 2026-04-06: `AgentDescriptor` now includes `SubAgentIds`, `SystemPromptFile`, and `IsolationOptions`; file-backed prompts are loaded relative to each agent config file and validated through `AgentDescriptorValidator`.
 - 2026-04-06: Gateway LLM execution now depends on startup provider wiring in `BotNexus.Gateway.Api/Program.cs` (shared `HttpClient`, Anthropic/OpenAI/OpenAICompat registrations) and runtime API-key resolution via `GatewayAuthManager` (`auth.json` → env vars → `providers.{name}.apiKey`).
 - 2026-04-06: Gateway now has channel capability flags (`SupportsSteering`, `SupportsFollowUp`, `SupportsThinkingDisplay`, `SupportsToolDisplay`), session lifecycle status/expiry with `SessionCleanupService`, BotNexus home `agents/` workspace scaffolding, and debounced `config.json` hot-reload via `PlatformConfigLoader.Watch`.
+- 2026-04-06: Gateway now composes agent system prompts through `IContextBuilder` + `WorkspaceContextBuilder`, loading `SOUL.md`, `IDENTITY.md`, config `SystemPrompt`, and `USER.md` from `~/.botnexus/agents/{agentId}/` via `IAgentWorkspaceManager`.
+- 2026-04-06: Added `src/gateway/BotNexus.Cli` with `botnexus validate` (local `PlatformConfigLoader.Validate`) plus `--remote` (`GET /api/config/validate`), `--gateway-url`, and `--verbose` output modes.
 
 ## Sprint 1 Summary — 2026-04-01T17:33Z
 

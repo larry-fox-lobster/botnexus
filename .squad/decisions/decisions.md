@@ -1085,3 +1085,385 @@ All P1s from prior reviews remain fixed:
 - ✅ GatewayOptionsTests in wrong file (fixed Phase 3)
 - ✅ Isolation stubs missing `/// <inheritdoc />` (fixed Phase 3)
 
+---
+
+# Gateway Phase 5 — Batch 2 Decisions
+
+**Batch:** 2026-04-06T00:40Z  
+**Agents:** Bender, Farnsworth, Hermes, Kif  
+**Phase:** Gateway Phase 5 — WebSocket streaming, auth guardrails, agent workspace, provider bootstrap, anticipatory tests
+
+---
+
+## Decision: Structured stream event adapter contract for WebSocket pipeline
+
+**Date:** 2026-04-06  
+**Owner:** Bender (Runtime Dev)
+
+### Context
+
+WebSocket chat had to move into the standard channel pipeline (`GatewayHost.DispatchAsync`) without losing protocol richness (`message_start`, `thinking_delta`, tool events, usage/end events). Existing channels only consumed plain text deltas via `SendStreamDeltaAsync`.
+
+### Decision
+
+Add a new optional channel capability contract, `IStreamEventChannelAdapter`, in gateway abstractions.  
+`GatewayHost` now checks this interface during streaming: if implemented, it forwards each `AgentStreamEvent`; otherwise it preserves existing behavior (content deltas only).
+
+### Rationale
+
+- Keeps non-WebSocket channels unchanged and backward compatible.
+- Avoids encoding protocol-specific event payloads into generic `OutboundMessage` metadata.
+- Allows WebSocket adapter to preserve full protocol fidelity while still using shared routing/session pipeline.
+
+### Impact
+
+- `WebSocketChannelAdapter` implements `IStreamEventChannelAdapter`.
+- Existing adapters (TUI/Telegram/etc.) require no changes.
+- Future rich channels can opt in incrementally.
+
+---
+
+## Decision: Gateway auth + session guardrails at API boundary
+
+**Date:** 2026-04-06  
+**Owner:** Bender (Runtime Dev)
+
+### Context
+
+Gateway runtime had an auth handler implementation but no ASP.NET middleware wiring, no OpenAPI surface, no per-agent session cap enforcement, and no per-session WebSocket connection lock.
+
+### Decision
+
+1. Enforce gateway authentication in middleware (`GatewayAuthMiddleware`) for all non-bypassed HTTP/WS upgrade requests.
+2. Keep explicit unauthenticated bypasses only for `/health`, `/webui`, static web assets, and `/swagger`.
+3. Enforce `MaxConcurrentSessions` in `DefaultAgentSupervisor` and return HTTP 429 via API controller handling.
+4. Validate isolation strategy names before instance creation and include known strategy names in error messages.
+5. Enforce single active WebSocket connection per `session` and reject duplicates with close code `4409`.
+
+### Why
+
+- Moves security and admission controls to the runtime boundary.
+- Prevents silent over-capacity behavior and duplicate socket contention.
+- Improves operator/developer diagnosis for bad agent configuration.
+
+### Notes
+
+- This change did **not** modify protected paths (`src/agent`, `src/providers`, `src/coding-agent`).
+
+---
+
+## Decision: Platform Config Agent Source
+
+**Date:** 2026-04-06  
+**Owner:** Bender (Runtime Dev)
+
+### Context
+
+Platform config (`~/.botnexus/config.json`) already validates `agents` entries, but those agents were not being loaded into the runtime. Only file-based agent descriptors were auto-registered.
+
+### Decision
+
+Introduce `PlatformConfigAgentSource` (`IAgentConfigurationSource`) and register it alongside the file-based source in `AddPlatformConfiguration`.
+
+### Rationale
+
+- Keeps config-driven runtime behavior consistent with platform config intent.
+- Reuses hosted-source merge behavior already implemented in `AgentConfigurationHostedService`.
+- Avoids hot-reload complexity for now (`Watch()` returns `null`) while enabling immediate startup parity.
+
+### Impact
+
+- Enabled platform-config agent definitions now become active agent descriptors automatically at startup.
+- File-based sources continue to work; both sources are now loaded together.
+
+---
+
+## Decision: Gateway provider/auth bootstrap
+
+**Date:** 2026-04-06  
+**Owner:** Farnsworth (Agent Workspace Manager)
+
+### Context
+
+Gateway API startup had no provider registration and no centralized credential resolution for in-process agent execution.
+
+### Decision
+
+Gateway now performs provider bootstrap at API startup and resolves provider credentials centrally through `GatewayAuthManager`.
+
+1. Register built-in providers during `LlmClient` singleton creation in `src/gateway/BotNexus.Gateway.Api/Program.cs`:
+   - `AnthropicProvider`
+   - `OpenAICompletionsProvider`
+   - `OpenAIResponsesProvider`
+   - `OpenAICompatProvider`
+2. Use one shared `HttpClient` singleton with a 10-minute timeout for provider calls.
+3. Resolve API keys in `GatewayAuthManager` with this order:
+   - `~/.botnexus/auth.json` (with Copilot OAuth refresh support)
+   - environment variables (`EnvironmentApiKeys`)
+   - `providers.{name}.apiKey` from `PlatformConfig`
+4. Wire `InProcessIsolationStrategy` to use `GatewayAuthManager.GetApiKeyAsync`.
+
+### Why
+
+Without provider registration, Gateway agents cannot make LLM calls. Without runtime key resolution, in-process agents cannot authenticate providers reliably across local auth, CI env vars, and config-based keys.
+
+### Impact
+
+- Gateway can execute agent prompts against Anthropic/OpenAI/Copilot-compatible endpoints.
+- Credential sourcing is consistent with platform-level config conventions (`~/.botnexus`), not coding-agent local auth paths.
+
+---
+
+## Decision: Gateway session/config lifecycle decisions
+
+**Date:** 2026-04-06  
+**Owner:** Farnsworth (Agent Workspace Manager)
+
+### Decision 1: Channel capability contract expansion
+
+- Added explicit capability flags to `IChannelAdapter`: `SupportsSteering`, `SupportsFollowUp`, `SupportsThinkingDisplay`, `SupportsToolDisplay`.
+- Base behavior defaults to `false` in `ChannelAdapterBase`.
+- Current channel declarations:
+  - TUI: thinking + tool display enabled.
+  - Telegram: thinking + tool display disabled.
+
+### Decision 2: Session lifecycle enforcement
+
+- Added `SessionStatus` (`Active`, `Suspended`, `Expired`, `Closed`) and nullable `ExpiresAt` to `GatewaySession`.
+- Added `SessionCleanupService` (`BackgroundService`) to expire stale active sessions and optionally purge closed sessions beyond retention.
+- Introduced `SessionCleanupOptions` with defaults:
+  - Check interval: 5 minutes
+  - Active session TTL: 24 hours
+  - Closed retention: optional (disabled by default)
+
+### Decision 3: BotNexus home agent workspace contract
+
+- Added `BotNexusHome` in Gateway configuration with required directories:
+  - `extensions/`, `tokens/`, `sessions/`, `logs/`, `agents/`
+- Added `GetAgentDirectory(string agentName)` to create and return `~/.botnexus/agents/{name}`.
+- First-time workspace scaffolding creates:
+  - `SOUL.md`
+  - `IDENTITY.md`
+  - `USER.md`
+  - `MEMORY.md`
+
+### Decision 4: Platform config file hot-reload shape
+
+- Added `PlatformConfigLoader.Watch(...)` with a `FileSystemWatcher` scoped to `config.json` (single-file filter).
+- Reload uses existing `Load(...)` + validation pipeline.
+- Introduced 500ms debounce to avoid change storms.
+- Exposed static `PlatformConfigLoader.ConfigChanged` event and optional callback hook in `Watch(...)`.
+
+---
+
+## Decision: Anticipatory test scaffolding strategy
+
+**Date:** 2026-04-06  
+**Owner:** Hermes (Test Infrastructure)
+
+### Context
+
+Phase-5 gateway features are being implemented in parallel by other agents, but QA coverage needed to be staged immediately.
+
+### Decision
+
+Create expected-behavior test suites now, and mark tests with explicit `Skip` reasons when they depend on not-yet-landed runtime types or wiring.
+
+### Rationale
+
+- Preserves test intent and naming now, reducing integration lag when feature PRs land.
+- Avoids brittle compile-time coupling to in-flight implementation classes.
+- Enables selective early assertions for already-available behavior while keeping the suite green.
+
+### Follow-up
+
+As feature branches merge, remove `Skip` attributes and replace placeholders with concrete arrange-act-assert implementations against real types.
+
+---
+
+## Decision: Gate live Copilot integration test behind opt-in env var
+
+**Date:** 2026-04-06  
+**Owner:** Hermes (Test Infrastructure)
+
+### Context
+
+`Phase5IntegrationTests` includes a live Copilot streaming validation that depends on external auth, network reachability, and provider availability.
+
+### Decision
+
+Keep the live test present and categorized with `[Trait("Category", "LiveIntegration")]`, but run it only when `BOTNEXUS_RUN_COPILOT_INTEGRATION=1`.
+
+### Rationale
+
+- Prevents routine CI/local test runs from failing due transient external dependency issues.
+- Preserves full live validation capability for explicit, opt-in smoke runs.
+- Aligns with existing integration patterns in `CopilotIntegrationTests` that gate live calls.
+
+---
+
+## Design Review: Gateway Sprint Changes
+
+**Reviewer:** Leela (Lead/Architect)  
+**Requested by:** Jon Bullen (via Copilot)  
+**Scope:** Gateway auth, platform-config agents, in-process isolation, composition root, DI extensions
+
+### GatewayAuthManager
+
+**File:** `src/gateway/BotNexus.Gateway/Configuration/GatewayAuthManager.cs`  
+**Grade:** B  
+**Recommendation:** APPROVE WITH NOTES
+
+#### Findings
+
+- **P1 — DIP violation: no interface.** `GatewayAuthManager` is a concrete class injected directly into `InProcessIsolationStrategy` and registered as `TryAddSingleton<GatewayAuthManager>`. There is no `IGatewayAuthManager` abstraction. This blocks mocking in tests (confirmed — `InProcessIsolationStrategyTests` constructs real instances) and prevents consumers from swapping auth resolution strategies. Extract an interface with `GetApiKeyAsync` and `GetApiEndpoint`.
+
+- **P1 — TOCTOU race on OAuth refresh.** Two concurrent calls for the same provider can both observe `NeedsRefresh == true`, both call `RefreshEntryAsync` with the same refresh token, and both write back. The second refresh may use an already-invalidated refresh token, causing a failure or silent credential corruption. Fix: use a `SemaphoreSlim` keyed per provider (or a `ConcurrentDictionary<string, Lazy<Task>>`) to serialize refreshes per provider while allowing concurrency across providers.
+
+- **P2 — File I/O under lock.** `SaveAuthEntries()` (line 211–221) performs `File.WriteAllText` while holding `_sync`. This blocks all concurrent readers during disk writes. Consider writing to a buffer under the lock and flushing outside it, or switching to `SemaphoreSlim` for async-friendly synchronization.
+
+- **P2 — Namespace placement.** This class resolves credentials and manages OAuth token lifecycle — it is authentication infrastructure, not configuration. A `Security` or `Auth` namespace would better communicate intent and separate it from config DTOs like `PlatformConfig`. Not blocking, but worth a follow-up move.
+
+- **P2 — Static coupling to `CopilotOAuth` and `EnvironmentApiKeys`.** `RefreshEntryAsync` calls `CopilotOAuth.RefreshAsync` directly, and key resolution calls `EnvironmentApiKeys.GetApiKey`. Both are static, untestable seams. Acceptable for now given scope, but flag for future extraction behind injectable interfaces.
+
+- **P2 — `_loaded` flag prevents re-reads.** If `auth.json` is modified after first load, `GatewayAuthManager` won't pick up changes until process restart. Consider a `FileSystemWatcher` or TTL-based reload (consistent with `FileAgentConfigurationSource`'s watch pattern).
+
+### PlatformConfigAgentSource
+
+**File:** `src/gateway/BotNexus.Gateway/Configuration/PlatformConfigAgentSource.cs`  
+**Grade:** A  
+**Recommendation:** APPROVE
+
+#### Findings
+
+- **Clean `IAgentConfigurationSource` implementation.** Single responsibility (maps platform config agents to descriptors), validates via shared `AgentDescriptorValidator`, correctly uses `IOptions<PlatformConfig>` for deferred resolution. Well-structured.
+
+- **Path traversal protection is correct and consistent.** The `TryLoadSystemPromptFromFileAsync` guard (lines 84–95) mirrors the identical pattern in `FileAgentConfigurationSource` (lines 109–121) — `GetFullPath` + directory prefix check with separator normalization. Both implementations are sound.
+
+- **P2 — `Watch` returns null.** This is valid per the interface contract (`IDisposable?`), but it means platform-config agents cannot hot-reload without process restart. Document this limitation or consider future watch support via `IOptionsMonitor<PlatformConfig>`.
+
+- **P2 — Duplicated path traversal logic.** Both `PlatformConfigAgentSource` and `FileAgentConfigurationSource` contain near-identical path traversal checks. Consider extracting to a shared `PathSafetyGuard.IsWithinDirectory(resolvedPath, rootDirectory)` utility to ensure both evolve together.
+
+### InProcessIsolationStrategy
+
+**File:** `src/gateway/BotNexus.Gateway/Isolation/InProcessIsolationStrategy.cs`  
+**Grade:** B+  
+**Recommendation:** APPROVE WITH NOTES
+
+#### Findings
+
+- **P1 — Concrete dependency on `GatewayAuthManager`.** Constructor takes `GatewayAuthManager` (concrete), not an abstraction. This is the consumer-side manifestation of the missing interface noted above. When the interface is extracted, update this constructor.
+
+- **P2 — `CreateAsync` is synchronous.** The method signature is `Task<IAgentHandle>` but returns `Task.FromResult` (line 78). This is fine for the in-process strategy, but future strategies (container, remote) will be truly async. No change needed — the interface correctly requires `Task` for the general case.
+
+- **`InProcessAgentHandle` streaming is well-designed.** The `Channel<T>`-based streaming pattern (line 128) with background `Task.Run` for the prompt (line 195) is clean. Error propagation via `TryComplete(ex)` with best-effort error event emission (line 178–190) is defensive and correct.
+
+- **`DisposeAsync` is properly guarded.** Wraps `AbortAsync` in try-catch to prevent dispose failures from bubbling. Good practice.
+
+- **Test coverage is adequate.** `InProcessIsolationStrategyTests` covers creation, missing model error, ID propagation, and name verification. Tests confirm the concrete `GatewayAuthManager` coupling (they construct real instances — lines 31–33, 80–83).
+
+### Program.cs
+
+**File:** `src/gateway/BotNexus.Gateway.Api/Program.cs`  
+**Grade:** B+  
+**Recommendation:** APPROVE WITH NOTES
+
+#### Findings
+
+- **P2 — Singleton `HttpClient` instead of `IHttpClientFactory`.** Line 22 registers `new HttpClient { Timeout = ... }` as a singleton. This works and avoids socket exhaustion, but bypasses DNS rotation and the standard `IHttpClientFactory` lifecycle. For a multi-provider gateway that may talk to different endpoints, consider migrating to named `HttpClient` registrations via `AddHttpClient<T>()`.
+
+- **P2 — Imperative provider registration in factory lambda.** The `LlmClient` factory (lines 23–37) hardcodes 4 provider registrations. This is acceptable for a composition root, but if providers become pluggable, consider a `IApiProviderContributor` pattern or a builder API. Not blocking.
+
+- **Registration order is correct.** `AddBotNexusGateway()` → `AddPlatformConfiguration()` → `AddBotNexusGatewayApi()` → provider singletons → `LlmClient` factory. The factory correctly resolves its dependencies lazily. `BuiltInModels.RegisterAll()` is called inside the factory, ensuring the `ModelRegistry` is populated before `LlmClient` is used.
+
+- **Health endpoint and fallback routing are clean.** Minimal API usage is idiomatic.
+
+### GatewayServiceCollectionExtensions
+
+**File:** `src/gateway/BotNexus.Gateway/Extensions/GatewayServiceCollectionExtensions.cs`  
+**Grade:** B  
+**Recommendation:** APPROVE WITH NOTES
+
+#### Findings
+
+- **P1 — `AddPlatformConfiguration` does too much.** This 50-line method loads config from disk, registers `IOptions<PlatformConfig>`, replaces `PlatformConfig` singleton, registers `GatewayAuthManager`, replaces `IGatewayAuthHandler`, configures default agent, sets up `FileSessionStore`, replaces `IAgentConfigurationSource`, registers `PlatformConfigAgentSource`, and registers `AgentConfigurationHostedService`. That's at least 6 distinct responsibilities in one method. Split into focused submethods: `ConfigureAuthHandler`, `ConfigureSessionStore`, `ConfigureAgentSources`, etc.
+
+- **P2 — `ApplyPlatformConfig` is fragile.** The manual property-by-property copy (lines 139–152) will silently drop new properties if `PlatformConfig` is extended. Consider either: (a) making `PlatformConfig` a `record` with `with` expressions, or (b) using a serialization roundtrip, or (c) adding a test that reflects over `PlatformConfig` properties to ensure `ApplyPlatformConfig` covers them all.
+
+- **P2 — `Replace` semantics are order-sensitive.** `Replace(ServiceDescriptor.Singleton<IGatewayAuthHandler>(...))` (line 94) depends on `AddBotNexusGateway` having already registered `ApiKeyGatewayAuthHandler`. If call order changes, the replacement silently does nothing (or throws). Add a comment documenting this ordering requirement, or use a more robust pattern (e.g., `PostConfigure` or a dedicated options callback).
+
+- **`TryAddSingleton<GatewayAuthManager>` is correct.** Allows consumers to register a custom auth manager before `AddPlatformConfiguration` is called.
+
+- **`PlatformConfigAgentSource` registration is clean.** Factory-based singleton with proper DI resolution of `IOptions<PlatformConfig>` and logger.
+
+### Summary Verdict
+
+| File | Grade | Recommendation |
+|------|-------|----------------|
+| GatewayAuthManager | B | APPROVE WITH NOTES |
+| PlatformConfigAgentSource | A | APPROVE |
+| InProcessIsolationStrategy | B+ | APPROVE WITH NOTES |
+| Program.cs | B+ | APPROVE WITH NOTES |
+| GatewayServiceCollectionExtensions | B | APPROVE WITH NOTES |
+
+**Overall: APPROVE WITH NOTES**
+
+#### P1 Action Items (address before next sprint)
+
+1. **Extract `IGatewayAuthManager` interface** with `GetApiKeyAsync` and `GetApiEndpoint`. Update `InProcessIsolationStrategy` constructor and DI registration. This unblocks proper test isolation and enables alternative auth implementations (e.g., vault-backed, managed identity).
+
+2. **Fix OAuth refresh race condition** in `GatewayAuthManager`. Serialize concurrent refreshes per provider using `SemaphoreSlim` or `ConcurrentDictionary<string, Lazy<Task>>` to prevent double-refresh with invalidated tokens.
+
+3. **Split `AddPlatformConfiguration`** into focused submethods. The current method is a maintenance risk — any change to platform config wiring requires reading and understanding 50+ lines of interleaved concerns.
+
+#### P2 Items (backlog / next opportunity)
+
+- Move `GatewayAuthManager` to an `Auth` or `Security` namespace.
+- Extract shared path traversal guard from `PlatformConfigAgentSource` and `FileAgentConfigurationSource`.
+- Add property-coverage test for `ApplyPlatformConfig` to prevent silent property drops.
+- Evaluate `IHttpClientFactory` migration for provider `HttpClient` management.
+- Consider `auth.json` file-watch or TTL reload for `GatewayAuthManager`.
+
+#### What's Working Well
+
+- **Extension model is clean.** `IAgentConfigurationSource`, `IIsolationStrategy`, and the `TryAdd`/`Replace` DI patterns give consumers clear extension points without modification.
+- **Security posture is solid.** Path traversal guards are consistent and correct. Auth fallback chain (auth.json → env → platform config) is well-ordered.
+- **Test coverage exists** for the key new types. `PlatformConfigAgentSourceTests` covers happy path, missing files, and watch semantics. `InProcessIsolationStrategyTests` covers creation and error paths.
+- **Streaming implementation is production-quality.** The `Channel<T>`-based streaming in `InProcessAgentHandle` with proper error propagation and disposal is well-crafted.
+
+---
+
+## Gateway Architecture Gap Analysis
+
+**Author:** Leela (Lead / Architect)  
+**Date:** 2026-04-04  
+**Requested by:** Brady (Jon Bullen)  
+**Status:** Analysis Complete — Ready for Sprint Planning
+
+### Executive Summary
+
+The Gateway has a **strong architectural foundation**. The abstractions layer (`BotNexus.Gateway.Abstractions`) is clean and complete — 10 interfaces, 12 model records, 3 enums, covering all 6 requirement areas. The API surface is surprisingly mature with REST controllers, WebSocket streaming with full event protocol (thinking, tool calls, content deltas, steering, follow-up, abort), and a functional WebUI.
+
+**The gap is not in design — it's in wiring and completeness.** Key interfaces exist but implementations are stubs (3 of 4 isolation strategies, 2 of 2 channel adapters), auth exists but isn't enforced on endpoints, config validation works via API but there's no CLI, and channels don't propagate steering/queuing capabilities.
+
+*See full analysis in original inbox document for comprehensive requirement-by-requirement breakdown, finding details, and change recommendations.*
+
+### Key Gaps Addressed in Batch 2
+
+✅ **Agent workspace management** — `AgentWorkspaceManager` + `IContextBuilder` implemented  
+✅ **MaxConcurrentSessions enforcement** — Added to `DefaultAgentSupervisor.GetOrCreateAsync()`  
+✅ **Isolation strategy validation** — Strategy name validation before instance creation  
+✅ **WebSocket as channel adapter** — `IStreamEventChannelAdapter` contract for protocol fidelity  
+✅ **Channel capability declaration** — Capability flags added to `IChannelAdapter`  
+✅ **TUI input loop** — Integrated with WebSocket streaming  
+✅ **Session lifecycle** — `SessionStatus` + `SessionCleanupService` with configurable TTL  
+✅ **Provider bootstrap** — `GatewayAuthManager` + centralized auth resolution  
+
+### Remaining Gaps (Phase 2/Future)
+
+- ⏳ Cross-agent calling (P2) — Requires remote Gateway discovery
+- ⏳ Agent health monitoring (P2) — Heartbeat check, auto-restart
+- ⏳ Sandbox/Container/Remote isolation implementations (P2)
+- ⏳ Slack/Discord adapters (P2)
+- ⏳ Dynamic channel loading (P2)
+
