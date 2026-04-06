@@ -228,6 +228,85 @@ public sealed class GatewayHostTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task DispatchAsync_WithSteerControl_RoutesToSteerHandler()
+    {
+        var router = new Mock<IMessageRouter>();
+        router.Setup(r => r.ResolveAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["agent-a"]);
+        var handle = new Mock<IAgentHandle>();
+        handle.SetupGet(h => h.AgentId).Returns("agent-a");
+        handle.SetupGet(h => h.SessionId).Returns("session-1");
+        var supervisor = new Mock<IAgentSupervisor>();
+        supervisor.Setup(s => s.GetInstance("agent-a", "session-1"))
+            .Returns(new AgentInstance
+            {
+                InstanceId = "agent-a::session-1",
+                AgentId = "agent-a",
+                SessionId = "session-1",
+                IsolationStrategy = "in-process"
+            });
+        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(handle.Object);
+        var sessions = new Mock<ISessionStore>();
+        sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GatewaySession { SessionId = "session-1", AgentId = "agent-a" });
+        var channel = CreateChannelAdapter("web", supportsStreaming: false);
+        var host = CreateHost(supervisor.Object, router.Object, sessions.Object, new RecordingActivityBroadcaster(), CreateChannelManager(channel.Object));
+
+        await host.DispatchAsync(CreateMessage("nudge", sessionId: "session-1", metadata: new Dictionary<string, object?> { ["control"] = "steer" }));
+
+        handle.Verify(h => h.SteerAsync("nudge", It.IsAny<CancellationToken>()), Times.Once);
+        handle.Verify(h => h.PromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        channel.Verify(c => c.SendAsync(
+                It.Is<OutboundMessage>(m => m.Content.Contains("Steering", StringComparison.OrdinalIgnoreCase)),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DispatchAsync_WhenSessionQueueIsFull_ReturnsBusyResponse()
+    {
+        var router = new Mock<IMessageRouter>();
+        router.Setup(r => r.ResolveAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["agent-a"]);
+        var handle = new Mock<IAgentHandle>();
+        handle.SetupGet(h => h.AgentId).Returns("agent-a");
+        handle.SetupGet(h => h.SessionId).Returns("session-1");
+        handle.Setup(h => h.PromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(async () =>
+            {
+                await Task.Delay(250);
+                return new AgentResponse { Content = "ok" };
+            });
+        var supervisor = new Mock<IAgentSupervisor>();
+        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(handle.Object);
+
+        var sessions = new InMemorySessionStore();
+        await sessions.GetOrCreateAsync("session-1", "agent-a");
+
+        var channel = CreateChannelAdapter("web", supportsStreaming: false);
+        var host = CreateHost(
+            supervisor.Object,
+            router.Object,
+            sessions,
+            new RecordingActivityBroadcaster(),
+            CreateChannelManager(channel.Object),
+            sessionQueueCapacity: 1);
+
+        var first = host.DispatchAsync(CreateMessage("one", sessionId: "session-1"));
+        var second = host.DispatchAsync(CreateMessage("two", sessionId: "session-1"));
+        await Task.Delay(20);
+        await host.DispatchAsync(CreateMessage("three", sessionId: "session-1"));
+        await Task.WhenAll(first, second);
+
+        channel.Verify(c => c.SendAsync(
+                It.Is<OutboundMessage>(m => m.Content.Contains("busy", StringComparison.OrdinalIgnoreCase)),
+                It.IsAny<CancellationToken>()),
+            Times.AtLeastOnce);
+    }
+
     private static Mock<IAgentHandle> CreatePromptHandle(string agentId, string sessionId, string content)
     {
         var handle = new Mock<IAgentHandle>();
@@ -266,17 +345,23 @@ public sealed class GatewayHostTests
         IMessageRouter router,
         ISessionStore sessions,
         IActivityBroadcaster activity,
-        IChannelManager channelManager)
-        => new(supervisor, router, sessions, activity, channelManager, NullLogger<GatewayHost>.Instance);
+        IChannelManager channelManager,
+        int sessionQueueCapacity = 64)
+        => new(supervisor, router, sessions, activity, channelManager, NullLogger<GatewayHost>.Instance, sessionQueueCapacity);
 
-    private static InboundMessage CreateMessage(string content, string? sessionId = null, string conversationId = "conv-1")
+    private static InboundMessage CreateMessage(
+        string content,
+        string? sessionId = null,
+        string conversationId = "conv-1",
+        IReadOnlyDictionary<string, object?>? metadata = null)
         => new()
         {
             ChannelType = "web",
             SenderId = "sender-1",
             ConversationId = conversationId,
             Content = content,
-            SessionId = sessionId
+            SessionId = sessionId,
+            Metadata = metadata ?? new Dictionary<string, object?>()
         };
 
     private static async IAsyncEnumerable<AgentStreamEvent> ToAsyncEnumerable(IEnumerable<AgentStreamEvent> events)

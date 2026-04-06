@@ -31,7 +31,7 @@ public sealed class TuiChannelAdapter(ILogger<TuiChannelAdapter> logger)
     public override bool SupportsStreaming => true;
 
     /// <inheritdoc />
-    public override bool SupportsSteering => false;
+    public override bool SupportsSteering => true;
 
     /// <inheritdoc />
     public override bool SupportsFollowUp => false;
@@ -174,6 +174,34 @@ public sealed class TuiChannelAdapter(ILogger<TuiChannelAdapter> logger)
 
             if (string.IsNullOrWhiteSpace(trimmed))
                 continue;
+
+            if (trimmed.StartsWith("/steer", StringComparison.OrdinalIgnoreCase))
+            {
+                var steerContent = trimmed.Length > "/steer".Length
+                    ? trimmed["/steer".Length..].TrimStart()
+                    : string.Empty;
+
+                if (string.IsNullOrWhiteSpace(steerContent))
+                {
+                    await Console.Out.WriteLineAsync("↪ Usage: /steer <message>");
+                    continue;
+                }
+
+                await Console.Out.WriteLineAsync($"↪ [{DisplayName}:console] Steering queued.");
+                await DispatchInboundAsync(new InboundMessage
+                {
+                    ChannelType = ChannelType,
+                    SenderId = Environment.UserName,
+                    ConversationId = "console",
+                    SessionId = "tui-console",
+                    Content = steerContent,
+                    Metadata = new Dictionary<string, object?>
+                    {
+                        ["control"] = "steer"
+                    }
+                }, cancellationToken);
+                continue;
+            }
 
             await DispatchInboundAsync(new InboundMessage
             {

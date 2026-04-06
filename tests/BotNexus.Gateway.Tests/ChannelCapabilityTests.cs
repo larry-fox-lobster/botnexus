@@ -28,7 +28,7 @@ public sealed class ChannelCapabilityTests
     {
         var adapter = new TuiChannelAdapter(NullLogger<TuiChannelAdapter>.Instance);
 
-        adapter.SupportsSteering.Should().BeFalse();
+        adapter.SupportsSteering.Should().BeTrue();
         adapter.SupportsFollowUp.Should().BeFalse();
         adapter.SupportsThinkingDisplay.Should().BeTrue();
         adapter.SupportsToolDisplay.Should().BeTrue();
@@ -66,7 +66,7 @@ public sealed class ChannelCapabilityTests
     {
         IChannelAdapter adapter = new TuiChannelAdapter(NullLogger<TuiChannelAdapter>.Instance);
 
-        adapter.SupportsSteering.Should().BeFalse();
+        adapter.SupportsSteering.Should().BeTrue();
         adapter.SupportsFollowUp.Should().BeFalse();
         adapter.SupportsThinkingDisplay.Should().BeTrue();
         adapter.SupportsToolDisplay.Should().BeTrue();

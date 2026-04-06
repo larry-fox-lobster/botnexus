@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using System.Threading.Channels;
+using BotNexus.Channels.Core;
 using BotNexus.Gateway.Abstractions.Activity;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Channels;
@@ -5,7 +8,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Routing;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Streaming;
-using BotNexus.Channels.Core;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -15,29 +17,19 @@ namespace BotNexus.Gateway;
 /// The central Gateway orchestration service. Manages the lifecycle of channel adapters,
 /// listens for inbound messages, routes them to agents, and streams responses back.
 /// </summary>
-/// <remarks>
-/// <para>
-/// This is the heart of BotNexus — it wires together the agent supervisor, message router,
-/// session store, channel adapters, and activity broadcaster into a coherent pipeline.
-/// </para>
-/// <para>Flow:</para>
-/// <list type="number">
-///   <item>Channel adapters receive messages from external sources and call <see cref="IChannelDispatcher.DispatchAsync"/>.</item>
-///   <item>The dispatcher routes the message via <see cref="IMessageRouter"/> to find target agents.</item>
-///   <item>For each target agent, the supervisor gets or creates an instance via <see cref="IAgentSupervisor"/>.</item>
-///   <item>The message is forwarded to the agent handle, which processes it and streams events.</item>
-///   <item>Responses are sent back through the originating channel adapter.</item>
-///   <item>All activity is broadcast via <see cref="IActivityBroadcaster"/> for real-time monitoring.</item>
-/// </list>
-/// </remarks>
 public sealed class GatewayHost : BackgroundService, IChannelDispatcher
 {
+    private const int DefaultSessionQueueCapacity = 64;
+    private const string BusyMessage = "Session is busy processing messages. Please retry shortly.";
+    private const string ControlSteer = "steer";
+
     private readonly IAgentSupervisor _supervisor;
     private readonly IMessageRouter _router;
     private readonly ISessionStore _sessions;
     private readonly IActivityBroadcaster _activity;
     private readonly IChannelManager _channelManager;
     private readonly ILogger<GatewayHost> _logger;
+    private readonly ConcurrentDictionary<string, SessionQueueState> _sessionQueues = new(StringComparer.OrdinalIgnoreCase);
 
     public GatewayHost(
         IAgentSupervisor supervisor,
@@ -45,7 +37,8 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
         ISessionStore sessions,
         IActivityBroadcaster activity,
         IChannelManager channelManager,
-        ILogger<GatewayHost> logger)
+        ILogger<GatewayHost> logger,
+        int sessionQueueCapacity = DefaultSessionQueueCapacity)
     {
         _supervisor = supervisor;
         _router = router;
@@ -53,7 +46,10 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
         _activity = activity;
         _channelManager = channelManager;
         _logger = logger;
+        SessionQueueCapacity = Math.Max(sessionQueueCapacity, 1);
     }
+
+    private int SessionQueueCapacity { get; }
 
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -65,7 +61,6 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
             return;
         }
 
-        // Start all registered adapters
         foreach (var channel in _channelManager.Adapters)
         {
             try
@@ -81,11 +76,9 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
 
         _logger.LogInformation("Gateway started with {ChannelCount} channel adapter(s)", _channelManager.Adapters.Count);
 
-        // Keep running until shutdown
         try { await Task.Delay(Timeout.Infinite, stoppingToken); }
-        catch (OperationCanceledException) { /* Expected on shutdown */ }
+        catch (OperationCanceledException) { }
 
-        // Graceful shutdown
         _logger.LogInformation("Gateway shutting down...");
         await _supervisor.StopAllAsync(CancellationToken.None);
 
@@ -94,10 +87,82 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
             try { await channel.StopAsync(CancellationToken.None); }
             catch (Exception ex) { _logger.LogWarning(ex, "Error stopping channel adapter: {ChannelType}", channel.ChannelType); }
         }
+
+        await CompleteSessionQueuesAsync();
     }
 
     /// <inheritdoc />
     public async Task DispatchAsync(InboundMessage message, CancellationToken cancellationToken = default)
+    {
+        var queueKey = GetQueueKey(message);
+        var queueState = _sessionQueues.GetOrAdd(queueKey, CreateSessionQueueState);
+        var queueItem = new QueuedInboundMessage(message, cancellationToken);
+
+        if (!queueState.Queue.Writer.TryWrite(queueItem))
+        {
+            await SendBusyAsync(message, cancellationToken);
+            return;
+        }
+
+        try
+        {
+            await queueItem.Completion.Task.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await queueItem.Completion.Task;
+            }
+            catch
+            {
+                // Preserve previous dispatcher behavior for canceled callers.
+            }
+        }
+    }
+
+    private SessionQueueState CreateSessionQueueState(string queueKey)
+    {
+        var queue = Channel.CreateBounded<QueuedInboundMessage>(new BoundedChannelOptions(SessionQueueCapacity)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = false
+        });
+
+        var workerTask = ProcessSessionQueueAsync(queueKey, queue.Reader);
+        return new SessionQueueState(queue, workerTask);
+    }
+
+    private async Task ProcessSessionQueueAsync(string queueKey, ChannelReader<QueuedInboundMessage> queueReader)
+    {
+        try
+        {
+            await foreach (var item in queueReader.ReadAllAsync())
+            {
+                try
+                {
+                    await ProcessInboundMessageAsync(item.Message, item.CancellationToken);
+                    item.Completion.TrySetResult();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error processing queued inbound message for queue '{QueueKey}'", queueKey);
+                    item.Completion.TrySetException(ex);
+                }
+                finally
+                {
+                    await CleanupQueueIfClosedSessionAsync(queueKey, item.Message, item.CancellationToken);
+                }
+            }
+        }
+        finally
+        {
+            _sessionQueues.TryRemove(queueKey, out _);
+        }
+    }
+
+    private async Task ProcessInboundMessageAsync(InboundMessage message, CancellationToken cancellationToken)
     {
         await _activity.PublishAsync(new GatewayActivity
         {
@@ -116,33 +181,21 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
 
         foreach (var agentId in targetAgents)
         {
-            // Each agent gets its own session
             var sessionId = message.SessionId ?? $"{message.ChannelType}:{message.ConversationId}:{agentId}";
             var session = await _sessions.GetOrCreateAsync(sessionId, agentId, cancellationToken);
-            if (session.Status == SessionStatus.Suspended)
+            if (session.Status != SessionStatus.Active)
             {
-                if (_channelManager.Get(message.ChannelType) is { } suspendedChannel)
-                {
-                    await suspendedChannel.SendAsync(new OutboundMessage
-                    {
-                        ChannelType = message.ChannelType,
-                        ConversationId = message.ConversationId,
-                        Content = "Session is suspended. Resume the session before sending new messages.",
-                        SessionId = sessionId
-                    }, cancellationToken);
-                }
-
-                await _activity.PublishAsync(new GatewayActivity
-                {
-                    Type = GatewayActivityType.Error,
-                    AgentId = agentId,
-                    SessionId = sessionId,
-                    Message = "Session is suspended."
-                }, cancellationToken);
+                await SendSessionStatusRejectedAsync(message, agentId, sessionId, session.Status, cancellationToken);
                 continue;
             }
 
-            // Record user message
+            if (TryGetControlCommand(message, out var controlCommand) &&
+                string.Equals(controlCommand, ControlSteer, StringComparison.OrdinalIgnoreCase))
+            {
+                await HandleSteeringAsync(message, agentId, sessionId, cancellationToken);
+                continue;
+            }
+
             session.AddEntry(new SessionEntry { Role = "user", Content = message.Content });
 
             try
@@ -156,7 +209,6 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
                     SessionId = sessionId
                 }, cancellationToken);
 
-                // Stream if the channel supports it, otherwise collect and send
                 var sessionSaved = false;
                 if (_channelManager.Get(message.ChannelType) is { SupportsStreaming: true } channel)
                 {
@@ -166,17 +218,13 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
                         _sessions,
                         new StreamingSessionOptions(
                             IncludeErrorsInHistory: true,
-                            OnEventAsync: (evt, cancellationToken) =>
+                            OnEventAsync: (evt, ct) =>
                             {
                                 if (channel is IStreamEventChannelAdapter streamEventChannel)
-                                {
-                                    return new ValueTask(streamEventChannel.SendStreamEventAsync(message.ConversationId, evt, cancellationToken));
-                                }
+                                    return new ValueTask(streamEventChannel.SendStreamEventAsync(message.ConversationId, evt, ct));
 
                                 if (evt.Type == AgentStreamEventType.ContentDelta && evt.ContentDelta is not null)
-                                {
-                                    return new ValueTask(channel.SendStreamDeltaAsync(message.ConversationId, evt.ContentDelta, cancellationToken));
-                                }
+                                    return new ValueTask(channel.SendStreamDeltaAsync(message.ConversationId, evt.ContentDelta, ct));
 
                                 return ValueTask.CompletedTask;
                             }),
@@ -201,9 +249,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
                 }
 
                 if (!sessionSaved)
-                {
                     await _sessions.SaveAsync(session, cancellationToken);
-                }
 
                 await _activity.PublishAsync(new GatewayActivity
                 {
@@ -224,5 +270,148 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
                 }, cancellationToken);
             }
         }
+    }
+
+    private async Task SendSessionStatusRejectedAsync(
+        InboundMessage message,
+        string agentId,
+        string sessionId,
+        SessionStatus status,
+        CancellationToken cancellationToken)
+    {
+        var statusMessage = status == SessionStatus.Suspended
+            ? "Session is suspended. Resume the session before sending new messages."
+            : $"Session is in '{status}' state and cannot accept messages.";
+
+        if (_channelManager.Get(message.ChannelType) is { } channel)
+        {
+            await channel.SendAsync(new OutboundMessage
+            {
+                ChannelType = message.ChannelType,
+                ConversationId = message.ConversationId,
+                Content = statusMessage,
+                SessionId = sessionId
+            }, cancellationToken);
+        }
+
+        await _activity.PublishAsync(new GatewayActivity
+        {
+            Type = GatewayActivityType.Error,
+            AgentId = agentId,
+            SessionId = sessionId,
+            Message = statusMessage
+        }, cancellationToken);
+    }
+
+    private async Task HandleSteeringAsync(
+        InboundMessage message,
+        string agentId,
+        string sessionId,
+        CancellationToken cancellationToken)
+    {
+        var instance = _supervisor.GetInstance(agentId, sessionId);
+        if (instance is null)
+        {
+            if (_channelManager.Get(message.ChannelType) is { } channel)
+            {
+                await channel.SendAsync(new OutboundMessage
+                {
+                    ChannelType = message.ChannelType,
+                    ConversationId = message.ConversationId,
+                    Content = "No active run to steer for this session.",
+                    SessionId = sessionId
+                }, cancellationToken);
+            }
+
+            return;
+        }
+
+        var handle = await _supervisor.GetOrCreateAsync(agentId, sessionId, cancellationToken);
+        await handle.SteerAsync(message.Content, cancellationToken);
+
+        if (_channelManager.Get(message.ChannelType) is { } steerChannel)
+        {
+            await steerChannel.SendAsync(new OutboundMessage
+            {
+                ChannelType = message.ChannelType,
+                ConversationId = message.ConversationId,
+                Content = "Steering message queued.",
+                SessionId = sessionId
+            }, cancellationToken);
+        }
+    }
+
+    private static bool TryGetControlCommand(InboundMessage message, out string? command)
+    {
+        command = null;
+        if (!message.Metadata.TryGetValue("control", out var controlValue))
+            return false;
+
+        command = controlValue?.ToString();
+        return !string.IsNullOrWhiteSpace(command);
+    }
+
+    private static string GetQueueKey(InboundMessage message)
+        => !string.IsNullOrWhiteSpace(message.SessionId)
+            ? message.SessionId
+            : $"{message.ChannelType}:{message.ConversationId}";
+
+    private async Task SendBusyAsync(InboundMessage message, CancellationToken cancellationToken)
+    {
+        if (_channelManager.Get(message.ChannelType) is not { } channel)
+            return;
+
+        await channel.SendAsync(new OutboundMessage
+        {
+            ChannelType = message.ChannelType,
+            ConversationId = message.ConversationId,
+            Content = BusyMessage,
+            SessionId = message.SessionId
+        }, cancellationToken);
+    }
+
+    private async Task CleanupQueueIfClosedSessionAsync(string queueKey, InboundMessage message, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(message.SessionId))
+            return;
+
+        var session = await _sessions.GetAsync(message.SessionId, cancellationToken);
+        if (session?.Status is not SessionStatus.Closed)
+            return;
+
+        if (_sessionQueues.TryRemove(queueKey, out var state))
+            state.Queue.Writer.TryComplete();
+    }
+
+    private async Task CompleteSessionQueuesAsync()
+    {
+        foreach (var state in _sessionQueues.Values)
+            state.Queue.Writer.TryComplete();
+
+        var workers = _sessionQueues.Values.Select(state => state.WorkerTask).ToArray();
+        if (workers.Length == 0)
+            return;
+
+        try
+        {
+            await Task.WhenAll(workers);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "One or more session queue workers completed with errors during shutdown.");
+        }
+    }
+
+    private sealed class SessionQueueState(Channel<QueuedInboundMessage> queue, Task workerTask)
+    {
+        public Channel<QueuedInboundMessage> Queue { get; } = queue;
+        public Task WorkerTask { get; } = workerTask;
+    }
+
+    private sealed class QueuedInboundMessage(InboundMessage message, CancellationToken cancellationToken)
+    {
+        public InboundMessage Message { get; } = message;
+        public CancellationToken CancellationToken { get; } = cancellationToken;
+        public TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 }

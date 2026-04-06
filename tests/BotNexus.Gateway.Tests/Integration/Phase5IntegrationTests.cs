@@ -82,7 +82,7 @@ public sealed class Phase5IntegrationTests
 
         var adapter = manager.Get("tui");
         adapter.Should().NotBeNull();
-        adapter!.SupportsSteering.Should().BeFalse();
+        adapter!.SupportsSteering.Should().BeTrue();
         adapter.SupportsFollowUp.Should().BeFalse();
         adapter.SupportsThinkingDisplay.Should().BeTrue();
         adapter.SupportsToolDisplay.Should().BeTrue();
