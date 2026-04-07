@@ -1,35 +1,23 @@
-// BotNexus WebUI — connects to the Gateway via WebSocket and REST APIs
+// BotNexus WebUI — connects to the Gateway via SignalR and REST APIs
 (function () {
     'use strict';
 
     // --- Configuration ---
     const API_BASE = '/api';
-    const WS_PATH = '/ws';
-    const RECONNECT_BASE_MS = 1000;
-    const RECONNECT_MAX_MS = 30000;
-    const RECONNECT_MAX_ATTEMPTS = 10;
-    const PING_INTERVAL_MS = 30000;
     const RESPONSE_TIMEOUT_MS = 30000;
     const MAX_ACTIVITY_ITEMS = 100;
 
     // --- State ---
-    /** @type {WebSocket|null} */
-    let ws = null;
+    /** @type {signalR.HubConnection|null} */
+    let connection = null;
     let currentSessionId = null;
     let currentAgentId = null;
     let connectionId = null;
-    let reconnectAttempts = 0;
-    let reconnectTimer = null;
-    let pingTimer = null;
     let responseTimeoutTimer = null;
     let steerIndicatorTimer = null;
     let isStreaming = false;
     let hasReceivedResponse = false;
-    let isWsConnecting = false;
     let isRestRequestInFlight = false;
-    let shouldReconnect = true;
-    let connectionHadOpen = false;
-    let currentWsUrl = '';
     let activeMessageId = null;
     let showTools = false;
     let showThinking = false;
@@ -59,11 +47,7 @@
     let activityWs = null;
     let activityReconnectTimer = null;
     let userScrolledUp = false;
-    let lastSequenceId = 0;
-    let sessionKey = null;
     let commandPaletteIndex = -1;
-    /** @type {Array<string>} */
-    let wsSendQueue = [];
 
     // --- DOM refs ---
     const $ = (sel) => document.querySelector(sel);
@@ -240,7 +224,7 @@
             elBtnSend.disabled = true;
             return;
         }
-        if (isStreaming && ws && ws.readyState === WebSocket.OPEN) {
+        if (isStreaming && connection?.state === signalR.HubConnectionState.Connected) {
             elBtnSend.disabled = !hasText;
             if (sendModeFollowUp) {
                 elBtnSend.textContent = '📨 Follow-up';
@@ -346,8 +330,8 @@
             const wasHealthy = gatewayHealthy;
             gatewayHealthy = response.ok;
             
-            // Update status if not connected via WebSocket
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
+            // Update status if not connected via SignalR
+            if (!connection || connection.state !== signalR.HubConnectionState.Connected) {
                 setStatus(gatewayHealthy ? 'online' : 'disconnected');
             }
             
@@ -361,7 +345,7 @@
             }
         } catch (e) {
             gatewayHealthy = false;
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
+            if (!connection || connection.state !== signalR.HubConnectionState.Connected) {
                 setStatus('disconnected');
             }
         }
@@ -374,123 +358,156 @@
     }
 
     // =========================================================================
-    // WebSocket connection
+    // SignalR Connection
     // =========================================================================
 
-    function connectWebSocket() {
-        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+    function initSignalR() {
+        connection = new signalR.HubConnectionBuilder()
+            .withUrl('/hub/gateway')
+            .withAutomaticReconnect([0, 1000, 2000, 5000, 10000, 30000])
+            .build();
 
-        isWsConnecting = true;
-        setStatus(reconnectAttempts > 0 ? 'reconnecting' : 'connecting');
-        showConnectionBanner(reconnectAttempts > 0 ? '⚠️ Connection lost. Reconnecting...' : 'Connecting...', 'warning');
-        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const url = `${proto}//${location.host}${WS_PATH}`;
-        currentWsUrl = url;
-
-        ws = new WebSocket(url);
-
-        ws.onopen = () => {
-            isWsConnecting = false;
-            connectionHadOpen = true;
+        // Server → Client methods
+        connection.on('Connected', (data) => {
+            connectionId = data.connectionId;
+            agentsCache = data.agents || [];
             setStatus('connected');
-            const wasReconnect = reconnectAttempts > 0;
-            reconnectAttempts = 0;
-            startPing();
-            flushWsSendQueue();
-            if (wasReconnect) {
-                // Re-establish session context after network reconnect
-                if (currentAgentId) {
-                    sendWs({ type: 'switch_session', agentId: currentAgentId, sessionId: currentSessionId || undefined });
-                }
-                loadChannels();
-                loadExtensions();
-                reloadCurrentSessionHistory().then((msgCount) => {
-                    const countStr = msgCount > 0 ? ` Loaded ${msgCount} previous messages.` : '';
-                    showConnectionBanner(`✅ Reconnected to gateway.${countStr}`, 'success');
-                    setTimeout(() => hideConnectionBanner(), 3000);
-                });
-            } else {
-                hideConnectionBanner();
+            hideConnectionBanner();
+            if (currentSessionId && currentAgentId) {
+                joinSession(currentAgentId, currentSessionId);
             }
-        };
+        });
 
-        ws.onclose = () => {
-            isWsConnecting = false;
+        connection.on('SessionJoined', (data) => {
+            currentSessionId = data.sessionId;
+            currentAgentId = data.agentId;
+            updateSessionIdDisplay();
+            loadChatHeaderModels();
+            loadSessions();
+        });
+
+        connection.on('SessionReset', (data) => {
+            currentSessionId = null;
+            updateSessionIdDisplay();
+            elChatMessages.innerHTML = '';
+            appendSystemMessage('Session reset. System prompt regenerated.');
+            loadSessions();
+        });
+
+        connection.on('MessageStart', (evt) => {
+            activeMessageId = evt.messageId;
+            isStreaming = true;
+            setSendingState(false);
+            activeToolCount = 0;
+            thinkingBuffer = '';
+            toolCallDepth = 0;
+            toolStartTimes = {};
+            elBtnAbort.classList.remove('hidden');
+            showStreamingIndicator();
+            showProcessingStatus('Agent is processing...', '⏳');
+            startResponseTimeout();
+            updateSendButtonState();
+            decrementQueue();
+        });
+
+        connection.on('ContentDelta', (delta) => {
+            removeStreamingIndicator();
+            markResponseReceived();
+            autoCollapseThinking();
+            showProcessingStatus('Writing response...', '✍️');
+            if (typeof delta === 'string') appendDelta(delta);
+            else if (delta?.delta) appendDelta(delta.delta);
+        });
+
+        connection.on('ThinkingDelta', (evt) => {
+            showProcessingStatus('Thinking...', '💭');
+            if (evt?.delta || evt?.thinkingContent) {
+                handleThinkingDelta({ delta: evt.delta || evt.thinkingContent });
+            }
+        });
+
+        connection.on('ToolStart', (evt) => {
+            showProcessingStatus(`Using tool: ${evt.toolName || 'tool'}`, '🔧');
+            handleToolStart(evt);
+            trackActivity('tool', currentAgentId, `🔧 ${evt.toolName || 'tool'} started`);
+        });
+
+        connection.on('ToolEnd', (evt) => {
+            handleToolEnd(evt);
+            const remainingTools = Object.values(activeToolCalls).filter(t => t.status === 'running');
+            if (remainingTools.length > 0) {
+                showProcessingStatus(`Using tool: ${remainingTools[0].toolName}`, '🔧');
+            } else {
+                showProcessingStatus('Processing...', '⏳');
+            }
+        });
+
+        connection.on('MessageEnd', (evt) => {
+            markResponseReceived();
+            trackActivity('response', currentAgentId, 'Response complete');
+            hideProcessingStatus();
+            finalizeMessage(evt || {});
+        });
+
+        connection.on('Error', (evt) => {
+            markResponseReceived();
+            trackActivity('error', currentAgentId, evt?.message || 'Error');
+            hideProcessingStatus();
+            handleError({ message: evt?.message || 'Unknown error', code: evt?.code });
+        });
+
+        // Connection lifecycle
+        connection.onreconnecting(() => {
+            setStatus('reconnecting');
+            showConnectionBanner('⚠️ Connection lost. Reconnecting...', 'warning');
+        });
+
+        connection.onreconnected(() => {
+            setStatus('connected');
+            hideConnectionBanner();
+            if (currentSessionId && currentAgentId) {
+                joinSession(currentAgentId, currentSessionId);
+            }
+        });
+
+        connection.onclose(() => {
             setStatus('disconnected');
             connectionId = null;
-            stopPing();
-            if (!shouldReconnect) return;
-            if (!connectionHadOpen && reconnectAttempts === 0) {
-                showConnectionBanner(`❌ Cannot connect to Gateway at ${currentWsUrl}. Check that the server is running.`, 'error', true);
-            } else {
-                showConnectionBanner('⚠️ Connection lost. Reconnecting...', 'warning');
-            }
-            scheduleReconnect();
-        };
+            showConnectionBanner('❌ Connection closed. Click Reconnect to retry.', 'error', true);
+        });
 
-        ws.onerror = () => {
+        startConnection();
+    }
+
+    async function startConnection() {
+        try {
+            setStatus('connecting');
+            showConnectionBanner('Connecting...', 'warning');
+            await connection.start();
+        } catch (err) {
+            console.error('SignalR connection error:', err);
             setStatus('disconnected');
-            if (!connectionHadOpen && reconnectAttempts === 0) {
-                showConnectionBanner(`❌ Cannot connect to Gateway at ${currentWsUrl}. Check that the server is running.`, 'error');
-            }
-        };
-
-        ws.onmessage = (event) => {
-            try { handleWsMessage(JSON.parse(event.data)); }
-            catch (e) { console.error('Failed to parse WS message:', e); }
-        };
-    }
-
-    function disconnectWebSocket() {
-        shouldReconnect = false;
-        stopPing();
-        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-        reconnectAttempts = 0;
-        if (ws) { ws.onclose = null; ws.close(); ws = null; }
-        isWsConnecting = false;
-        setStatus('disconnected');
-        connectionId = null;
-        lastSequenceId = 0;
-        sessionKey = null;
-        hideConnectionBanner();
-        setTimeout(() => { shouldReconnect = true; }, 0);
-    }
-
-    function scheduleReconnect() {
-        if (reconnectTimer) return;
-        if (reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
-            setStatus('disconnected');
-            showConnectionBanner('❌ Unable to reconnect after multiple attempts. Check Gateway health and reconnect manually.', 'error', true);
-            return;
-        }
-
-        const delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, reconnectAttempts), RECONNECT_MAX_MS);
-        reconnectAttempts++;
-        setStatus('reconnecting');
-        showConnectionBanner(`⚠️ Connection lost. Reconnecting in ${Math.round(delay / 1000)}s... (attempt ${reconnectAttempts}/${RECONNECT_MAX_ATTEMPTS})`, 'warning');
-        reconnectTimer = setTimeout(() => { reconnectTimer = null; connectWebSocket(); }, delay);
-    }
-
-    function startPing() {
-        stopPing();
-        pingTimer = setInterval(() => { sendWs({ type: 'ping' }); }, PING_INTERVAL_MS);
-    }
-
-    function stopPing() {
-        if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
-    }
-
-    function sendWs(obj) {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify(obj));
-        } else {
-            wsSendQueue.push(JSON.stringify(obj));
+            showConnectionBanner('❌ Cannot connect to Gateway. Check that the server is running.', 'error', true);
+            setTimeout(startConnection, 5000);
         }
     }
 
-    function flushWsSendQueue() {
-        while (wsSendQueue.length > 0 && ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(wsSendQueue.shift());
+    async function joinSession(agentId, sessionId) {
+        if (!connection || connection.state !== signalR.HubConnectionState.Connected) return;
+
+        // Leave previous session group
+        if (currentSessionId && currentSessionId !== sessionId) {
+            try { await connection.invoke('LeaveSession', currentSessionId); } catch {}
+        }
+
+        currentAgentId = agentId;
+
+        // Join new session group
+        try {
+            await connection.invoke('JoinSession', agentId, sessionId || null);
+        } catch (err) {
+            console.error('Failed to join session:', err);
+            appendSystemMessage(`Failed to join session: ${err.message}`, 'error');
         }
     }
 
@@ -506,44 +523,6 @@
         return msgCount;
     }
 
-    function switchSession(agentId, sessionId) {
-        // Clear streaming/tool state
-        activeMessageId = null;
-        activeToolCalls = {};
-        activeToolCount = 0;
-        toolCallDepth = 0;
-        thinkingBuffer = '';
-        clearResponseTimeout();
-        resetQueue();
-        removeStreamingIndicator();
-        hideProcessingStatus();
-        isStreaming = false;
-        stopToolElapsedTimer();
-
-        // Clear chat display
-        elChatMessages.innerHTML = '';
-
-        // Update state
-        currentAgentId = agentId;
-        currentSessionId = sessionId || null;
-
-        // Tell server to switch
-        sendWs({ type: 'switch_session', agentId: agentId, sessionId: sessionId || undefined });
-
-        // Update UI
-        elChatTitle.textContent = `${agentId || 'New Chat'} — WebSocket`;
-        elChatMeta.textContent = `Agent: ${agentId || 'default'} · ${sessionId ? 'Loading...' : 'Session will be created on first message'}`;
-        updateSessionIdDisplay();
-        setSendingState(false);
-        updateSendButtonState();
-        loadChatHeaderModels();
-
-        // Check if agent is currently running for this session
-        if (sessionId && agentId) {
-            checkAgentRunningStatus(agentId, sessionId);
-        }
-    }
-
     async function checkAgentRunningStatus(agentId, sessionId) {
         try {
             const status = await fetchJson(`/agents/${encodeURIComponent(agentId)}/sessions/${encodeURIComponent(sessionId)}/status`);
@@ -556,106 +535,6 @@
             }
         } catch (e) {
             // Status endpoint may 404 if no instance — that's fine
-        }
-    }
-
-    // =========================================================================
-    // WebSocket message handler
-    // =========================================================================
-
-    function handleWsMessage(msg) {
-        if (msg.sequenceId !== undefined) lastSequenceId = msg.sequenceId;
-
-        // Ignore messages from sessions other than the current one
-        // (background agent output from a session the user switched away from)
-        if (msg.sessionId && currentSessionId && msg.sessionId !== currentSessionId &&
-            msg.type !== 'connected' && msg.type !== 'session_switched' && msg.type !== 'pong' && msg.type !== 'error') {
-            return;
-        }
-
-        switch (msg.type) {
-            case 'connected':
-                connectionId = msg.connectionId;
-                if (msg.sessionId) {
-                    currentSessionId = msg.sessionId;
-                    updateSessionIdDisplay();
-                }
-                if (msg.sessionKey) sessionKey = msg.sessionKey;
-                break;
-            case 'message_start':
-                activeMessageId = msg.messageId;
-                isStreaming = true;
-                setSendingState(false);
-                activeToolCount = 0;
-                thinkingBuffer = '';
-                toolCallDepth = 0;
-                toolStartTimes = {};
-                elBtnAbort.classList.remove('hidden');
-                showStreamingIndicator();
-                showProcessingStatus('Agent is processing...', '⏳');
-                startResponseTimeout();
-                updateSendButtonState();
-                decrementQueue();
-                break;
-            case 'content_delta':
-                removeStreamingIndicator();
-                markResponseReceived();
-                autoCollapseThinking();
-                showProcessingStatus('Writing response...', '✍️');
-                appendDelta(msg.delta);
-                break;
-            case 'thinking_delta':
-                showProcessingStatus('Thinking...', '💭');
-                handleThinkingDelta(msg);
-                break;
-            case 'tool_start':
-                handleToolStart(msg);
-                showProcessingStatus(`Using tool: ${msg.toolName || 'tool'}`, '🔧');
-                trackActivity('tool', currentAgentId, `🔧 ${msg.toolName || 'tool'} started`);
-                break;
-            case 'tool_end':
-                handleToolEnd(msg);
-                // After tool ends, update stage based on remaining active tools
-                const remainingTools = Object.values(activeToolCalls).filter(t => t.status === 'running');
-                if (remainingTools.length > 0) {
-                    showProcessingStatus(`Using tool: ${remainingTools[0].toolName}`, '🔧');
-                } else {
-                    showProcessingStatus('Processing...', '⏳');
-                }
-                break;
-            case 'message_end':
-                markResponseReceived();
-                trackActivity('response', currentAgentId, 'Response complete');
-                hideProcessingStatus();
-                finalizeMessage(msg);
-                break;
-            case 'error':
-                markResponseReceived();
-                trackActivity('error', currentAgentId, msg.message || 'Error');
-                hideProcessingStatus();
-                handleError(msg);
-                break;
-            case 'session_reset':
-                currentSessionId = null;
-                updateSessionIdDisplay();
-                currentAgentId = elAgentSelect.value || currentAgentId;
-                if (currentAgentId) switchSession(currentAgentId, null);
-                loadSessions();
-                break;
-            case 'session_switched':
-                currentSessionId = msg.sessionId;
-                currentAgentId = msg.agentId;
-                updateSessionIdDisplay();
-                elChatTitle.textContent = `${msg.agentId || 'Chat'} — WebSocket`;
-                elChatMeta.textContent = `Agent: ${msg.agentId || 'unknown'} · Session: ${msg.sessionId?.substring(0, 8) || 'new'}`;
-                loadSessions();
-                break;
-            case 'reconnect_ack':
-                if (msg.sessionKey) sessionKey = msg.sessionKey;
-                if (msg.lastSeqId !== undefined) lastSequenceId = msg.lastSeqId;
-                break;
-            case 'pong':
-                break;
         }
     }
 
@@ -797,10 +676,12 @@
     // =========================================================================
 
     function manualReconnect() {
-        reconnectAttempts = 0;
-        connectionHadOpen = false;
         hideConnectionBanner();
-        connectWebSocket();
+        if (connection) {
+            connection.stop().then(() => startConnection()).catch(() => startConnection());
+        } else {
+            initSignalR();
+        }
     }
 
     // =========================================================================
@@ -1235,30 +1116,20 @@
     }
 
     async function executeReset(commandType = 'reset') {
-        const previousSessionId = currentSessionId;
-        const canResetViaWebSocket = !!(previousSessionId && ws && ws.readyState === WebSocket.OPEN);
-
         clearChatForSessionReset();
         appendSystemMessage('Session reset. System prompt regenerated.');
 
-        if (canResetViaWebSocket) {
-            currentSessionId = null;
-            updateSessionIdDisplay();
-            sendWs({ type: commandType });
-            loadSessions();
-            return;
-        }
-
-        if (previousSessionId) {
+        if (currentAgentId && currentSessionId && connection?.state === signalR.HubConnectionState.Connected) {
             try {
-                await fetch(`${API_BASE}/sessions/${encodeURIComponent(previousSessionId)}`, { method: 'DELETE' });
-            } catch (e) {
-                console.warn('Failed to delete previous session during reset:', e);
+                await connection.invoke('ResetSession', currentAgentId, currentSessionId);
+            } catch (err) {
+                console.warn('Failed to reset session via SignalR:', err);
             }
         }
 
+        currentSessionId = null;
+        updateSessionIdDisplay();
         currentAgentId = elAgentSelect.value || currentAgentId;
-        if (currentAgentId) switchSession(currentAgentId, null);
         loadSessions();
     }
 
@@ -1275,7 +1146,7 @@
         isStreaming = false;
         setSendingState(false);
         elChatMessages.innerHTML = '';
-        elChatTitle.textContent = `${elAgentSelect.value || 'New Chat'} — WebSocket`;        elChatMeta.textContent = `Agent: ${elAgentSelect.value || 'default'} · Session will be created on first message`;
+        elChatTitle.textContent = `${elAgentSelect.value || 'New Chat'} — SignalR`;        elChatMeta.textContent = `Agent: ${elAgentSelect.value || 'default'} · Session will be created on first message`;
         elSessionIdDisplay.classList.add('hidden');
         elAgentSelect.classList.remove('hidden');
     }
@@ -1333,9 +1204,9 @@
     // Chat actions
     // =========================================================================
 
-    function sendMessage() {
+    async function sendMessage() {
         const text = elChatInput.value.trim();
-        if (!text) return;
+        if (!text || !currentAgentId) return;
 
         // Intercept slash commands
         if (text.startsWith('/')) {
@@ -1355,18 +1226,31 @@
         autoResize(elChatInput);
         updateSendButtonState();
 
-        if (isStreaming && ws && ws.readyState === WebSocket.OPEN) {
+        if (!currentSessionId) {
+            // First message — join will create the session
+            await joinSession(currentAgentId, null);
+        }
+
+        if (isStreaming && connection?.state === signalR.HubConnectionState.Connected) {
             if (sendModeFollowUp) {
-                sendWs({ type: 'follow_up', content: text });
-                showFollowUpIndicator();
                 pendingQueuedMessages.push(text);
-                trackActivity('message', currentAgentId, `Follow-up: ${text.substring(0, 60)}`);
                 incrementQueue();
+                showFollowUpIndicator();
+                trackActivity('message', currentAgentId, `Follow-up: ${text.substring(0, 60)}`);
+                try {
+                    await connection.invoke('FollowUp', currentAgentId, currentSessionId, text);
+                } catch (err) {
+                    appendSystemMessage(`Failed to queue: ${err.message}`, 'error');
+                }
             } else {
-                sendWs({ type: 'steer', content: text });
-                showSteerIndicator();
                 appendSystemMessage(`🧭 Steering: ${text}`);
+                showSteerIndicator();
                 trackActivity('message', currentAgentId, `Steer: ${text.substring(0, 60)}`);
+                try {
+                    await connection.invoke('Steer', currentAgentId, currentSessionId, text);
+                } catch (err) {
+                    appendSystemMessage(`Failed to steer: ${err.message}`, 'error');
+                }
             }
             return;
         }
@@ -1378,57 +1262,19 @@
         incrementQueue();
         startResponseTimeout();
 
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            sendWs({ type: 'message', content: text });
-        } else {
-            sendViaRest(text);
-        }
-    }
-
-    async function sendViaRest(text) {
-        showStreamingIndicator();
-        const body = { agentId: currentAgentId || (elAgentSelect.value || undefined), message: text };
-        if (currentSessionId) body.sessionId = currentSessionId;
-
         try {
-            const res = await fetch(`${API_BASE}/chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            removeStreamingIndicator();
-            markResponseReceived();
-            if (res.ok) {
-                const data = await res.json();
-                if (data.sessionId) currentSessionId = data.sessionId;
-                if (data.content) appendChatMessage('assistant', data.content);
-                if (data.usage) {
-                    const usageStr = formatUsage(data.usage);
-                    if (usageStr) {
-                        const badge = document.createElement('div');
-                        badge.className = 'msg-footer';
-                        badge.textContent = usageStr;
-                        const last = elChatMessages.lastElementChild;
-                        if (last) last.appendChild(badge);
-                    }
-                }
-                loadSessions();
-            } else {
-                appendErrorMessage(`❌ ${res.status} — ${await res.text()}`);
-            }
-        } catch (e) {
-            removeStreamingIndicator();
-            appendErrorMessage(`❌ Connection error: ${e.message}`);
-        } finally {
+            await connection.invoke('SendMessage', currentAgentId, currentSessionId, text);
+        } catch (err) {
+            appendSystemMessage(`Error: ${err.message}`, 'error');
             isStreaming = false;
-            clearResponseTimeout();
             setSendingState(false);
-            removeStreamingIndicator();
         }
     }
 
-    function abortRequest() {
-        sendWs({ type: 'abort' });
+    async function abortRequest() {
+        if (currentAgentId && currentSessionId && connection?.state === signalR.HubConnectionState.Connected) {
+            try { await connection.invoke('Abort', currentAgentId, currentSessionId); } catch {}
+        }
         isStreaming = false;
         clearResponseTimeout();
         stopToolElapsedTimer();
@@ -1445,14 +1291,22 @@
         const agentId = elAgentSelect.value || null;
         if (!agentId) return;
 
-        // Switch session — no disconnect
-        switchSession(agentId, null);
+        elChatMessages.innerHTML = '';
+        currentSessionId = null;
+        isStreaming = false;
+        resetQueue();
 
         elWelcome.classList.add('hidden');
         elChatView.classList.remove('hidden');
+        elChatTitle.textContent = `${agentId} — SignalR`;
+        elChatMeta.textContent = `Agent: ${agentId} · Session will be created on first message`;
         elAgentSelect.classList.remove('hidden');
-        elSessionsList.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
+
+        currentAgentId = agentId;
+        updateSessionIdDisplay();
+        loadChatHeaderModels();
         loadSessions();
+        elSessionsList.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
         elChatInput.focus();
     }
 
@@ -1544,7 +1398,7 @@
             const channelsDiv = document.createElement('div');
             channelsDiv.className = 'agent-group-channels';
 
-            // Always show WebSocket channel
+            // Always show channel entry
             const agentSessions = (sessionsByAgent[agentId] || []).sort((a, b) =>
                 new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0)
             );
@@ -1556,7 +1410,7 @@
             channelEl.dataset.agentId = agentId;
 
             const timeStr = latestSession ? relativeTime(latestSession.updatedAt || latestSession.createdAt) : 'No sessions';
-            const channelType = latestSession?.channelType || 'WebSocket';
+            const channelType = latestSession?.channelType || 'SignalR';
             const emoji = channelEmoji(channelType);
             const isActive = latestSession && latestSession.sessionId === currentSessionId;
 
@@ -1613,8 +1467,10 @@
     }
 
     async function openSession(sessionId, agentId) {
-        // Switch session on existing connection
-        switchSession(agentId, sessionId);
+        elChatMessages.innerHTML = '';
+
+        // Join the session group
+        await joinSession(agentId, sessionId);
 
         elSessionsList.querySelectorAll('.list-item').forEach(el => {
             el.classList.toggle('active', el.dataset.sessionId === sessionId);
@@ -1630,7 +1486,7 @@
         const session = await fetchJson(`/sessions/${encodeURIComponent(sessionId)}`);
 
         // Set title after session data is available
-        const channelType = session?.channelType || 'WebSocket';
+        const channelType = session?.channelType || 'SignalR';
         elChatTitle.textContent = agentId ? `${agentId} — ${channelType}` : 'Chat';
 
         elChatMessages.innerHTML = '';
@@ -1664,6 +1520,9 @@
                 for (const entry of recent) renderHistoryEntry(entry);
             }
         }
+
+        // Check if agent is running
+        checkAgentRunningStatus(agentId, sessionId);
 
         scrollToBottom();
         elChatInput.focus();
@@ -1736,7 +1595,7 @@
     const CHANNELS_REFRESH_MS = 30000;
 
     function channelEmoji(name) {
-        const map = { websocket: '🌐', telegram: '✈️', discord: '🎮', slack: '💼', tui: '🖥️' };
+        const map = { websocket: '🌐', signalr: '🌐', telegram: '✈️', discord: '🎮', slack: '💼', tui: '🖥️' };
         return map[(name || '').toLowerCase()] || '📡';
     }
 
@@ -1942,7 +1801,7 @@
             html += `<table class="debug-table">`;
             html += `<tr><td>Session ID</td><td><code>${escapeHtml(currentSessionId)}</code></td></tr>`;
             html += `<tr><td>Connection ID</td><td><code>${escapeHtml(connectionId || 'none')}</code></td></tr>`;
-            html += `<tr><td>WebSocket</td><td>${ws && ws.readyState === WebSocket.OPEN ? '🟢 Connected' : '🔴 Disconnected'}</td></tr>`;
+            html += `<tr><td>SignalR</td><td>${connection?.state === signalR.HubConnectionState.Connected ? '🟢 Connected' : '🔴 Disconnected'}</td></tr>`;
             html += `<tr><td>Streaming</td><td>${isStreaming ? '⏳ Yes' : 'No'}</td></tr>`;
             html += `</table></div>`;
 
@@ -1995,9 +1854,7 @@
         const btnReset = body.querySelector('#debug-btn-reset');
         if (btnReset) btnReset.addEventListener('click', () => {
             closeDebugModal();
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                sendWs({ type: 'message', message: '/reset' });
-            }
+            executeReset();
         });
 
         const btnCopy = body.querySelector('#debug-btn-copy-sid');
@@ -2426,13 +2283,13 @@
                 showConfirm(
                     `Switch to agent "${newAgent}"? This will start a new session.`,
                     'Switch Agent',
-                    () => switchSession(newAgent, null),
+                    () => { elAgentSelect.value = newAgent; startNewChat(); },
                     'Switch'
                 );
                 elAgentSelect.value = currentAgentId;
                 return;
             }
-            switchSession(newAgent, null);
+            startNewChat();
         });
 
         elToggleTools.addEventListener('change', toggleToolVisibility);
@@ -2603,8 +2460,8 @@
         startHealthCheck();
         setStatus('online');
         updateSendButtonState();
-        // Connect WebSocket once on page load
-        connectWebSocket();
+        // Initialize SignalR (replaces connectWebSocket)
+        initSignalR();
         // Collapse sidebar on mobile by default
         if (window.innerWidth <= 768) {
             elSidebar.classList.add('collapsed');
