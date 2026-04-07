@@ -5,6 +5,7 @@ using BotNexus.Channels.WebSocket;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Api.WebSocket;
 using BotNexus.Gateway.Sessions;
 using FluentAssertions;
@@ -419,14 +420,15 @@ public sealed class GatewayWebSocketHandlerTests
         payloads.Any(payload => HasStringProperty(payload, "type", "session_reset")).Should().BeTrue();
     }
 
-    [Fact(Skip = "Deadlocks after single-connection refactor — duplicate session handling changed to error response")]
+    [Fact]
     public async Task HandleAsync_WithDuplicateSessionConnection_ClosesSecondSocket()
     {
-        var handler = CreateHandler();
+        var store = new BlockingGetOrCreateSessionStore();
+        var handler = CreateHandler(sessions: store);
 
         var firstContext = new DefaultHttpContext();
         firstContext.Request.QueryString = new QueryString("?agent=agent-a&session=session-123");
-        var firstSocket = new BlockingWebSocket();
+        var firstSocket = new TestWebSocket();
         firstContext.Features.Set<IHttpWebSocketFeature>(new TestWebSocketFeature
         {
             IsWebSocketRequest = true,
@@ -435,7 +437,7 @@ public sealed class GatewayWebSocketHandlerTests
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var firstConnectionTask = handler.HandleAsync(firstContext, cts.Token);
-        await firstSocket.ReceiveStarted.Task.WaitAsync(cts.Token);
+        await store.WaitUntilBlockedAsync(cts.Token);
 
         var secondContext = new DefaultHttpContext();
         secondContext.Request.QueryString = new QueryString("?agent=agent-a&session=session-123");
@@ -453,7 +455,62 @@ public sealed class GatewayWebSocketHandlerTests
         secondPayloads.Any(payload => HasStringProperty(payload, "type", "error") && HasStringProperty(payload, "code", "SESSION_ALREADY_CONNECTED"))
             .Should().BeTrue();
 
-        firstSocket.AllowClose();
+        store.Release();
+        await firstConnectionTask;
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithSwitchSessionMessage_SwitchesToNewSession()
+    {
+        var context = new DefaultHttpContext();
+        var socket = new TestWebSocket();
+        socket.QueueIncomingText("""{"type":"switch_session","agentId":"agent-a","sessionId":"session-xyz"}""");
+        context.Features.Set<IHttpWebSocketFeature>(new TestWebSocketFeature
+        {
+            IsWebSocketRequest = true,
+            Socket = socket
+        });
+        var handler = CreateHandler();
+
+        await handler.HandleAsync(context, CancellationToken.None);
+
+        var payloads = ParsePayloads(socket.SentMessages);
+        payloads.Any(payload => HasStringProperty(payload, "type", "connected")).Should().BeTrue();
+        payloads.Any(payload =>
+            HasStringProperty(payload, "type", "session_switched") &&
+            HasStringProperty(payload, "sessionId", "session-xyz") &&
+            HasStringProperty(payload, "agentId", "agent-a"))
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithSwitchSessionToActiveSession_ReturnsError()
+    {
+        var store = new BlockingGetOrCreateSessionStore();
+        var handler = CreateHandler(sessions: store);
+
+        var firstContext = new DefaultHttpContext();
+        firstContext.Request.QueryString = new QueryString("?agent=agent-a&session=session-123");
+        var firstSocket = new TestWebSocket();
+        firstContext.Features.Set<IHttpWebSocketFeature>(new TestWebSocketFeature { IsWebSocketRequest = true, Socket = firstSocket });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var firstConnectionTask = handler.HandleAsync(firstContext, cts.Token);
+        await store.WaitUntilBlockedAsync(cts.Token);
+
+        var secondContext = new DefaultHttpContext();
+        var secondSocket = new TestWebSocket();
+        secondSocket.QueueIncomingText("""{"type":"switch_session","agentId":"agent-a","sessionId":"session-123"}""");
+        secondContext.Features.Set<IHttpWebSocketFeature>(new TestWebSocketFeature { IsWebSocketRequest = true, Socket = secondSocket });
+
+        await handler.HandleAsync(secondContext, cts.Token);
+
+        var secondPayloads = ParsePayloads(secondSocket.SentMessages);
+        secondPayloads.Any(payload => HasStringProperty(payload, "type", "error") && HasStringProperty(payload, "code", "SESSION_ALREADY_CONNECTED"))
+            .Should().BeTrue();
+        secondSocket.LastCloseStatus.Should().NotBe((WebSocketCloseStatus)4409);
+
+        store.Release();
         await firstConnectionTask;
     }
 
@@ -474,7 +531,7 @@ public sealed class GatewayWebSocketHandlerTests
     private static GatewayWebSocketHandler CreateHandler(
         IAgentSupervisor? supervisor = null,
         WebSocketChannelAdapter? channelAdapter = null,
-        InMemorySessionStore? sessions = null,
+        ISessionStore? sessions = null,
         IOptions<GatewayWebSocketOptions>? options = null)
     {
         var resolvedOptions = options ?? Options.Create(new GatewayWebSocketOptions());
@@ -593,47 +650,40 @@ public sealed class GatewayWebSocketHandlerTests
             => _state = WebSocketState.Closed;
     }
 
-    private sealed class BlockingWebSocket : WebSocket
+    private sealed class BlockingGetOrCreateSessionStore : ISessionStore
     {
-        private WebSocketState _state = WebSocketState.Open;
-        private readonly TaskCompletionSource _allowClose = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly InMemorySessionStore _inner = new();
+        private readonly TaskCompletionSource<bool> _blocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _shouldBlock = 1;
 
-        public TaskCompletionSource<bool> ReceiveStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task WaitUntilBlockedAsync(CancellationToken cancellationToken)
+            => _blocked.Task.WaitAsync(cancellationToken);
 
-        public void AllowClose() => _allowClose.TrySetResult();
+        public void Release()
+            => _release.TrySetResult(true);
 
-        public override WebSocketCloseStatus? CloseStatus => null;
-        public override string? CloseStatusDescription => null;
-        public override WebSocketState State => _state;
-        public override string? SubProtocol => null;
+        public Task<GatewaySession?> GetAsync(string sessionId, CancellationToken cancellationToken = default)
+            => _inner.GetAsync(sessionId, cancellationToken);
 
-        public override void Abort()
-            => _state = WebSocketState.Aborted;
-
-        public override Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
+        public async Task<GatewaySession> GetOrCreateAsync(string sessionId, string agentId, CancellationToken cancellationToken = default)
         {
-            _state = WebSocketState.Closed;
-            return Task.CompletedTask;
+            if (Interlocked.Exchange(ref _shouldBlock, 0) == 1)
+            {
+                _blocked.TrySetResult(true);
+                await _release.Task.WaitAsync(cancellationToken);
+            }
+
+            return await _inner.GetOrCreateAsync(sessionId, agentId, cancellationToken);
         }
 
-        public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
-        {
-            _state = WebSocketState.CloseSent;
-            return Task.CompletedTask;
-        }
+        public Task SaveAsync(GatewaySession session, CancellationToken cancellationToken = default)
+            => _inner.SaveAsync(session, cancellationToken);
 
-        public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
-        {
-            ReceiveStarted.TrySetResult(true);
-            await _allowClose.Task.WaitAsync(cancellationToken);
-            _state = WebSocketState.CloseReceived;
-            return new WebSocketReceiveResult(0, WebSocketMessageType.Close, true);
-        }
+        public Task DeleteAsync(string sessionId, CancellationToken cancellationToken = default)
+            => _inner.DeleteAsync(sessionId, cancellationToken);
 
-        public override Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
-            => Task.CompletedTask;
-
-        public override void Dispose()
-            => _state = WebSocketState.Closed;
+        public Task<IReadOnlyList<GatewaySession>> ListAsync(string? agentId = null, CancellationToken cancellationToken = default)
+            => _inner.ListAsync(agentId, cancellationToken);
     }
 }
