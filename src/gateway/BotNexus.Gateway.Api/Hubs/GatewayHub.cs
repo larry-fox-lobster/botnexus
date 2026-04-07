@@ -35,19 +35,22 @@ public sealed class GatewayHub : Hub
         _activity = activity;
     }
 
-    public async Task JoinSession(string agentId, string? sessionId)
+    public async Task<object> JoinSession(string agentId, string? sessionId)
     {
         sessionId ??= Guid.NewGuid().ToString("N");
         await Groups.AddToGroupAsync(Context.ConnectionId, GetSessionGroup(sessionId));
 
         var session = await _sessions.GetOrCreateAsync(sessionId, agentId, Context.ConnectionAborted);
-        await Clients.Caller.SendAsync("SessionJoined", new
+        var result = new
         {
             sessionId,
             agentId,
             connectionId = Context.ConnectionId,
             messageCount = session.History.Count
-        });
+        };
+
+        await Clients.Caller.SendAsync("SessionJoined", result);
+        return result;
     }
 
     public Task LeaveSession(string sessionId)

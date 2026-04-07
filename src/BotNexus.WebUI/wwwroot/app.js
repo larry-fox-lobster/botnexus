@@ -523,7 +523,10 @@
     }
 
     async function joinSession(agentId, sessionId) {
-        if (!connection || connection.state !== signalR.HubConnectionState.Connected) return;
+        if (!connection || connection.state !== signalR.HubConnectionState.Connected) {
+            debugLog('session', 'Cannot join — not connected');
+            return;
+        }
 
         // Leave previous session group
         if (currentSessionId && currentSessionId !== sessionId) {
@@ -532,11 +535,17 @@
 
         currentAgentId = agentId;
 
-        // Join new session group
+        // Join new session group — server returns session data
         try {
-            await hubInvoke('JoinSession', agentId, sessionId || null);
+            const result = await hubInvoke('JoinSession', agentId, sessionId || null);
+            // Set session ID immediately from return value if available
+            if (result?.sessionId) {
+                currentSessionId = result.sessionId;
+                debugLog('session', 'Joined session:', currentSessionId);
+                updateSessionIdDisplay();
+            }
         } catch (err) {
-            console.error('Failed to join session:', err);
+            debugLog('session', 'Join failed:', err.message);
             appendSystemMessage(`Failed to join session: ${err.message}`, 'error');
         }
     }
