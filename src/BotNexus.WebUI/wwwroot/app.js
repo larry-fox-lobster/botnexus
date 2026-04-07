@@ -385,8 +385,14 @@
         }
     }
 
-    // Client version from meta tag — sent to server for debugging
-    const CLIENT_VERSION = document.querySelector('meta[name="botnexus-version"]')?.content || 'unknown';
+    // Client version — fetched from server build timestamp
+    let CLIENT_VERSION = 'loading';
+    fetch('/api/version').then(r => r.json()).then(d => {
+        CLIENT_VERSION = d.version || 'unknown';
+        debugLog('init', `Client version: ${CLIENT_VERSION}`);
+        const meta = document.querySelector('meta[name="botnexus-version"]');
+        if (meta) meta.content = CLIENT_VERSION;
+    }).catch(() => { CLIENT_VERSION = 'unknown'; });
 
     // Post client logs to server for unified debugging
     function serverLog(level, message, data) {

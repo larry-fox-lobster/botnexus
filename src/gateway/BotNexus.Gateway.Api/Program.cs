@@ -170,6 +170,12 @@ app.UseSwaggerUI();
 app.MapControllers();
 app.MapHub<GatewayHub>("/hub/gateway");
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/api/version", () =>
+{
+    var assembly = typeof(Program).Assembly;
+    var buildTime = File.GetLastWriteTimeUtc(assembly.Location).ToString("yyyyMMddHHmmss");
+    return Results.Ok(new { version = buildTime });
+});
 app.MapFallbackToFile("index.html");
 
 app.Run();
