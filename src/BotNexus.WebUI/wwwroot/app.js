@@ -49,6 +49,8 @@
     let confirmCallback = null;
     /** @type {number} */
     let messageQueueCount = 0;
+    /** @type {Array<string>} */
+    let pendingQueuedMessages = [];
     /** @type {number} */
     let toolCallDepth = 0;
     /** @type {boolean} */
@@ -685,11 +687,16 @@
 
     function decrementQueue() {
         if (messageQueueCount > 0) messageQueueCount--;
+        if (pendingQueuedMessages.length > 0) {
+            const queuedText = pendingQueuedMessages.shift();
+            appendChatMessage('user', queuedText);
+        }
         updateQueueDisplay();
     }
 
     function resetQueue() {
         messageQueueCount = 0;
+        pendingQueuedMessages = [];
         updateQueueDisplay();
     }
 
@@ -1271,7 +1278,7 @@
             if (sendModeFollowUp) {
                 sendWs({ type: 'follow_up', content: text });
                 showFollowUpIndicator();
-                appendSystemMessage(`📨 Follow-up queued: ${text}`);
+                pendingQueuedMessages.push(text);
                 trackActivity('message', currentAgentId, `Follow-up: ${text.substring(0, 60)}`);
                 incrementQueue();
             } else {
