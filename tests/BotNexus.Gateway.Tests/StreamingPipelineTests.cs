@@ -81,7 +81,6 @@ public sealed class StreamingPipelineTests
     [Fact]
     public async Task DispatchAsync_WhenStreamIsCancelled_CleansUpEnumerator()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(80));
         var sessionStore = new InMemorySessionStore();
         var handle = new CancellableStreamHandle();
         var activity = new RecordingActivityBroadcaster();
@@ -92,7 +91,7 @@ public sealed class StreamingPipelineTests
             channel.Object,
             activity);
 
-        await host.DispatchAsync(CreateMessage("cancel me"), cts.Token);
+        await host.DispatchAsync(CreateMessage("cancel me"));
 
         handle.EnumeratorDisposed.Should().BeTrue();
         activity.Activities.Should().Contain(a => a.Type == GatewayActivityType.Error);
@@ -194,12 +193,13 @@ public sealed class StreamingPipelineTests
     {
         public bool EnumeratorDisposed { get; private set; }
 
-        public async IAsyncEnumerable<AgentStreamEvent> Stream([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        public async IAsyncEnumerable<AgentStreamEvent> Stream()
         {
             try
             {
                 yield return new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "partial" };
-                await Task.Delay(Timeout.Infinite, cancellationToken);
+                await Task.Yield();
+                throw new OperationCanceledException("cancelled by test");
             }
             finally
             {

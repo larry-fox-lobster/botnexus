@@ -870,7 +870,7 @@ src/gateway/
 │   │   ├── SessionsController.cs
 │   │   └── ConfigController.cs
 │   ├── WebSocket/
-│   │   └── GatewayWebSocketHandler.cs # Session locking (4409)
+│   │   └── GatewayHub.cs              # SignalR hub + session groups
 │   └── wwwroot/
 │       ├── index.html
 │       ├── app.js

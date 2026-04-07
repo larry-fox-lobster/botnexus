@@ -16,7 +16,7 @@ public sealed class GatewaySession
     /// <summary>The agent this session is bound to.</summary>
     public required string AgentId { get; set; }
 
-    /// <summary>The channel this session originated from (e.g., "websocket", "telegram").</summary>
+    /// <summary>The channel this session originated from (e.g., "signalr", "telegram").</summary>
     public string? ChannelType { get; set; }
 
     /// <summary>Caller-specific identifier within the channel (e.g., user ID, chat ID).</summary>

@@ -24,8 +24,8 @@ public sealed class ChannelsControllerTests
     public void List_WithRegisteredAdapter_ReturnsMappedAdapterDto()
     {
         var controller = CreateController(CreateAdapter(
-            channelType: "websocket",
-            displayName: "WebSocket",
+            channelType: "signalr",
+            displayName: "SignalR",
             isRunning: true,
             supportsStreaming: true,
             supportsSteering: true,
@@ -39,8 +39,8 @@ public sealed class ChannelsControllerTests
         payload.Should().NotBeNull();
         payload!.Should().ContainSingle();
         payload[0].Should().BeEquivalentTo(new ChannelAdapterResponse(
-            Name: "websocket",
-            DisplayName: "WebSocket",
+            Name: "signalr",
+            DisplayName: "SignalR",
             IsRunning: true,
             SupportsStreaming: true,
             SupportsSteering: true,
@@ -53,7 +53,7 @@ public sealed class ChannelsControllerTests
     public void List_WithMultipleAdapters_ReturnsAllInRegistrationOrder()
     {
         var controller = CreateController(
-            CreateAdapter("websocket", "WebSocket", true, true, true, false, true, false),
+            CreateAdapter("signalr", "SignalR", true, true, true, false, true, false),
             CreateAdapter("telegram", "Telegram", false, false, false, true, false, true));
 
         var result = controller.List();
@@ -61,7 +61,7 @@ public sealed class ChannelsControllerTests
         var payload = (result.Result as OkObjectResult)?.Value as IReadOnlyList<ChannelAdapterResponse>;
         payload.Should().NotBeNull();
         payload!.Should().HaveCount(2);
-        payload.Select(item => item.Name).Should().ContainInOrder("websocket", "telegram");
+        payload.Select(item => item.Name).Should().ContainInOrder("signalr", "telegram");
     }
 
     [Theory]

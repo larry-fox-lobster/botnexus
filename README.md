@@ -8,7 +8,7 @@ A modular, extensible AI agent execution platform built in C#/.NET. BotNexus ena
 |-------|----------|
 | **[Getting Started →](docs/getting-started.md)** | First-time users — clone to running in minutes |
 | **[Developer Guide →](docs/dev-guide.md)** | Developers and agents — build, test, run locally |
-| **[API Reference →](docs/api-reference.md)** | REST and WebSocket endpoint documentation |
+| **[API Reference →](docs/api-reference.md)** | REST and SignalR endpoint documentation |
 | **[Architecture →](docs/architecture/overview.md)** | System design, components, and extension points |
 | **[Observability →](docs/observability.md)** | Distributed tracing, logging, and local Jaeger setup |
 
@@ -17,7 +17,7 @@ A modular, extensible AI agent execution platform built in C#/.NET. BotNexus ena
 ## Key Features
 
 - **Multi-Agent** — Run multiple agents with independent configs (model, provider, system prompt, tools)
-- **Multi-Channel** — Discord, Slack, Telegram, WebSocket, and REST API
+- **Multi-Channel** — Discord, Slack, Telegram, SignalR, and REST API
 - **Multi-Provider** — GitHub Copilot (26 models: Claude, GPT, GPT-5, Gemini, Grok via model-aware routing), OpenAI, Anthropic, Azure OpenAI
 - **Model-Aware Routing** — Each model defines its API format (Anthropic Messages, OpenAI Completions, OpenAI Responses); requests route to the correct handler automatically
 - **Extensible** — Dynamic assembly loading with folder-based extension system
@@ -42,7 +42,7 @@ A modular, extensible AI agent execution platform built in C#/.NET. BotNexus ena
 The **BotNexus Gateway** is the central hub for multi-agent orchestration. It provides:
 
 - **REST API** — Agents, sessions, chat, configuration endpoints
-- **WebSocket** — Real-time streaming with agents
+- **SignalR** — Real-time streaming with agents
 - **Multi-agent routing** — Route messages to different agents by ID
 - **Session persistence** — Durable conversation history (JSONL)
 - **Hot reload** — Edit `config.json` and changes apply live (no restart)
@@ -113,37 +113,31 @@ Edit `~/.botnexus/config.json` to configure:
 | `/api/sessions` | GET | List sessions |
 | `/api/sessions/{id}` | GET | Get session history |
 | `/api/sessions/{id}` | DELETE | Delete a session |
-| `/ws` | WebSocket | Real-time streaming with agents |
+| `/hub/gateway` | SignalR Hub | Real-time streaming with agents |
 | `/webui` | GET | Interactive WebUI dashboard |
 
-### WebSocket Protocol
+### SignalR Hub
 
-Connect to `ws://localhost:5005/ws?agent={agentId}&session={sessionId}` for real-time streaming.
+Connect to `http://localhost:5005/hub/gateway` with a SignalR client.
 
-**Client → Server message types:**
-- `{ "type": "message", "content": "..." }` — Send message to agent
-- `{ "type": "abort" }` — Abort current execution
-- `{ "type": "steer", "content": "..." }` — Inject steering message
-- `{ "type": "follow_up", "content": "..." }` — Queue follow-up
-- `{ "type": "ping" }` — Keepalive
+**Hub methods:**
+- `JoinSession(agentId, sessionId?)`
+- `SendMessage(agentId, sessionId, content)`
+- `Steer(agentId, sessionId, content)`
+- `Abort(agentId, sessionId)`
+- `ResetSession(agentId, sessionId)`
 
-**Server → Client message types:**
-- `{ "type": "connected", "connectionId": "...", "sessionId": "..." }` — Connection established
-- `{ "type": "message_start", "messageId": "..." }` — Agent started processing
-- `{ "type": "thinking_delta", "delta": "...", "messageId": "..." }` — Thinking/reasoning content
-- `{ "type": "content_delta", "delta": "..." }` — Streaming content chunk
-- `{ "type": "tool_start", "toolCallId": "...", "toolName": "..." }` — Tool execution started
-- `{ "type": "tool_end", "toolCallId": "...", "toolName": "...", "toolResult": "...", "toolIsError": false }` — Tool result received
-- `{ "type": "message_end", "messageId": "...", "usage": {...} }` — Agent completed
-- `{ "type": "error", "message": "...", "code": "..." }` — Error occurred
-- `{ "type": "pong" }` — Keepalive response
+**Server events:**
+- `Connected`
+- `SessionJoined`
+- `MessageStart`, `ThinkingDelta`, `ContentDelta`, `ToolStart`, `ToolEnd`, `MessageEnd`, `Error`
 
 ### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Gateway.Api (ASP.NET)                │
-│  [REST Controllers] [WebSocket Handler] [WebUI Files]   │
+│   [REST Controllers] [SignalR Hub] [WebUI Files]        │
 └────────────┬──────────────────────────────┬─────────────┘
              │                              │
         Message Bus                  Session Persistence
@@ -225,7 +219,7 @@ On first run, BotNexus creates `~/.botnexus/` with a default `config.json`. Edit
 | **Core** | 14 interface contracts, configuration, extension loading |
 | **Cli** | `botnexus` command-line tool — config, agents, providers, doctor, Gateway lifecycle |
 | **Diagnostics** | 13 health checkups with auto-fix, used by CLI doctor and `/api/doctor` endpoint |
-| **Channels** | Discord, Slack, Telegram, WebSocket implementations |
+| **Channels** | Discord, Slack, Telegram, SignalR implementations |
 | **Providers** | Copilot (OAuth, model-aware routing), OpenAI, Anthropic LLM backends |
 | **Session** | JSONL-based conversation persistence |
 | **WebUI** | Real-time activity monitoring dashboard |
@@ -265,7 +259,7 @@ See [Architecture Guide](docs/architecture.md#provider-architecture-pi-style) an
 
 - **[Getting Started](docs/getting-started.md)** ← Start here
 - [Developer Guide](docs/dev-guide.md) — Build, test, and run locally
-- [API Reference](docs/api-reference.md) — REST and WebSocket endpoints
+- [API Reference](docs/api-reference.md) — REST and SignalR endpoints
 - [Architecture Overview](docs/architecture/overview.md) — System design and components
 - [Developer Guide](docs/dev-guide.md) — Build, test, and deploy with dev-loop script
 - [Configuration Guide](docs/configuration.md) — Complete configuration reference
@@ -279,7 +273,7 @@ See [Architecture Guide](docs/architecture.md#provider-architecture-pi-style) an
 ```
 src/
 ├── BotNexus.Core          # Abstractions, config, extension loader
-├── BotNexus.Gateway       # Main host, agent router, WebSocket, hot reload
+├── BotNexus.Gateway       # Main host, agent router, SignalR routing, hot reload
 ├── BotNexus.Cli           # CLI tool (botnexus command)
 ├── BotNexus.Diagnostics   # Health checkups (doctor) with auto-fix
 ├── BotNexus.Api           # OpenAI-compatible REST API

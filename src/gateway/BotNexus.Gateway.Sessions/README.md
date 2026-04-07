@@ -40,7 +40,7 @@ Each line is a serialized `SessionEntry`:
 ```json
 {
   "agentId": "coding-agent",
-  "channelType": "websocket",
+  "channelType": "signalr",
   "callerId": "user-123",
   "createdAt": "2026-04-05T10:00:00+00:00",
   "updatedAt": "2026-04-05T10:05:00+00:00"

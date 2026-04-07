@@ -510,7 +510,7 @@ X-Api-Key: your-api-key
 
 ## Channels Management
 
-> **Added in Wave 1.** Channels are adapter plugins that connect BotNexus to external surfaces (WebSocket, Telegram, TUI, etc.).
+> **Added in Wave 1.** Channels are adapter plugins that connect BotNexus to external surfaces (SignalR, Telegram, TUI, etc.).
 
 ### List Channel Adapters
 
@@ -528,8 +528,8 @@ X-Api-Key: your-api-key
 ```json
 [
   {
-    "name": "websocket",
-    "displayName": "WebSocket",
+    "name": "signalr",
+    "displayName": "SignalR",
     "isRunning": true,
     "supportsStreaming": true,
     "supportsSteering": true,
@@ -554,7 +554,7 @@ X-Api-Key: your-api-key
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `name` | string | Channel type identifier (e.g., `"websocket"`, `"telegram"`, `"tui"`) |
+| `name` | string | Channel type identifier (e.g., `"signalr"`, `"telegram"`, `"tui"`) |
 | `displayName` | string | Human-readable channel name |
 | `isRunning` | boolean | Whether the adapter is currently active |
 | `supportsStreaming` | boolean | Whether the adapter supports streamed content deltas |
@@ -620,7 +620,7 @@ X-Api-Key: your-api-key
 
 **Endpoint:** `POST /api/chat`
 
-**Description:** Send a message to an agent and receive the complete response (non-streaming). For real-time streaming, use the WebSocket endpoint at `/ws`.
+**Description:** Send a message to an agent and receive the complete response (non-streaming). For real-time streaming, use the SignalR hub at `/hub/gateway`.
 
 **Request Body:**
 ```json
@@ -760,7 +760,7 @@ X-Api-Key: your-api-key
   {
     "sessionId": "abc123",
     "agentId": "assistant",
-    "channelType": "websocket",
+    "channelType": "signalr",
     "callerId": "user-1",
     "status": "Active",
     "createdAt": "2026-01-15T10:30:00Z",
@@ -1516,7 +1516,7 @@ ws://localhost:5005/ws/activity?agent={agentFilter}
   "type": "AgentProcessing",
   "agentId": "assistant",
   "sessionId": "abc123",
-  "channelType": "websocket",
+  "channelType": "signalr",
   "message": "Agent started processing request",
   "timestamp": "2026-01-15T10:30:00Z",
   "data": { "model": "gpt-4.1" }

@@ -5,7 +5,7 @@ namespace BotNexus.Gateway.Abstractions.Models;
 /// </summary>
 public sealed record InboundMessage
 {
-    /// <summary>The channel this message arrived from (e.g., "websocket", "telegram").</summary>
+    /// <summary>The channel this message arrived from (e.g., "signalr", "telegram").</summary>
     public required string ChannelType { get; init; }
 
     /// <summary>Identifier of the sender within the channel.</summary>

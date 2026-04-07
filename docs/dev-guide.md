@@ -34,7 +34,7 @@ A comprehensive guide for running BotNexus locally — for developers and AI age
 
 | Tool | Purpose |
 |------|---------|
-| `wscat` / `websocat` | WebSocket client for testing `/ws` endpoint |
+| SignalR client | Validate `/hub/gateway` hub methods and events |
 | `curl` | HTTP client for testing REST endpoints |
 | A code editor | VS Code recommended for C# development |
 
@@ -358,8 +358,7 @@ curl http://localhost:5005/api/agents
 | `/api/chat` | Send messages (REST, non-streaming) |
 | `/api/sessions` | Session management |
 | `/api/config/validate` | Config validation |
-| `/ws` | WebSocket streaming |
-| `/ws/activity` | Activity event stream |
+| `/hub/gateway` | SignalR streaming hub |
 | `/webui` | Real-time chat dashboard |
 | `/swagger` | API documentation browser |
 
@@ -438,7 +437,7 @@ Open in your browser: `http://localhost:5005/webui`
 
 ### WebUI Auth
 
-The WebUI path (`/webui`) is **exempt from API key authentication**. It serves static files directly. WebSocket connections from the WebUI to `/ws` are subject to auth unless running in development mode.
+The WebUI path (`/webui`) is **exempt from API key authentication**. It serves static files directly. SignalR connections from the WebUI to `/hub/gateway` are subject to auth unless running in development mode.
 
 ---
 
@@ -632,7 +631,7 @@ Reference it in `config.json` with `"apiKey": "auth:copilot"`.
 
 ### Gateway Endpoint Protection
 
-The `GatewayAuthMiddleware` protects HTTP and WebSocket endpoints.
+The `GatewayAuthMiddleware` protects HTTP and SignalR endpoints.
 
 **Development mode:** When no API keys are configured in `gateway.apiKeys`, all requests are allowed without authentication. Every caller gets admin-level access.
 
@@ -820,8 +819,8 @@ Verify extension assemblies are in the correct subdirectories:
 ## See Also
 
 - [Architecture Overview](architecture/overview.md) — System design and component responsibilities
-- [API Reference](api-reference.md) — REST and WebSocket endpoint documentation
+- [API Reference](api-reference.md) — REST and SignalR endpoint documentation
 - [Configuration Guide](configuration.md) — Complete field-by-field config.json reference
-- [WebSocket Protocol](websocket-protocol.md) — Low-level WebSocket protocol specification
+- [SignalR Protocol](websocket-protocol.md) — SignalR hub contract reference
 - [Extension Development](extension-development.md) — Building custom providers, channels, and tools
 - [Getting Started](getting-started.md) — First-time user guide with end-to-end walkthrough

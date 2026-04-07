@@ -15,7 +15,7 @@
 Optional but recommended:
 
 - **curl** — for testing API endpoints (built into modern Windows and macOS)
-- A WebSocket-capable browser — for the built-in WebUI
+- A modern browser — for the built-in WebUI (SignalR client)
 
 ---
 

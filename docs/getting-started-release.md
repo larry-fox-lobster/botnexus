@@ -14,7 +14,7 @@
 Optional but recommended:
 
 - **curl** — for testing API endpoints (built into modern Windows and macOS)
-- A WebSocket-capable browser — for the built-in WebUI
+- A modern browser — for the built-in WebUI (SignalR client)
 
 ---
 
@@ -268,7 +268,7 @@ Open your browser to:
 http://localhost:18790/
 ```
 
-You should see the BotNexus web interface. The UI connects to the Gateway automatically via WebSocket.
+You should see the BotNexus web interface. The UI connects to the Gateway automatically via SignalR.
 
 ### The Web Interface Layout
 
@@ -279,7 +279,7 @@ You should see the BotNexus web interface. The UI connects to the Gateway automa
 - **🧠 Agents** — See available agents with their models
 - **🧩 Extensions** — Panel showing loaded providers, tools, and health status
 - **📊 Activity Monitor** — Real-time feed of all messages
-- **🌐 Connection Status** — Shows WebSocket connection state
+- **🌐 Connection Status** — Shows SignalR connection state
 
 #### **Main Chat Area** — Your Conversation
 - **Welcome Screen** — Displays when no session is selected

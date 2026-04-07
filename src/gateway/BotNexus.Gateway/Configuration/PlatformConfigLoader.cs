@@ -260,7 +260,7 @@ public static class PlatformConfigLoader
             }
 
             if (string.IsNullOrWhiteSpace(channelConfig.Type))
-                errors.Add($"channels.{channelKey}.type is required (example: 'websocket' or 'slack').");
+                errors.Add($"channels.{channelKey}.type is required (example: 'signalr' or 'slack').");
         }
     }
 

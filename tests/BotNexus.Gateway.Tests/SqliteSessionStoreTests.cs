@@ -56,7 +56,7 @@ public sealed class SqliteSessionStoreTests
         using var fixture = new StoreFixture();
         var store = fixture.CreateStore();
         var session = await store.GetOrCreateAsync("s1", "agent-a");
-        session.ChannelType = "websocket";
+        session.ChannelType = "signalr";
         session.CallerId = "caller-a";
         session.Metadata["version"] = 1L;
         await store.SaveAsync(session);
@@ -69,7 +69,7 @@ public sealed class SqliteSessionStoreTests
         var reloaded = await fixture.CreateStore().GetAsync("s1");
         reloaded.Should().NotBeNull();
         reloaded!.Status.Should().Be(SessionStatus.Suspended);
-        reloaded.ChannelType.Should().Be("websocket");
+        reloaded.ChannelType.Should().Be("signalr");
         reloaded.CallerId.Should().Be("caller-a");
         reloaded.Metadata.Should().ContainKey("version");
         reloaded.Metadata["version"]!.ToString().Should().Be("2");

@@ -50,7 +50,7 @@ public sealed class SchemaValidationTests
             {
                 ["web"] = new()
                 {
-                    Type = "websocket",
+                    Type = "signalr",
                     Enabled = true
                 }
             },

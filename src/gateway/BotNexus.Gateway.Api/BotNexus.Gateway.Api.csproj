@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <RootNamespace>BotNexus.Gateway.Api</RootNamespace>
-    <Description>ASP.NET Core API surface — REST controllers and WebSocket middleware for the BotNexus Gateway.</Description>
+    <Description>ASP.NET Core API surface — REST controllers and SignalR hub for the BotNexus Gateway.</Description>
   </PropertyGroup>
 
   <ItemGroup>

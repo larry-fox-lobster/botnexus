@@ -491,12 +491,6 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
         if (adapter is not null)
             return adapter;
 
-        if (channelType.Equals("signalr", StringComparison.OrdinalIgnoreCase))
-            return _channelManager.Get("websocket");
-
-        if (channelType.Equals("websocket", StringComparison.OrdinalIgnoreCase))
-            return _channelManager.Get("signalr");
-
         return null;
     }
 

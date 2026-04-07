@@ -215,7 +215,7 @@ public sealed class AgentDefinitionConfig
 /// <summary>Channel definition in platform config.</summary>
 public sealed class ChannelConfig
 {
-    /// <summary>Channel type (e.g. 'websocket', 'slack').</summary>
+    /// <summary>Channel type (e.g. 'signalr', 'slack').</summary>
     public string? Type { get; set; }
     /// <summary>Whether this channel is enabled.</summary>
     public bool Enabled { get; set; } = true;

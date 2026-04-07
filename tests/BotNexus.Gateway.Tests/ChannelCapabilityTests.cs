@@ -1,12 +1,14 @@
 using BotNexus.Channels.Core;
 using BotNexus.Channels.Telegram;
 using BotNexus.Channels.Tui;
-using BotNexus.Channels.WebSocket;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Api.Hubs;
 using FluentAssertions;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Moq;
 using System.Net.Http;
 
 namespace BotNexus.Gateway.Tests;
@@ -37,9 +39,11 @@ public sealed class ChannelCapabilityTests
     }
 
     [Fact]
-    public void WebSocketAdapter_SupportsFullInteractiveCapabilities()
+    public void SignalRAdapter_SupportsFullInteractiveCapabilities()
     {
-        var adapter = new WebSocketChannelAdapter(NullLogger<WebSocketChannelAdapter>.Instance);
+        var adapter = new SignalRChannelAdapter(
+            NullLogger<SignalRChannelAdapter>.Instance,
+            Mock.Of<IHubContext<GatewayHub>>());
 
         adapter.SupportsStreaming.Should().BeTrue();
         adapter.SupportsSteering.Should().BeTrue();

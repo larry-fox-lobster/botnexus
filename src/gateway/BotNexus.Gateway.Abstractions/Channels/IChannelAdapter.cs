@@ -10,7 +10,7 @@ namespace BotNexus.Gateway.Abstractions.Channels;
 /// <remarks>
 /// <para>
 /// Channel adapters run independently of the Gateway API surface. The API's native
-/// WebSocket endpoint is <b>not</b> a channel adapter — it's built into Gateway.Api.
+/// SignalR hub endpoint is <b>not</b> a channel adapter — it's built into Gateway.Api.
 /// Channel adapters are for external protocols that need their own connection management.
 /// </para>
 /// <para>
@@ -101,33 +101,3 @@ public interface IStreamEventChannelAdapter
     Task SendStreamEventAsync(string conversationId, AgentStreamEvent streamEvent, CancellationToken cancellationToken = default);
 }
 
-/// <summary>
-/// WebSocket-specific channel contract used by the Gateway API runtime.
-/// </summary>
-public interface IGatewayWebSocketChannelAdapter : IChannelAdapter, IStreamEventChannelAdapter
-{
-    /// <summary>
-    /// Registers a live WebSocket connection for a session.
-    /// </summary>
-    bool RegisterConnection(
-        string sessionId,
-        string connectionId,
-        System.Net.WebSockets.WebSocket socket,
-        Func<object, CancellationToken, ValueTask<object>>? payloadMutator = null);
-
-    /// <summary>
-    /// Unregisters a previously registered WebSocket connection.
-    /// </summary>
-    void UnregisterConnection(string sessionId, string connectionId);
-
-    /// <summary>
-    /// Dispatches an inbound message originating from a WebSocket client.
-    /// </summary>
-    Task DispatchInboundMessageAsync(
-        string agentId,
-        string sessionId,
-        string senderId,
-        string content,
-        string messageType = "message",
-        CancellationToken cancellationToken = default);
-}

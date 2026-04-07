@@ -10,10 +10,10 @@ public sealed class ChannelManagerTests
     [Fact]
     public void Get_WithCaseInsensitiveChannelType_ReturnsAdapter()
     {
-        var adapter = new TestChannelAdapter("WebSocket");
+        var adapter = new TestChannelAdapter("SignalR");
         var manager = new ChannelManager([adapter]);
 
-        var resolved = manager.Get("websocket");
+        var resolved = manager.Get("signalr");
 
         resolved.Should().BeSameAs(adapter);
     }
@@ -23,7 +23,7 @@ public sealed class ChannelManagerTests
     {
         var manager = new ChannelManager([]);
 
-        var resolved = manager.Get("websocket");
+        var resolved = manager.Get("signalr");
 
         resolved.Should().BeNull();
     }
