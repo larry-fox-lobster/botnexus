@@ -361,11 +361,37 @@
     // SignalR Connection
     // =========================================================================
 
+    // Client-side debug log — visible in browser console (F12)
+    const DEBUG = true;
+    function debugLog(category, ...args) {
+        if (DEBUG) console.log(`[BotNexus:${category}]`, ...args);
+    }
+
+    // Safe invoke — guards against null/disconnected connection
+    async function hubInvoke(method, ...args) {
+        if (!connection || connection.state !== signalR.HubConnectionState.Connected) {
+            debugLog('hub', `SKIP ${method} — not connected (state: ${connection?.state || 'null'})`);
+            return null;
+        }
+        debugLog('hub', `→ ${method}`, ...args);
+        try {
+            const result = await hubInvoke(method, ...args);
+            debugLog('hub', `← ${method} OK`, result);
+            return result;
+        } catch (err) {
+            debugLog('hub', `← ${method} ERROR`, err.message);
+            throw err;
+        }
+    }
+
     function initSignalR() {
         connection = new signalR.HubConnectionBuilder()
             .withUrl('/hub/gateway')
             .withAutomaticReconnect([0, 1000, 2000, 5000, 10000, 30000])
+            .configureLogging(signalR.LogLevel.Warning)
             .build();
+
+        debugLog('init', 'SignalR hub builder created');
 
         // Server → Client methods
         connection.on('Connected', (data) => {
@@ -471,6 +497,7 @@
         });
 
         connection.onclose(() => {
+            debugLog('lifecycle', 'Connection closed');
             setStatus('disconnected');
             connectionId = null;
             showConnectionBanner('❌ Connection closed. Click Reconnect to retry.', 'error', true);
@@ -481,10 +508,13 @@
 
     async function startConnection() {
         try {
+            debugLog('lifecycle', 'Starting connection...');
             setStatus('connecting');
             showConnectionBanner('Connecting...', 'warning');
             await connection.start();
+            debugLog('lifecycle', 'Connected! State:', connection.state);
         } catch (err) {
+            debugLog('lifecycle', 'Connection FAILED:', err.message);
             console.error('SignalR connection error:', err);
             setStatus('disconnected');
             showConnectionBanner('❌ Cannot connect to Gateway. Check that the server is running.', 'error', true);
@@ -497,14 +527,14 @@
 
         // Leave previous session group
         if (currentSessionId && currentSessionId !== sessionId) {
-            try { await connection.invoke('LeaveSession', currentSessionId); } catch {}
+            try { await hubInvoke('LeaveSession', currentSessionId); } catch {}
         }
 
         currentAgentId = agentId;
 
         // Join new session group
         try {
-            await connection.invoke('JoinSession', agentId, sessionId || null);
+            await hubInvoke('JoinSession', agentId, sessionId || null);
         } catch (err) {
             console.error('Failed to join session:', err);
             appendSystemMessage(`Failed to join session: ${err.message}`, 'error');
@@ -1121,7 +1151,7 @@
 
         if (currentAgentId && currentSessionId && connection?.state === signalR.HubConnectionState.Connected) {
             try {
-                await connection.invoke('ResetSession', currentAgentId, currentSessionId);
+                await hubInvoke('ResetSession', currentAgentId, currentSessionId);
             } catch (err) {
                 console.warn('Failed to reset session via SignalR:', err);
             }
@@ -1238,7 +1268,7 @@
                 showFollowUpIndicator();
                 trackActivity('message', currentAgentId, `Follow-up: ${text.substring(0, 60)}`);
                 try {
-                    await connection.invoke('FollowUp', currentAgentId, currentSessionId, text);
+                    await hubInvoke('FollowUp', currentAgentId, currentSessionId, text);
                 } catch (err) {
                     appendSystemMessage(`Failed to queue: ${err.message}`, 'error');
                 }
@@ -1247,7 +1277,7 @@
                 showSteerIndicator();
                 trackActivity('message', currentAgentId, `Steer: ${text.substring(0, 60)}`);
                 try {
-                    await connection.invoke('Steer', currentAgentId, currentSessionId, text);
+                    await hubInvoke('Steer', currentAgentId, currentSessionId, text);
                 } catch (err) {
                     appendSystemMessage(`Failed to steer: ${err.message}`, 'error');
                 }
@@ -1263,7 +1293,7 @@
         startResponseTimeout();
 
         try {
-            await connection.invoke('SendMessage', currentAgentId, currentSessionId, text);
+            await hubInvoke('SendMessage', currentAgentId, currentSessionId, text);
         } catch (err) {
             appendSystemMessage(`Error: ${err.message}`, 'error');
             isStreaming = false;
@@ -1273,7 +1303,7 @@
 
     async function abortRequest() {
         if (currentAgentId && currentSessionId && connection?.state === signalR.HubConnectionState.Connected) {
-            try { await connection.invoke('Abort', currentAgentId, currentSessionId); } catch {}
+            try { await hubInvoke('Abort', currentAgentId, currentSessionId); } catch {}
         }
         isStreaming = false;
         clearResponseTimeout();
@@ -2475,4 +2505,5 @@
         init();
     }
 })();
+
 
