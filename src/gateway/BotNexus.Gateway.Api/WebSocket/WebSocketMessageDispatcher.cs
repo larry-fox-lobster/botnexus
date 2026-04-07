@@ -295,8 +295,9 @@ public sealed class WebSocketMessageDispatcher
         sessionActivity?.SetTag("botnexus.agent.id", agentId);
         var session = await _sessions.GetOrCreateAsync(targetSessionId, agentId, cancellationToken);
 
-        if (!string.IsNullOrWhiteSpace(previousSessionId))
-            _channelAdapter.UnregisterConnection(previousSessionId, sessionContext.ConnectionId);
+        // Keep the previous session's connection registered so background agent
+        // output still reaches the client. Multiple sessions can share the same socket.
+        // The client uses sessionId in each payload to identify which session it belongs to.
 
         if (!_channelAdapter.RegisterConnection(
                 targetSessionId,

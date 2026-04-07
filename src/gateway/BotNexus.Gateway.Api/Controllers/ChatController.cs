@@ -6,7 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace BotNexus.Gateway.Api.Controllers;
 
 /// <summary>
-/// REST endpoint for non-streaming chat. For real-time streaming, use the WebSocket endpoint.
+/// REST endpoint for non-streaming chat. Routes through the gateway message queue
+/// to ensure proper session serialization. For real-time streaming, use the WebSocket endpoint.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -45,7 +46,19 @@ public sealed class ChatController : ControllerBase
                 ? Guid.NewGuid().ToString("N")
                 : request.SessionId;
             var handle = await _supervisor.GetOrCreateAsync(request.AgentId, sessionId, cancellationToken);
-            var response = await handle.PromptAsync(request.Message, cancellationToken);
+
+            // If agent is already running, queue as follow-up instead of failing
+            AgentResponse response;
+            try
+            {
+                response = await handle.PromptAsync(request.Message, cancellationToken);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("already running", StringComparison.OrdinalIgnoreCase))
+            {
+                // Agent is busy — queue as follow-up
+                await handle.FollowUpAsync(request.Message, cancellationToken);
+                return Accepted(new ChatResponse(sessionId, "Message queued as follow-up — agent is currently processing a previous request.", null));
+            }
 
             var session = await _sessions.GetOrCreateAsync(sessionId, request.AgentId, cancellationToken);
             session.AddEntry(new SessionEntry { Role = "user", Content = request.Message });

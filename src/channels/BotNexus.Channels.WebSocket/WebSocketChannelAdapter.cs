@@ -55,19 +55,11 @@ public sealed class WebSocketChannelAdapter(ILogger<WebSocketChannelAdapter> log
         NetWebSocket socket,
         Func<object, CancellationToken, ValueTask<object>>? payloadMutator = null)
     {
+        // Allow same connection to own multiple sessions (single-connection pattern)
         if (_connections.TryGetValue(sessionId, out var existingBySession) &&
             !string.Equals(existingBySession.ConnectionId, connectionId, StringComparison.Ordinal))
         {
             return false;
-        }
-
-        foreach (var (registeredSessionId, registration) in _connections)
-        {
-            if (!string.Equals(registeredSessionId, sessionId, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(registration.ConnectionId, connectionId, StringComparison.Ordinal))
-            {
-                _connections.TryRemove(registeredSessionId, out _);
-            }
         }
 
         _connections[sessionId] = new ConnectionRegistration(connectionId, socket, payloadMutator);
