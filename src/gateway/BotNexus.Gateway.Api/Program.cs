@@ -32,7 +32,7 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .Enrich.WithThreadId()
     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
     .WriteTo.File(
-        Path.Combine(AppContext.BaseDirectory, "logs", "botnexus-.log"),
+        Path.Combine(BotNexusHome.ResolveHomePath(), "logs", "botnexus-.log"),
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 14),
     preserveStaticLogger: true);

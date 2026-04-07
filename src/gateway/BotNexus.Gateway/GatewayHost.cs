@@ -152,6 +152,10 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
                     await ProcessInboundMessageAsync(item.Message, item.CancellationToken);
                     item.Completion.TrySetResult();
                 }
+                catch (OperationCanceledException) when (item.CancellationToken.IsCancellationRequested)
+                {
+                    item.Completion.TrySetCanceled(item.CancellationToken);
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error processing queued inbound message for queue '{QueueKey}'", queueKey);
@@ -295,19 +299,30 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
                     SessionId = sessionId
                 }, cancellationToken);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogInformation("Processing cancelled for agent '{AgentId}' session '{SessionId}' (client disconnected)", agentId, sessionId);
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing message for agent '{AgentId}' session '{SessionId}'", agentId, sessionId);
 
-                if (_channelManager.Get(message.ChannelType) is { } errorChannel)
+                try
                 {
-                    await errorChannel.SendAsync(new OutboundMessage
+                    if (_channelManager.Get(message.ChannelType) is { } errorChannel)
                     {
-                        ChannelType = message.ChannelType,
-                        ConversationId = message.ConversationId,
-                        Content = $"Error: {ex.Message}",
-                        SessionId = sessionId
-                    }, cancellationToken);
+                        await errorChannel.SendAsync(new OutboundMessage
+                        {
+                            ChannelType = message.ChannelType,
+                            ConversationId = message.ConversationId,
+                            Content = $"Error: {ex.Message}",
+                            SessionId = sessionId
+                        }, CancellationToken.None);
+                    }
+                }
+                catch (Exception sendEx)
+                {
+                    _logger.LogDebug(sendEx, "Failed to send error response for agent '{AgentId}' session '{SessionId}'", agentId, sessionId);
                 }
 
                 await _activity.PublishAsync(new GatewayActivity
@@ -316,7 +331,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
                     AgentId = agentId,
                     SessionId = sessionId,
                     Message = ex.Message
-                }, cancellationToken);
+                }, CancellationToken.None);
             }
         }
     }
