@@ -491,6 +491,9 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
         if (adapter is not null)
             return adapter;
 
+        _logger.LogWarning("No channel adapter found for type '{ChannelType}'. Available: {Available}",
+            channelType,
+            string.Join(", ", _channelManager.Adapters.Select(a => a.ChannelType)));
         return null;
     }
 
