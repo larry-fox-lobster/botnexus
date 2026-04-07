@@ -1361,6 +1361,10 @@
     }
 
     function startNewChat() {
+        // Stop the old agent instance if one exists
+        if (currentSessionId && currentAgentId) {
+            fetch(`${API_BASE}/agents/${encodeURIComponent(currentAgentId)}/sessions/${encodeURIComponent(currentSessionId)}/stop`, { method: 'POST' }).catch(() => {});
+        }
         disconnectWebSocket();
         currentSessionId = null;
         activeMessageId = null;
@@ -1387,6 +1391,7 @@
             loadChatHeaderModels();
         }
         else updateSendButtonState();
+        loadSessions();
         elChatInput.focus();
     }
 
