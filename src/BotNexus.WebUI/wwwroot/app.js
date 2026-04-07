@@ -980,7 +980,14 @@
     // Chat message rendering
     // =========================================================================
 
+    function stripControlTags(text) {
+        if (!text) return text;
+        return text.replace(/\[\[\s*reply_to_current\s*\]\]/gi, '')
+                   .replace(/\[\[\s*reply_to:\s*\w+\s*\]\]/gi, '');
+    }
+
     function appendChatMessage(role, content) {
+        content = stripControlTags(content);
         if (!content || !content.trim()) return;
         const div = document.createElement('div');
         div.className = `message ${role}`;
@@ -1024,10 +1031,8 @@
 
     function appendDelta(content) {
         if (!content) return;
-        // Strip control tags that shouldn't be displayed
-        content = content.replace(/\[\[reply_to_current\]\]/gi, '')
-                         .replace(/\[\[reply_to:\w+\]\]/gi, '');
-        if (!content.trim()) return;
+        content = stripControlTags(content);
+        if (!content) return;
         
         let streaming = elChatMessages.querySelector('.message.assistant.streaming');
         if (!streaming) {
