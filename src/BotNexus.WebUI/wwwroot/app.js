@@ -438,6 +438,14 @@
         });
 
         connection.on('MessageStart', (evt) => {
+            // Finalize any previous streaming message before starting new one
+            const prevStreaming = elChatMessages.querySelector('.message.assistant.streaming');
+            if (prevStreaming) {
+                prevStreaming.classList.remove('streaming', 'message-streaming');
+                const timeEl = prevStreaming.querySelector('.msg-time');
+                if (timeEl) timeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+            
             activeMessageId = evt.messageId;
             isStreaming = true;
             setSendingState(false);
@@ -1016,6 +1024,11 @@
 
     function appendDelta(content) {
         if (!content) return;
+        // Strip control tags that shouldn't be displayed
+        content = content.replace(/\[\[reply_to_current\]\]/gi, '')
+                         .replace(/\[\[reply_to:\w+\]\]/gi, '');
+        if (!content.trim()) return;
+        
         let streaming = elChatMessages.querySelector('.message.assistant.streaming');
         if (!streaming) {
             streaming = document.createElement('div');
