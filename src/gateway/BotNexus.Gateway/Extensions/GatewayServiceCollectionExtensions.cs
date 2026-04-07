@@ -15,7 +15,6 @@ using BotNexus.Gateway.Routing;
 using BotNexus.Gateway.Sessions;
 using BotNexus.Gateway.Security;
 using BotNexus.Channels.Core;
-using BotNexus.Channels.WebSocket;
 using BotNexus.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -74,7 +73,6 @@ public static class GatewayServiceCollectionExtensions
         services.AddSingleton<IActivityBroadcaster, InMemoryActivityBroadcaster>();
         services.AddSingleton<IGatewayAuthHandler, ApiKeyGatewayAuthHandler>();
         services.AddSingleton<IModelFilter, ConfigModelFilter>();
-        services.AddBotNexusWebSocketChannel();
 
         // Built-in isolation strategies
         services.AddSingleton<IIsolationStrategy, InProcessIsolationStrategy>();
@@ -86,7 +84,9 @@ public static class GatewayServiceCollectionExtensions
         services.AddBotNexusTools();
 
         // Gateway host
-        services.AddHostedService<GatewayHost>();
+        services.TryAddSingleton<GatewayHost>();
+        services.TryAddSingleton<IChannelDispatcher>(serviceProvider => serviceProvider.GetRequiredService<GatewayHost>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService>(serviceProvider => serviceProvider.GetRequiredService<GatewayHost>()));
         services.AddHostedService<SessionCleanupService>();
 
         // Default agent configuration from BotNexusHome (~/.botnexus/agents/)

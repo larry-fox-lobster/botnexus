@@ -1,4 +1,5 @@
 using BotNexus.Gateway.Api.Extensions;
+using BotNexus.Gateway.Api.Hubs;
 using BotNexus.Gateway.Api;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Extensions;
@@ -63,6 +64,7 @@ builder.Services.AddOpenTelemetry()
 builder.Services.AddBotNexusGateway();
 builder.Services.AddPlatformConfiguration(platformConfigPath);
 builder.Services.AddExtensionLoading();
+builder.Services.AddSignalR();
 builder.Services.AddBotNexusGatewayApi();
 builder.Services.AddCors(options =>
 {
@@ -162,13 +164,12 @@ app.UseCors(GatewayCorsPolicy);
 app.UseSerilogRequestLogging();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<GatewayAuthMiddleware>();
-app.UseWebSockets();
 app.UseMiddleware<RateLimitingMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI();
 
 app.MapControllers();
-app.MapBotNexusGatewayWebSocket();
+app.MapHub<GatewayHub>("/hub/gateway");
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapFallbackToFile("index.html");
 

@@ -248,7 +248,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
                 }, cancellationToken);
 
                 var sessionSaved = false;
-                if (_channelManager.Get(message.ChannelType) is { SupportsStreaming: true } channel)
+                if (ResolveChannelAdapter(message.ChannelType) is { SupportsStreaming: true } channel)
                 {
                     await StreamingSessionHelper.ProcessAndSaveAsync(
                         handle.StreamAsync(message.Content, cancellationToken),
@@ -273,7 +273,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
                 else
                 {
                     var response = await handle.PromptAsync(message.Content, cancellationToken);
-                    if (_channelManager.Get(message.ChannelType) is { } ch)
+                    if (ResolveChannelAdapter(message.ChannelType) is { } ch)
                     {
                         await ch.SendAsync(new OutboundMessage
                         {
@@ -312,7 +312,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
 
                 try
                 {
-                    if (_channelManager.Get(message.ChannelType) is { } errorChannel)
+                    if (ResolveChannelAdapter(message.ChannelType) is { } errorChannel)
                     {
                         await errorChannel.SendAsync(new OutboundMessage
                         {
@@ -350,7 +350,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
             ? "Session is suspended. Resume the session before sending new messages."
             : $"Session is in '{status}' state and cannot accept messages.";
 
-        if (_channelManager.Get(message.ChannelType) is { } channel)
+        if (ResolveChannelAdapter(message.ChannelType) is { } channel)
         {
             await channel.SendAsync(new OutboundMessage
             {
@@ -379,7 +379,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
         var instance = _supervisor.GetInstance(agentId, sessionId);
         if (instance is null)
         {
-            if (_channelManager.Get(message.ChannelType) is { } channel)
+            if (ResolveChannelAdapter(message.ChannelType) is { } channel)
             {
                 await channel.SendAsync(new OutboundMessage
                 {
@@ -396,7 +396,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
         var handle = await _supervisor.GetOrCreateAsync(agentId, sessionId, cancellationToken);
         await handle.SteerAsync(message.Content, cancellationToken);
 
-        if (_channelManager.Get(message.ChannelType) is { } steerChannel)
+        if (ResolveChannelAdapter(message.ChannelType) is { } steerChannel)
         {
             await steerChannel.SendAsync(new OutboundMessage
             {
@@ -438,7 +438,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
 
     private async Task SendBusyAsync(InboundMessage message, CancellationToken cancellationToken)
     {
-        if (_channelManager.Get(message.ChannelType) is not { } channel)
+        if (ResolveChannelAdapter(message.ChannelType) is not { } channel)
             return;
 
         await channel.SendAsync(new OutboundMessage
@@ -483,6 +483,21 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
         {
             _logger.LogDebug(ex, "One or more session queue workers completed with errors during shutdown.");
         }
+    }
+
+    private IChannelAdapter? ResolveChannelAdapter(string channelType)
+    {
+        var adapter = _channelManager.Get(channelType);
+        if (adapter is not null)
+            return adapter;
+
+        if (channelType.Equals("signalr", StringComparison.OrdinalIgnoreCase))
+            return _channelManager.Get("websocket");
+
+        if (channelType.Equals("websocket", StringComparison.OrdinalIgnoreCase))
+            return _channelManager.Get("signalr");
+
+        return null;
     }
 
     private sealed class SessionQueueState(Channel<QueuedInboundMessage> queue, Task workerTask)

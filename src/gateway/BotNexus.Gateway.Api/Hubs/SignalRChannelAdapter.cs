@@ -1,0 +1,55 @@
+using BotNexus.Channels.Core;
+using BotNexus.Gateway.Abstractions.Channels;
+using BotNexus.Gateway.Abstractions.Models;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
+
+namespace BotNexus.Gateway.Api.Hubs;
+
+public sealed class SignalRChannelAdapter(ILogger<SignalRChannelAdapter> logger, IHubContext<GatewayHub> hubContext)
+    : ChannelAdapterBase(logger), IStreamEventChannelAdapter
+{
+    private readonly IHubContext<GatewayHub> _hubContext = hubContext;
+
+    public override string ChannelType => "signalr";
+    public override string DisplayName => "Gateway SignalR";
+    public override bool SupportsStreaming => true;
+    public override bool SupportsSteering => true;
+    public override bool SupportsFollowUp => true;
+    public override bool SupportsThinkingDisplay => true;
+    public override bool SupportsToolDisplay => true;
+
+    protected override Task OnStartAsync(CancellationToken cancellationToken)
+        => Task.CompletedTask;
+
+    protected override Task OnStopAsync(CancellationToken cancellationToken)
+        => Task.CompletedTask;
+
+    public override Task SendAsync(OutboundMessage message, CancellationToken cancellationToken = default)
+        => _hubContext.Clients.Group(GetSessionGroup(message.SessionId ?? message.ConversationId))
+            .SendAsync("ContentDelta", message.Content, cancellationToken);
+
+    public override Task SendStreamDeltaAsync(string conversationId, string delta, CancellationToken cancellationToken = default)
+        => _hubContext.Clients.Group(GetSessionGroup(conversationId))
+            .SendAsync("ContentDelta", delta, cancellationToken);
+
+    public Task SendStreamEventAsync(string conversationId, AgentStreamEvent streamEvent, CancellationToken cancellationToken = default)
+    {
+        var method = streamEvent.Type switch
+        {
+            AgentStreamEventType.MessageStart => "MessageStart",
+            AgentStreamEventType.ThinkingDelta => "ThinkingDelta",
+            AgentStreamEventType.ContentDelta => "ContentDelta",
+            AgentStreamEventType.ToolStart => "ToolStart",
+            AgentStreamEventType.ToolEnd => "ToolEnd",
+            AgentStreamEventType.MessageEnd => "MessageEnd",
+            AgentStreamEventType.Error => "Error",
+            _ => "Unknown"
+        };
+
+        return _hubContext.Clients.Group(GetSessionGroup(conversationId))
+            .SendAsync(method, streamEvent, cancellationToken);
+    }
+
+    private static string GetSessionGroup(string sessionId) => $"session:{sessionId}";
+}

@@ -1,6 +1,5 @@
-using BotNexus.Gateway.Api.WebSocket;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Routing;
+using BotNexus.Gateway.Abstractions.Channels;
+using BotNexus.Gateway.Api.Hubs;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BotNexus.Gateway.Api.Extensions;
@@ -11,45 +10,16 @@ namespace BotNexus.Gateway.Api.Extensions;
 public static class GatewayApiServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the Gateway API services (controllers, WebSocket handler).
+    /// Registers the Gateway API services (controllers, SignalR hub + channel adapter).
     /// Call after <c>AddBotNexusGateway()</c>.
     /// </summary>
-    public static IServiceCollection AddBotNexusGatewayApi(
-        this IServiceCollection services,
-        Action<GatewayWebSocketOptions>? configure = null)
+    public static IServiceCollection AddBotNexusGatewayApi(this IServiceCollection services)
     {
-        services.AddOptions<GatewayWebSocketOptions>();
-        if (configure is not null)
-            services.Configure(configure);
-
-        services.AddSingleton<WebSocketConnectionManager>();
-        services.AddSingleton<WebSocketMessageDispatcher>();
-        services.AddSingleton<GatewayWebSocketHandler>();
-        services.AddSingleton<ActivityWebSocketHandler>();
+        services.AddSingleton<SignalRChannelAdapter>();
+        services.AddSingleton<IChannelAdapter>(provider => provider.GetRequiredService<SignalRChannelAdapter>());
         services.AddControllers()
             .AddApplicationPart(typeof(GatewayApiServiceCollectionExtensions).Assembly);
 
         return services;
-    }
-
-    /// <summary>
-    /// Maps the Gateway WebSocket endpoint at <c>/ws</c> (optional query parameters: <c>agent</c>, <c>session</c>).
-    /// Call in the request pipeline after <c>UseWebSockets()</c>.
-    /// </summary>
-    public static IEndpointRouteBuilder MapBotNexusGatewayWebSocket(this IEndpointRouteBuilder endpoints)
-    {
-        endpoints.Map("/ws", async context =>
-        {
-            var handler = context.RequestServices.GetRequiredService<GatewayWebSocketHandler>();
-            await handler.HandleAsync(context, context.RequestAborted);
-        });
-
-        endpoints.Map("/ws/activity", async context =>
-        {
-            var handler = context.RequestServices.GetRequiredService<ActivityWebSocketHandler>();
-            await handler.HandleAsync(context, context.RequestAborted);
-        });
-
-        return endpoints;
     }
 }

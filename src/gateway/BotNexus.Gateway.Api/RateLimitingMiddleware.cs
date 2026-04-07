@@ -41,7 +41,7 @@ public sealed class RateLimitingMiddleware
         // Exempt health checks, WebSocket upgrades, and static files from rate limiting
         if (context.Request.Path.Equals("/health", StringComparison.OrdinalIgnoreCase) ||
             context.WebSockets.IsWebSocketRequest ||
-            context.Request.Path.StartsWithSegments("/ws", StringComparison.OrdinalIgnoreCase) ||
+            context.Request.Path.StartsWithSegments("/hub", StringComparison.OrdinalIgnoreCase) ||
             IsStaticFileRequest(context.Request.Path))
         {
             await _next(context);

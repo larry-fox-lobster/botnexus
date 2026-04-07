@@ -29,7 +29,7 @@ public sealed class ChatController : ControllerBase
 
     /// <summary>
     /// Sends a message to an agent and returns the complete response.
-    /// For streaming, connect via <c>ws://host/ws</c>.
+    /// For streaming, connect via SignalR at <c>/hub/gateway</c>.
     /// </summary>
     [HttpPost]
     public async Task<ActionResult<ChatResponse>> Send([FromBody] ChatRequest request, CancellationToken cancellationToken)

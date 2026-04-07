@@ -38,7 +38,7 @@ public sealed class WorkspaceContextBuilder : IContextBuilder
                 Os = Environment.OSVersion.ToString(),
                 Provider = descriptor.ApiProvider,
                 Model = descriptor.ModelId,
-                Channel = "websocket"
+                Channel = "signalr"
             },
             PromptMode = PromptMode.Full
         });
