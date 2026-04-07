@@ -521,39 +521,52 @@
         }
     }
 
-    let joiningSession = false;
+    let joinSessionVersion = 0;
 
     async function joinSession(agentId, sessionId) {
-        if (joiningSession) {
-            debugLog('session', 'SKIP join — already joining');
-            return;
-        }
         if (!connection || connection.state !== signalR.HubConnectionState.Connected) {
             debugLog('session', 'Cannot join — not connected');
             return;
         }
 
-        joiningSession = true;
+        // Increment version — any in-flight join with older version will be ignored
+        const myVersion = ++joinSessionVersion;
+        debugLog('session', `Join v${myVersion}: ${agentId} ${sessionId || '(new)'}`);
+
+        // Update agent immediately so SendMessage uses the right agent
+        currentAgentId = agentId;
+
+        // Leave previous session group
+        if (currentSessionId && currentSessionId !== sessionId) {
+            try { await hubInvoke('LeaveSession', currentSessionId); } catch {}
+        }
+
+        // If a newer join was requested while we were leaving, abort
+        if (myVersion !== joinSessionVersion) {
+            debugLog('session', `Join v${myVersion} superseded by v${joinSessionVersion}`);
+            return;
+        }
+
         try {
-            // Leave previous session group
-            if (currentSessionId && currentSessionId !== sessionId) {
-                try { await hubInvoke('LeaveSession', currentSessionId); } catch {}
+            const result = await hubInvoke('JoinSession', agentId, sessionId || null);
+
+            // If a newer join was requested while we were joining, discard result
+            if (myVersion !== joinSessionVersion) {
+                debugLog('session', `Join v${myVersion} result discarded (v${joinSessionVersion} active)`);
+                return;
             }
 
-            currentAgentId = agentId;
-
-            // Join new session group — server returns session data
-            const result = await hubInvoke('JoinSession', agentId, sessionId || null);
             if (result?.sessionId) {
                 currentSessionId = result.sessionId;
-                debugLog('session', 'Joined session:', currentSessionId);
+                currentAgentId = result.agentId || agentId;
+                debugLog('session', `Joined v${myVersion}: session=${currentSessionId} agent=${currentAgentId}`);
                 updateSessionIdDisplay();
             }
         } catch (err) {
-            debugLog('session', 'Join failed:', err.message);
-            appendSystemMessage(`Failed to join session: ${err.message}`, 'error');
-        } finally {
-            joiningSession = false;
+            if (myVersion === joinSessionVersion) {
+                debugLog('session', 'Join failed:', err.message);
+                appendSystemMessage(`Failed to join session: ${err.message}`, 'error');
+            }
         }
     }
 
