@@ -1352,7 +1352,10 @@
         elSessionsList.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
 
         currentAgentId = elAgentSelect.value || null;
-        if (currentAgentId) connectWebSocket();
+        if (currentAgentId) {
+            connectWebSocket();
+            loadChatHeaderModels();
+        }
         else updateSendButtonState();
         elChatInput.focus();
     }
