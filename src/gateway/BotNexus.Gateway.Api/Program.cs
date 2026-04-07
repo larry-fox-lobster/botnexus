@@ -36,8 +36,7 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .WriteTo.File(
         Path.Combine(BotNexusHome.ResolveHomePath(), "logs", "botnexus-.log"),
         rollingInterval: RollingInterval.Hour,
-        retainedFileCountLimit: 168,
-        restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Warning),
+        retainedFileCountLimit: 168),
     preserveStaticLogger: true);
 
 var platformConfigPath = builder.Configuration["BotNexus:ConfigPath"];
