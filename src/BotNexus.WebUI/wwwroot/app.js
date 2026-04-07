@@ -545,6 +545,13 @@
     function handleWsMessage(msg) {
         if (msg.sequenceId !== undefined) lastSequenceId = msg.sequenceId;
 
+        // Ignore messages from sessions other than the current one
+        // (background agent output from a session the user switched away from)
+        if (msg.sessionId && currentSessionId && msg.sessionId !== currentSessionId &&
+            msg.type !== 'connected' && msg.type !== 'session_switched' && msg.type !== 'pong' && msg.type !== 'error') {
+            return;
+        }
+
         switch (msg.type) {
             case 'connected':
                 connectionId = msg.connectionId;
