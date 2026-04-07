@@ -400,8 +400,10 @@
             agentsCache = data.agents || [];
             setStatus('connected');
             hideConnectionBanner();
+            debugLog('lifecycle', 'Connected! connectionId:', connectionId);
+            // Defer session join to next tick to avoid re-entrant hub calls
             if (currentSessionId && currentAgentId) {
-                joinSession(currentAgentId, currentSessionId);
+                setTimeout(() => joinSession(currentAgentId, currentSessionId), 0);
             }
         });
 
@@ -487,8 +489,9 @@
         connection.onreconnected(() => {
             setStatus('connected');
             hideConnectionBanner();
+            debugLog('lifecycle', 'Reconnected');
             if (currentSessionId && currentAgentId) {
-                joinSession(currentAgentId, currentSessionId);
+                setTimeout(() => joinSession(currentAgentId, currentSessionId), 0);
             }
         });
 
