@@ -86,7 +86,7 @@ public static class GatewayServiceCollectionExtensions
         // Gateway host
         services.TryAddSingleton<GatewayHost>();
         services.TryAddSingleton<IChannelDispatcher>(serviceProvider => serviceProvider.GetRequiredService<GatewayHost>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService>(serviceProvider => serviceProvider.GetRequiredService<GatewayHost>()));
+        services.AddSingleton<IHostedService>(serviceProvider => serviceProvider.GetRequiredService<GatewayHost>());
         services.AddHostedService<SessionCleanupService>();
 
         // Default agent configuration from BotNexusHome (~/.botnexus/agents/)
