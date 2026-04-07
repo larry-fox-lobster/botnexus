@@ -234,10 +234,8 @@ public static class PlatformConfigLoader
                 continue;
             }
 
-            if (string.IsNullOrWhiteSpace(providerConfig.ApiKey) && string.IsNullOrWhiteSpace(providerConfig.BaseUrl))
-            {
-                errors.Add($"providers.{providerKey} must define apiKey or baseUrl.");
-            }
+            if (!providerConfig.Enabled)
+                continue;
 
             if (!string.IsNullOrWhiteSpace(providerConfig.BaseUrl) &&
                 (!Uri.TryCreate(providerConfig.BaseUrl, UriKind.Absolute, out var providerUri) ||
