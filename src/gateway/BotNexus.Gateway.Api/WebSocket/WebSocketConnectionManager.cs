@@ -35,9 +35,17 @@ public sealed class WebSocketConnectionManager
 
     /// <summary>
     /// Registers a reconnect attempt and enforces throttling windows.
+    /// Loopback clients (localhost) are always allowed — matches OpenClaw's exemptLoopback pattern.
     /// </summary>
     public bool TryRegisterConnectionAttempt(HttpContext context, string agentId, out TimeSpan retryAfter)
     {
+        // Exempt loopback/localhost clients from reconnect throttling
+        if (IsLoopback(context))
+        {
+            retryAfter = TimeSpan.Zero;
+            return true;
+        }
+
         var options = _webSocketOptions.Value;
         var maxAttempts = Math.Max(options.MaxReconnectAttempts, 1);
         var attemptWindow = TimeSpan.FromSeconds(Math.Max(options.AttemptWindowSeconds, 1));
@@ -172,4 +180,10 @@ public sealed class WebSocketConnectionManager
     }
 
     private readonly record struct ConnectionAttemptWindow(DateTimeOffset WindowStartedUtc, int AttemptCount);
+
+    private static bool IsLoopback(HttpContext context)
+    {
+        var remote = context.Connection.RemoteIpAddress;
+        return remote is not null && (System.Net.IPAddress.IsLoopback(remote) || remote.Equals(System.Net.IPAddress.IPv6Loopback));
+    }
 }
