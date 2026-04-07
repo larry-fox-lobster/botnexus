@@ -82,4 +82,7 @@ public sealed record AgentDescriptor
     /// </summary>
     public IReadOnlyDictionary<string, object?> IsolationOptions { get; init; } =
         new Dictionary<string, object?>();
+
+    /// <summary>Memory system configuration for this agent. Null means memory is disabled.</summary>
+    public MemoryAgentConfig? Memory { get; init; }
 }

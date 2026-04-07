@@ -1,11 +1,10 @@
 using System.Collections.Concurrent;
-using BotNexus.Gateway.Configuration;
 
 namespace BotNexus.Memory;
 
-public sealed class MemoryStoreFactory(BotNexusHome home) : IMemoryStoreFactory, IAsyncDisposable
+public sealed class MemoryStoreFactory(Func<string, string> dbPathResolver) : IMemoryStoreFactory, IAsyncDisposable
 {
-    private readonly BotNexusHome _home = home;
+    private readonly Func<string, string> _dbPathResolver = dbPathResolver;
     private readonly ConcurrentDictionary<string, IMemoryStore> _stores = new(StringComparer.OrdinalIgnoreCase);
 
     public IMemoryStore Create(string agentId)
@@ -14,8 +13,7 @@ public sealed class MemoryStoreFactory(BotNexusHome home) : IMemoryStoreFactory,
 
         return _stores.GetOrAdd(agentId, id =>
         {
-            var agentDirectory = _home.GetAgentDirectory(id);
-            var dbPath = Path.Combine(agentDirectory, "data", "memory.sqlite");
+            var dbPath = _dbPathResolver(id);
             return new SqliteMemoryStore(dbPath);
         });
     }

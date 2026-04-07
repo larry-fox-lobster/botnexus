@@ -8,6 +8,8 @@ using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Isolation;
 using BotNexus.Gateway.Tools;
+using BotNexus.Memory;
+using BotNexus.Memory.Models;
 using BotNexus.Tools;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
@@ -47,6 +49,20 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
                     SubAgents = ["helper-agent"],
                     IsolationStrategy = "remote",
                     MaxConcurrentSessions = 3,
+                    Memory = new MemoryAgentConfig
+                    {
+                        Enabled = true,
+                        Indexing = "auto",
+                        Search = new MemorySearchAgentConfig
+                        {
+                            DefaultTopK = 7,
+                            TemporalDecay = new TemporalDecayAgentConfig
+                            {
+                                Enabled = true,
+                                HalfLifeDays = 21
+                            }
+                        }
+                    },
                     Metadata = JsonSerializer.Deserialize<JsonElement>("{\"owner\":\"team-gateway\"}"),
                     IsolationOptions = JsonSerializer.Deserialize<JsonElement>("{\"timeoutMs\":1000}"),
                     Enabled = true
@@ -80,6 +96,13 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
         descriptor.IsolationOptions.Should().ContainKey("timeoutMs").WhoseValue.Should().Be(1000L);
         descriptor.SystemPrompt.Should().BeNull();
         descriptor.SystemPromptFiles.Should().Equal(["AGENTS.md", "SOUL.md"]);
+        descriptor.Memory.Should().NotBeNull();
+        descriptor.Memory!.Enabled.Should().BeTrue();
+        descriptor.Memory.Indexing.Should().Be("auto");
+        descriptor.Memory.Search.Should().NotBeNull();
+        descriptor.Memory.Search!.DefaultTopK.Should().Be(7);
+        descriptor.Memory.Search.TemporalDecay.Should().NotBeNull();
+        descriptor.Memory.Search.TemporalDecay!.HalfLifeDays.Should().Be(21);
     }
 
     [Fact]
@@ -148,6 +171,7 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
             new StaticAgentToolFactory(),
             new TestWorkspaceManager(_configDirectory),
             new DefaultToolRegistry(Array.Empty<IAgentTool>()),
+            new StubMemoryStoreFactory(),
             NullLogger<InProcessIsolationStrategy>.Instance);
 
         var handle = await strategy.CreateAsync(
@@ -241,5 +265,27 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
         public void Dispose()
         {
         }
+    }
+
+    private sealed class StubMemoryStoreFactory : IMemoryStoreFactory
+    {
+        private readonly IMemoryStore _store = new StubMemoryStore();
+
+        public IMemoryStore Create(string agentId) => _store;
+    }
+
+    private sealed class StubMemoryStore : IMemoryStore
+    {
+        public Task InitializeAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public Task<MemoryEntry> InsertAsync(MemoryEntry entry, CancellationToken ct = default) => Task.FromResult(entry);
+        public Task<MemoryEntry?> GetByIdAsync(string id, CancellationToken ct = default) => Task.FromResult<MemoryEntry?>(null);
+        public Task<IReadOnlyList<MemoryEntry>> GetBySessionAsync(string sessionId, int limit = 20, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<MemoryEntry>>([]);
+        public Task<IReadOnlyList<MemoryEntry>> SearchAsync(string query, int topK = 10, MemorySearchFilter? filter = null, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<MemoryEntry>>([]);
+        public Task DeleteAsync(string id, CancellationToken ct = default) => Task.CompletedTask;
+        public Task ClearAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public Task<MemoryStoreStats> GetStatsAsync(CancellationToken ct = default) => Task.FromResult(new MemoryStoreStats(0, 0, null));
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

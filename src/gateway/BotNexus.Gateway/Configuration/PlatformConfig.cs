@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BotNexus.Gateway.Abstractions.Models;
 
 namespace BotNexus.Gateway.Configuration;
 
@@ -207,6 +208,8 @@ public sealed class AgentDefinitionConfig
     public JsonElement? IsolationOptions { get; set; }
     /// <summary>Whether this agent is enabled.</summary>
     public bool Enabled { get; set; } = true;
+    /// <summary>Memory system configuration for this agent.</summary>
+    public MemoryAgentConfig? Memory { get; set; }
 }
 
 /// <summary>Channel definition in platform config.</summary>

@@ -13,6 +13,8 @@ using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
+using BotNexus.Memory;
+using BotNexus.Memory.Tools;
 using Microsoft.Extensions.Logging;
 using AgentCoreUserMessage = BotNexus.AgentCore.Types.UserMessage;
 
@@ -34,6 +36,7 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
     private readonly IAgentToolFactory _toolFactory;
     private readonly IAgentWorkspaceManager _workspaceManager;
     private readonly IToolRegistry _toolRegistry;
+    private readonly IMemoryStoreFactory _memoryStoreFactory;
     private readonly ILogger<InProcessIsolationStrategy> _logger;
 
     public InProcessIsolationStrategy(
@@ -43,6 +46,7 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         IAgentToolFactory toolFactory,
         IAgentWorkspaceManager workspaceManager,
         IToolRegistry toolRegistry,
+        IMemoryStoreFactory memoryStoreFactory,
         ILogger<InProcessIsolationStrategy> logger)
     {
         _llmClient = llmClient;
@@ -51,6 +55,7 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         _toolFactory = toolFactory;
         _workspaceManager = workspaceManager;
         _toolRegistry = toolRegistry;
+        _memoryStoreFactory = memoryStoreFactory;
         _logger = logger;
     }
 
@@ -85,6 +90,14 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         var tools = selectedWorkspaceTools
             .Concat(extensionTools.Where(tool => !workspaceToolNames.Contains(tool.Name)))
             .ToList();
+
+        if (descriptor.Memory?.Enabled == true)
+        {
+            var memoryStore = _memoryStoreFactory.Create(descriptor.AgentId);
+            await memoryStore.InitializeAsync(cancellationToken);
+            tools.Add(new MemorySearchTool(memoryStore, descriptor.Memory));
+            tools.Add(new MemoryGetTool(memoryStore));
+        }
 
         var options = new AgentOptions(
             InitialState: new AgentInitialState(

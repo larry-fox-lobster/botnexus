@@ -81,7 +81,8 @@ public sealed class PlatformConfigAgentSource(
                     : agentConfig.IsolationStrategy,
                 MaxConcurrentSessions = agentConfig.MaxConcurrentSessions ?? 0,
                 Metadata = ConvertObject(agentConfig.Metadata),
-                IsolationOptions = ConvertObject(agentConfig.IsolationOptions)
+                IsolationOptions = ConvertObject(agentConfig.IsolationOptions),
+                Memory = CloneMemoryConfig(agentConfig.Memory)
             };
 
             var validationErrors = AgentDescriptorValidator.Validate(descriptor);
@@ -109,6 +110,31 @@ public sealed class PlatformConfigAgentSource(
             return [agentConfig.SystemPromptFile];
 
         return [];
+    }
+
+    private static MemoryAgentConfig? CloneMemoryConfig(MemoryAgentConfig? memoryConfig)
+    {
+        if (memoryConfig is null)
+            return null;
+
+        return new MemoryAgentConfig
+        {
+            Enabled = memoryConfig.Enabled,
+            Indexing = memoryConfig.Indexing,
+            Search = memoryConfig.Search is null
+                ? null
+                : new MemorySearchAgentConfig
+                {
+                    DefaultTopK = memoryConfig.Search.DefaultTopK,
+                    TemporalDecay = memoryConfig.Search.TemporalDecay is null
+                        ? null
+                        : new TemporalDecayAgentConfig
+                        {
+                            Enabled = memoryConfig.Search.TemporalDecay.Enabled,
+                            HalfLifeDays = memoryConfig.Search.TemporalDecay.HalfLifeDays
+                        }
+                }
+        };
     }
 
     private static IReadOnlyDictionary<string, object?> ConvertObject(JsonElement? element)

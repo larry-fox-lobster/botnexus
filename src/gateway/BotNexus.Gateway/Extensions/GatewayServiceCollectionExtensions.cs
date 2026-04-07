@@ -16,6 +16,7 @@ using BotNexus.Gateway.Sessions;
 using BotNexus.Gateway.Security;
 using BotNexus.Channels.Core;
 using BotNexus.Channels.WebSocket;
+using BotNexus.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -48,6 +49,15 @@ public static class GatewayServiceCollectionExtensions
 
         // Core services
         services.TryAddSingleton<BotNexusHome>();
+        services.TryAddSingleton<IMemoryStoreFactory>(serviceProvider =>
+        {
+            var home = serviceProvider.GetRequiredService<BotNexusHome>();
+            return new MemoryStoreFactory(agentId =>
+            {
+                var agentDirectory = home.GetAgentDirectory(agentId);
+                return Path.Combine(agentDirectory, "data", "memory.sqlite");
+            });
+        });
         services.AddSingleton<IAgentWorkspaceManager, FileAgentWorkspaceManager>();
          services.AddSingleton<IContextBuilder, WorkspaceContextBuilder>();
          services.AddSingleton<IAgentRegistry, DefaultAgentRegistry>();

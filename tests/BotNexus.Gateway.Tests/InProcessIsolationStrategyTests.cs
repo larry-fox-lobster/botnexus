@@ -6,6 +6,8 @@ using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Isolation;
 using BotNexus.Gateway.Tools;
+using BotNexus.Memory;
+using BotNexus.Memory.Models;
 using BotNexus.Tools;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
@@ -40,6 +42,7 @@ public sealed class InProcessIsolationStrategyTests
             new StaticAgentToolFactory(),
             new TestWorkspaceManager(),
             new DefaultToolRegistry(Array.Empty<IAgentTool>()),
+            new StubMemoryStoreFactory(),
             NullLogger<InProcessIsolationStrategy>.Instance);
 
         var act = () => strategy.CreateAsync(
@@ -93,6 +96,7 @@ public sealed class InProcessIsolationStrategyTests
             new StaticAgentToolFactory(),
             new TestWorkspaceManager(),
             new DefaultToolRegistry(Array.Empty<IAgentTool>()),
+            new StubMemoryStoreFactory(),
             NullLogger<InProcessIsolationStrategy>.Instance);
     }
 
@@ -128,5 +132,27 @@ public sealed class InProcessIsolationStrategyTests
 
         public string GetWorkspacePath(string agentName)
             => AppContext.BaseDirectory;
+    }
+
+    private sealed class StubMemoryStoreFactory : IMemoryStoreFactory
+    {
+        private readonly IMemoryStore _store = new StubMemoryStore();
+
+        public IMemoryStore Create(string agentId) => _store;
+    }
+
+    private sealed class StubMemoryStore : IMemoryStore
+    {
+        public Task InitializeAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public Task<MemoryEntry> InsertAsync(MemoryEntry entry, CancellationToken ct = default) => Task.FromResult(entry);
+        public Task<MemoryEntry?> GetByIdAsync(string id, CancellationToken ct = default) => Task.FromResult<MemoryEntry?>(null);
+        public Task<IReadOnlyList<MemoryEntry>> GetBySessionAsync(string sessionId, int limit = 20, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<MemoryEntry>>([]);
+        public Task<IReadOnlyList<MemoryEntry>> SearchAsync(string query, int topK = 10, MemorySearchFilter? filter = null, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<MemoryEntry>>([]);
+        public Task DeleteAsync(string id, CancellationToken ct = default) => Task.CompletedTask;
+        public Task ClearAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public Task<MemoryStoreStats> GetStatsAsync(CancellationToken ct = default) => Task.FromResult(new MemoryStoreStats(0, 0, null));
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }
