@@ -33,7 +33,7 @@ public static class GatewayApiServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Maps the Gateway WebSocket endpoint at <c>/ws</c>.
+    /// Maps the Gateway WebSocket endpoint at <c>/ws</c> (optional query parameters: <c>agent</c>, <c>session</c>).
     /// Call in the request pipeline after <c>UseWebSockets()</c>.
     /// </summary>
     public static IEndpointRouteBuilder MapBotNexusGatewayWebSocket(this IEndpointRouteBuilder endpoints)

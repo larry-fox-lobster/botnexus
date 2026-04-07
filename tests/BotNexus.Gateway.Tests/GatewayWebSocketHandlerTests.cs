@@ -31,20 +31,24 @@ public sealed class GatewayWebSocketHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_WithMissingAgentQuery_ReturnsBadRequest()
+    public async Task HandleAsync_WithoutAgentQuery_ConnectsWithoutSession()
     {
         var context = new DefaultHttpContext();
-        context.Response.Body = new MemoryStream();
+        var socket = new TestWebSocket();
         context.Features.Set<IHttpWebSocketFeature>(new TestWebSocketFeature
         {
             IsWebSocketRequest = true,
-            Socket = new TestWebSocket()
+            Socket = socket
         });
         var handler = CreateHandler();
 
         await handler.HandleAsync(context, CancellationToken.None);
 
-        context.Response.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
+        context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+        socket.SentMessages.Should().NotBeEmpty();
+        var payload = JsonDocument.Parse(Encoding.UTF8.GetString(socket.SentMessages[0]));
+        payload.RootElement.GetProperty("type").GetString().Should().Be("connected");
+        payload.RootElement.TryGetProperty("sessionId", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -61,12 +65,12 @@ public sealed class GatewayWebSocketHandlerTests
         var handler = CreateHandler();
 
         await handler.HandleAsync(context, CancellationToken.None);
-        var payload = JsonDocument.Parse(Encoding.UTF8.GetString(socket.SentMessages.Single()));
+        var payloads = ParsePayloads(socket.SentMessages);
 
-        payload.RootElement.GetProperty("type").GetString().Should().Be("connected");
-        payload.RootElement.GetProperty("sessionId").GetString().Should().Be("session-123");
-        payload.RootElement.GetProperty("connectionId").GetString().Should().NotBeNullOrEmpty();
-        payload.RootElement.GetProperty("sequenceId").GetInt64().Should().Be(1);
+        payloads.Any(payload => HasStringProperty(payload, "type", "session_switched") && HasStringProperty(payload, "sessionId", "session-123"))
+            .Should().BeTrue();
+        payloads.Any(payload => HasStringProperty(payload, "type", "connected"))
+            .Should().BeTrue();
     }
 
     [Fact]
@@ -377,8 +381,9 @@ public sealed class GatewayWebSocketHandlerTests
         await channelAdapter.StartAsync(dispatcher.Object, CancellationToken.None);
 
         var context = new DefaultHttpContext();
-        context.Request.QueryString = new QueryString("?agent=agent-a&session=session-123");
+        context.Request.QueryString = new QueryString();
         var socket = new TestWebSocket();
+        socket.QueueIncomingText("""{"type":"switch_session","agentId":"agent-a","sessionId":"session-123"}""");
         socket.QueueIncomingText("""{"type":"message","content":"hello"}""");
         context.Features.Set<IHttpWebSocketFeature>(new TestWebSocketFeature { IsWebSocketRequest = true, Socket = socket });
         var handler = CreateHandler(channelAdapter: channelAdapter);
@@ -443,8 +448,10 @@ public sealed class GatewayWebSocketHandlerTests
 
         await handler.HandleAsync(secondContext, cts.Token);
 
-        secondSocket.LastCloseStatus.Should().Be((WebSocketCloseStatus)4409);
-        secondSocket.LastCloseDescription.Should().Be("Session already has an active connection");
+        secondSocket.LastCloseStatus.Should().NotBe((WebSocketCloseStatus)4409);
+        var secondPayloads = ParsePayloads(secondSocket.SentMessages);
+        secondPayloads.Any(payload => HasStringProperty(payload, "type", "error") && HasStringProperty(payload, "code", "SESSION_ALREADY_CONNECTED"))
+            .Should().BeTrue();
 
         firstSocket.AllowClose();
         await firstConnectionTask;
@@ -473,9 +480,11 @@ public sealed class GatewayWebSocketHandlerTests
         var resolvedOptions = options ?? Options.Create(new GatewayWebSocketOptions());
         var resolvedChannelAdapter = channelAdapter ?? new WebSocketChannelAdapter(NullLogger<WebSocketChannelAdapter>.Instance);
         var resolvedSessions = sessions ?? new InMemorySessionStore();
+        var registry = CreateAgentRegistry();
         var connectionManager = new WebSocketConnectionManager(resolvedOptions, NullLogger<WebSocketConnectionManager>.Instance);
         var dispatcher = new WebSocketMessageDispatcher(
             supervisor ?? Mock.Of<IAgentSupervisor>(),
+            registry.Object,
             resolvedChannelAdapter,
             resolvedSessions,
             resolvedOptions,
@@ -484,11 +493,37 @@ public sealed class GatewayWebSocketHandlerTests
 
         return new GatewayWebSocketHandler(
             resolvedChannelAdapter,
-            resolvedSessions,
             resolvedOptions,
             connectionManager,
             dispatcher,
             NullLogger<GatewayWebSocketHandler>.Instance);
+    }
+
+    private static Mock<IAgentRegistry> CreateAgentRegistry()
+    {
+        var registry = new Mock<IAgentRegistry>();
+        var agents = new[]
+        {
+            new AgentDescriptor
+            {
+                AgentId = "agent-a",
+                DisplayName = "Agent A",
+                ModelId = "test-model",
+                ApiProvider = "test"
+            },
+            new AgentDescriptor
+            {
+                AgentId = "agent-b",
+                DisplayName = "Agent B",
+                ModelId = "test-model",
+                ApiProvider = "test"
+            }
+        };
+
+        registry.Setup(r => r.GetAll()).Returns(agents);
+        registry.Setup(r => r.Contains(It.IsAny<string>()))
+            .Returns((string agentId) => agents.Any(agent => string.Equals(agent.AgentId, agentId, StringComparison.OrdinalIgnoreCase)));
+        return registry;
     }
 
     private sealed class TestWebSocketFeature : IHttpWebSocketFeature

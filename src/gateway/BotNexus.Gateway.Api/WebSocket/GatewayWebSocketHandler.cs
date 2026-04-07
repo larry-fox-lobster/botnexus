@@ -1,14 +1,10 @@
 using BotNexus.Gateway.Abstractions.Channels;
-using BotNexus.Gateway.Abstractions.Sessions;
-using System.Diagnostics;
-using BotNexus.Gateway.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace BotNexus.Gateway.Api.WebSocket;
 using NetWebSocket = System.Net.WebSockets.WebSocket;
-using NetWebSocketCloseStatus = System.Net.WebSockets.WebSocketCloseStatus;
 using NetWebSocketError = System.Net.WebSockets.WebSocketError;
 using NetWebSocketException = System.Net.WebSockets.WebSocketException;
 
@@ -17,9 +13,10 @@ using NetWebSocketException = System.Net.WebSockets.WebSocketException;
 /// </summary>
 /// <remarks>
 /// <para>WebSocket Protocol:</para>
-/// <para><b>Connection:</b> <c>ws://host/ws?agent={agentId}&amp;session={sessionId}</c></para>
+/// <para><b>Connection:</b> <c>ws://host/ws</c> (optional: <c>?agent={agentId}&amp;session={sessionId}</c>)</para>
 /// <para><b>Client → Server messages:</b></para>
 /// <list type="bullet">
+///   <item><c>{ "type": "switch_session", "agentId": "...", "sessionId": "optional" }</c> — Switch active session.</item>
 ///   <item><c>{ "type": "message", "content": "..." }</c> — Send a message to the agent.</item>
 ///   <item><c>{ "type": "reconnect", "sessionKey": "...", "lastSeqId": 42 }</c> — Replay missed outbound events.</item>
 ///   <item><c>{ "type": "abort" }</c> — Abort the current agent execution.</item>
@@ -31,7 +28,8 @@ using NetWebSocketException = System.Net.WebSockets.WebSocketException;
 /// </list>
 /// <para><b>Server → Client messages:</b></para>
 /// <list type="bullet">
-///   <item><c>{ "type": "connected", "connectionId": "...", "sessionId": "...", "sequenceId": 1 }</c></item>
+///   <item><c>{ "type": "connected", "connectionId": "...", "sessionId": "...", "agentId": "...", "availableAgents": [ ... ] }</c></item>
+///   <item><c>{ "type": "session_switched", "connectionId": "...", "sessionId": "...", "agentId": "...", "sequenceId": 2 }</c></item>
 ///   <item><c>{ "type": "message_start", "messageId": "..." }</c></item>
 ///   <item><c>{ "type": "thinking_delta", "delta": "...", "messageId": "..." }</c></item>
 ///   <item><c>{ "type": "content_delta", "delta": "...", "messageId": "..." }</c></item>
@@ -46,7 +44,6 @@ using NetWebSocketException = System.Net.WebSockets.WebSocketException;
 public sealed class GatewayWebSocketHandler
 {
     private readonly IGatewayWebSocketChannelAdapter _channelAdapter;
-    private readonly ISessionStore _sessions;
     private readonly IOptions<GatewayWebSocketOptions> _webSocketOptions;
     private readonly WebSocketConnectionManager _connectionManager;
     private readonly WebSocketMessageDispatcher _dispatcher;
@@ -57,14 +54,12 @@ public sealed class GatewayWebSocketHandler
     /// </summary>
     public GatewayWebSocketHandler(
         IGatewayWebSocketChannelAdapter channelAdapter,
-        ISessionStore sessions,
         IOptions<GatewayWebSocketOptions> webSocketOptions,
         WebSocketConnectionManager connectionManager,
         WebSocketMessageDispatcher dispatcher,
         ILogger<GatewayWebSocketHandler> logger)
     {
         _channelAdapter = channelAdapter;
-        _sessions = sessions;
         _webSocketOptions = webSocketOptions;
         _connectionManager = connectionManager;
         _dispatcher = dispatcher;
@@ -82,17 +77,10 @@ public sealed class GatewayWebSocketHandler
             return;
         }
 
-        var agentId = context.Request.Query["agent"].FirstOrDefault();
-        var sessionId = context.Request.Query["session"].FirstOrDefault() ?? Guid.NewGuid().ToString("N");
+        var initialAgentId = context.Request.Query["agent"].FirstOrDefault();
+        var initialSessionId = context.Request.Query["session"].FirstOrDefault();
 
-        if (string.IsNullOrEmpty(agentId))
-        {
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await context.Response.WriteAsync("Missing 'agent' query parameter", cancellationToken);
-            return;
-        }
-
-        if (!_connectionManager.TryRegisterConnectionAttempt(context, agentId, out var retryAfter))
+        if (!_connectionManager.TryRegisterConnectionAttempt(context, out var retryAfter))
         {
             context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
             var retrySeconds = (int)Math.Ceiling(retryAfter.TotalSeconds);
@@ -106,38 +94,39 @@ public sealed class GatewayWebSocketHandler
         }
 
         var connectionId = Guid.NewGuid().ToString("N");
-        if (!_connectionManager.TryReserveSession(sessionId, connectionId))
-        {
-            await _connectionManager.CloseDuplicateSessionAsync(context, cancellationToken);
-            return;
-        }
 
         NetWebSocket? socket = null;
+        var sessionContext = new WebSocketSessionContext(connectionId);
+        var replayWindow = Math.Max(_webSocketOptions.Value.ReplayWindowSize, 1);
         try
         {
             socket = await context.WebSockets.AcceptWebSocketAsync();
-            using var sessionActivity = GatewayDiagnostics.Source.StartActivity("session.get_or_create", ActivityKind.Internal);
-            sessionActivity?.SetTag("botnexus.session.id", sessionId);
-            sessionActivity?.SetTag("botnexus.agent.id", agentId);
-            var session = await _sessions.GetOrCreateAsync(sessionId, agentId, cancellationToken);
-            var replayWindow = Math.Max(_webSocketOptions.Value.ReplayWindowSize, 1);
+            await _dispatcher.SendConnectedAsync(sessionContext, socket, replayWindow, cancellationToken);
 
-            _logger.LogInformation("WebSocket connected: {ConnectionId} agent={AgentId} session={SessionId}", connectionId, agentId, sessionId);
-            if (!_channelAdapter.RegisterConnection(
-                    sessionId,
-                    connectionId,
-                    socket,
-                    (payload, ct) => _dispatcher.SequenceAndPersistPayloadAsync(session, payload, replayWindow, ct)))
+            if (!string.IsNullOrWhiteSpace(initialAgentId))
             {
-                await socket.CloseAsync(
-                    (NetWebSocketCloseStatus)WebSocketConnectionManager.SessionAlreadyConnectedCloseCode,
-                    "Session already has an active connection",
+                var resolvedSessionId = string.IsNullOrWhiteSpace(initialSessionId)
+                    ? Guid.NewGuid().ToString("N")
+                    : initialSessionId;
+
+                await _dispatcher.TrySwitchSessionAsync(
+                    socket,
+                    sessionContext,
+                    initialAgentId,
+                    resolvedSessionId,
+                    includeHistory: false,
+                    historyLimit: null,
+                    replayWindow,
                     cancellationToken);
-                return;
             }
 
-            await _dispatcher.SendConnectedAsync(session, sessionId, socket, connectionId, replayWindow, cancellationToken);
-            await _dispatcher.ProcessMessagesAsync(socket, connectionId, agentId, sessionId, session, replayWindow, cancellationToken);
+            _logger.LogInformation(
+                "WebSocket connected: {ConnectionId} agent={AgentId} session={SessionId}",
+                connectionId,
+                sessionContext.AgentId ?? "(none)",
+                sessionContext.SessionId ?? "(none)");
+
+            await _dispatcher.ProcessMessagesAsync(socket, sessionContext, replayWindow, cancellationToken);
         }
         catch (NetWebSocketException ex) when (ex.WebSocketErrorCode == NetWebSocketError.ConnectionClosedPrematurely)
         {
@@ -149,9 +138,10 @@ public sealed class GatewayWebSocketHandler
         }
         finally
         {
-            _channelAdapter.UnregisterConnection(sessionId, connectionId);
+            if (!string.IsNullOrWhiteSpace(sessionContext.SessionId))
+                _channelAdapter.UnregisterConnection(sessionContext.SessionId, connectionId);
             socket?.Dispose();
-            _connectionManager.ReleaseSession(sessionId, connectionId);
+            _connectionManager.ReleaseSession(sessionContext.SessionId ?? string.Empty, connectionId);
             _logger.LogInformation("WebSocket disconnected: {ConnectionId}", connectionId);
         }
     }

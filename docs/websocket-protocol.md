@@ -23,29 +23,27 @@
 ### Endpoint URL
 
 ```
-ws://host:port/ws?agent={agentId}&session={sessionId}
+ws://host:port/ws
 ```
 
 | Parameter   | Required | Description |
 |-------------|----------|-------------|
-| `agent`     | **Yes**  | Agent ID to connect to. Must match an agent defined in platform config. |
-| `session`   | No       | Session ID for continuity. When omitted, the server generates a new ID (`Guid.NewGuid().ToString("N")`). |
+| `agent`     | No       | Optional backward-compatible initial agent selection. |
+| `session`   | No       | Optional backward-compatible initial session selection. |
 
 ### Handshake
 
 The WebSocket endpoint uses the standard HTTP Upgrade handshake defined by [RFC 6455](https://datatracker.ietf.org/doc/html/rfc6455). The server validates the request before accepting:
 
 1. Verifies the request is a WebSocket upgrade (`Upgrade: websocket` header).
-2. Validates the `agent` query parameter is present and non-empty.
-3. Checks rate limits for the client/agent pair.
-4. Ensures no other active connection holds the same session slot.
-5. Accepts the WebSocket and sends a `connected` event.
+2. Checks rate limits for the client.
+3. Accepts the WebSocket and sends a `connected` event.
+4. If `agent` was supplied, the server attempts an initial session switch.
 
 **Failure responses before upgrade:**
 
 | Condition | HTTP Status | Body |
 |-----------|-------------|------|
-| Missing `agent` parameter | `400 Bad Request` | `Missing 'agent' query parameter` |
 | Rate limit exceeded | `429 Too Many Requests` | `Reconnect limit exceeded. Retry in N second(s).` |
 | Not a WebSocket request | `400 Bad Request` | — |
 
@@ -53,7 +51,7 @@ The `429` response includes a `Retry-After` header with the number of seconds to
 
 ### Session Locking
 
-Each session allows **one active WebSocket connection** at a time. If a second client connects with the same `session` parameter while another connection is active, the duplicate receives a WebSocket close with code `4409` and reason `"Session already has an active connection"`.
+Each session allows **one active WebSocket connection** at a time. Conflicts are enforced on `switch_session`: if a different connection already owns the target session, the server sends an `error` payload with code `SESSION_ALREADY_CONNECTED` and keeps the socket open.
 
 ---
 
@@ -100,6 +98,27 @@ Send a user message to the agent.
 |-----------|--------|----------|-------------|
 | `type`    | string | Yes      | Must be `"message"` |
 | `content` | string | Yes      | The user's message text |
+
+### `switch_session`
+
+Switches the connection's active session without reconnecting.
+
+```json
+{
+  "type": "switch_session",
+  "agentId": "nova",
+  "sessionId": "optional",
+  "includeHistory": false
+}
+```
+
+| Field            | Type    | Required | Description |
+|------------------|---------|----------|-------------|
+| `type`           | string  | Yes      | Must be `"switch_session"` |
+| `agentId`        | string  | Yes      | Target agent ID |
+| `sessionId`      | string  | No       | Existing session ID. Omit to create a new session ID. |
+| `includeHistory` | boolean | No       | When true, server sends `session_history` after switching. |
+| `historyLimit`   | int     | No       | Optional max history entries for `session_history` (default 100). |
 
 ### `reconnect`
 
@@ -200,6 +219,8 @@ Sent immediately after the WebSocket is accepted. Confirms the connection and se
   "type": "connected",
   "connectionId": "a1b2c3d4e5f6",
   "sessionId": "session123",
+  "agentId": "nova",
+  "availableAgents": [{ "agentId": "nova", "displayName": "Nova" }],
   "sequenceId": 1
 }
 ```
@@ -208,8 +229,24 @@ Sent immediately after the WebSocket is accepted. Confirms the connection and se
 |----------------|--------|-------------|
 | `type`         | string | `"connected"` |
 | `connectionId` | string | Unique identifier for this WebSocket connection |
-| `sessionId`    | string | Session ID (matches query param or server-generated) |
+| `sessionId`    | string | Optional current session ID when already selected |
+| `agentId`      | string | Optional current agent ID when already selected |
+| `availableAgents` | array | Registered agents available for switching |
 | `sequenceId`   | long   | Monotonically increasing sequence number |
+
+### `session_switched`
+
+Emitted after a successful `switch_session`.
+
+```json
+{
+  "type": "session_switched",
+  "sessionId": "session123",
+  "agentId": "nova",
+  "connectionId": "a1b2c3d4e5f6",
+  "sequenceId": 2
+}
+```
 
 ### `message_start`
 

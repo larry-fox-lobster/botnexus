@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Globalization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,7 +18,9 @@ public sealed class WebSocketConnectionManager
     private readonly IOptions<GatewayWebSocketOptions> _webSocketOptions;
     private readonly ILogger<WebSocketConnectionManager> _logger;
     private readonly ConcurrentDictionary<string, ConnectionAttemptWindow> _connectionAttempts = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, string> _activeSessionConnections = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _activeSessionConnections = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _connectionSessions = new(StringComparer.Ordinal);
+    private readonly Lock _sessionSync = new();
     private long _connectionAttemptUpdates;
 
     /// <summary>
@@ -37,7 +38,7 @@ public sealed class WebSocketConnectionManager
     /// Registers a reconnect attempt and enforces throttling windows.
     /// Loopback clients (localhost) are always allowed — matches OpenClaw's exemptLoopback pattern.
     /// </summary>
-    public bool TryRegisterConnectionAttempt(HttpContext context, string agentId, out TimeSpan retryAfter)
+    public bool TryRegisterConnectionAttempt(HttpContext context, out TimeSpan retryAfter)
     {
         // Exempt loopback/localhost clients from reconnect throttling
         if (IsLoopback(context))
@@ -52,7 +53,7 @@ public sealed class WebSocketConnectionManager
         var backoffBase = TimeSpan.FromSeconds(Math.Max(options.BackoffBaseSeconds, 1));
         var backoffMax = TimeSpan.FromSeconds(Math.Max(options.BackoffMaxSeconds, options.BackoffBaseSeconds));
         var now = DateTimeOffset.UtcNow;
-        var clientKey = GetClientAttemptKey(context, agentId);
+        var clientKey = GetClientAttemptKey(context);
 
         while (true)
         {
@@ -104,7 +105,38 @@ public sealed class WebSocketConnectionManager
     /// Reserves a session slot for an active WebSocket connection.
     /// </summary>
     public bool TryReserveSession(string sessionId, string connectionId)
-        => _activeSessionConnections.TryAdd(sessionId, connectionId);
+        => TryReserveSession(sessionId, connectionId, previousSessionId: null, out _);
+
+    /// <summary>
+    /// Reserves a session slot for an active WebSocket connection, releasing a previous session reservation when switching.
+    /// </summary>
+    public bool TryReserveSession(string sessionId, string connectionId, string? previousSessionId, out string? conflictingConnectionId)
+    {
+        conflictingConnectionId = null;
+        lock (_sessionSync)
+        {
+            if (_activeSessionConnections.TryGetValue(sessionId, out var existingConnectionId) &&
+                !string.Equals(existingConnectionId, connectionId, StringComparison.Ordinal))
+            {
+                conflictingConnectionId = existingConnectionId;
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(previousSessionId))
+            {
+                ReleaseSessionInternal(previousSessionId, connectionId);
+            }
+            else if (_connectionSessions.TryGetValue(connectionId, out var reservedSessionId) &&
+                     !string.Equals(reservedSessionId, sessionId, StringComparison.OrdinalIgnoreCase))
+            {
+                ReleaseSessionInternal(reservedSessionId, connectionId);
+            }
+
+            _activeSessionConnections[sessionId] = connectionId;
+            _connectionSessions[connectionId] = sessionId;
+            return true;
+        }
+    }
 
     /// <summary>
     /// Closes a duplicate session connection with the gateway's session-conflict code.
@@ -123,14 +155,17 @@ public sealed class WebSocketConnectionManager
     /// </summary>
     public void ReleaseSession(string sessionId, string connectionId)
     {
-        _activeSessionConnections.TryRemove(new KeyValuePair<string, string>(sessionId, connectionId));
-
-        // Reset reconnect throttle for all keys matching this session's client
-        // so clean disconnects don't penalize subsequent reconnects
-        foreach (var key in _connectionAttempts.Keys)
+        lock (_sessionSync)
         {
-            _connectionAttempts.TryRemove(key, out _);
+            if (!string.IsNullOrWhiteSpace(sessionId))
+                ReleaseSessionInternal(sessionId, connectionId);
+
+            if (_connectionSessions.TryGetValue(connectionId, out var reservedSessionId))
+                ReleaseSessionInternal(reservedSessionId, connectionId);
         }
+
+        // Reset reconnect throttling on clean disconnect.
+        _connectionAttempts.Clear();
     }
 
     /// <summary>
@@ -156,7 +191,7 @@ public sealed class WebSocketConnectionManager
         return true;
     }
 
-    private static string GetClientAttemptKey(HttpContext context, string agentId)
+    private static string GetClientAttemptKey(HttpContext context)
     {
         var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
         var clientAddress = context.Connection.RemoteIpAddress?.ToString();
@@ -164,7 +199,7 @@ public sealed class WebSocketConnectionManager
             ? clientAddress
             : forwardedFor.Split(',')[0].Trim();
 
-        return $"{(string.IsNullOrWhiteSpace(clientId) ? "unknown" : clientId)}::{agentId}";
+        return string.IsNullOrWhiteSpace(clientId) ? "unknown" : clientId;
     }
 
     private void CleanupStaleAttemptWindows(TimeSpan attemptWindow, DateTimeOffset now)
@@ -180,6 +215,21 @@ public sealed class WebSocketConnectionManager
     }
 
     private readonly record struct ConnectionAttemptWindow(DateTimeOffset WindowStartedUtc, int AttemptCount);
+
+    private void ReleaseSessionInternal(string sessionId, string connectionId)
+    {
+        if (_activeSessionConnections.TryGetValue(sessionId, out var existingConnectionId) &&
+            string.Equals(existingConnectionId, connectionId, StringComparison.Ordinal))
+        {
+            _activeSessionConnections.Remove(sessionId);
+        }
+
+        if (_connectionSessions.TryGetValue(connectionId, out var existingSessionId) &&
+            string.Equals(existingSessionId, sessionId, StringComparison.OrdinalIgnoreCase))
+        {
+            _connectionSessions.Remove(connectionId);
+        }
+    }
 
     private static bool IsLoopback(HttpContext context)
     {

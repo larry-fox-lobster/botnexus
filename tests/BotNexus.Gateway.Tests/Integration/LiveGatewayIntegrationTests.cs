@@ -75,14 +75,29 @@ public sealed class LiveGatewayIntegrationTests
     public async Task WebSocketConnectionTest_WsEndpoint_SendsConnectedMessage()
     {
         await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var descriptor = new AgentDescriptor
+        {
+            AgentId = "ws-agent",
+            DisplayName = "WebSocket Agent",
+            ModelId = "gpt-4.1",
+            ApiProvider = "copilot",
+            IsolationStrategy = "in-process"
+        };
+        var registerResponse = await client.PostAsJsonAsync("/api/agents", descriptor);
+        registerResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
         using var socket = await factory.Server.CreateWebSocketClient()
             .ConnectAsync(new Uri("ws://localhost/ws?agent=ws-agent&session=ws-session"), CancellationToken.None);
 
-        var payload = await ReceiveTextAsync(socket, CancellationToken.None);
-        using var doc = JsonDocument.Parse(payload);
+        var connectedPayload = await ReceiveTextAsync(socket, CancellationToken.None);
+        using var connectedDoc = JsonDocument.Parse(connectedPayload);
+        connectedDoc.RootElement.GetProperty("type").GetString().Should().Be("connected");
 
-        doc.RootElement.GetProperty("type").GetString().Should().Be("connected");
-        doc.RootElement.GetProperty("sessionId").GetString().Should().Be("ws-session");
+        var switchedPayload = await ReceiveTextAsync(socket, CancellationToken.None);
+        using var switchedDoc = JsonDocument.Parse(switchedPayload);
+        switchedDoc.RootElement.GetProperty("type").GetString().Should().Be("session_switched");
+        switchedDoc.RootElement.GetProperty("sessionId").GetString().Should().Be("ws-session");
     }
 
     [Fact]
@@ -145,6 +160,7 @@ public sealed class LiveGatewayIntegrationTests
 
         using var socket = await factory.Server.CreateWebSocketClient()
             .ConnectAsync(new Uri("ws://localhost/ws?agent=copilot-live&session=live-session"), CancellationToken.None);
+        await ReceiveTextAsync(socket, CancellationToken.None);
         await ReceiveTextAsync(socket, CancellationToken.None);
 
         await SendTextAsync(socket, """{"type":"message","content":"Reply with a short greeting."}""", CancellationToken.None);

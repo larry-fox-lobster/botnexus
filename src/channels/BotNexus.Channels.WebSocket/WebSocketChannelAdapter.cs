@@ -54,7 +54,25 @@ public sealed class WebSocketChannelAdapter(ILogger<WebSocketChannelAdapter> log
         string connectionId,
         NetWebSocket socket,
         Func<object, CancellationToken, ValueTask<object>>? payloadMutator = null)
-        => _connections.TryAdd(sessionId, new ConnectionRegistration(connectionId, socket, payloadMutator));
+    {
+        if (_connections.TryGetValue(sessionId, out var existingBySession) &&
+            !string.Equals(existingBySession.ConnectionId, connectionId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        foreach (var (registeredSessionId, registration) in _connections)
+        {
+            if (!string.Equals(registeredSessionId, sessionId, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(registration.ConnectionId, connectionId, StringComparison.Ordinal))
+            {
+                _connections.TryRemove(registeredSessionId, out _);
+            }
+        }
+
+        _connections[sessionId] = new ConnectionRegistration(connectionId, socket, payloadMutator);
+        return true;
+    }
 
     public void UnregisterConnection(string sessionId, string connectionId)
     {

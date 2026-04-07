@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using BotNexus.Channels.WebSocket;
 using BotNexus.Gateway.Abstractions.Agents;
+using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Api.WebSocket;
 using BotNexus.Gateway.Sessions;
 using FluentAssertions;
@@ -33,8 +34,16 @@ public sealed class SessionLockingTests
 
         await handler.HandleAsync(secondContext, cts.Token);
 
-        secondSocket.LastCloseStatus.Should().Be((WebSocketCloseStatus)4409);
-        secondSocket.LastCloseDescription.Should().Be("Session already has an active connection");
+        secondSocket.LastCloseStatus.Should().NotBe((WebSocketCloseStatus)4409);
+        var payloads = secondSocket.SentMessages
+            .Select(bytes => JsonDocument.Parse(Encoding.UTF8.GetString(bytes)).RootElement.Clone())
+            .ToList();
+        payloads.Any(payload =>
+            payload.TryGetProperty("type", out var type) &&
+            string.Equals(type.GetString(), "error", StringComparison.Ordinal) &&
+            payload.TryGetProperty("code", out var code) &&
+            string.Equals(code.GetString(), "SESSION_ALREADY_CONNECTED", StringComparison.Ordinal))
+            .Should().BeTrue();
 
         firstSocket.AllowClose();
         await firstConnectionTask;
@@ -60,8 +69,15 @@ public sealed class SessionLockingTests
         secondSocket.LastCloseStatus.Should().NotBe((WebSocketCloseStatus)4409);
         secondSocket.SentMessages.Should().NotBeEmpty();
 
-        var payload = JsonDocument.Parse(Encoding.UTF8.GetString(secondSocket.SentMessages[0]));
-        payload.RootElement.GetProperty("type").GetString().Should().Be("connected");
+        var payloads = secondSocket.SentMessages
+            .Select(bytes => JsonDocument.Parse(Encoding.UTF8.GetString(bytes)).RootElement.Clone())
+            .ToList();
+        payloads.Any(payload =>
+            payload.TryGetProperty("type", out var type) &&
+            string.Equals(type.GetString(), "session_switched", StringComparison.Ordinal) &&
+            payload.TryGetProperty("sessionId", out var sessionId) &&
+            string.Equals(sessionId.GetString(), "session-2", StringComparison.Ordinal))
+            .Should().BeTrue();
 
         firstSocket.AllowClose();
         await firstConnectionTask;
@@ -113,9 +129,11 @@ public sealed class SessionLockingTests
         var options = Options.Create(new GatewayWebSocketOptions());
         var channelAdapter = new WebSocketChannelAdapter(NullLogger<WebSocketChannelAdapter>.Instance);
         var sessions = new InMemorySessionStore();
+        var registry = CreateAgentRegistry();
         var connectionManager = new WebSocketConnectionManager(options, NullLogger<WebSocketConnectionManager>.Instance);
         var dispatcher = new WebSocketMessageDispatcher(
             Mock.Of<IAgentSupervisor>(),
+            registry.Object,
             channelAdapter,
             sessions,
             options,
@@ -124,11 +142,30 @@ public sealed class SessionLockingTests
 
         return new GatewayWebSocketHandler(
             channelAdapter,
-            sessions,
             options,
             connectionManager,
             dispatcher,
             NullLogger<GatewayWebSocketHandler>.Instance);
+    }
+
+    private static Mock<IAgentRegistry> CreateAgentRegistry()
+    {
+        var registry = new Mock<IAgentRegistry>();
+        var agents = new[]
+        {
+            new AgentDescriptor
+            {
+                AgentId = "agent-a",
+                DisplayName = "Agent A",
+                ModelId = "test-model",
+                ApiProvider = "test"
+            }
+        };
+
+        registry.Setup(r => r.GetAll()).Returns(agents);
+        registry.Setup(r => r.Contains(It.IsAny<string>()))
+            .Returns((string agentId) => agents.Any(agent => string.Equals(agent.AgentId, agentId, StringComparison.OrdinalIgnoreCase)));
+        return registry;
     }
 
     private static HttpContext CreateWebSocketContext(string agentId, string sessionId, WebSocket socket)

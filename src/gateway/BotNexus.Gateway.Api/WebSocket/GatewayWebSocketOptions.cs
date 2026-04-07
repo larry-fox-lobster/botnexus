@@ -6,7 +6,7 @@ namespace BotNexus.Gateway.Api.WebSocket;
 public sealed class GatewayWebSocketOptions
 {
     /// <summary>
-    /// Maximum reconnection attempts per client/agent within the tracking window.
+    /// Maximum reconnection attempts per client within the tracking window.
     /// </summary>
     public int MaxReconnectAttempts { get; set; } = 20;
 
