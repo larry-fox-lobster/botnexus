@@ -41,16 +41,13 @@ public sealed class GatewayHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, GetSessionGroup(sessionId));
 
         var session = await _sessions.GetOrCreateAsync(sessionId, agentId, Context.ConnectionAborted);
-        var result = new
+        return new
         {
             sessionId,
             agentId,
             connectionId = Context.ConnectionId,
             messageCount = session.History.Count
         };
-
-        await Clients.Caller.SendAsync("SessionJoined", result);
-        return result;
     }
 
     public Task LeaveSession(string sessionId)

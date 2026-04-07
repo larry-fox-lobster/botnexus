@@ -324,18 +324,19 @@
     // Gateway health check
     // =========================================================================
 
+    let gatewayHealthy = false;
+    let healthCheckInterval = null;
+
     async function checkGatewayHealth() {
         try {
             const response = await fetch('/health');
             const wasHealthy = gatewayHealthy;
             gatewayHealthy = response.ok;
             
-            // Update status if not connected via SignalR
             if (!connection || connection.state !== signalR.HubConnectionState.Connected) {
                 setStatus(gatewayHealthy ? 'online' : 'disconnected');
             }
             
-            // If health state changed, show banner
             if (wasHealthy !== gatewayHealthy) {
                 if (!gatewayHealthy) {
                     showConnectionBanner('⚠️ Gateway offline', 'warning');
@@ -350,8 +351,6 @@
             }
         }
     }
-
-    let healthCheckInterval = null;
 
     function startHealthCheck() {
         if (healthCheckInterval) return;
@@ -406,14 +405,8 @@
             }
         });
 
-        connection.on('SessionJoined', (data) => {
-            // Session state already set by joinSession() return value.
-            // Just refresh the sidebar display.
-            debugLog('session', 'SessionJoined callback:', data.sessionId);
-            if (data.sessionId) currentSessionId = data.sessionId;
-            if (data.agentId) currentAgentId = data.agentId;
-            updateSessionIdDisplay();
-        });
+        // SessionJoined is no longer sent as a separate callback —
+        // JoinSession returns the data directly via invoke result.
 
         connection.on('SessionReset', (data) => {
             currentSessionId = null;
