@@ -1361,10 +1361,8 @@
     }
 
     function startNewChat() {
-        // Stop the old agent instance if one exists
-        if (currentSessionId && currentAgentId) {
-            fetch(`${API_BASE}/agents/${encodeURIComponent(currentAgentId)}/sessions/${encodeURIComponent(currentSessionId)}/stop`, { method: 'POST' }).catch(() => {});
-        }
+        // Disconnect WebSocket but do NOT stop the agent instance —
+        // it should continue running in the background
         disconnectWebSocket();
         currentSessionId = null;
         activeMessageId = null;

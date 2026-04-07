@@ -149,12 +149,15 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
             {
                 try
                 {
-                    await ProcessInboundMessageAsync(item.Message, item.CancellationToken);
+                    // Use a detached token for agent processing so client disconnect
+                    // doesn't kill in-progress agent work. The agent continues in the
+                    // background even if the WebSocket closes.
+                    await ProcessInboundMessageAsync(item.Message, CancellationToken.None);
                     item.Completion.TrySetResult();
                 }
-                catch (OperationCanceledException) when (item.CancellationToken.IsCancellationRequested)
+                catch (OperationCanceledException)
                 {
-                    item.Completion.TrySetCanceled(item.CancellationToken);
+                    item.Completion.TrySetCanceled();
                 }
                 catch (Exception ex)
                 {
@@ -163,7 +166,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
                 }
                 finally
                 {
-                    await CleanupQueueIfClosedSessionAsync(queueKey, item.Message, item.CancellationToken);
+                    await CleanupQueueIfClosedSessionAsync(queueKey, item.Message, CancellationToken.None);
                 }
             }
         }
