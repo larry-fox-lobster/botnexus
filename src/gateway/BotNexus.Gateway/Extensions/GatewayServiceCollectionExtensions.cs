@@ -1,6 +1,7 @@
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Activity;
 using BotNexus.Gateway.Abstractions.Agents;
+using BotNexus.Gateway.Abstractions.Hooks;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Routing;
 using BotNexus.Gateway.Abstractions.Security;
@@ -10,6 +11,7 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Activity;
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
+using BotNexus.Gateway.Hooks;
 using BotNexus.Gateway.Isolation;
 using BotNexus.Gateway.Routing;
 using BotNexus.Gateway.Sessions;
@@ -73,6 +75,9 @@ public static class GatewayServiceCollectionExtensions
         services.AddSingleton<IActivityBroadcaster, InMemoryActivityBroadcaster>();
         services.AddSingleton<IGatewayAuthHandler, ApiKeyGatewayAuthHandler>();
         services.AddSingleton<IModelFilter, ConfigModelFilter>();
+
+        // Hook dispatcher
+        services.TryAddSingleton<IHookDispatcher, HookDispatcher>();
 
         // Built-in isolation strategies
         services.AddSingleton<IIsolationStrategy, InProcessIsolationStrategy>();

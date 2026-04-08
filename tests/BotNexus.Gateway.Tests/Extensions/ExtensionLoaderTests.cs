@@ -2,7 +2,9 @@ using System.Runtime.Loader;
 using System.Text.Json;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Extensions;
+using BotNexus.Gateway.Abstractions.Hooks;
 using BotNexus.Gateway.Extensions;
+using BotNexus.Gateway.Hooks;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -140,7 +142,7 @@ public sealed class ExtensionLoaderTests : IDisposable
     }
 
     private static AssemblyLoadContextExtensionLoader CreateLoader(IServiceCollection services)
-        => new(services, NullLogger<AssemblyLoadContextExtensionLoader>.Instance);
+        => new(services, new HookDispatcher(), NullLogger<AssemblyLoadContextExtensionLoader>.Instance);
 
     private static string ResolveTelegramAssemblyPath()
     {

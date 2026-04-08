@@ -1,0 +1,7 @@
+{
+  "name": "exec-tool",
+  "displayName": "Exec Tool",
+  "description": "Enhanced shell execution tool with timeout, background mode, and Windows command resolution.",
+  "version": "0.1.0",
+  "extensionTypes": ["tool"]
+}

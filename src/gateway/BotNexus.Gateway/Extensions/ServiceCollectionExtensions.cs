@@ -1,5 +1,7 @@
 using BotNexus.Gateway.Abstractions.Extensions;
+using BotNexus.Gateway.Abstractions.Hooks;
 using BotNexus.Gateway.Configuration;
+using BotNexus.Gateway.Hooks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -14,6 +16,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IExtensionLoader>(serviceProvider =>
             new AssemblyLoadContextExtensionLoader(
                 services,
+                serviceProvider.GetRequiredService<IHookDispatcher>(),
                 serviceProvider.GetRequiredService<ILogger<AssemblyLoadContextExtensionLoader>>()));
         return services;
     }
@@ -29,7 +32,14 @@ public static class ServiceCollectionExtensions
 
         var logger = loggerFactory?.CreateLogger<AssemblyLoadContextExtensionLoader>()
             ?? NullLogger<AssemblyLoadContextExtensionLoader>.Instance;
-        var loader = new AssemblyLoadContextExtensionLoader(services, logger);
+
+        // Resolve or create the hook dispatcher for extension-discovered hook handlers
+        var hookDispatcher = services
+            .Where(d => d.ServiceType == typeof(IHookDispatcher))
+            .Select(d => d.ImplementationInstance as IHookDispatcher)
+            .FirstOrDefault()
+            ?? new HookDispatcher();
+        var loader = new AssemblyLoadContextExtensionLoader(services, hookDispatcher, logger);
 
         var extensionsConfig = platformConfig.GetExtensions();
         if (extensionsConfig?.Enabled is false)

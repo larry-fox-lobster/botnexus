@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/extensions/" />
+  <Folder Name="/extensions/skills/">
+    <Project Path="extensions/skills/BotNexus.Extensions.Skills/BotNexus.Extensions.Skills.csproj" />
+  </Folder>
   <Folder Name="/src/" />
   <Folder Name="/src/agent/">
     <Project Path="src/agent/BotNexus.AgentCore/BotNexus.AgentCore.csproj" />
@@ -28,14 +32,15 @@
   <Folder Name="/src/coding-agent/">
     <Project Path="src/coding-agent/BotNexus.CodingAgent/BotNexus.CodingAgent.csproj" />
   </Folder>
-  <Folder Name="/src/skills/">
-    <Project Path="src/skills/BotNexus.Skills/BotNexus.Skills.csproj" />
-  </Folder>
   <Folder Name="/src/tools/">
     <Project Path="src/tools/BotNexus.Memory/BotNexus.Memory.csproj" />
     <Project Path="src/tools/BotNexus.Tools/BotNexus.Tools.csproj" />
   </Folder>
+  <Folder Name="/extensions/tools/">
+    <Project Path="extensions/tools/process/BotNexus.Extensions.ProcessTool/BotNexus.Extensions.ProcessTool.csproj" />
+  </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/BotNexus.Extensions.ProcessTool.Tests/BotNexus.Extensions.ProcessTool.Tests.csproj" />
     <Project Path="tests/BotNexus.AgentCore.Tests/BotNexus.AgentCore.Tests.csproj" />
     <Project Path="tests/BotNexus.Providers.Core.Tests/BotNexus.Providers.Core.Tests.csproj" />
     <Project Path="tests/BotNexus.Providers.Conformance.Tests/BotNexus.Providers.Conformance.Tests.csproj" />
@@ -49,4 +54,6 @@
     <Project Path="tests/BotNexus.Gateway.Tests/BotNexus.Gateway.Tests.csproj" />
     <Project Path="tests/BotNexus.Skills.Tests/BotNexus.Skills.Tests.csproj" />
   </Folder>
+  <Project Path="extensions/tools/exec/BotNexus.Extensions.ExecTool/BotNexus.Extensions.ExecTool.csproj" />
+  <Project Path="tests/BotNexus.Extensions.ExecTool.Tests/BotNexus.Extensions.ExecTool.Tests.csproj" />
 </Solution>

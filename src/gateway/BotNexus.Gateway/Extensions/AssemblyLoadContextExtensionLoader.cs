@@ -6,6 +6,7 @@ using BotNexus.Gateway.Abstractions.Activity;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Extensions;
+using BotNexus.Gateway.Abstractions.Hooks;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Routing;
 using BotNexus.Gateway.Abstractions.Security;
@@ -38,15 +39,18 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
     ];
 
     private readonly IServiceCollection _services;
+    private readonly IHookDispatcher _hookDispatcher;
     private readonly ILogger<AssemblyLoadContextExtensionLoader> _logger;
     private readonly Lock _sync = new();
     private readonly Dictionary<string, LoadedExtensionRuntime> _loaded = new(StringComparer.OrdinalIgnoreCase);
 
     public AssemblyLoadContextExtensionLoader(
         IServiceCollection services,
+        IHookDispatcher hookDispatcher,
         ILogger<AssemblyLoadContextExtensionLoader> logger)
     {
         _services = services;
+        _hookDispatcher = hookDispatcher;
         _logger = logger;
     }
 
@@ -124,7 +128,9 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
             var assembly = loadContext.LoadFromAssemblyPath(extension.EntryAssemblyPath);
 
             var discoveredImplementations = DiscoverImplementations(assembly);
+            var hookHandlerTypes = DiscoverHookHandlers(assembly);
             var registeredServiceNames = RegisterServices(discoveredImplementations);
+            RegisterHookHandlers(hookHandlerTypes, registeredServiceNames);
 
             var loadedExtension = new LoadedExtension
             {
@@ -237,7 +243,8 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
             "agent-supervisor",
             "agent-communicator",
             "activity-broadcaster",
-            "tool"
+            "tool",
+            "hook-handler"
         };
 
         var invalidTypes = extensionTypes
@@ -291,7 +298,7 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
         return implementations;
     }
 
-    private IReadOnlyList<string> RegisterServices(IReadOnlyList<(Type ServiceContract, Type Implementation)> implementations)
+    private List<string> RegisterServices(IReadOnlyList<(Type ServiceContract, Type Implementation)> implementations)
     {
         List<string> registered = [];
         foreach (var (contract, implementation) in implementations)
@@ -329,6 +336,44 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
         catch (ReflectionTypeLoadException ex)
         {
             return ex.Types.Where(type => type is not null).Cast<Type>().ToArray();
+        }
+    }
+
+    private static IReadOnlyList<(Type ClosedInterface, Type Implementation)> DiscoverHookHandlers(Assembly assembly)
+    {
+        var hookHandlerOpenGeneric = typeof(IHookHandler<,>);
+        var types = GetLoadableTypes(assembly);
+        List<(Type ClosedInterface, Type Implementation)> handlers = [];
+
+        foreach (var type in types)
+        {
+            if (!type.IsClass || type.IsAbstract || type.IsGenericTypeDefinition)
+                continue;
+
+            foreach (var iface in type.GetInterfaces())
+            {
+                if (iface.IsGenericType && iface.GetGenericTypeDefinition() == hookHandlerOpenGeneric)
+                    handlers.Add((iface, type));
+            }
+        }
+
+        return handlers;
+    }
+
+    private void RegisterHookHandlers(
+        IReadOnlyList<(Type ClosedInterface, Type Implementation)> hookHandlerTypes,
+        List<string> registeredServiceNames)
+    {
+        // Use reflection to call IHookDispatcher.Register<TEvent, TResult>(handler)
+        var registerMethod = typeof(IHookDispatcher).GetMethod(nameof(IHookDispatcher.Register))!;
+
+        foreach (var (closedInterface, implementation) in hookHandlerTypes)
+        {
+            var genericArgs = closedInterface.GetGenericArguments(); // [TEvent, TResult]
+            var instance = Activator.CreateInstance(implementation)!;
+            var closed = registerMethod.MakeGenericMethod(genericArgs);
+            closed.Invoke(_hookDispatcher, [instance]);
+            registeredServiceNames.Add($"IHookHandler<{genericArgs[0].Name},{genericArgs[1].Name}>->{implementation.FullName}");
         }
     }
 

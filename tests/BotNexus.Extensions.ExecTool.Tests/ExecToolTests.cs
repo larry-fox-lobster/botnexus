@@ -1,0 +1,256 @@
+using System.Runtime.InteropServices;
+using System.Text.Json;
+using BotNexus.AgentCore.Types;
+using BotNexus.Extensions.ExecTool;
+using FluentAssertions;
+
+namespace BotNexus.Extensions.ExecTool.Tests;
+
+public class ExecToolTests : IDisposable
+{
+    private readonly ExecTool _tool = new();
+
+    public void Dispose()
+    {
+        ExecTool.ClearBackgroundProcesses();
+    }
+
+    [Fact]
+    public void Name_ReturnsExec()
+    {
+        _tool.Name.Should().Be("exec");
+    }
+
+    [Fact]
+    public void Definition_HasRequiredCommandProperty()
+    {
+        var def = _tool.Definition;
+        def.Name.Should().Be("exec");
+        def.Parameters.GetProperty("required").EnumerateArray()
+            .Select(e => e.GetString())
+            .Should().Contain("command");
+    }
+
+    [Fact]
+    public async Task ExecuteSimpleEchoCommand()
+    {
+        var args = BuildArgs(GetEchoCommand("hello world"));
+
+        var result = await _tool.ExecuteAsync("test-1", args);
+
+        var text = GetResultText(result);
+        text.Should().Contain("hello world");
+    }
+
+    [Fact]
+    public async Task ExecuteReturnsExitCode()
+    {
+        // Use a command that exits with non-zero
+        string[] command = IsWindows
+            ? ["cmd.exe", "/c", "exit /b 42"]
+            : ["/bin/bash", "-c", "exit 42"];
+
+        var args = BuildArgs(command);
+        var result = await _tool.ExecuteAsync("test-exitcode", args);
+
+        var text = GetResultText(result);
+        text.Should().Contain("42");
+
+        var details = result.Details as ExecTool.ExecToolDetails;
+        details.Should().NotBeNull();
+        details!.ExitCode.Should().Be(42);
+        details.Termination.Should().Be("exit");
+    }
+
+    [Fact]
+    public async Task TimeoutKillsLongRunningCommand()
+    {
+        // Run a command that sleeps longer than the timeout
+        string[] command = IsWindows
+            ? ["cmd.exe", "/c", "ping -n 30 127.0.0.1"]
+            : ["/bin/bash", "-c", "sleep 30"];
+
+        var args = BuildArgs(command, timeoutMs: 500);
+        var result = await _tool.ExecuteAsync("test-timeout", args);
+
+        var text = GetResultText(result);
+        text.Should().Contain("timed out");
+
+        var details = result.Details as ExecTool.ExecToolDetails;
+        details.Should().NotBeNull();
+        details!.Termination.Should().Be("timeout");
+    }
+
+    [Fact]
+    public async Task BackgroundModeReturnsPid()
+    {
+        // Start a long-running process in background
+        string[] command = IsWindows
+            ? ["cmd.exe", "/c", "ping -n 10 127.0.0.1"]
+            : ["/bin/bash", "-c", "sleep 10"];
+
+        var args = BuildArgs(command, background: true);
+        var result = await _tool.ExecuteAsync("test-bg", args);
+
+        var text = GetResultText(result);
+        var json = JsonDocument.Parse(text);
+        json.RootElement.GetProperty("pid").GetInt32().Should().BeGreaterThan(0);
+        json.RootElement.GetProperty("status").GetString().Should().Be("running");
+
+        var details = result.Details as ExecTool.ExecToolDetails;
+        details.Should().NotBeNull();
+        details!.Termination.Should().Be("background");
+        details.Pid.Should().BeGreaterThan(0);
+
+        // Cleanup: kill background process
+        TryKillPid(details.Pid!.Value);
+    }
+
+    [Fact]
+    public async Task WorkingDirectoryOverride()
+    {
+        var tempDir = Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar);
+
+        string[] command = IsWindows
+            ? ["cmd.exe", "/c", "cd"]
+            : ["/bin/pwd"];
+
+        var args = BuildArgs(command, workingDir: tempDir);
+        var result = await _tool.ExecuteAsync("test-cwd", args);
+
+        var text = GetResultText(result);
+        // Normalize both paths for comparison
+        text.Trim().ToLowerInvariant().Should().Contain(
+            Path.GetFullPath(tempDir).TrimEnd(Path.DirectorySeparatorChar).ToLowerInvariant());
+    }
+
+    [Fact]
+    public async Task InputPipingToStdin()
+    {
+        string[] command = IsWindows
+            ? ["cmd.exe", "/c", "findstr /n ."]
+            : ["/bin/cat"];
+
+        var inputText = "piped input line";
+        var args = BuildArgs(command, input: inputText);
+        var result = await _tool.ExecuteAsync("test-stdin", args);
+
+        var text = GetResultText(result);
+        text.Should().Contain("piped input line");
+    }
+
+    [Fact]
+    public async Task PrepareArguments_RejectsEmptyCommand()
+    {
+        var args = new Dictionary<string, object?>
+        {
+            ["command"] = JsonDocument.Parse("[]").RootElement.Clone(),
+        };
+
+        var act = () => _tool.PrepareArgumentsAsync(args);
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*at least one element*");
+    }
+
+    [Fact]
+    public async Task PrepareArguments_RejectsInvalidTimeout()
+    {
+        var args = new Dictionary<string, object?>
+        {
+            ["command"] = JsonDocument.Parse("""["echo","hi"]""").RootElement.Clone(),
+            ["timeoutMs"] = JsonDocument.Parse("-5").RootElement.Clone(),
+        };
+
+        var act = () => _tool.PrepareArgumentsAsync(args);
+        await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+    }
+
+    [ConditionalFact(typeof(WindowsOnly))]
+    public async Task WindowsCmdResolution()
+    {
+        // "where.exe" is a known .exe on Windows, test that it resolves
+        var args = BuildArgs(["where.exe", "cmd.exe"]);
+        var result = await _tool.ExecuteAsync("test-win-resolve", args);
+
+        var text = GetResultText(result);
+        text.Should().Contain("cmd.exe");
+    }
+
+    [Fact]
+    public void ResolveCommand_PassthroughOnNonWindows()
+    {
+        if (IsWindows) return; // skip on Windows
+
+        var (fileName, args) = ExecTool.ResolveCommand(["mycommand", "arg1", "arg2"]);
+        fileName.Should().Be("mycommand");
+        args.Should().BeEquivalentTo(["arg1", "arg2"]);
+    }
+
+    #region Helpers
+
+    private static bool IsWindows => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+
+    private static string[] GetEchoCommand(string message) =>
+        IsWindows
+            ? ["cmd.exe", "/c", $"echo {message}"]
+            : ["/bin/echo", message];
+
+    private static IReadOnlyDictionary<string, object?> BuildArgs(
+        string[] command,
+        int? timeoutMs = null,
+        int? noOutputTimeoutMs = null,
+        string? input = null,
+        bool? background = null,
+        string? workingDir = null)
+    {
+        var dict = new Dictionary<string, object?>
+        {
+            ["command"] = (IReadOnlyList<string>)command.ToList(),
+            ["timeoutMs"] = timeoutMs ?? ExecTool_DefaultTimeoutMs,
+            ["noOutputTimeoutMs"] = noOutputTimeoutMs,
+            ["input"] = input,
+            ["background"] = background ?? false,
+            ["env"] = null,
+            ["workingDir"] = workingDir,
+        };
+
+        return dict;
+    }
+
+    private const int ExecTool_DefaultTimeoutMs = 120_000;
+
+    private static string GetResultText(AgentToolResult result)
+    {
+        result.Content.Should().NotBeEmpty();
+        return result.Content[0].Value;
+    }
+
+    private static void TryKillPid(int pid)
+    {
+        try
+        {
+            var process = System.Diagnostics.Process.GetProcessById(pid);
+            process.Kill(entireProcessTree: true);
+        }
+        catch
+        {
+            // Process may have already exited
+        }
+    }
+
+    #endregion
+}
+
+public class ConditionalFactAttribute : FactAttribute
+{
+    public ConditionalFactAttribute(Type conditionType)
+    {
+        if (conditionType == typeof(WindowsOnly) && !RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            Skip = "Windows-only test.";
+        }
+    }
+}
+
+public class WindowsOnly;
+
