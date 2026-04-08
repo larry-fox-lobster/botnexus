@@ -222,6 +222,59 @@ public sealed class CronToolTests
         localNext.Hour.Should().Be(12, "schedule should be interpreted in Eastern time");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_Create_WithInvalidSchedule_SetsNullNextRunAt()
+    {
+        var store = new Mock<ICronStore>();
+        var scheduler = CreateScheduler();
+        CronJob? created = null;
+        store.Setup(value => value.CreateAsync(It.IsAny<CronJob>(), It.IsAny<CancellationToken>()))
+            .Callback<CronJob, CancellationToken>((job, _) => created = job)
+            .ReturnsAsync((CronJob job, CancellationToken _) => job);
+        var tool = new CronTool(store.Object, scheduler, "agent-a");
+
+        var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?>
+        {
+            ["action"] = "create",
+            ["name"] = "Bad schedule job",
+            ["schedule"] = "not valid cron",
+            ["message"] = "test"
+        });
+
+        created.Should().NotBeNull();
+        created!.NextRunAt.Should().BeNull("invalid schedule should not compute a NextRunAt");
+        created.Schedule.Should().Be("not valid cron");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Update_WithInvalidSchedule_SetsNullNextRunAt()
+    {
+        var store = new Mock<ICronStore>();
+        var scheduler = CreateScheduler();
+        var existingJob = CreateJob("job-1", createdBy: "agent-a") with
+        {
+            Schedule = "*/5 * * * *",
+            NextRunAt = DateTimeOffset.UtcNow.AddMinutes(3)
+        };
+        store.Setup(value => value.GetAsync("job-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingJob);
+        CronJob? saved = null;
+        store.Setup(value => value.UpdateAsync(It.IsAny<CronJob>(), It.IsAny<CancellationToken>()))
+            .Callback<CronJob, CancellationToken>((job, _) => saved = job)
+            .ReturnsAsync((CronJob job, CancellationToken _) => job);
+        var tool = new CronTool(store.Object, scheduler, "agent-a");
+
+        await tool.ExecuteAsync("call-1", new Dictionary<string, object?>
+        {
+            ["action"] = "update",
+            ["jobId"] = "job-1",
+            ["schedule"] = "garbage"
+        });
+
+        saved.Should().NotBeNull();
+        saved!.NextRunAt.Should().BeNull("invalid schedule should null out NextRunAt");
+    }
+
     private static CronScheduler CreateScheduler()
     {
         var store = new Mock<ICronStore>().Object;

@@ -254,6 +254,183 @@ public sealed class CronSchedulerTests
         afterRun.NextRunAt!.Value.Day.Should().Be(1);
     }
 
+    [Fact]
+    public async Task Scheduler_OneJobFailure_DoesNotPreventOtherJobsFromRunning()
+    {
+        await using var context = await CronStoreTestContext.CreateAsync();
+        var failAction = new ThrowingAction("fail-action", "kaboom");
+        var okAction = new RecordingAction("ok-action");
+
+        var job1 = CronStoreTestContext.CreateJob("job-fail", actionType: "fail-action") with
+        {
+            NextRunAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+        };
+        var job2 = CronStoreTestContext.CreateJob("job-ok", actionType: "ok-action") with
+        {
+            NextRunAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+        };
+        await context.Store.CreateAsync(job1);
+        await context.Store.CreateAsync(job2);
+
+        var scheduler = CreateScheduler(context.Store, [failAction, okAction]);
+
+        await InvokeProcessTickAsync(scheduler);
+
+        okAction.ExecutionCount.Should().Be(1,
+            "the second job should still run even though the first threw");
+        var failedRun = await context.Store.GetRunHistoryAsync("job-fail");
+        failedRun.Should().ContainSingle(run => run.Status == "error");
+    }
+
+    [Fact]
+    public async Task Scheduler_MultipleDueJobs_AllFire()
+    {
+        await using var context = await CronStoreTestContext.CreateAsync();
+        var action = new RecordingAction("test-action");
+
+        for (var i = 1; i <= 3; i++)
+        {
+            var job = CronStoreTestContext.CreateJob($"job-{i}", actionType: "test-action") with
+            {
+                NextRunAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+            };
+            await context.Store.CreateAsync(job);
+        }
+
+        var scheduler = CreateScheduler(context.Store, [action]);
+        await InvokeProcessTickAsync(scheduler);
+
+        action.ExecutionCount.Should().Be(3, "all three due jobs should fire");
+    }
+
+    [Fact]
+    public async Task Scheduler_JobWithInvalidSchedule_SkipsWithoutPoisoningLoop()
+    {
+        await using var context = await CronStoreTestContext.CreateAsync();
+        var action = new RecordingAction("test-action");
+
+        var badJob = CronStoreTestContext.CreateJob("bad-job", actionType: "test-action") with
+        {
+            Schedule = "not a cron expression",
+            NextRunAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+        };
+        var goodJob = CronStoreTestContext.CreateJob("good-job", actionType: "test-action") with
+        {
+            NextRunAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+        };
+        await context.Store.CreateAsync(badJob);
+        await context.Store.CreateAsync(goodJob);
+
+        var scheduler = CreateScheduler(context.Store, [action]);
+        await InvokeProcessTickAsync(scheduler);
+
+        action.ExecutionCount.Should().Be(1, "valid job should still fire");
+        var goodHistory = await context.Store.GetRunHistoryAsync("good-job");
+        goodHistory.Should().ContainSingle(run => run.Status == "ok");
+    }
+
+    [Fact]
+    public async Task Scheduler_ReenabledJob_WithPastNextRunAt_FiresImmediately()
+    {
+        await using var context = await CronStoreTestContext.CreateAsync();
+        var action = new RecordingAction("test-action");
+
+        // Job was disabled, had a past NextRunAt. Now re-enabled.
+        var job = CronStoreTestContext.CreateJob("job-1", actionType: "test-action") with
+        {
+            NextRunAt = DateTimeOffset.UtcNow.AddMinutes(-10),
+            Enabled = true
+        };
+        await context.Store.CreateAsync(job);
+        var scheduler = CreateScheduler(context.Store, [action]);
+
+        await InvokeProcessTickAsync(scheduler);
+
+        action.ExecutionCount.Should().Be(1,
+            "re-enabled job with past NextRunAt should fire immediately");
+    }
+
+    [Fact]
+    public async Task RunNowAsync_NonexistentJob_Throws()
+    {
+        await using var context = await CronStoreTestContext.CreateAsync();
+        var action = new RecordingAction("test-action");
+        var scheduler = CreateScheduler(context.Store, [action]);
+
+        var act = () => scheduler.RunNowAsync("nonexistent-job");
+
+        await act.Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    [Fact]
+    public async Task RunNowAsync_DisabledJob_StillRuns()
+    {
+        // Manual runs should bypass the enabled check — the user
+        // explicitly asked to run it.
+        await using var context = await CronStoreTestContext.CreateAsync();
+        var action = new RecordingAction("test-action");
+
+        var job = CronStoreTestContext.CreateJob("job-1", actionType: "test-action", enabled: false);
+        await context.Store.CreateAsync(job);
+        var scheduler = CreateScheduler(context.Store, [action]);
+
+        var run = await scheduler.RunNowAsync("job-1");
+
+        run.Status.Should().Be("ok");
+        action.ExecutionCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Scheduler_SyncConfiguredJobs_UpdatedSchedule_CorrectsStaleness()
+    {
+        // Config sync changes a schedule from yearly to every minute,
+        // but doesn't recompute NextRunAt. The scheduler's stale-detection
+        // in ProcessTickAsync should catch and correct it.
+        await using var context = await CronStoreTestContext.CreateAsync();
+        var action = new RecordingAction("test-action");
+
+        // Pre-seed a job with a yearly schedule and distant NextRunAt
+        var job = CronStoreTestContext.CreateJob("config-job", actionType: "test-action") with
+        {
+            Schedule = "0 0 1 1 *",
+            NextRunAt = new DateTimeOffset(DateTimeOffset.UtcNow.Year + 1, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        };
+        await context.Store.CreateAsync(job);
+
+        // Now simulate config sync changing the schedule to every minute
+        // but NOT recomputing NextRunAt (the SyncConfiguredJobs bug)
+        var synced = job with { Schedule = "* * * * *" };
+        await context.Store.UpdateAsync(synced);
+
+        var scheduler = CreateScheduler(context.Store, [action]);
+        await InvokeProcessTickAsync(scheduler);
+
+        // ProcessTickAsync should detect the mismatch and correct NextRunAt
+        var updated = await context.Store.GetAsync("config-job");
+        updated!.NextRunAt.Should().NotBeNull();
+        updated.NextRunAt!.Value.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(2),
+            "scheduler should correct stale NextRunAt after config sync");
+    }
+
+    [Fact]
+    public async Task Scheduler_CreateWithInvalidSchedule_SetsNullNextRunAt()
+    {
+        await using var context = await CronStoreTestContext.CreateAsync();
+        var action = new RecordingAction("test-action");
+
+        var job = CronStoreTestContext.CreateJob("job-1", actionType: "test-action") with
+        {
+            Schedule = "garbage"
+        };
+        await context.Store.CreateAsync(job);
+
+        var scheduler = CreateScheduler(context.Store, [action]);
+        await InvokeProcessTickAsync(scheduler);
+
+        // Should not throw, should not fire, job should be untouched
+        action.ExecutionCount.Should().Be(0);
+    }
+
     private static CronScheduler CreateScheduler(ICronStore store, IEnumerable<ICronAction> actions)
     {
         var services = new ServiceCollection().BuildServiceProvider();
