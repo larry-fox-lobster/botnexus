@@ -47,7 +47,7 @@ The **BotNexus Gateway** is the central hub for multi-agent orchestration. It pr
 - **Session persistence** — Durable conversation history (JSONL)
 - **Hot reload** — Edit `config.json` and changes apply live (no restart)
 - **Health checks** — Built-in `/health` endpoint for monitoring
-- **WebUI** — Real-time chat dashboard at `/webui`
+- **WebUI** — Real-time chat dashboard served at the root URL
 
 ### Quick Start
 
@@ -66,7 +66,7 @@ dotnet build BotNexus.slnx
 dotnet run --project src/gateway/BotNexus.Gateway.Api
 ```
 
-Open `http://localhost:5005/webui` for the real-time chat dashboard. See the [Developer Guide](docs/dev-guide.md) for the full workflow.
+Open `http://localhost:5005` for the real-time chat dashboard. See the [Developer Guide](docs/dev-guide.md) for the full workflow.
 
 ### Configuration
 
@@ -114,7 +114,6 @@ Edit `~/.botnexus/config.json` to configure:
 | `/api/sessions/{id}` | GET | Get session history |
 | `/api/sessions/{id}` | DELETE | Delete a session |
 | `/hub/gateway` | SignalR Hub | Real-time streaming with agents |
-| `/webui` | GET | Interactive WebUI dashboard |
 
 ### SignalR Hub
 

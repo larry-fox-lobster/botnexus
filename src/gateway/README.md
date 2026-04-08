@@ -313,7 +313,6 @@ These paths bypass authentication entirely:
 | Path | Reason |
 |------|--------|
 | `/health` | Health checks for load balancers and monitoring |
-| `/webui` | Browser-based UI (served as static files) |
 | `/swagger` | API documentation browser |
 
 #### Development Mode
@@ -599,9 +598,6 @@ The script builds the Gateway, starts it on a temporary port, fetches `/swagger/
   - Query params: `?agent={agentId}&session={sessionId}`
   - See [WebSocket Protocol](#websocket-protocol) section in root README
 
-### WebUI
-- **GET `/webui`** — Real-time chat dashboard
-
 ## WebSocket Protocol
 
 ### Connection
@@ -808,7 +804,7 @@ wscat -c "ws://localhost:5005/ws?agent=test-agent&session=test-session-1"
 
 ### Explore the API
 
-- **WebUI:** `http://localhost:5005/webui` — Real-time chat dashboard
+- **WebUI:** `http://localhost:5005` — Real-time chat dashboard
 - **Swagger:** `http://localhost:5005/swagger` — Interactive API docs
 - **Health:** `http://localhost:5005/health` — Status check (no auth required)
 
@@ -898,7 +894,7 @@ src/gateway/
 ### 401 Unauthorized on API calls
 1. Check if API keys are configured in `gateway.apiKeys` — if yes, include `X-Api-Key` header
 2. In dev mode (no keys configured), all requests should pass — verify your config
-3. Endpoints `/health`, `/webui`, `/swagger`, and static files are always exempt
+3. Endpoints `/health`, `/swagger`, and static files are always exempt
 
 ### 429 Too Many Requests
 1. Agent has reached its `maxConcurrentSessions` limit

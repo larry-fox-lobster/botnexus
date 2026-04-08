@@ -44,7 +44,7 @@ Or pass it as a query parameter:
 GET /api/agents?apiKey=your-api-key-here
 ```
 
-**Exemptions:** `/health`, `/webui`, and `/swagger` are exempt from authentication.
+**Exemptions:** `/health` and `/swagger` are exempt from authentication. Static files served from the web root are also exempt.
 
 ### Request & Response Headers
 

@@ -91,7 +91,6 @@ Subscribes to real-time activity events (agent started, tool called, streaming e
 | `/health` | Health check (no auth required) — returns `{"status":"ok"}` |
 | `/swagger` | Interactive OpenAPI documentation (no auth required) |
 | `/swagger/v1/swagger.json` | OpenAPI spec in JSON format |
-| `/webui` | Built-in web interface (no auth required) |
 
 ## Middleware
 
@@ -100,7 +99,6 @@ Subscribes to real-time activity events (agent started, tool called, streaming e
 Validates all requests using a route-based allowlist. The following paths skip authentication:
 
 - `/health` — Health check endpoint
-- `/webui/**` — Built-in web interface
 - `/swagger/**` — OpenAPI documentation
 - Static files in `wwwroot` — GET/HEAD requests for files that exist in the web root (excludes `/api/**` paths)
 

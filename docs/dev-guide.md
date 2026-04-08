@@ -55,7 +55,7 @@ dotnet build BotNexus.slnx
 .\scripts\start-gateway.ps1
 ```
 
-The Gateway starts at `http://localhost:5005` with the WebUI at `http://localhost:5005/webui`.
+The Gateway starts at `http://localhost:5005` with the WebUI served at the root URL.
 
 > **First run?** BotNexus auto-creates `~/.botnexus/` with a default `config.json`. No manual setup needed for development mode.
 
@@ -181,7 +181,6 @@ Full build → test → run cycle for rapid development.
 ✅ Tests passed
 🚀 Starting Gateway API
    URL:        http://localhost:5005
-   WebUI:      http://localhost:5005/webui
    Environment: Development
 ```
 
@@ -314,7 +313,6 @@ The Gateway watches `config.json` with a `FileSystemWatcher`. Changes are deboun
 
 The Gateway starts with:
 - **URL:** `http://localhost:5005`
-- **WebUI:** `http://localhost:5005/webui`
 - **Swagger:** `http://localhost:5005/swagger`
 - **Health:** `http://localhost:5005/health`
 - **Environment:** `Development`
@@ -359,7 +357,6 @@ curl http://localhost:5005/api/agents
 | `/api/sessions` | Session management |
 | `/api/config/validate` | Config validation |
 | `/hub/gateway` | SignalR streaming hub |
-| `/webui` | Real-time chat dashboard |
 | `/swagger` | API documentation browser |
 
 ---
@@ -417,11 +414,11 @@ dotnet test BotNexus.slnx --logger "console;verbosity=detailed"
 
 ## WebUI Access
 
-The Gateway serves a real-time chat dashboard at `/webui`.
+The Gateway serves a real-time chat dashboard at the root URL (`/`).
 
 ### Accessing the WebUI
 
-Open in your browser: `http://localhost:5005/webui`
+Open in your browser: `http://localhost:5005`
 
 ### Features
 
@@ -437,7 +434,7 @@ Open in your browser: `http://localhost:5005/webui`
 
 ### WebUI Auth
 
-The WebUI path (`/webui`) is **exempt from API key authentication**. It serves static files directly. SignalR connections from the WebUI to `/hub/gateway` are subject to auth unless running in development mode.
+The WebUI is served as static files at the root URL and is **exempt from API key authentication** via the static file provider. SignalR connections from the WebUI to `/hub/gateway` are subject to auth unless running in development mode.
 
 ---
 
@@ -670,7 +667,6 @@ curl "http://localhost:5005/api/agents?apiKey=sk-my-secret-key"
 | Path | Reason |
 |------|--------|
 | `/health` | Load balancer health checks |
-| `/webui` | Browser-based UI (static files) |
 | `/swagger` | API documentation browser |
 
 ### Multi-Tenant API Keys

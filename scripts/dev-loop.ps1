@@ -57,7 +57,7 @@ try {
 
         Write-Host ""
         Write-Host "👀 Starting Gateway in watch mode at $gatewayUrl"
-        Write-Host "Open WebUI: $gatewayUrl/webui"
+        Write-Host "Open WebUI: $gatewayUrl"
         dotnet watch --project $gatewayProject run --no-launch-profile
     }
     else {

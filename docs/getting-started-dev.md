@@ -78,7 +78,6 @@ The Gateway will be ready when you see output like:
 ```
 🚀 Starting Gateway API
    URL:        http://localhost:5005
-   WebUI:      http://localhost:5005/webui
 ```
 
 ---
@@ -261,7 +260,7 @@ http://localhost:5005/
 Or directly to the WebUI:
 
 ```
-http://localhost:5005/webui
+http://localhost:5005
 ```
 
 You should see the BotNexus web interface.
