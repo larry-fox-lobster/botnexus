@@ -49,13 +49,13 @@ public sealed class GatewayStartupAndConfigurationTests
             using var client = factory.CreateClient();
 
             var health = await client.GetFromJsonAsync<JsonElement>("/health");
-            var webUi = await client.GetAsync("/webui");
+            var root = await client.GetAsync("/");
             var swagger = await client.GetAsync("/swagger");
             var swaggerJson = await client.GetAsync("/swagger/v1/swagger.json");
 
             health.GetProperty("status").GetString().Should().Be("ok");
-            webUi.StatusCode.Should().Be(HttpStatusCode.OK);
-            (await webUi.Content.ReadAsStringAsync()).Should().Contain("<html");
+            root.StatusCode.Should().Be(HttpStatusCode.OK);
+            (await root.Content.ReadAsStringAsync()).Should().Contain("<html");
             swagger.StatusCode.Should().Be(HttpStatusCode.OK);
             swaggerJson.StatusCode.Should().Be(HttpStatusCode.OK);
         });

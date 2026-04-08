@@ -126,10 +126,20 @@ public sealed class GatewayAuthMiddlewareTests
     }
 
     [Fact]
-    public async Task WebUIEndpoint_SkipsAuth()
+    public async Task StaticWebRootFile_SkipsAuth()
     {
         var authHandler = new Mock<IGatewayAuthHandler>(MockBehavior.Strict);
         var nextCalled = false;
+        var fileProvider = new Mock<IFileProvider>(MockBehavior.Strict);
+        var fileInfo = new Mock<IFileInfo>(MockBehavior.Strict);
+        fileInfo.SetupGet(info => info.Exists).Returns(true);
+        fileInfo.SetupGet(info => info.IsDirectory).Returns(false);
+        fileProvider
+            .Setup(provider => provider.GetFileInfo("styles.css"))
+            .Returns(fileInfo.Object);
+
+        var webHostEnvironment = new Mock<IWebHostEnvironment>(MockBehavior.Strict);
+        webHostEnvironment.SetupGet(environment => environment.WebRootFileProvider).Returns(fileProvider.Object);
         var middleware = new GatewayAuthMiddleware(
             _ =>
             {
@@ -137,11 +147,12 @@ public sealed class GatewayAuthMiddlewareTests
                 return Task.CompletedTask;
             },
             authHandler.Object,
-            CreateWebHostEnvironment(),
+            webHostEnvironment.Object,
             NullLogger<GatewayAuthMiddleware>.Instance);
 
         var context = new DefaultHttpContext();
-        context.Request.Path = "/webui/index.html";
+        context.Request.Method = HttpMethods.Get;
+        context.Request.Path = "/styles.css";
 
         await middleware.InvokeAsync(context);
 
@@ -242,7 +253,6 @@ public sealed class GatewayAuthMiddlewareTests
     [Theory]
     [InlineData("/health")]
     [InlineData("/swagger/index.html")]
-    [InlineData("/webui/styles.css")]
     public async Task AllowlistedRoutes_SkipAuth(string path)
     {
         var authHandler = new Mock<IGatewayAuthHandler>(MockBehavior.Strict);

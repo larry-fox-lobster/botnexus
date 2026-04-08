@@ -101,7 +101,6 @@ public sealed class GatewayAuthMiddleware
     {
         var path = request.Path;
         return path.Equals("/health", StringComparison.OrdinalIgnoreCase) ||
-               path.StartsWithSegments("/webui", StringComparison.OrdinalIgnoreCase) ||
                path.StartsWithSegments("/swagger", StringComparison.OrdinalIgnoreCase) ||
                IsStaticWebRootFile(request, webRootFileProvider);
     }
