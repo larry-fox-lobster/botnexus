@@ -264,6 +264,22 @@ public sealed class AgentDefinitionConfig
     public SessionAccessConfig? SessionAccess { get; set; }
     /// <summary>Skills configuration for this agent.</summary>
     public BotNexus.Extensions.Skills.SkillsConfig? Skills { get; set; }
+
+    /// <summary>Tool policy overrides for this agent.</summary>
+    public ToolPolicyConfig? ToolPolicy { get; set; }
+}
+
+/// <summary>Per-agent tool policy configuration that overrides default risk classifications.</summary>
+public sealed class ToolPolicyConfig
+{
+    /// <summary>Tools that always require approval regardless of default classification.</summary>
+    public List<string>? AlwaysApprove { get; set; }
+
+    /// <summary>Tools that skip approval even if classified as dangerous (trusted).</summary>
+    public List<string>? NeverApprove { get; set; }
+
+    /// <summary>Tools completely blocked for this agent.</summary>
+    public List<string>? Denied { get; set; }
 }
 
 /// <summary>Controls what sessions an agent can access via the session tool.</summary>

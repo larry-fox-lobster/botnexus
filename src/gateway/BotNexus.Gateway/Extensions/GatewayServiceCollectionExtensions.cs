@@ -79,6 +79,11 @@ public static class GatewayServiceCollectionExtensions
         // Hook dispatcher
         services.TryAddSingleton<IHookDispatcher, HookDispatcher>();
 
+        // Tool policy
+        services.TryAddSingleton<DefaultToolPolicyProvider>();
+        services.TryAddSingleton<IToolPolicyProvider>(sp => sp.GetRequiredService<DefaultToolPolicyProvider>());
+        services.AddSingleton<ToolPolicyHookHandler>();
+
         // Built-in isolation strategies
         services.AddSingleton<IIsolationStrategy, InProcessIsolationStrategy>();
         services.AddSingleton<IIsolationStrategy, SandboxIsolationStrategy>();
