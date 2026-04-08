@@ -85,7 +85,7 @@ public sealed class PlatformConfigAgentSource(
                 Memory = CloneMemoryConfig(agentConfig.Memory),
                 SessionAccessLevel = agentConfig.SessionAccess?.Level ?? "own",
                 SessionAllowedAgents = agentConfig.SessionAccess?.AllowedAgents?.ToArray() ?? [],
-                Skills = agentConfig.Skills
+                ExtensionConfig = agentConfig.Extensions ?? new Dictionary<string, JsonElement>()
             };
 
             var validationErrors = AgentDescriptorValidator.Validate(descriptor);

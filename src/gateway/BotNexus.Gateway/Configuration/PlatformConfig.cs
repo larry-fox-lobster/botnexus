@@ -262,8 +262,12 @@ public sealed class AgentDefinitionConfig
     public MemoryAgentConfig? Memory { get; set; }
     /// <summary>Session access configuration for this agent's session tool.</summary>
     public SessionAccessConfig? SessionAccess { get; set; }
-    /// <summary>Skills configuration for this agent.</summary>
-    public SkillsConfig? Skills { get; set; }
+
+    /// <summary>
+    /// Extension-specific configuration keyed by extension ID.
+    /// Each extension reads its own section (e.g., "botnexus-skills", "botnexus-exec").
+    /// </summary>
+    public Dictionary<string, JsonElement>? Extensions { get; set; }
 
     /// <summary>Tool policy overrides for this agent.</summary>
     public ToolPolicyConfig? ToolPolicy { get; set; }

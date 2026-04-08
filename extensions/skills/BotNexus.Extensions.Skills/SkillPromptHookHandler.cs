@@ -47,7 +47,8 @@ public sealed class SkillPromptHookHandler
         if (allSkills.Count == 0)
             return Task.FromResult<BeforePromptBuildResult?>(null);
 
-        var resolution = SkillResolver.Resolve(allSkills, descriptor.Skills);
+        var config = ResolveSkillsConfig(descriptor);
+        var resolution = SkillResolver.Resolve(allSkills, config);
         if (resolution.Loaded.Count == 0 && resolution.Available.Count == 0)
             return Task.FromResult<BeforePromptBuildResult?>(null);
 
@@ -59,5 +60,19 @@ public sealed class SkillPromptHookHandler
         {
             AppendSystemContext = prompt
         });
+    }
+
+    private static SkillsConfig? ResolveSkillsConfig(AgentDescriptor descriptor)
+    {
+        if (descriptor.ExtensionConfig.TryGetValue("botnexus-skills", out var element))
+        {
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<SkillsConfig>(element.GetRawText());
+            }
+            catch { /* invalid config — use defaults */ }
+        }
+
+        return null;
     }
 }

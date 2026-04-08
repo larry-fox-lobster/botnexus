@@ -140,7 +140,8 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         var globalSkillsDir = Path.Combine(homeDir, ".botnexus", "skills");
         var agentSkillsDir = Path.Combine(homeDir, ".botnexus", "agents", descriptor.AgentId, "skills");
         var workspaceSkillsDir = Path.Combine(workspacePath, "skills");
-        tools.Add(new SkillTool(globalSkillsDir, agentSkillsDir, workspaceSkillsDir, descriptor.Skills));
+        var skillsConfig = ResolveExtensionConfig<BotNexus.Extensions.Skills.SkillsConfig>(descriptor, "botnexus-skills");
+        tools.Add(new SkillTool(globalSkillsDir, agentSkillsDir, workspaceSkillsDir, skillsConfig));
 
         var hookDispatcher = _serviceProvider.GetService<IHookDispatcher>();
         BeforeToolCallDelegate? beforeToolCall = null;
@@ -261,6 +262,20 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         }
 
         return (level, allowed);
+    }
+
+    private static T? ResolveExtensionConfig<T>(AgentDescriptor descriptor, string extensionId) where T : class
+    {
+        if (descriptor.ExtensionConfig.TryGetValue(extensionId, out var element))
+        {
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<T>(element.GetRawText());
+            }
+            catch { /* invalid config — use defaults */ }
+        }
+
+        return null;
     }
 }
 

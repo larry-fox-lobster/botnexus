@@ -92,6 +92,11 @@ public sealed record AgentDescriptor
     /// <summary>Agent IDs this agent can view sessions for (when SessionAccessLevel is "allowlist").</summary>
     public IReadOnlyList<string> SessionAllowedAgents { get; init; } = [];
 
-    /// <summary>Skills configuration for this agent. Null means skills use defaults (enabled, no autoLoad).</summary>
-    public SkillsConfig? Skills { get; init; }
+    /// <summary>
+    /// Extension-specific configuration keyed by extension ID.
+    /// Extensions read their own config from this bag using their ID as the key.
+    /// Example: <c>ExtensionConfig["botnexus-skills"]</c> for skills config.
+    /// </summary>
+    public IReadOnlyDictionary<string, System.Text.Json.JsonElement> ExtensionConfig { get; init; } =
+        new Dictionary<string, System.Text.Json.JsonElement>();
 }
