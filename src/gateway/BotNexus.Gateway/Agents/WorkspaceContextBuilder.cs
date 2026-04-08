@@ -1,5 +1,6 @@
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Skills;
 
 namespace BotNexus.Gateway.Agents;
 
@@ -26,11 +27,15 @@ public sealed class WorkspaceContextBuilder : IContextBuilder
         var promptFiles = ResolvePromptFiles(descriptor);
         var contextFiles = await LoadContextFilesAsync(workspacePath, promptFiles, cancellationToken);
 
+        // Discover and resolve skills
+        var skillsPrompt = BuildSkillsPrompt(descriptor, workspacePath);
+
         return SystemPromptBuilder.Build(new SystemPromptParams
         {
             WorkspaceDir = workspacePath,
             ExtraSystemPrompt = descriptor.SystemPrompt,
             ContextFiles = contextFiles,
+            SkillsPrompt = skillsPrompt,
             Runtime = new RuntimeInfo
             {
                 AgentId = descriptor.AgentId,
@@ -42,6 +47,26 @@ public sealed class WorkspaceContextBuilder : IContextBuilder
             },
             PromptMode = PromptMode.Full
         });
+    }
+
+    private static string? BuildSkillsPrompt(AgentDescriptor descriptor, string workspacePath)
+    {
+        var botnexusHome = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".botnexus");
+
+        var globalSkillsDir = Path.Combine(botnexusHome, "skills");
+        var agentSkillsDir = Path.Combine(botnexusHome, "agents", descriptor.AgentId, "skills");
+        var workspaceSkillsDir = Path.Combine(workspacePath, "skills");
+
+        var allSkills = SkillDiscovery.Discover(globalSkillsDir, agentSkillsDir, workspaceSkillsDir);
+        if (allSkills.Count == 0)
+            return null;
+
+        var resolution = SkillResolver.Resolve(allSkills, descriptor.Skills);
+        if (resolution.Loaded.Count == 0 && resolution.Available.Count == 0)
+            return null;
+
+        return SkillPromptBuilder.Build(resolution.Loaded, resolution.Available);
     }
 
     private static async Task<ContextFile[]> LoadContextFilesAsync(

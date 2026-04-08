@@ -84,7 +84,8 @@ public sealed class PlatformConfigAgentSource(
                 IsolationOptions = ConvertObject(agentConfig.IsolationOptions),
                 Memory = CloneMemoryConfig(agentConfig.Memory),
                 SessionAccessLevel = agentConfig.SessionAccess?.Level ?? "own",
-                SessionAllowedAgents = agentConfig.SessionAccess?.AllowedAgents?.ToArray() ?? []
+                SessionAllowedAgents = agentConfig.SessionAccess?.AllowedAgents?.ToArray() ?? [],
+                Skills = agentConfig.Skills
             };
 
             var validationErrors = AgentDescriptorValidator.Validate(descriptor);

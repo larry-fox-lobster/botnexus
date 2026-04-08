@@ -91,4 +91,7 @@ public sealed record AgentDescriptor
 
     /// <summary>Agent IDs this agent can view sessions for (when SessionAccessLevel is "allowlist").</summary>
     public IReadOnlyList<string> SessionAllowedAgents { get; init; } = [];
+
+    /// <summary>Skills configuration for this agent. Null means skills use defaults (enabled, no autoLoad).</summary>
+    public BotNexus.Skills.SkillsConfig? Skills { get; init; }
 }

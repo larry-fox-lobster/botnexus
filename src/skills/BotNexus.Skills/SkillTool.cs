@@ -1,0 +1,134 @@
+using System.Text.Json;
+using BotNexus.AgentCore.Tools;
+using BotNexus.AgentCore.Types;
+using BotNexus.Providers.Core.Models;
+
+namespace BotNexus.Skills;
+
+/// <summary>
+/// Agent-facing tool for listing and loading skills at runtime.
+/// </summary>
+public sealed class SkillTool(
+    IReadOnlyList<SkillDefinition> allSkills,
+    SkillsConfig? config) : IAgentTool
+{
+    private readonly HashSet<string> _sessionLoaded = new(StringComparer.OrdinalIgnoreCase);
+
+    public string Name => "skills";
+    public string Label => "Skill Manager";
+
+    public Tool Definition => new(
+        Name,
+        "List available skills and load them into context. Use when you need domain-specific knowledge.",
+        JsonDocument.Parse("""
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": ["list", "load"],
+                  "description": "Action: 'list' shows available skills and their descriptions, 'load' activates a skill."
+                },
+                "skillName": {
+                  "type": "string",
+                  "description": "Skill name to load (required for 'load' action)."
+                }
+              },
+              "required": ["action"]
+            }
+            """).RootElement.Clone());
+
+    /// <summary>Gets the set of skill names explicitly loaded during this session.</summary>
+    public IReadOnlySet<string> SessionLoadedSkills => _sessionLoaded;
+
+    public Task<IReadOnlyDictionary<string, object?>> PrepareArgumentsAsync(
+        IReadOnlyDictionary<string, object?> arguments,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(arguments);
+    }
+
+    public Task<AgentToolResult> ExecuteAsync(
+        string toolCallId,
+        IReadOnlyDictionary<string, object?> arguments,
+        CancellationToken cancellationToken = default,
+        AgentToolUpdateCallback? onUpdate = null)
+    {
+        var action = ReadString(arguments, "action") ?? "list";
+        return Task.FromResult(action.ToLowerInvariant() switch
+        {
+            "list" => ListSkills(),
+            "load" => LoadSkill(arguments),
+            _ => TextResult($"Unknown action: {action}")
+        });
+    }
+
+    private AgentToolResult ListSkills()
+    {
+        var resolution = SkillResolver.Resolve(allSkills, config, explicitlyLoaded: _sessionLoaded.ToList());
+
+        var lines = new List<string>();
+        if (resolution.Loaded.Count > 0)
+        {
+            lines.Add("## Loaded Skills");
+            foreach (var s in resolution.Loaded)
+                lines.Add($"- **{s.Name}**: {s.Description}");
+            lines.Add("");
+        }
+
+        if (resolution.Available.Count > 0)
+        {
+            lines.Add("## Available Skills (not loaded)");
+            lines.Add("Use `skills` tool with action `load` and the skill name to activate.");
+            foreach (var s in resolution.Available)
+                lines.Add($"- **{s.Name}**: {s.Description}");
+            lines.Add("");
+        }
+
+        if (lines.Count == 0)
+            lines.Add("No skills available.");
+
+        return TextResult(string.Join("\n", lines));
+    }
+
+    private AgentToolResult LoadSkill(IReadOnlyDictionary<string, object?> arguments)
+    {
+        var skillName = ReadString(arguments, "skillName");
+        if (string.IsNullOrWhiteSpace(skillName))
+            return TextResult("Error: skillName is required for load action.");
+
+        var skill = allSkills.FirstOrDefault(s => string.Equals(s.Name, skillName, StringComparison.OrdinalIgnoreCase));
+        if (skill is null)
+            return TextResult($"Skill '{skillName}' not found. Use action 'list' to see available skills.");
+
+        // Check deny list
+        var denySet = config?.Disabled is { Count: > 0 }
+            ? new HashSet<string>(config.Disabled, StringComparer.OrdinalIgnoreCase)
+            : null;
+        if (denySet is not null && denySet.Contains(skillName))
+            return TextResult($"Skill '{skillName}' is disabled for this agent.");
+
+        _sessionLoaded.Add(skill.Name);
+
+        return TextResult($"""
+            ## Skill: {skill.Name}
+            
+            {skill.Content}
+            """);
+    }
+
+    private static string? ReadString(IReadOnlyDictionary<string, object?> args, string key)
+    {
+        if (!args.TryGetValue(key, out var value) || value is null) return null;
+        return value switch
+        {
+            JsonElement { ValueKind: JsonValueKind.String } el => el.GetString(),
+            JsonElement el => el.ToString(),
+            _ => value.ToString()
+        };
+    }
+
+    private static AgentToolResult TextResult(string text)
+        => new([new AgentToolContent(AgentToolContentType.Text, text)]);
+}
