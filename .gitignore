@@ -48,7 +48,5 @@ TestResults/
 # Squad: SubSquad activation file (local to this machine)
 .squad-workstream
 
-# Extension build output
-/extensions/
 .botnexus-agent
 node_modules/
