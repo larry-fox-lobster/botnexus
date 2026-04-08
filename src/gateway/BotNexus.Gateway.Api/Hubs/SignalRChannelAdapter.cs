@@ -17,7 +17,7 @@ public sealed class SignalRChannelAdapter(ILogger<SignalRChannelAdapter> logger,
     private readonly IHubContext<GatewayHub> _hubContext = hubContext;
 
     public override string ChannelType => "signalr";
-    public override string DisplayName => "Gateway SignalR";
+    public override string DisplayName => "Web Chat";
     public override bool SupportsStreaming => true;
     public override bool SupportsSteering => true;
     public override bool SupportsFollowUp => true;

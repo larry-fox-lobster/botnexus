@@ -13,7 +13,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$gatewayProject = Join-Path $repoRoot "src\gateway\BotNexus.Gateway.Api\BotNexus.Gateway.Api.csproj"
+$solution = Join-Path $repoRoot "BotNexus.slnx"
 $gatewayDll = Join-Path $repoRoot "src\gateway\BotNexus.Gateway.Api\bin\Release\net10.0\BotNexus.Gateway.Api.dll"
 $gatewayUrl = "http://localhost:$Port"
 $tcpAddress = [System.Net.IPAddress]::Loopback
@@ -39,8 +39,8 @@ function Test-PortAvailable {
 }
 
 function Build-Gateway {
-    Write-Host "🔧 Building Gateway API project (Release)..."
-    dotnet build $gatewayProject -c Release --nologo --tl:off
+    Write-Host "🔧 Building solution (Release)..."
+    dotnet build $solution -c Release --nologo --tl:off
     if ($LASTEXITCODE -ne 0) {
         throw "Gateway API build failed."
     }
@@ -89,38 +89,89 @@ elseif (-not (Test-Path $gatewayDll)) {
 $env:ASPNETCORE_ENVIRONMENT = "Development"
 $env:ASPNETCORE_URLS = $gatewayUrl
 
+# --- Ctrl+C handler: kill child process, keep script alive ---
+
+$script:gwProc = $null
+
+# Use a C# handler for CancelKeyPress because PowerShell script blocks
+# crash on the native signal thread (no Runspace available).
+Add-Type -TypeDefinition @"
+using System;
+public static class CtrlCHandler {
+    public static volatile bool Pressed;
+    public static void OnCancel(object sender, ConsoleCancelEventArgs e) {
+        e.Cancel = true;   // keep PowerShell alive
+        Pressed = true;    // signal the run loop
+        // The child shares the console — it already received Ctrl+C
+        // and will begin graceful shutdown on its own.
+    }
+}
+"@
+
+$cancelHandler = [System.ConsoleCancelEventHandler]([CtrlCHandler]::OnCancel)
+[Console]::add_CancelKeyPress($cancelHandler)
+
+function Stop-GatewayGracefully {
+    param([int]$TimeoutSeconds = 10)
+    $p = $script:gwProc
+    if (-not $p -or $p.HasExited) { return }
+    # Wait for the process to finish its graceful shutdown
+    if (-not $p.WaitForExit($TimeoutSeconds * 1000)) {
+        Write-Host "⚠️  Gateway did not exit within $TimeoutSeconds seconds — force-killing." -ForegroundColor Red
+        try { $p.Kill($true) } catch { }
+    }
+}
+
+function Start-Gateway {
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = "dotnet"
+    $psi.Arguments = "`"$gatewayDll`""
+    $psi.UseShellExecute = $false
+    $psi.Environment["ASPNETCORE_ENVIRONMENT"] = $env:ASPNETCORE_ENVIRONMENT
+    $psi.Environment["ASPNETCORE_URLS"] = $env:ASPNETCORE_URLS
+    [CtrlCHandler]::Pressed = $false
+    $script:gwProc = [System.Diagnostics.Process]::Start($psi)
+    $script:gwProc.WaitForExit()
+    return $script:gwProc.ExitCode
+}
+
 # --- Run loop ---
 
-while ($true) {
-    Write-Host ""
-    Write-Host "🚀 Starting Gateway API"
-    Write-Host "   URL:         $gatewayUrl"
-    Write-Host "   Environment: $($env:ASPNETCORE_ENVIRONMENT)"
-    Write-Host ""
-    Write-Host "Press Ctrl+C to stop the gateway."
+try {
+    while ($true) {
+        Write-Host ""
+        Write-Host "🚀 Starting Gateway API"
+        Write-Host "   URL:         $gatewayUrl"
+        Write-Host "   Environment: $($env:ASPNETCORE_ENVIRONMENT)"
+        Write-Host ""
+        Write-Host "Press Ctrl+C to stop the gateway."
 
-    try {
-        dotnet $gatewayDll
-    }
-    catch {
-        Write-Host "⚠️  Gateway exited with error: $($_.Exception.Message)" -ForegroundColor Red
-    }
+        $exitCode = Start-Gateway
 
-    Write-Host ""
-    Write-Host "⏹️  Gateway process exited." -ForegroundColor Cyan
+        if ([CtrlCHandler]::Pressed) {
+            Stop-GatewayGracefully -TimeoutSeconds 10
+        }
 
-    if (-not (Wait-ForRestartOrAbort -Seconds 5)) {
-        break
-    }
+        Write-Host ""
+        Write-Host "⏹️  Gateway process exited (code $exitCode)." -ForegroundColor Cyan
 
-    # Rebuild before restarting
-    try {
-        Build-Gateway
-    }
-    catch {
-        Write-Host "❌ Build failed: $($_.Exception.Message)" -ForegroundColor Red
         if (-not (Wait-ForRestartOrAbort -Seconds 5)) {
             break
         }
+
+        # Rebuild before restarting
+        try {
+            Build-Gateway
+        }
+        catch {
+            Write-Host "❌ Build failed: $($_.Exception.Message)" -ForegroundColor Red
+            if (-not (Wait-ForRestartOrAbort -Seconds 5)) {
+                break
+            }
+        }
     }
+}
+finally {
+    [Console]::remove_CancelKeyPress($cancelHandler)
+    Stop-GatewayGracefully -TimeoutSeconds 10
 }

@@ -404,7 +404,24 @@
         debugLog('init', `Client version: ${CLIENT_VERSION}`);
         const meta = document.querySelector('meta[name="botnexus-version"]');
         if (meta) meta.content = CLIENT_VERSION;
+        scheduleVersionCheck();
     }).catch(() => { CLIENT_VERSION = 'unknown'; });
+
+    function scheduleVersionCheck() {
+        setInterval(async () => {
+            try {
+                const res = await fetch('/api/version');
+                if (!res.ok) return;
+                const data = await res.json();
+                const serverVersion = data.version || 'unknown';
+                if (CLIENT_VERSION !== 'loading' && CLIENT_VERSION !== 'unknown' &&
+                    serverVersion !== CLIENT_VERSION) {
+                    console.log(`Version changed: ${CLIENT_VERSION} → ${serverVersion}. Reloading...`);
+                    location.reload();
+                }
+            } catch { /* server may be restarting */ }
+        }, 10000);
+    }
 
     // Post client logs to server for unified debugging
     function serverLog(level, message, data) {
@@ -1537,7 +1554,7 @@
             );
             const latestByChannel = new Map();
             for (const s of agentSessions) {
-                const key = (s.channelType || 'Web Chat').toLowerCase();
+                const key = (s.channelType || 'signalr').toLowerCase();
                 if (!latestByChannel.has(key)) latestByChannel.set(key, s);
             }
 
@@ -1545,6 +1562,7 @@
                 const emptyChannelEl = document.createElement('div');
                 emptyChannelEl.className = 'list-item';
                 emptyChannelEl.dataset.agentId = agentId;
+                emptyChannelEl.dataset.channelType = 'web chat';
                 emptyChannelEl.innerHTML = `
                     <div class="list-item-row">
                         <span class="item-title">💬 Web Chat</span>
@@ -1559,24 +1577,28 @@
                 channelsDiv.appendChild(emptyChannelEl);
             } else {
                 for (const latestSession of latestByChannel.values()) {
+                    const channelType = latestSession.channelType || 'signalr';
+                    const displayName = channelDisplayName(channelType);
+                    const isActive = currentAgentId === agentId &&
+                        currentChannelType && currentChannelType.toLowerCase() === channelType.toLowerCase();
+
                     const channelEl = document.createElement('div');
-                    channelEl.className = 'list-item' + (latestSession.sessionId === currentSessionId ? ' active' : '');
+                    channelEl.className = 'list-item' + (isActive ? ' active' : '');
                     channelEl.dataset.sessionId = latestSession.sessionId;
                     channelEl.dataset.agentId = agentId;
+                    channelEl.dataset.channelType = channelType.toLowerCase();
 
                     const timeStr = relativeTime(latestSession.updatedAt || latestSession.createdAt);
-                    const channelType = latestSession.channelType || 'Web Chat';
                     const emoji = channelEmoji(channelType);
-                    const isActive = latestSession.sessionId === currentSessionId;
 
                     channelEl.innerHTML = `
                         <div class="list-item-row">
-                            <span class="item-title">${emoji} ${escapeHtml(channelType)}${isActive ? ' (active)' : ''}</span>
+                            <span class="item-title">${emoji} ${escapeHtml(displayName)}${isActive ? ' (active)' : ''}</span>
                         </div>
                         <span class="item-meta">${timeStr}</span>
                     `;
 
-                    channelEl.addEventListener('click', () => openSession(latestSession.sessionId, agentId));
+                    channelEl.addEventListener('click', () => openAgentTimeline(agentId, channelType));
                     channelsDiv.appendChild(channelEl);
                 }
             }
@@ -1627,7 +1649,9 @@
         await joinSession(agentId, null);
 
         elSessionsList.querySelectorAll('.list-item').forEach(el => {
-            el.classList.toggle('active', el.dataset.agentId === agentId);
+            el.classList.toggle('active',
+                el.dataset.agentId === agentId &&
+                (el.dataset.channelType || '').toLowerCase() === channelType.toLowerCase());
         });
 
         showView('chat-view');
@@ -1637,7 +1661,7 @@
         currentAgentId = agentId;
         currentChannelType = channelType;
 
-        elChatTitle.textContent = `${agentId} — ${channelType}`;
+        elChatTitle.textContent = `${agentId} — ${channelDisplayName(channelType)}`;
 
         // Fetch all sessions for this agent
         const allSessions = await fetchJson(`/sessions?agentId=${encodeURIComponent(agentId)}`);
@@ -1653,7 +1677,7 @@
 
         // Filter to matching channel type and sort oldest-first
         const channelSessions = allSessions
-            .filter(s => (s.channelType || 'Web Chat').toLowerCase() === channelType.toLowerCase())
+            .filter(s => (s.channelType || 'signalr').toLowerCase() === channelType.toLowerCase())
             .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
 
         if (channelSessions.length === 0) {
@@ -1848,9 +1872,22 @@
     const CHANNELS_REFRESH_MS = 30000;
 
     function channelEmoji(name) {
-        const map = { websocket: '🌐', signalr: '🌐', 'web chat': '💬', telegram: '✈️', discord: '🎮', slack: '💼', tui: '🖥️' };
+        const map = { websocket: '🌐', signalr: '🌐', 'web-chat': '💬', 'web chat': '💬', telegram: '✈️', discord: '🎮', slack: '💼', tui: '🖥️' };
         return map[(name || '').toLowerCase()] || '📡';
     }
+
+    function channelDisplayName(name) {
+        const n = (name || '').toLowerCase();
+        // Map internal channel IDs to user-facing display names
+        if (_channelDisplayNames[n]) return _channelDisplayNames[n];
+        // Fallback for known types
+        if (n === 'signalr') return 'Web Chat';
+        if (n === 'web-chat') return 'Web Chat';
+        return name || 'Web Chat';
+    }
+
+    // Populated from /api/channels response
+    let _channelDisplayNames = {};
 
     function buildCapabilityIcons(ch) {
         const caps = [];
@@ -1867,6 +1904,13 @@
         if (!channels || channels.length === 0) {
             elChannelsList.innerHTML = '<div class="empty-state">No channels</div>';
             return;
+        }
+
+        // Build display name lookup from API response
+        for (const ch of channels) {
+            if (ch.name && ch.displayName) {
+                _channelDisplayNames[ch.name.toLowerCase()] = ch.displayName;
+            }
         }
 
         // Build a set of channel names from the response for pruning stale entries

@@ -138,7 +138,7 @@ public sealed class GatewayHub : Hub
             {
                 Type = GatewayActivityType.System,
                 ChannelType = "signalr",
-                Message = "SignalR client connected.",
+                Message = "Web Chat client connected.",
                 Data = new Dictionary<string, object?> { ["connectionId"] = Context.ConnectionId }
             },
             Context.ConnectionAborted);
