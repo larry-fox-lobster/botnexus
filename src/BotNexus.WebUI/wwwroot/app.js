@@ -3015,6 +3015,20 @@
         $('#btn-refresh-extensions').addEventListener('click', (e) => { e.stopPropagation(); loadExtensions(); });
         $('#btn-refresh-agents').addEventListener('click', (e) => { e.stopPropagation(); loadAgents(); });
 
+        $('#btn-stop-gateway').addEventListener('click', () => {
+            showConfirm(
+                'Stop the gateway? It will be restarted by the management process.',
+                'Stop Gateway',
+                async () => {
+                    try {
+                        await fetch(`${API_BASE}/gateway/shutdown`, { method: 'POST' });
+                    } catch {}
+                    appendSystemMessage('Gateway shutdown initiated.');
+                },
+                'Stop'
+            );
+        });
+
         // Delegated click handlers for dynamic chat content
         elChatMessages.addEventListener('click', (e) => {
             // Copy message button
