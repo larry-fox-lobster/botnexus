@@ -1721,29 +1721,56 @@
     }
 
     async function loadChannels() {
-        elChannelsList.innerHTML = '<div class="loading">Loading...</div>';
         const channels = await fetchJson('/channels');
         if (!channels || channels.length === 0) {
             elChannelsList.innerHTML = '<div class="empty-state">No channels</div>';
             return;
         }
-        elChannelsList.innerHTML = '';
+
+        // Build a set of channel names from the response for pruning stale entries
+        const incomingNames = new Set(channels.map(ch => ch.name));
+
+        // Remove channels that no longer exist
+        for (const existing of [...elChannelsList.querySelectorAll('.list-item[data-channel]')]) {
+            if (!incomingNames.has(existing.dataset.channel)) {
+                existing.remove();
+            }
+        }
+
+        // Remove any loading/empty-state placeholders
+        for (const placeholder of [...elChannelsList.querySelectorAll('.loading, .empty-state')]) {
+            placeholder.remove();
+        }
+
         for (const ch of channels) {
-            const el = document.createElement('div');
-            el.className = 'list-item';
-            el.setAttribute('role', 'listitem');
             const dotClass = ch.isRunning ? 'running' : 'stopped';
-            el.innerHTML = `
-                <div class="list-item-row">
-                    <span class="item-title">
-                        <span class="channel-status-dot ${dotClass}" aria-hidden="true"></span>
-                        ${channelEmoji(ch.name)} ${escapeHtml(ch.displayName || ch.name)}
-                    </span>
-                    <span class="item-meta" style="font-size:0.68rem;">${ch.isRunning ? 'running' : 'stopped'}</span>
-                </div>
-                <div class="channel-caps">${buildCapabilityIcons(ch)}</div>
-            `;
-            elChannelsList.appendChild(el);
+            const statusText = ch.isRunning ? 'running' : 'stopped';
+            const capsHtml = buildCapabilityIcons(ch);
+            const titleHtml = `<span class="channel-status-dot ${dotClass}" aria-hidden="true"></span> ${channelEmoji(ch.name)} ${escapeHtml(ch.displayName || ch.name)}`;
+
+            const existing = elChannelsList.querySelector(`.list-item[data-channel="${CSS.escape(ch.name)}"]`);
+            if (existing) {
+                // Update only the parts that may have changed
+                const titleEl = existing.querySelector('.item-title');
+                if (titleEl && titleEl.innerHTML !== titleHtml) titleEl.innerHTML = titleHtml;
+                const metaEl = existing.querySelector('.item-meta');
+                if (metaEl && metaEl.textContent !== statusText) metaEl.textContent = statusText;
+                const capsEl = existing.querySelector('.channel-caps');
+                if (capsEl && capsEl.innerHTML !== capsHtml) capsEl.innerHTML = capsHtml;
+            } else {
+                const el = document.createElement('div');
+                el.className = 'list-item';
+                el.setAttribute('role', 'listitem');
+                el.dataset.channel = ch.name;
+                el.innerHTML = `
+                    <div class="list-item-row">
+                        <span class="item-title">${titleHtml}</span>
+                        <span class="item-meta" style="font-size:0.68rem;">${statusText}</span>
+                    </div>
+                    <div class="channel-caps">${capsHtml}</div>
+                `;
+                elChannelsList.appendChild(el);
+            }
         }
     }
 
