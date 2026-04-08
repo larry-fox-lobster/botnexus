@@ -17,6 +17,7 @@ using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Tools;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
+using BotNexus.Skills;
 using BotNexus.Memory;
 using BotNexus.Memory.Tools;
 using Microsoft.Extensions.DependencyInjection;
@@ -128,6 +129,14 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
             var (sessionAccessLevel, sessionAllowedAgents) = ResolveSessionAccess(descriptor);
             tools.Add(new SessionTool(sessionStore, descriptor.AgentId, sessionAccessLevel, sessionAllowedAgents));
         }
+
+        // Skills tool — discovers skills from global, per-agent, and workspace paths
+        var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var globalSkillsDir = Path.Combine(homeDir, ".botnexus", "skills");
+        var agentSkillsDir = Path.Combine(homeDir, ".botnexus", "agents", descriptor.AgentId, "skills");
+        var workspaceSkillsDir = Path.Combine(workspacePath, "skills");
+        var allSkills = SkillDiscovery.Discover(globalSkillsDir, agentSkillsDir, workspaceSkillsDir);
+        tools.Add(new SkillTool(allSkills, descriptor.Skills));
 
         var options = new AgentOptions(
             InitialState: new AgentInitialState(
