@@ -285,34 +285,32 @@
 
     function showProcessingStatus(stage, icon) {
         elProcessingStatus.classList.remove('hidden');
-
-        // Show/update an inline status message at the bottom of chat
-        let statusEl = elChatMessages.querySelector('.processing-inline');
-        if (!statusEl) {
-            statusEl = document.createElement('div');
-            statusEl.className = 'message system-msg processing-inline';
-            elChatMessages.appendChild(statusEl);
+        const label = $('#processing-label');
+        if (label) {
+            label.textContent = `${icon || '⏳'} ${stage}`;
+            label.classList.remove('hidden');
         }
-        statusEl.textContent = `${icon || '⏳'} ${stage}`;
-        scrollToBottom();
     }
 
     function updateProcessingToolCount() {
-        const statusEl = elChatMessages.querySelector('.processing-inline');
-        if (!statusEl) return;
+        const label = $('#processing-label');
+        if (!label || label.classList.contains('hidden')) return;
 
         const runningCount = Object.values(activeToolCalls).filter(t => t.status === 'running').length;
         if (runningCount > 0) {
-            const currentText = statusEl.textContent;
+            const currentText = label.textContent;
             const baseText = currentText.replace(/\s*·\s*🔧.*$/, '');
-            statusEl.textContent = `${baseText} · 🔧 ${runningCount} tool${runningCount > 1 ? 's' : ''} active`;
+            label.textContent = `${baseText} · 🔧 ${runningCount} tool${runningCount > 1 ? 's' : ''} active`;
         }
     }
 
     function hideProcessingStatus() {
         elProcessingStatus.classList.add('hidden');
-        const statusEl = elChatMessages.querySelector('.processing-inline');
-        if (statusEl) statusEl.remove();
+        const label = $('#processing-label');
+        if (label) {
+            label.textContent = '';
+            label.classList.add('hidden');
+        }
     }
 
     // =========================================================================

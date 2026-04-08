@@ -208,6 +208,15 @@ body {
 }
 .chat-info h2 { font-size: 1rem; font-weight: 600; }
 .chat-info .text-muted { font-size: 0.78rem; }
+.processing-label {
+    font-size: 0.75rem; color: var(--accent); font-weight: 500;
+    animation: processingPulse 1.5s ease-in-out infinite;
+}
+.processing-label.hidden { display: none; }
+@keyframes processingPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
 .chat-header-controls { display: flex; align-items: center; gap: 0.5rem; }
 .select-label { font-size: 0.85rem; color: var(--text-muted); white-space: nowrap; }
 
