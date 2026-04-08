@@ -97,17 +97,27 @@ public sealed class CronTool(
     private async Task<AgentToolResult> CreateAsync(IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
+        var schedule = ReadRequired(arguments, "schedule");
+        DateTimeOffset? nextRunAt = null;
+        try
+        {
+            var expr = Cronos.CronExpression.Parse(schedule, Cronos.CronFormat.Standard);
+            nextRunAt = expr.GetNextOccurrence(now, TimeZoneInfo.Utc);
+        }
+        catch { /* invalid schedule — will be caught by scheduler */ }
+
         var job = new CronJob
         {
             Id = Guid.NewGuid().ToString("N"),
             Name = ReadRequired(arguments, "name"),
-            Schedule = ReadRequired(arguments, "schedule"),
+            Schedule = schedule,
             ActionType = "agent-prompt",
             AgentId = ReadString(arguments, "agentId") ?? _agentId,
             Message = ReadString(arguments, "message"),
             Enabled = arguments.TryGetValue("enabled", out var enabled) && enabled is bool boolEnabled ? boolEnabled : true,
             CreatedBy = _agentId,
             CreatedAt = now,
+            NextRunAt = nextRunAt,
             Metadata = new Dictionary<string, object?>()
         };
 

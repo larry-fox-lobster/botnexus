@@ -35,6 +35,7 @@ public sealed class CronScheduler(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await _cronStore.InitializeAsync(stoppingToken).ConfigureAwait(false);
+        _logger.LogInformation("Cron scheduler started. Tick interval: {Interval}s", _optionsMonitor.CurrentValue?.TickIntervalSeconds ?? 60);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -109,6 +110,8 @@ public sealed class CronScheduler(
             };
 
             await action.ExecuteAsync(context, ct).ConfigureAwait(false);
+            _logger.LogInformation("Cron job executed: {JobName} ({JobId}) action={ActionType} trigger={TriggerType}",
+                job.Name, job.Id, job.ActionType, triggerType);
             await _cronStore.RecordRunCompleteAsync(run.Id, "ok", sessionId: context.SessionId, ct: ct).ConfigureAwait(false);
             await _cronStore.UpdateAsync(job with
             {
