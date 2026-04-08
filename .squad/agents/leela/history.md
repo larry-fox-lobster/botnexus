@@ -2321,3 +2321,37 @@ Nova produced a 310-line feature spec for agent persistent memory (FTS5 search, 
 - Risk assessment (performance, concurrency, growth, injection, migration)
 
 **Decision written to:** `.squad/decisions/inbox/leela-memory-system-review.md`
+
+## 2026-04-10 — Cron Infrastructure Architecture Proposal (Lead)
+
+**Status:** ✅ Proposal delivered
+**Requested by:** Jon Bullen
+**Scope:** Full architecture proposal for BotNexus cron system, based on OpenClaw reference implementation
+
+**Context:**
+Jon requested a cron scheduling subsystem for BotNexus. Analyzed OpenClaw's mature TypeScript cron implementation (~25 files across src/cron/) — CronService orchestrator, JSON file store, Croner scheduler, agent tool, isolated sessions, delivery system. Designed C#/.NET equivalent adapted to BotNexus patterns.
+
+**Key Design Decisions:**
+1. **SQLite over JSON files** — Matches existing SqliteMemoryStore pattern; enables efficient querying, pagination, and atomic writes
+2. **Polymorphic ICronAction via DI** — Interface + dependency injection for extensible action types (vs OpenClaw's discriminated unions)
+3. **Cronos library** — Lightweight MIT-licensed cron expression evaluator with timezone support (not Quartz — too heavy)
+4. **Cron sessions as first-class GatewaySessions** — ChannelType="cron", zero changes to existing session infrastructure, immediate WebUI visibility
+5. **Dual-path job creation** — Config file seeding + dynamic creation via API/agent tool
+
+**Architecture Highlights:**
+- `CronScheduler` as BackgroundService (timer loop, concurrency semaphore, startup catch-up)
+- `ICronStore` / `SqliteCronStore` (cron_jobs + cron_runs tables, WAL mode)
+- `AgentPromptAction` creates isolated cron sessions, dispatches via IAgentCommunicator
+- `WebhookAction` for HTTP POST integrations
+- `CronTool : IAgentTool` with ownership-based permission model
+- REST API: full CRUD + run-now + status + run history
+- Session resumption via existing JoinSession pipeline (no new infrastructure)
+
+**Implementation Plan:** 4 waves
+- Wave 1 (Farnsworth): Core — project, models, store, scheduler
+- Wave 2 (Bender): Actions + session integration
+- Wave 3 (Hermes): REST API + agent tool
+- Wave 4 (Amy/Hermes): WebUI + polish
+- ~60 new tests across all waves
+
+**Decision written to:** `.squad/decisions/inbox/leela-cron-infrastructure.md`
