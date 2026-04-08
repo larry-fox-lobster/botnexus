@@ -47,6 +47,18 @@ function Build-Gateway {
     if (-not (Test-Path $gatewayDll)) {
         throw "Release build output not found at $gatewayDll."
     }
+    Deploy-Extensions
+}
+
+function Deploy-Extensions {
+    Write-Host "📦 Deploying extensions..."
+    $deployScript = Join-Path $PSScriptRoot "deploy-extensions.ps1"
+    if (Test-Path $deployScript) {
+        & $deployScript -Configuration Release
+    }
+    else {
+        Write-Host "⚠️  deploy-extensions.ps1 not found — skipping extension deployment." -ForegroundColor Yellow
+    }
 }
 
 function Wait-ForRestartOrAbort {
