@@ -68,14 +68,28 @@ public sealed class CronScheduler(
             if (!TryGetSchedule(job, out var expression))
                 continue;
 
+            var tz = ResolveTimeZone(job);
+            var computedNext = expression.GetNextOccurrence(now, tz);
+
             if (job.NextRunAt is null)
             {
                 var initialized = job with
                 {
-                    NextRunAt = expression.GetNextOccurrence(now, TimeZoneInfo.Utc)
+                    NextRunAt = computedNext
                 };
                 await _cronStore.UpdateAsync(initialized, ct).ConfigureAwait(false);
                 continue;
+            }
+
+            // Detect stale NextRunAt: if the schedule was changed to fire sooner
+            // than the stored value, correct it so the job isn't stuck waiting on
+            // a NextRunAt that no longer matches the current schedule.
+            if (computedNext is not null && computedNext < job.NextRunAt)
+            {
+                var corrected = job with { NextRunAt = computedNext };
+                await _cronStore.UpdateAsync(corrected, ct).ConfigureAwait(false);
+                if (computedNext > now)
+                    continue;
             }
 
             if (job.NextRunAt > now)
@@ -86,7 +100,7 @@ public sealed class CronScheduler(
             var latest = await _cronStore.GetAsync(job.Id, ct).ConfigureAwait(false) ?? job;
             var updated = latest with
             {
-                NextRunAt = expression.GetNextOccurrence(now, TimeZoneInfo.Utc)
+                NextRunAt = expression.GetNextOccurrence(now, tz)
             };
             await _cronStore.UpdateAsync(updated, ct).ConfigureAwait(false);
         }
@@ -113,7 +127,12 @@ public sealed class CronScheduler(
             _logger.LogInformation("Cron job executed: {JobName} ({JobId}) action={ActionType} trigger={TriggerType}",
                 job.Name, job.Id, job.ActionType, triggerType);
             await _cronStore.RecordRunCompleteAsync(run.Id, "ok", sessionId: context.SessionId, ct: ct).ConfigureAwait(false);
-            await _cronStore.UpdateAsync(job with
+
+            // Re-read the job before updating run status to avoid clobbering
+            // concurrent changes (schedule updates, NextRunAt corrections, etc.)
+            // that occurred while the action was executing.
+            var latest = await _cronStore.GetAsync(job.Id, ct).ConfigureAwait(false) ?? job;
+            await _cronStore.UpdateAsync(latest with
             {
                 LastRunAt = triggeredAt,
                 LastRunStatus = "ok",
@@ -125,7 +144,9 @@ public sealed class CronScheduler(
         {
             _logger.LogError(ex, "Cron job execution failed. JobId: {JobId}, ActionType: {ActionType}", job.Id, job.ActionType);
             await _cronStore.RecordRunCompleteAsync(run.Id, "error", ex.Message, ct: ct).ConfigureAwait(false);
-            await _cronStore.UpdateAsync(job with
+
+            var latest = await _cronStore.GetAsync(job.Id, ct).ConfigureAwait(false) ?? job;
+            await _cronStore.UpdateAsync(latest with
             {
                 LastRunAt = triggeredAt,
                 LastRunStatus = "error",
@@ -158,6 +179,21 @@ public sealed class CronScheduler(
         }
     }
 
+    private static TimeZoneInfo ResolveTimeZone(CronJob job)
+    {
+        if (string.IsNullOrWhiteSpace(job.TimeZone))
+            return TimeZoneInfo.Utc;
+
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(job.TimeZone);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.Utc;
+        }
+    }
+
     private async Task SyncConfiguredJobsAsync(CronOptions options, CancellationToken ct)
     {
         if (options.Jobs is null || options.Jobs.Count == 0)
@@ -186,6 +222,7 @@ public sealed class CronScheduler(
                     WebhookUrl = configuredJob.WebhookUrl,
                     ShellCommand = configuredJob.ShellCommand,
                     Enabled = configuredJob.Enabled,
+                    TimeZone = configuredJob.TimeZone,
                     CreatedBy = configuredJob.CreatedBy,
                     CreatedAt = DateTimeOffset.UtcNow,
                     Metadata = configuredJob.Metadata
@@ -204,6 +241,7 @@ public sealed class CronScheduler(
                 WebhookUrl = configuredJob.WebhookUrl,
                 ShellCommand = configuredJob.ShellCommand,
                 Enabled = configuredJob.Enabled,
+                TimeZone = configuredJob.TimeZone ?? existing.TimeZone,
                 CreatedBy = configuredJob.CreatedBy ?? existing.CreatedBy,
                 Metadata = configuredJob.Metadata ?? existing.Metadata
             };

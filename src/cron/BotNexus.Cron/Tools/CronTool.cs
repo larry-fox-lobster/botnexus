@@ -31,7 +31,8 @@ public sealed class CronTool(
                 },
                 "jobId": { "type": "string", "description": "Optional - for update/delete/run." },
                 "name": { "type": "string", "description": "Job name (for create)." },
-                "schedule": { "type": "string", "description": "Cron expression (for create/update)." },
+                "schedule": { "type": "string", "description": "Standard 5-field cron expression (minute hour day month weekday). The expression is evaluated in the timezone specified by 'timeZone', or UTC if omitted. Example: '30 22 * * *' with timeZone 'America/Los_Angeles' fires at 10:30 PM Pacific daily." },
+                "timeZone": { "type": "string", "description": "IANA timezone name for the schedule (e.g. 'America/Los_Angeles', 'Europe/London', 'Asia/Tokyo'). When set, the cron expression is interpreted in this timezone (including DST adjustments). Defaults to UTC if omitted." },
                 "agentId": { "type": "string", "description": "Target agent (for create, defaults to calling agent)." },
                 "message": { "type": "string", "description": "Prompt message (for create/update)." },
                 "enabled": { "type": "boolean", "description": "Whether the job is enabled." }
@@ -57,6 +58,7 @@ public sealed class CronTool(
         CopyString(arguments, prepared, "jobId");
         CopyString(arguments, prepared, "name");
         CopyString(arguments, prepared, "schedule");
+        CopyString(arguments, prepared, "timeZone");
         CopyString(arguments, prepared, "agentId");
         CopyString(arguments, prepared, "message");
 
@@ -98,11 +100,14 @@ public sealed class CronTool(
     {
         var now = DateTimeOffset.UtcNow;
         var schedule = ReadRequired(arguments, "schedule");
+        var timeZone = ReadString(arguments, "timeZone");
+        var tz = ResolveTimeZone(timeZone);
+
         DateTimeOffset? nextRunAt = null;
         try
         {
             var expr = Cronos.CronExpression.Parse(schedule, Cronos.CronFormat.Standard);
-            nextRunAt = expr.GetNextOccurrence(now, TimeZoneInfo.Utc);
+            nextRunAt = expr.GetNextOccurrence(now, tz);
         }
         catch { /* invalid schedule — will be caught by scheduler */ }
 
@@ -115,6 +120,7 @@ public sealed class CronTool(
             AgentId = ReadString(arguments, "agentId") ?? _agentId,
             Message = ReadString(arguments, "message"),
             Enabled = arguments.TryGetValue("enabled", out var enabled) && enabled is bool boolEnabled ? boolEnabled : true,
+            TimeZone = timeZone,
             CreatedBy = _agentId,
             CreatedAt = now,
             NextRunAt = nextRunAt,
@@ -133,14 +139,33 @@ public sealed class CronTool(
 
         EnsureCanManage(existing);
 
+        var newSchedule = ReadString(arguments, "schedule") ?? existing.Schedule;
+        var newTimeZone = arguments.ContainsKey("timeZone") ? ReadString(arguments, "timeZone") : existing.TimeZone;
         var updated = existing with
         {
             Name = ReadString(arguments, "name") ?? existing.Name,
-            Schedule = ReadString(arguments, "schedule") ?? existing.Schedule,
+            Schedule = newSchedule,
+            TimeZone = newTimeZone,
             Message = ReadString(arguments, "message") ?? existing.Message,
             AgentId = ReadString(arguments, "agentId") ?? existing.AgentId,
             Enabled = arguments.TryGetValue("enabled", out var enabled) && enabled is bool boolEnabled ? boolEnabled : existing.Enabled
         };
+
+        var scheduleChanged = !string.Equals(newSchedule, existing.Schedule, StringComparison.Ordinal);
+        var tzChanged = !string.Equals(newTimeZone ?? "", existing.TimeZone ?? "", StringComparison.Ordinal);
+        if (scheduleChanged || tzChanged)
+        {
+            var tz = ResolveTimeZone(newTimeZone);
+            DateTimeOffset? nextRunAt = null;
+            try
+            {
+                var expr = Cronos.CronExpression.Parse(newSchedule, Cronos.CronFormat.Standard);
+                nextRunAt = expr.GetNextOccurrence(DateTimeOffset.UtcNow, tz);
+            }
+            catch { /* invalid schedule — will be caught by scheduler */ }
+
+            updated = updated with { NextRunAt = nextRunAt };
+        }
 
         var saved = await cronStore.UpdateAsync(updated, cancellationToken).ConfigureAwait(false);
         return TextResult(JsonSerializer.Serialize(saved, JsonOptions));
@@ -179,6 +204,21 @@ public sealed class CronTool(
 
     private static AgentToolResult TextResult(string text)
         => new([new AgentToolContent(AgentToolContentType.Text, text)]);
+
+    private static TimeZoneInfo ResolveTimeZone(string? timeZone)
+    {
+        if (string.IsNullOrWhiteSpace(timeZone))
+            return TimeZoneInfo.Utc;
+
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(timeZone);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.Utc;
+        }
+    }
 
     private static bool IsKnownAction(string action)
         => action.Equals("list", StringComparison.OrdinalIgnoreCase)
