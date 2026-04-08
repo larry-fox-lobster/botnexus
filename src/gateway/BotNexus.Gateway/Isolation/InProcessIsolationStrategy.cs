@@ -5,10 +5,12 @@ using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore;
 using BotNexus.AgentCore.Configuration;
 using BotNexus.AgentCore.Diagnostics;
+using BotNexus.AgentCore.Hooks;
 using BotNexus.AgentCore.Types;
 using BotNexus.Cron;
 using BotNexus.Cron.Tools;
 using BotNexus.Gateway.Abstractions.Agents;
+using BotNexus.Gateway.Abstractions.Hooks;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
@@ -23,6 +25,8 @@ using BotNexus.Memory.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using AgentCoreUserMessage = BotNexus.AgentCore.Types.UserMessage;
+using GatewayBeforeToolCallResult = BotNexus.Gateway.Abstractions.Hooks.BeforeToolCallResult;
+using GatewayAfterToolCallResult = BotNexus.Gateway.Abstractions.Hooks.AfterToolCallResult;
 
 namespace BotNexus.Gateway.Isolation;
 
@@ -137,6 +141,55 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         var workspaceSkillsDir = Path.Combine(workspacePath, "skills");
         tools.Add(new SkillTool(globalSkillsDir, agentSkillsDir, workspaceSkillsDir, descriptor.Skills));
 
+        var hookDispatcher = _serviceProvider.GetService<IHookDispatcher>();
+        BeforeToolCallDelegate? beforeToolCall = null;
+        AfterToolCallDelegate? afterToolCall = null;
+
+        if (hookDispatcher is not null)
+        {
+            var agentId = descriptor.AgentId;
+
+            beforeToolCall = async (ctx, ct) =>
+            {
+                var hookEvent = new BeforeToolCallEvent(
+                    agentId,
+                    ctx.ToolCallRequest.Name,
+                    ctx.ToolCallRequest.Id,
+                    ctx.ValidatedArgs);
+
+                var results = await hookDispatcher
+                    .DispatchAsync<BeforeToolCallEvent, GatewayBeforeToolCallResult>(hookEvent, ct)
+                    .ConfigureAwait(false);
+
+                var denied = results.FirstOrDefault(r => r.Denied);
+                if (denied is not null)
+                {
+                    return new AgentCore.Hooks.BeforeToolCallResult(
+                        Block: true,
+                        Reason: denied.DenyReason);
+                }
+
+                return null;
+            };
+
+            afterToolCall = async (ctx, ct) =>
+            {
+                var resultText = ctx.Result.Content.FirstOrDefault()?.ToString();
+                var hookEvent = new AfterToolCallEvent(
+                    agentId,
+                    ctx.ToolCallRequest.Name,
+                    ctx.ToolCallRequest.Id,
+                    resultText,
+                    ctx.IsError);
+
+                await hookDispatcher
+                    .DispatchAsync<AfterToolCallEvent, GatewayAfterToolCallResult>(hookEvent, ct)
+                    .ConfigureAwait(false);
+
+                return null;
+            };
+        }
+
         var options = new AgentOptions(
             InitialState: new AgentInitialState(
                 SystemPrompt: enrichedSystemPrompt,
@@ -150,8 +203,8 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
             GetSteeringMessages: null,
             GetFollowUpMessages: null,
             ToolExecutionMode: ToolExecutionMode.Parallel,
-            BeforeToolCall: null,
-            AfterToolCall: null,
+            BeforeToolCall: beforeToolCall,
+            AfterToolCall: afterToolCall,
             GenerationSettings: new SimpleStreamOptions(),
             SteeringMode: QueueMode.All,
             FollowUpMode: QueueMode.All,
