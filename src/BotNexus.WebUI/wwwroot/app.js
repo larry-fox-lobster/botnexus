@@ -2595,19 +2595,48 @@
                 <td>${escapeHtml(job.name || '')}</td>
                 <td><code>${escapeHtml(job.schedule || '')}</code></td>
                 <td>${escapeHtml(job.agentId || '')}</td>
-                <td>${job.lastRun ? escapeHtml(relativeTime(job.lastRun)) : '—'}</td>
-                <td>${job.nextRun ? escapeHtml(relativeTime(job.nextRun)) : '—'}</td>
+                <td>${job.lastRunAt ? escapeHtml(relativeTime(job.lastRunAt)) : '—'}</td>
+                <td>${job.nextRunAt ? escapeHtml(relativeTime(job.nextRunAt)) : '—'}</td>
                 <td>${statusLabel}</td>
                 <td>
-                    <button class="btn btn-sm" onclick="alert('Cron API not yet available')">▶ Run</button>
-                    <button class="btn btn-sm" onclick="alert('Cron API not yet available')">✏️</button>
-                    <button class="btn btn-sm btn-danger-sm" onclick="alert('Cron API not yet available')">🗑</button>
+                    <button class="btn btn-sm" onclick="runCronJob('${job.id}')">▶ Run</button>
+                    <button class="btn btn-sm btn-danger-sm" onclick="deleteCronJob('${job.id}')">🗑</button>
                 </td>
             </tr>`;
         }
         html += '</tbody></table>';
         body.innerHTML = html;
     }
+
+    window.runCronJob = async function(jobId) {
+        try {
+            const res = await fetch(`${API_BASE}/cron/${encodeURIComponent(jobId)}/run`, { method: 'POST' });
+            if (res.ok) {
+                appendSystemMessage('Cron job triggered.');
+                loadCronJobs();
+                loadSessions();
+            } else {
+                appendSystemMessage(`Failed to run: ${res.status}`, 'error');
+            }
+        } catch (e) {
+            appendSystemMessage(`Error: ${e.message}`, 'error');
+        }
+    };
+
+    window.deleteCronJob = async function(jobId) {
+        showConfirm('Delete this cron job?', 'Delete Cron Job', async () => {
+            try {
+                const res = await fetch(`${API_BASE}/cron/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
+                if (res.ok || res.status === 204) {
+                    loadCronJobs();
+                } else {
+                    appendSystemMessage(`Failed to delete: ${res.status}`, 'error');
+                }
+            } catch (e) {
+                appendSystemMessage(`Error: ${e.message}`, 'error');
+            }
+        }, 'Delete');
+    };
 
     function showAddCronForm() {
         const body = $('#cron-body');
