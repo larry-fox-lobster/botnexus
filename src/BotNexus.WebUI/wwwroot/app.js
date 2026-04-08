@@ -80,6 +80,7 @@
     const elAgentForm = $('#agent-form');
     const elDebugModal = $('#debug-modal');
     const elAgentConfigView = $('#agent-config-view');
+    const elCronView = $('#cron-view');
     const elConfirmDialog = $('#confirm-dialog');
     const elBtnReconnect = $('#btn-reconnect');
     const elConnectionBannerText = $('#connection-banner-text');
@@ -1393,9 +1394,7 @@
         isStreaming = false;
         resetQueue();
 
-        elWelcome.classList.add('hidden');
-        elChatView.classList.remove('hidden');
-        elAgentConfigView.classList.add('hidden');
+        showView('chat-view');
         elChatTitle.textContent = `${agentId} — SignalR`;
         elChatMeta.textContent = `Agent: ${agentId} · Session will be created on first message`;
         elAgentSelect.classList.remove('hidden');
@@ -1549,9 +1548,7 @@
                             currentSessionId = null;
                             currentAgentId = null;
                             updateSessionIdDisplay();
-                            elChatView.classList.add('hidden');
-                            elAgentConfigView.classList.add('hidden');
-                            elWelcome.classList.remove('hidden');
+                            showView('welcome-screen');
                         }
                         loadSessions();
                     } else {
@@ -1575,9 +1572,7 @@
             el.classList.toggle('active', el.dataset.sessionId === sessionId);
         });
 
-        elWelcome.classList.add('hidden');
-        elChatView.classList.remove('hidden');
-        elAgentConfigView.classList.add('hidden');
+        showView('chat-view');
         elChatMessages.innerHTML = '<div class="loading">Loading messages...</div>';
 
         if (agentId) elAgentSelect.value = agentId;
@@ -1833,6 +1828,17 @@
     }
 
     // =========================================================================
+    // View switching helper
+    // =========================================================================
+
+    function showView(viewId) {
+        ['welcome-screen', 'chat-view', 'agent-config-view', 'cron-view'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('hidden', id !== viewId);
+        });
+    }
+
+    // =========================================================================
     // Agent config view (full canvas — replaces chat area)
     // =========================================================================
 
@@ -1840,10 +1846,8 @@
         const agent = await fetchJson(`/agents/${encodeURIComponent(agentId)}`);
         if (!agent) { appendSystemMessage('Agent not found', 'error'); return; }
 
-        // Hide other views, show agent config
-        elWelcome.classList.add('hidden');
-        elChatView.classList.add('hidden');
-        elAgentConfigView.classList.remove('hidden');
+        // Show agent config view
+        showView('agent-config-view');
 
         $('#agent-config-title').textContent = agent.displayName || agent.name || agentId;
 
@@ -1853,9 +1857,19 @@
 
         // Wire save button
         $('#btn-agent-save').onclick = () => saveAgentConfig(agentId);
+
+        // Wire toggle label updates
+        ['cfg-enabled', 'cfg-memoryEnabled', 'cfg-temporalDecayEnabled'].forEach(id => {
+            const cb = $(`#${id}`);
+            if (cb) cb.addEventListener('change', () => {
+                const lbl = cb.parentElement.querySelector('label');
+                if (lbl) lbl.textContent = cb.checked ? 'Active' : 'Disabled';
+            });
+        });
+
         $('#btn-agent-chat').onclick = () => {
             // Switch back to chat with this agent
-            elAgentConfigView.classList.add('hidden');
+            showView('chat-view');
             currentAgentId = agentId;
             elAgentSelect.value = agentId;
             startNewChat();
@@ -1880,6 +1894,20 @@
     }
 
     function buildAgentConfigForm(agent, agentId) {
+        const memoryEnabled = agent.memory?.enabled || agent.memoryEnabled || false;
+        const memoryIndexing = agent.memory?.indexing || 'auto';
+        const memoryTopK = agent.memory?.search?.defaultTopK ?? 10;
+        const temporalEnabled = agent.memory?.search?.temporalDecay?.enabled ?? true;
+        const temporalHalfLife = agent.memory?.search?.temporalDecay?.halfLifeDays ?? 30;
+        const allowedModelIds = (agent.allowedModelIds || agent.allowedModels || []).join(', ');
+        const subAgentIds = (agent.subAgentIds || agent.subAgents || []).join(', ');
+        const agentEnabled = agent.enabled !== undefined ? agent.enabled : true;
+
+        let metadataJson = '{}';
+        try { metadataJson = JSON.stringify(agent.metadata || {}, null, 2); } catch { /* ignore */ }
+        let isolationJson = '{}';
+        try { isolationJson = JSON.stringify(agent.isolationOptions || {}, null, 2); } catch { /* ignore */ }
+
         return `
             <div class="config-section">
                 <h3>Identity</h3>
@@ -1895,6 +1923,13 @@
                     <div class="config-field full-width">
                         <label>Description</label>
                         <textarea id="cfg-description" class="config-input" rows="3">${escapeHtml(agent.description || '')}</textarea>
+                    </div>
+                    <div class="config-field">
+                        <label>Enabled</label>
+                        <div class="config-toggle">
+                            <input type="checkbox" id="cfg-enabled" ${agentEnabled ? 'checked' : ''}>
+                            <label for="cfg-enabled">${agentEnabled ? 'Active' : 'Disabled'}</label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1920,6 +1955,14 @@
                         <label>Max Concurrent Sessions</label>
                         <input type="number" id="cfg-maxSessions" value="${agent.maxConcurrentSessions || 0}" class="config-input">
                     </div>
+                    <div class="config-field full-width">
+                        <label>Allowed Model IDs <span class="config-muted">(comma-separated)</span></label>
+                        <input type="text" id="cfg-allowedModelIds" value="${escapeHtml(allowedModelIds)}" class="config-input" placeholder="e.g. gpt-4.1, claude-sonnet-4-20250514">
+                    </div>
+                    <div class="config-field full-width">
+                        <label>Sub-Agent IDs <span class="config-muted">(comma-separated)</span></label>
+                        <input type="text" id="cfg-subAgentIds" value="${escapeHtml(subAgentIds)}" class="config-input" placeholder="e.g. coding-agent, research-agent">
+                    </div>
                 </div>
             </div>
 
@@ -1942,11 +1985,33 @@
                 <div class="config-grid">
                     <div class="config-field">
                         <label>Memory Enabled</label>
-                        <div class="config-value">${(agent.memory?.enabled || agent.memoryEnabled) ? '✅ Yes' : '❌ No'}</div>
+                        <div class="config-toggle">
+                            <input type="checkbox" id="cfg-memoryEnabled" ${memoryEnabled ? 'checked' : ''}>
+                            <label for="cfg-memoryEnabled">${memoryEnabled ? 'Active' : 'Disabled'}</label>
+                        </div>
                     </div>
                     <div class="config-field">
-                        <label>Indexing</label>
-                        <div class="config-value">${agent.memory?.indexing || 'auto'}</div>
+                        <label>Indexing Mode</label>
+                        <select id="cfg-memoryIndexing" class="config-input">
+                            <option value="auto" ${memoryIndexing === 'auto' ? 'selected' : ''}>Auto</option>
+                            <option value="manual" ${memoryIndexing === 'manual' ? 'selected' : ''}>Manual</option>
+                            <option value="off" ${memoryIndexing === 'off' ? 'selected' : ''}>Off</option>
+                        </select>
+                    </div>
+                    <div class="config-field">
+                        <label>Search Default Top-K</label>
+                        <input type="number" id="cfg-memoryTopK" value="${memoryTopK}" min="1" max="100" class="config-input">
+                    </div>
+                    <div class="config-field">
+                        <label>Temporal Decay Enabled</label>
+                        <div class="config-toggle">
+                            <input type="checkbox" id="cfg-temporalDecayEnabled" ${temporalEnabled ? 'checked' : ''}>
+                            <label for="cfg-temporalDecayEnabled">${temporalEnabled ? 'Active' : 'Disabled'}</label>
+                        </div>
+                    </div>
+                    <div class="config-field">
+                        <label>Temporal Decay Half-Life (days)</label>
+                        <input type="number" id="cfg-temporalHalfLife" value="${temporalHalfLife}" min="1" class="config-input">
                     </div>
                 </div>
             </div>
@@ -1956,6 +2021,22 @@
                 <div class="config-field full-width">
                     <label>Tool IDs</label>
                     <div class="config-value">${(agent.toolIds || []).join(', ') || '<span class="config-muted">All tools available</span>'}</div>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h3>Metadata</h3>
+                <div class="config-field full-width">
+                    <label>Agent Metadata <span class="config-muted">(read-only)</span></label>
+                    <pre class="config-json">${escapeHtml(metadataJson)}</pre>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h3>Isolation Options</h3>
+                <div class="config-field full-width">
+                    <label>Strategy-specific options <span class="config-muted">(read-only)</span></label>
+                    <pre class="config-json">${escapeHtml(isolationJson)}</pre>
                 </div>
             </div>
 
@@ -1995,6 +2076,14 @@
         const systemPrompt = $('#cfg-systemPrompt')?.value;
         const modelId = $('#cfg-model')?.value;
         const maxSessions = parseInt($('#cfg-maxSessions')?.value, 10);
+        const enabled = $('#cfg-enabled')?.checked ?? true;
+        const allowedModelIdsRaw = $('#cfg-allowedModelIds')?.value || '';
+        const subAgentIdsRaw = $('#cfg-subAgentIds')?.value || '';
+        const memoryEnabled = $('#cfg-memoryEnabled')?.checked ?? false;
+        const memoryIndexing = $('#cfg-memoryIndexing')?.value || 'auto';
+        const memoryTopK = parseInt($('#cfg-memoryTopK')?.value, 10) || 10;
+        const temporalDecayEnabled = $('#cfg-temporalDecayEnabled')?.checked ?? true;
+        const temporalHalfLife = parseInt($('#cfg-temporalHalfLife')?.value, 10) || 30;
 
         const updated = { ...agentData };
         if (displayName !== undefined) updated.displayName = displayName;
@@ -2002,6 +2091,20 @@
         if (systemPrompt !== undefined) updated.systemPrompt = systemPrompt;
         if (modelId) updated.modelId = modelId;
         if (!isNaN(maxSessions)) updated.maxConcurrentSessions = maxSessions;
+        updated.enabled = enabled;
+        updated.allowedModelIds = allowedModelIdsRaw ? allowedModelIdsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+        updated.subAgentIds = subAgentIdsRaw ? subAgentIdsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+        updated.memory = {
+            enabled: memoryEnabled,
+            indexing: memoryIndexing,
+            search: {
+                defaultTopK: memoryTopK,
+                temporalDecay: {
+                    enabled: temporalDecayEnabled,
+                    halfLifeDays: temporalHalfLife
+                }
+            }
+        };
 
         const res = await fetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}`, {
             method: 'PUT',
@@ -2445,6 +2548,113 @@
     }
 
     // =========================================================================
+    // Cron view (placeholder — no backend yet)
+    // =========================================================================
+
+    function openCronView() {
+        showView('cron-view');
+        loadCronJobs();
+    }
+
+    async function loadCronJobs() {
+        const body = $('#cron-body');
+        if (!body) return;
+
+        const jobs = await fetchJson('/cron');
+        if (!jobs || !Array.isArray(jobs) || jobs.length === 0) {
+            body.innerHTML = `
+                <div class="cron-empty">
+                    <p>No cron jobs configured. Add one to schedule agent tasks.</p>
+                </div>`;
+            return;
+        }
+
+        let html = `<table class="cron-table">
+            <thead><tr>
+                <th>Name</th><th>Schedule</th><th>Agent</th><th>Last Run</th><th>Next Run</th><th>Status</th><th>Actions</th>
+            </tr></thead><tbody>`;
+        for (const job of jobs) {
+            const statusLabel = job.enabled ? 'active' : 'paused';
+            html += `<tr>
+                <td>${escapeHtml(job.name || '')}</td>
+                <td><code>${escapeHtml(job.schedule || '')}</code></td>
+                <td>${escapeHtml(job.agentId || '')}</td>
+                <td>${job.lastRun ? escapeHtml(relativeTime(job.lastRun)) : '—'}</td>
+                <td>${job.nextRun ? escapeHtml(relativeTime(job.nextRun)) : '—'}</td>
+                <td>${statusLabel}</td>
+                <td>
+                    <button class="btn btn-sm" onclick="alert('Cron API not yet available')">▶ Run</button>
+                    <button class="btn btn-sm" onclick="alert('Cron API not yet available')">✏️</button>
+                    <button class="btn btn-sm btn-danger-sm" onclick="alert('Cron API not yet available')">🗑</button>
+                </td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+        body.innerHTML = html;
+    }
+
+    function showAddCronForm() {
+        const body = $('#cron-body');
+        if (!body) return;
+
+        // Don't add duplicate form
+        if (body.querySelector('.cron-form')) return;
+
+        const formHtml = `
+            <div class="cron-form">
+                <h3>New Cron Job</h3>
+                <div class="config-grid">
+                    <div class="config-field">
+                        <label>Job Name</label>
+                        <input type="text" id="cron-name" class="config-input" placeholder="e.g. daily-summary">
+                    </div>
+                    <div class="config-field">
+                        <label>Cron Expression</label>
+                        <input type="text" id="cron-schedule" class="config-input" placeholder="e.g. 0 9 * * *">
+                    </div>
+                    <div class="config-field">
+                        <label>Target Agent</label>
+                        <select id="cron-agent" class="config-input">
+                            ${agentsCache.map(a => {
+                                const name = a.name || a.agentId || a.id || 'unknown';
+                                return `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
+                            }).join('')}
+                        </select>
+                    </div>
+                    <div class="config-field">
+                        <label>Enabled</label>
+                        <div class="config-toggle">
+                            <input type="checkbox" id="cron-enabled" checked>
+                            <label for="cron-enabled">Active</label>
+                        </div>
+                    </div>
+                    <div class="config-field full-width">
+                        <label>Message / Task</label>
+                        <textarea id="cron-message" class="config-input" rows="3" placeholder="Message to send to the agent on each run..."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-secondary" id="btn-cancel-cron">Cancel</button>
+                    <button class="btn btn-primary" id="btn-submit-cron">Create Job</button>
+                </div>
+            </div>`;
+
+        body.insertAdjacentHTML('afterbegin', formHtml);
+
+        $('#btn-cancel-cron').addEventListener('click', () => {
+            body.querySelector('.cron-form')?.remove();
+        });
+        $('#btn-submit-cron').addEventListener('click', () => {
+            appendSystemMessage('Cron API not yet available — job was not created.', 'error');
+        });
+        const cronEnabledCb = $('#cron-enabled');
+        if (cronEnabledCb) cronEnabledCb.addEventListener('change', () => {
+            const lbl = cronEnabledCb.parentElement.querySelector('label');
+            if (lbl) lbl.textContent = cronEnabledCb.checked ? 'Active' : 'Disabled';
+        });
+    }
+
+    // =========================================================================
     // Toggle visibility
     // =========================================================================
 
@@ -2527,6 +2737,13 @@
                 if (e.target.closest('.btn-icon') || e.target.closest('.toggle-switch')) return;
                 const target = document.getElementById(header.dataset.toggle);
                 if (target) target.classList.toggle('collapsed');
+            });
+        });
+        // Cron sidebar header opens cron view
+        $$('.section-header[data-view]').forEach(header => {
+            header.addEventListener('click', () => {
+                const view = header.dataset.view;
+                if (view === 'cron') openCronView();
             });
         });
     }
@@ -2644,6 +2861,10 @@
 
         $('#btn-cancel-agent').addEventListener('click', closeAgentForm);
         $('#btn-save-agent').addEventListener('click', saveAgent);
+
+        // Cron view
+        $('#btn-add-cron').addEventListener('click', showAddCronForm);
+
         $('#form-agent-provider').addEventListener('change', () => { loadModelsForProvider($('#form-agent-provider').value); });
         $('#form-agent-temperature-enabled').addEventListener('change', (e) => { $('#form-agent-temperature').disabled = !e.target.checked; });
         $('#form-agent-max-tokens-enabled').addEventListener('change', (e) => { $('#form-agent-max-tokens').disabled = !e.target.checked; });
@@ -2682,8 +2903,11 @@
                 if (isCommandPaletteVisible()) { hideCommandPalette(); return; }
                 if (!elAgentConfigView.classList.contains('hidden')) {
                     // Escape from agent config goes back to welcome
-                    elAgentConfigView.classList.add('hidden');
-                    elWelcome.classList.remove('hidden');
+                    showView('welcome-screen');
+                    return;
+                }
+                if (!elCronView.classList.contains('hidden')) {
+                    showView('welcome-screen');
                     return;
                 }
                 if (!elToolModal.classList.contains('hidden')) { closeToolModal(); return; }

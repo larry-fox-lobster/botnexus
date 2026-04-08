@@ -76,6 +76,12 @@
             </div>
 
             <div class="sidebar-section">
+                <div class="section-header" data-view="cron">
+                    <span>⏰ Cron</span>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
                 <div class="section-header" data-toggle="activity-feed">
                     <span>📊 Activity</span>
                     <label class="toggle-switch" title="Subscribe to activity events">
@@ -188,6 +194,17 @@
                     </div>
                 </div>
                 <div class="agent-config-body" id="agent-config-body">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Cron View -->
+            <div id="cron-view" class="content-view hidden">
+                <div class="cron-header">
+                    <h2>Cron Jobs</h2>
+                    <button id="btn-add-cron" class="btn btn-primary">+ Add Job</button>
+                </div>
+                <div class="cron-body" id="cron-body">
                     <!-- Populated by JS -->
                 </div>
             </div>

@@ -993,8 +993,28 @@ body {
 .config-value { font-size: 0.9rem; padding: 8px 0; }
 .config-muted { color: var(--text-secondary); font-style: italic; }
 .prompt-file-item { padding: 4px 8px; background: var(--bg-tertiary); border-radius: 4px; font-size: 0.85rem; margin-bottom: 4px; font-family: var(--font-mono); }
+.config-toggle { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
+.config-toggle input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+.config-toggle label { font-size: 0.9rem; cursor: pointer; }
+.config-json { font-family: var(--font-mono); font-size: 0.82rem; padding: 10px 12px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; }
+
+/* === Cron View === */
+.cron-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border); }
+.cron-header h2 { margin: 0; font-size: 1.2rem; }
+.cron-body { padding: 24px; }
+.cron-table { width: 100%; border-collapse: collapse; }
+.cron-table th { text-align: left; padding: 8px 12px; font-size: 0.8rem; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.cron-table td { padding: 8px 12px; font-size: 0.9rem; border-bottom: 1px solid var(--border); }
+.cron-empty { text-align: center; padding: 48px; color: var(--text-secondary); }
+.cron-form { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+.cron-form h3 { margin: 0 0 16px; font-size: 1rem; }
+.cron-form .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.cron-form .config-field { display: flex; flex-direction: column; gap: 4px; }
+.cron-form .config-field.full-width { grid-column: 1 / -1; }
+.cron-form .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 
 @media (max-width: 768px) {
     .config-grid { grid-template-columns: 1fr; }
     .agent-config-body { padding: 16px; }
+    .cron-form .config-grid { grid-template-columns: 1fr; }
 }
