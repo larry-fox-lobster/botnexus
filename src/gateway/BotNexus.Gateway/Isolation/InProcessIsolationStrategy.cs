@@ -130,13 +130,12 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
             tools.Add(new SessionTool(sessionStore, descriptor.AgentId, sessionAccessLevel, sessionAllowedAgents));
         }
 
-        // Skills tool — discovers skills from global, per-agent, and workspace paths
+        // Skills tool — passes discovery paths so skills are found dynamically
         var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var globalSkillsDir = Path.Combine(homeDir, ".botnexus", "skills");
         var agentSkillsDir = Path.Combine(homeDir, ".botnexus", "agents", descriptor.AgentId, "skills");
         var workspaceSkillsDir = Path.Combine(workspacePath, "skills");
-        var allSkills = SkillDiscovery.Discover(globalSkillsDir, agentSkillsDir, workspaceSkillsDir);
-        tools.Add(new SkillTool(allSkills, descriptor.Skills));
+        tools.Add(new SkillTool(globalSkillsDir, agentSkillsDir, workspaceSkillsDir, descriptor.Skills));
 
         var options = new AgentOptions(
             InitialState: new AgentInitialState(

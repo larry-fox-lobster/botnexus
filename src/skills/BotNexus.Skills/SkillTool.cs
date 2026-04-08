@@ -7,12 +7,27 @@ namespace BotNexus.Skills;
 
 /// <summary>
 /// Agent-facing tool for listing and loading skills at runtime.
+/// Re-discovers skills on each call to pick up filesystem changes.
 /// </summary>
 public sealed class SkillTool(
-    IReadOnlyList<SkillDefinition> allSkills,
+    string? globalSkillsDir,
+    string? agentSkillsDir,
+    string? workspaceSkillsDir,
     SkillsConfig? config) : IAgentTool
 {
     private readonly HashSet<string> _sessionLoaded = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Creates a SkillTool with a static skill list (for testing).</summary>
+    internal SkillTool(IReadOnlyList<SkillDefinition> allSkills, SkillsConfig? config)
+        : this(null, null, null, config)
+    {
+        _staticSkills = allSkills;
+    }
+
+    private readonly IReadOnlyList<SkillDefinition>? _staticSkills;
+
+    private IReadOnlyList<SkillDefinition> DiscoverSkills()
+        => _staticSkills ?? SkillDiscovery.Discover(globalSkillsDir, agentSkillsDir, workspaceSkillsDir);
 
     public string Name => "skills";
     public string Label => "Skill Manager";
@@ -66,7 +81,8 @@ public sealed class SkillTool(
 
     private AgentToolResult ListSkills()
     {
-        var resolution = SkillResolver.Resolve(allSkills, config, explicitlyLoaded: _sessionLoaded.ToList());
+        var currentSkills = DiscoverSkills();
+        var resolution = SkillResolver.Resolve(currentSkills, config, explicitlyLoaded: _sessionLoaded.ToList());
 
         var lines = new List<string>();
         if (resolution.Loaded.Count > 0)
@@ -101,7 +117,8 @@ public sealed class SkillTool(
         if (config is not null && !config.Enabled)
             return TextResult("Skills are disabled for this agent.");
 
-        var skill = allSkills.FirstOrDefault(s => string.Equals(s.Name, skillName, StringComparison.OrdinalIgnoreCase));
+        var currentSkills = DiscoverSkills();
+        var skill = currentSkills.FirstOrDefault(s => string.Equals(s.Name, skillName, StringComparison.OrdinalIgnoreCase));
         if (skill is null)
             return TextResult($"Skill '{skillName}' not found. Use action 'list' to see available skills.");
 
@@ -109,7 +126,7 @@ public sealed class SkillTool(
             return TextResult($"Skill '{skill.Name}' is already loaded.");
 
         // Delegate access checks to the resolver — it handles deny, allow, and limits
-        var resolution = SkillResolver.Resolve(allSkills, config, explicitlyLoaded: [skill.Name]);
+        var resolution = SkillResolver.Resolve(currentSkills, config, explicitlyLoaded: [skill.Name]);
         if (resolution.Denied.Any(s => string.Equals(s.Name, skillName, StringComparison.OrdinalIgnoreCase)))
             return TextResult($"Skill '{skillName}' is not available for this agent.");
 
