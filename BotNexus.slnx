@@ -10,6 +10,9 @@
     <Project Path="src/providers/BotNexus.Providers.OpenAICompat/BotNexus.Providers.OpenAICompat.csproj" />
     <Project Path="src/providers/BotNexus.Providers.Copilot/BotNexus.Providers.Copilot.csproj" />
   </Folder>
+  <Folder Name="/src/cron/">
+    <Project Path="src/cron/BotNexus.Cron/BotNexus.Cron.csproj" />
+  </Folder>
   <Folder Name="/src/gateway/">
     <Project Path="src/gateway/BotNexus.Cli/BotNexus.Cli.csproj" />
     <Project Path="src/gateway/BotNexus.Gateway.Abstractions/BotNexus.Gateway.Abstractions.csproj" />

@@ -1,0 +1,156 @@
+using Cronos;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace BotNexus.Cron;
+
+public sealed class CronScheduler(
+    ICronStore cronStore,
+    IEnumerable<ICronAction> actions,
+    IServiceScopeFactory scopeFactory,
+    IOptionsMonitor<CronOptions> optionsMonitor,
+    ILogger<CronScheduler> logger) : BackgroundService
+{
+    private readonly ICronStore _cronStore = cronStore;
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
+    private readonly IOptionsMonitor<CronOptions> _optionsMonitor = optionsMonitor;
+    private readonly ILogger<CronScheduler> _logger = logger;
+    private readonly IReadOnlyDictionary<string, ICronAction> _actions = actions
+        .GroupBy(action => action.ActionType, StringComparer.OrdinalIgnoreCase)
+        .ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase);
+
+    public async Task<CronRun> RunNowAsync(string jobId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
+        await _cronStore.InitializeAsync(cancellationToken).ConfigureAwait(false);
+
+        var job = await _cronStore.GetAsync(jobId, cancellationToken).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Cron job '{jobId}' was not found.");
+
+        return await RunActionAsync(job, CronTriggerType.Manual, DateTimeOffset.UtcNow, cancellationToken).ConfigureAwait(false);
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        await _cronStore.InitializeAsync(stoppingToken).ConfigureAwait(false);
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var options = _optionsMonitor.CurrentValue ?? new CronOptions();
+            if (options.Enabled)
+            {
+                try
+                {
+                    await ProcessTickAsync(stoppingToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Cron scheduler tick failed.");
+                }
+            }
+
+            var delay = TimeSpan.FromSeconds(Math.Max(1, options.TickIntervalSeconds));
+            await Task.Delay(delay, stoppingToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task ProcessTickAsync(CancellationToken ct)
+    {
+        var jobs = await _cronStore.ListAsync(ct: ct).ConfigureAwait(false);
+        var now = DateTimeOffset.UtcNow;
+
+        foreach (var job in jobs.Where(j => j.Enabled))
+        {
+            if (!TryGetSchedule(job, out var expression))
+                continue;
+
+            if (job.NextRunAt is null)
+            {
+                var initialized = job with
+                {
+                    NextRunAt = expression.GetNextOccurrence(now, TimeZoneInfo.Utc)
+                };
+                await _cronStore.UpdateAsync(initialized, ct).ConfigureAwait(false);
+                continue;
+            }
+
+            if (job.NextRunAt > now)
+                continue;
+
+            await RunActionAsync(job, CronTriggerType.Scheduled, now, ct).ConfigureAwait(false);
+
+            var latest = await _cronStore.GetAsync(job.Id, ct).ConfigureAwait(false) ?? job;
+            var updated = latest with
+            {
+                NextRunAt = expression.GetNextOccurrence(now, TimeZoneInfo.Utc)
+            };
+            await _cronStore.UpdateAsync(updated, ct).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<CronRun> RunActionAsync(CronJob job, CronTriggerType triggerType, DateTimeOffset triggeredAt, CancellationToken ct)
+    {
+        var run = await _cronStore.RecordRunStartAsync(job.Id, ct).ConfigureAwait(false);
+        var action = ResolveAction(job.ActionType);
+
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var context = new CronExecutionContext
+            {
+                Job = job,
+                RunId = run.Id,
+                TriggeredAt = triggeredAt,
+                TriggerType = triggerType,
+                Services = scope.ServiceProvider
+            };
+
+            await action.ExecuteAsync(context, ct).ConfigureAwait(false);
+            await _cronStore.RecordRunCompleteAsync(run.Id, "ok", sessionId: context.SessionId, ct: ct).ConfigureAwait(false);
+            await _cronStore.UpdateAsync(job with
+            {
+                LastRunAt = triggeredAt,
+                LastRunStatus = "ok",
+                LastRunError = null
+            }, ct).ConfigureAwait(false);
+            return run with { Status = "ok", CompletedAt = DateTimeOffset.UtcNow, SessionId = context.SessionId };
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogError(ex, "Cron job execution failed. JobId: {JobId}, ActionType: {ActionType}", job.Id, job.ActionType);
+            await _cronStore.RecordRunCompleteAsync(run.Id, "error", ex.Message, ct: ct).ConfigureAwait(false);
+            await _cronStore.UpdateAsync(job with
+            {
+                LastRunAt = triggeredAt,
+                LastRunStatus = "error",
+                LastRunError = ex.ToString()
+            }, ct).ConfigureAwait(false);
+            return run with { Status = "error", CompletedAt = DateTimeOffset.UtcNow, Error = ex.Message };
+        }
+    }
+
+    private ICronAction ResolveAction(string actionType)
+    {
+        if (_actions.TryGetValue(actionType, out var action))
+            return action;
+
+        throw new InvalidOperationException($"No cron action registered for type '{actionType}'.");
+    }
+
+    private bool TryGetSchedule(CronJob job, out CronExpression expression)
+    {
+        try
+        {
+            expression = CronExpression.Parse(job.Schedule, CronFormat.Standard);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Invalid cron expression for job {JobId}: {Schedule}", job.Id, job.Schedule);
+            expression = default!;
+            return false;
+        }
+    }
+}

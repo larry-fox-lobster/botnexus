@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RootNamespace>BotNexus.Cron</RootNamespace>
+    <Description>Cron scheduling infrastructure for BotNexus.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="CronJob.cs" />
+    <Compile Include="CronRun.cs" />
+    <Compile Include="ICronAction.cs" />
+    <Compile Include="ICronStore.cs" />
+    <Compile Include="SqliteCronStore.cs" />
+    <Compile Include="CronOptions.cs" />
+    <Compile Include="CronScheduler.cs" />
+    <Compile Include="ActionStubs\AgentPromptActionStub.cs" />
+    <Compile Include="ActionStubs\WebhookActionStub.cs" />
+    <Compile Include="Extensions\CronServiceCollectionExtensions.cs" />
+    <Compile Include="Tools\CronTool.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\agent\BotNexus.AgentCore\BotNexus.AgentCore.csproj" />
+    <ProjectReference Include="..\..\providers\BotNexus.Providers.Core\BotNexus.Providers.Core.csproj" />
+    <ProjectReference Include="..\..\gateway\BotNexus.Gateway.Abstractions\BotNexus.Gateway.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Cronos" Version="0.11.1" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0-preview.3.25171.6" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0-preview.3.25171.5" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0-preview.3.25171.5" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0-preview.3.25171.5" />
+  </ItemGroup>
+
+</Project>
