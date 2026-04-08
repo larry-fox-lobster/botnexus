@@ -260,6 +260,17 @@ public sealed class AgentDefinitionConfig
     public bool Enabled { get; set; } = true;
     /// <summary>Memory system configuration for this agent.</summary>
     public MemoryAgentConfig? Memory { get; set; }
+    /// <summary>Session access configuration for this agent's session tool.</summary>
+    public SessionAccessConfig? SessionAccess { get; set; }
+}
+
+/// <summary>Controls what sessions an agent can access via the session tool.</summary>
+public sealed class SessionAccessConfig
+{
+    /// <summary>Access level: "own" (default), "allowlist", or "all".</summary>
+    public string Level { get; set; } = "own";
+    /// <summary>Agent IDs this agent can view sessions for (when level is "allowlist").</summary>
+    public List<string>? AllowedAgents { get; set; }
 }
 
 /// <summary>Channel definition in platform config.</summary>

@@ -85,4 +85,10 @@ public sealed record AgentDescriptor
 
     /// <summary>Memory system configuration for this agent. Null means memory is disabled.</summary>
     public MemoryAgentConfig? Memory { get; init; }
+
+    /// <summary>Session access level for this agent's session tool. Defaults to "own".</summary>
+    public string SessionAccessLevel { get; init; } = "own";
+
+    /// <summary>Agent IDs this agent can view sessions for (when SessionAccessLevel is "allowlist").</summary>
+    public IReadOnlyList<string> SessionAllowedAgents { get; init; } = [];
 }

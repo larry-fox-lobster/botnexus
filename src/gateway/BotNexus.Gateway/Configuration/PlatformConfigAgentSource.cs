@@ -82,7 +82,9 @@ public sealed class PlatformConfigAgentSource(
                 MaxConcurrentSessions = agentConfig.MaxConcurrentSessions ?? 0,
                 Metadata = ConvertObject(agentConfig.Metadata),
                 IsolationOptions = ConvertObject(agentConfig.IsolationOptions),
-                Memory = CloneMemoryConfig(agentConfig.Memory)
+                Memory = CloneMemoryConfig(agentConfig.Memory),
+                SessionAccessLevel = agentConfig.SessionAccess?.Level ?? "own",
+                SessionAllowedAgents = agentConfig.SessionAccess?.AllowedAgents?.ToArray() ?? []
             };
 
             var validationErrors = AgentDescriptorValidator.Validate(descriptor);

@@ -11,8 +11,10 @@ using BotNexus.Cron.Tools;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
+using BotNexus.Gateway.Tools;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
 using BotNexus.Memory;
@@ -119,6 +121,14 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
             }
         }
 
+        // Session tool — always available, access level from config
+        var sessionStore = _serviceProvider.GetService<ISessionStore>();
+        if (sessionStore is not null)
+        {
+            var (sessionAccessLevel, sessionAllowedAgents) = ResolveSessionAccess(descriptor);
+            tools.Add(new SessionTool(sessionStore, descriptor.AgentId, sessionAccessLevel, sessionAllowedAgents));
+        }
+
         var options = new AgentOptions(
             InitialState: new AgentInitialState(
                 SystemPrompt: enrichedSystemPrompt,
@@ -158,6 +168,37 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
             string value when bool.TryParse(value, out var parsed) => parsed,
             _ => false
         };
+    }
+
+    private static (SessionAccessLevel level, IReadOnlyList<string>? allowedAgents) ResolveSessionAccess(AgentDescriptor descriptor)
+    {
+        var level = (descriptor.SessionAccessLevel ?? "own").ToLowerInvariant() switch
+        {
+            "all" => SessionAccessLevel.All,
+            "allowlist" => SessionAccessLevel.Allowlist,
+            _ => SessionAccessLevel.Own
+        };
+
+        var allowed = descriptor.SessionAllowedAgents is { Count: > 0 }
+            ? descriptor.SessionAllowedAgents
+            : null;
+
+        // If sub-agents are configured, automatically include them in the allowlist
+        if (descriptor.SubAgentIds is { Count: > 0 } && level != SessionAccessLevel.All)
+        {
+            var combined = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (allowed is not null)
+                foreach (var a in allowed) combined.Add(a);
+            foreach (var s in descriptor.SubAgentIds) combined.Add(s);
+
+            if (combined.Count > 0)
+            {
+                level = SessionAccessLevel.Allowlist;
+                allowed = combined.ToList();
+            }
+        }
+
+        return (level, allowed);
     }
 }
 
