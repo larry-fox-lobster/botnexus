@@ -101,8 +101,6 @@
     const elBtnSendMode = $('#btn-send-mode');
     const elFollowUpIndicator = $('#followup-indicator');
     const elProcessingStatus = $('#processing-status');
-    const elProcessingStage = $('#processing-stage');
-    const elProcessingToolCount = $('#processing-tool-count');
     const elCommandPalette = $('#command-palette');
 
     // =========================================================================
@@ -286,24 +284,35 @@
     // =========================================================================
 
     function showProcessingStatus(stage, icon) {
-        elProcessingStage.innerHTML = `<span aria-hidden="true">${icon || '⏳'}</span> ${escapeHtml(stage)}`;
-        updateProcessingToolCount();
         elProcessingStatus.classList.remove('hidden');
+
+        // Show/update an inline status message at the bottom of chat
+        let statusEl = elChatMessages.querySelector('.processing-inline');
+        if (!statusEl) {
+            statusEl = document.createElement('div');
+            statusEl.className = 'message system-msg processing-inline';
+            elChatMessages.appendChild(statusEl);
+        }
+        statusEl.textContent = `${icon || '⏳'} ${stage}`;
+        scrollToBottom();
     }
 
     function updateProcessingToolCount() {
+        const statusEl = elChatMessages.querySelector('.processing-inline');
+        if (!statusEl) return;
+
         const runningCount = Object.values(activeToolCalls).filter(t => t.status === 'running').length;
         if (runningCount > 0) {
-            elProcessingToolCount.textContent = `🔧 ${runningCount} tool${runningCount > 1 ? 's' : ''} active`;
-        } else if (activeToolCount > 0) {
-            elProcessingToolCount.textContent = `🔧 ${activeToolCount} tool${activeToolCount > 1 ? 's' : ''} used`;
-        } else {
-            elProcessingToolCount.textContent = '';
+            const currentText = statusEl.textContent;
+            const baseText = currentText.replace(/\s*·\s*🔧.*$/, '');
+            statusEl.textContent = `${baseText} · 🔧 ${runningCount} tool${runningCount > 1 ? 's' : ''} active`;
         }
     }
 
     function hideProcessingStatus() {
         elProcessingStatus.classList.add('hidden');
+        const statusEl = elChatMessages.querySelector('.processing-inline');
+        if (statusEl) statusEl.remove();
     }
 
     // =========================================================================
