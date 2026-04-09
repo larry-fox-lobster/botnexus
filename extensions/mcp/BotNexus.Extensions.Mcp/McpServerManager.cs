@@ -1,5 +1,7 @@
 using BotNexus.AgentCore.Tools;
 using BotNexus.Extensions.Mcp.Transport;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BotNexus.Extensions.Mcp;
 
@@ -9,10 +11,21 @@ namespace BotNexus.Extensions.Mcp;
 public sealed class McpServerManager : IAsyncDisposable
 {
     private readonly List<McpClient> _clients = [];
+    private readonly ILogger _logger;
     private bool _disposed;
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="McpServerManager"/> class.
+    /// </summary>
+    /// <param name="logger">Logger instance for diagnostics. If null, uses NullLogger.</param>
+    public McpServerManager(ILogger? logger = null)
+    {
+        _logger = logger ?? NullLogger.Instance;
+    }
+
+    /// <summary>
     /// Starts all configured MCP servers, initializes them, and returns bridged tools.
+    /// Failures on individual servers are logged as warnings and skipped; successful servers continue.
     /// </summary>
     public async Task<IReadOnlyList<IAgentTool>> StartServersAsync(
         McpExtensionConfig config,
@@ -24,33 +37,67 @@ public sealed class McpServerManager : IAsyncDisposable
 
         foreach (var (serverId, serverConfig) in config.Servers)
         {
-            var transport = CreateTransport(serverConfig);
-            if (transport is null)
-                continue;
-
-            var client = new McpClient(transport, serverId);
-
-            using var initCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            initCts.CancelAfter(serverConfig.InitTimeoutMs);
-
+            // Wrap entire per-server initialization in try/catch to isolate failures
             try
             {
-                await client.InitializeAsync(initCts.Token).ConfigureAwait(false);
+                var transport = CreateTransport(serverConfig);
+                if (transport is null)
+                    continue;
+
+                var client = new McpClient(transport, serverId);
+
+                using var initCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                initCts.CancelAfter(serverConfig.InitTimeoutMs);
+
+                try
+                {
+                    await client.InitializeAsync(initCts.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    // Per-server timeout — log warning and skip this server
+                    await client.DisposeAsync().ConfigureAwait(false);
+                    _logger.LogWarning(
+                        "MCP server '{ServerId}' did not initialize within {TimeoutMs}ms. Skipping server.",
+                        serverId,
+                        serverConfig.InitTimeoutMs);
+                    continue;
+                }
+                catch (Exception ex)
+                {
+                    // InitializeAsync may throw McpException, process crashes, JSON errors, etc.
+                    await client.DisposeAsync().ConfigureAwait(false);
+                    _logger.LogWarning(
+                        ex,
+                        "MCP server '{ServerId}' failed to initialize: {ErrorMessage}. Skipping server.",
+                        serverId,
+                        ex.Message);
+                    continue;
+                }
+
+                _clients.Add(client);
+
+                var mcpTools = await client.ListToolsAsync(ct).ConfigureAwait(false);
+
+                _logger.LogInformation(
+                    "MCP server '{ServerId}' initialized successfully with {ToolCount} tool(s).",
+                    serverId,
+                    mcpTools.Count);
+
+                foreach (var mcpTool in mcpTools)
+                {
+                    tools.Add(new McpBridgedTool(client, mcpTool, config.ToolPrefix));
+                }
             }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            catch (Exception ex)
             {
-                await client.DisposeAsync().ConfigureAwait(false);
-                throw new TimeoutException(
-                    $"MCP server '{serverId}' did not initialize within {serverConfig.InitTimeoutMs}ms.");
-            }
-
-            _clients.Add(client);
-
-            var mcpTools = await client.ListToolsAsync(ct).ConfigureAwait(false);
-
-            foreach (var mcpTool in mcpTools)
-            {
-                tools.Add(new McpBridgedTool(client, mcpTool, config.ToolPrefix));
+                // Catch any unexpected transport creation or other failures
+                _logger.LogWarning(
+                    ex,
+                    "Failed to start MCP server '{ServerId}': {ErrorMessage}. Skipping server.",
+                    serverId,
+                    ex.Message);
+                continue;
             }
         }
 

@@ -149,7 +149,8 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         var mcpConfig = ResolveExtensionConfig<McpExtensionConfig>(descriptor, "botnexus-mcp");
         if (mcpConfig is { Servers.Count: > 0 })
         {
-            mcpManager = new McpServerManager();
+            var mcpLogger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<McpServerManager>();
+            mcpManager = new McpServerManager(mcpLogger);
             var mcpTools = await mcpManager.StartServersAsync(mcpConfig, cancellationToken).ConfigureAwait(false);
             tools.AddRange(mcpTools);
         }

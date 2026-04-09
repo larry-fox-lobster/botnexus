@@ -13,6 +13,16 @@
 
 ## Learnings
 
+### 2026-04-10 — MCP server graceful initialization (P0 bug fix)
+- Fixed critical bug in `McpServerManager.StartServersAsync` where ANY single server initialization failure (timeout, auth error, process crash) would kill the entire agent session creation.
+- Added `ILogger` parameter to `McpServerManager` constructor (optional, defaults to `NullLogger`) and injected from `InProcessIsolationStrategy` via `ILoggerFactory`.
+- Wrapped per-server initialization in try/catch blocks: timeout exceptions, general initialization exceptions, and transport creation failures are now logged as warnings and the failed server is skipped.
+- Added success logging: `LogInformation` when a server initializes successfully (includes server ID and tool count).
+- Key insight: MCP servers are optional dependencies — if one fails (e.g., GitHub MCP missing `GITHUB_TOKEN`), other servers and the agent session itself should still succeed.
+- Real-world impact: Cron jobs that don't need GitHub tools were failing because the GitHub MCP server couldn't auth → now they succeed with a warning log.
+- Files modified: `extensions\mcp\BotNexus.Extensions.Mcp\McpServerManager.cs`, `src\gateway\BotNexus.Gateway\Isolation\InProcessIsolationStrategy.cs`
+- Tests: All 148 MCP tests pass, Gateway isolation tests pass, build clean.
+
 ### 2026-04-06 — Platform-config agent auto-registration + local gateway scripts
 - `src\gateway\BotNexus.Gateway\Configuration\PlatformConfigAgentSource.cs` now maps `PlatformConfig.Agents` entries into `AgentDescriptor` records, loads `SystemPromptFile` from the platform config directory, skips disabled agents, and exposes no watcher (`Watch()` returns `null`).
 - `src\gateway\BotNexus.Gateway\Extensions\GatewayServiceCollectionExtensions.cs` now registers platform-config and file-based agent sources together in `AddPlatformConfiguration`, so platform-config-defined agents are loaded at startup.
@@ -174,3 +184,6 @@
 - Implemented PlatformConfigAgentSource.Watch() by subscribing to PlatformConfigLoader.ConfigChanged and returning a disposable subscription.
 - Added AllowedModelIds to AgentDescriptor and updated gateway tests for new mapping + watch behavior.
 - Validation: dotnet build Q:\repos\botnexus\BotNexus.slnx ✅; dotnet test Q:\repos\botnexus\tests\BotNexus.Gateway.Tests --no-restore --verbosity minimal ✅ (passed after retrying transient flaky test).
+### 2026-04-09 — Extension loader DI safety for tools + hook handlers
+- Updated `AssemblyLoadContextExtensionLoader` to skip auto-registering `IAgentTool` implementations unless they expose at least one DI-compatible constructor (interfaces/abstract deps, IServiceProvider, or optional defaults).
+- Switched extension hook handler activation from `Activator.CreateInstance` to `ActivatorUtilities.CreateInstance` using a temporary service provider built from the current `IServiceCollection`, so constructor-injected hook handlers can load safely.
