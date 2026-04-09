@@ -3070,15 +3070,14 @@
 
         $('#btn-stop-gateway').addEventListener('click', () => {
             showConfirm(
-                'Stop the gateway? It will be restarted by the management process.',
-                'Stop Gateway',
+                'Restart the gateway? Active sessions will be interrupted.',
+                'Restart Gateway',
                 async () => {
                     try {
                         await fetch(`${API_BASE}/gateway/shutdown`, { method: 'POST' });
                     } catch {}
-                    appendSystemMessage('Gateway shutdown initiated.');
-                },
-                'Stop'
+                    appendSystemMessage('Gateway restart initiated.');
+                }
             );
         });
 
