@@ -13391,3 +13391,36 @@ This is unacceptable behavior — optional dependencies shouldn't be able to kil
 - `src\gateway\BotNexus.Gateway\Isolation\InProcessIsolationStrategy.cs`
 - `.squad\agents\bender\history.md` (2026-04-10 entry)
 
+
+---
+
+### Web Search Copilot Integration Uses MCP (2026-04-09)
+
+**Decision Date:** 2026-04-09  
+**Decided By:** Farnsworth (Platform Dev)  
+**Status:** Implemented  
+**Commit:** d546f7f
+
+**Context:** Web search needs to integrate with Copilot as a provider. Previous approach used chat-completions API directly. New approach uses MCP-native provider.
+
+**Decision:** Replace the previous Copilot chat-completions search implementation with an MCP-native provider (\CopilotMcpSearchProvider\) that calls the Copilot MCP endpoint and invokes the \web_search\ tool.
+
+**Rationale:**
+1. **MCP Alignment** — Aligns web search behavior with the MCP tool contract already used by Copilot clients
+2. **Auth Reuse** — Uses existing Copilot auth/token refresh path from \GatewayAuthManager\ without requiring separate search API key
+3. **Session Longevity** — Supports long-lived session reuse via cached MCP client with proper async disposal semantics
+
+**Implementation:**
+- New provider: \xtensions\web\BotNexus.Extensions.WebTools\Search\CopilotMcpSearchProvider.cs\
+- Wired in \WebSearchTool\ provider switch ("copilot" case)
+- Gateway in-process strategy now instantiates \WebSearchTool\ for copilot even when no \ApiKey\ is configured
+- MCP endpoint resolved as \{base}/mcp\ with fallback to \https://api.githubcopilot.com/mcp\
+
+**Technical Details:**
+- Uses \HttpSseMcpTransport\ + \McpClient\ for MCP communication
+- Invokes \web_search\ tool on Copilot MCP endpoint
+- Leverages \GatewayAuthManager\ for token resolution and refresh
+- Cached client enables session reuse
+
+**Status:** Complete. Build passes. Ready for gateway integration and end-to-end testing.
+
