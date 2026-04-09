@@ -42,6 +42,9 @@
   <Folder Name="/extensions/mcp-invoke/">
     <Project Path="extensions/mcp-invoke/BotNexus.Extensions.McpInvoke/BotNexus.Extensions.McpInvoke.csproj" />
   </Folder>
+  <Folder Name="/extensions/web/">
+    <Project Path="extensions/web/BotNexus.Extensions.WebTools/BotNexus.Extensions.WebTools.csproj" />
+  </Folder>
   <Folder Name="/extensions/tools/">
     <Project Path="extensions/tools/process/BotNexus.Extensions.ProcessTool/BotNexus.Extensions.ProcessTool.csproj" />
   </Folder>

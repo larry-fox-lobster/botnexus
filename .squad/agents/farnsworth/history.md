@@ -103,3 +103,50 @@ Validation: `dotnet build src\gateway\BotNexus.Cli\BotNexus.Cli.csproj --nologo 
 - Reviewed WorkspaceContextBuilder: no direct file path logic; it continues to work through IAgentWorkspaceManager.
 - Updated Gateway tests for new layout and migration behavior (BotNexusHomeTests, FileAgentConfigurationWriterTests).
 - Validation: dotnet build Q:\repos\botnexus\BotNexus.slnx ✅ and dotnet test Q:\repos\botnexus\tests\BotNexus.Gateway.Tests --no-restore --verbosity minimal ✅ (452 passed).
+
+## 2026-04-09T13:37Z — Web Tools Extension: WebFetchTool and WebSearchTool
+
+**Status:** ✅ Complete
+
+**Deliverables:**
+- **WebFetchTool** (`web_fetch`): Fetches URLs and returns content as readable text or raw HTML
+  - Schema: `url` (required), `max_length` (default: 5000, max: 20000), `raw` (default: false), `start_index` (default: 0)
+  - Uses lightweight regex-based HTML-to-text conversion (no external dependencies)
+  - HtmlToText utility: Strips script/style/nav/footer/header tags, converts block elements to newlines, converts links to markdown format `[text](url)`, decodes HTML entities, normalizes whitespace
+  - Pagination support via `start_index` with truncation messages
+  - Configurable timeout and User-Agent from `WebFetchConfig`
+
+- **WebSearchTool** (`web_search`): Multi-provider web search with formatted markdown results
+  - Schema: `query` (required)
+  - Three provider implementations via `ISearchProvider` interface:
+    - **BraveSearchProvider**: GET `https://api.search.brave.com/res/v1/web/search` with `X-Subscription-Token` header
+    - **TavilySearchProvider**: POST `https://api.tavily.com/search` with API key in body
+    - **BingSearchProvider**: GET `https://api.bing.microsoft.com/v7.0/search` with `Ocp-Apim-Subscription-Key` header
+  - Provider selection based on `WebSearchConfig.Provider` ("brave", "tavily", "bing")
+  - API key resolution using `${env:VAR}` syntax (copied pattern from StdioMcpTransport)
+  - Returns formatted markdown: `## Search Results for "{query}"` with numbered list of `[title](url)` + snippet
+
+**Files Created:**
+- `extensions\web\BotNexus.Extensions.WebTools\HtmlToText.cs` — Regex-based HTML-to-text converter with partial regex methods
+- `extensions\web\BotNexus.Extensions.WebTools\WebFetchTool.cs` — URL fetcher with pagination
+- `extensions\web\BotNexus.Extensions.WebTools\WebSearchTool.cs` — Multi-provider search with markdown output
+- `extensions\web\BotNexus.Extensions.WebTools\Search\ISearchProvider.cs` — Provider interface + SearchResult record
+- `extensions\web\BotNexus.Extensions.WebTools\Search\BraveSearchProvider.cs` — Brave Search API implementation
+- `extensions\web\BotNexus.Extensions.WebTools\Search\TavilySearchProvider.cs` — Tavily Search API implementation
+- `extensions\web\BotNexus.Extensions.WebTools\Search\BingSearchProvider.cs` — Bing Search API implementation
+
+**Patterns Followed:**
+- IAgentTool pattern from ExecTool and McpInvokeTool
+- `JsonDocument.Parse("""...""")` for tool schema definitions
+- `AgentToolResult` with `AgentToolContent(AgentToolContentType.Text, text)` for results
+- Argument helper methods with JsonElement handling (ReadString, ReadOptionalInt, ReadOptionalBool)
+- HttpClient injection with owned/external lifecycle management
+- No external NuGet dependencies — System.Net.Http, System.Text.Json, System.Text.RegularExpressions only
+
+**Build:** ✅ `dotnet build extensions\web\BotNexus.Extensions.WebTools` — Clean, 0 warnings, 0 errors
+
+## Learnings
+
+- 2026-04-09: `WebSearchTool` now supports provider `"copilot"` with `CopilotMcpSearchProvider`, using MCP `tools/call` to invoke `web_search` against `https://api.githubcopilot.com/mcp` (or configured endpoint).
+- 2026-04-09: Copilot MCP search auth requires headers `Authorization`, `X-MCP-Toolsets=web_search`, `X-MCP-Host=github-coding-agent`, and `X-Initiator=agent`; provider caches a lazily initialized `McpClient` for reuse.
+- 2026-04-09: `InProcessIsolationStrategy` now enables `botnexus-web.search` when provider is `"copilot"` even without `ApiKey`, wiring auth via `_authManager.GetApiKeyAsync(descriptor.ApiProvider, ct)` and endpoint normalization to `.../mcp`.

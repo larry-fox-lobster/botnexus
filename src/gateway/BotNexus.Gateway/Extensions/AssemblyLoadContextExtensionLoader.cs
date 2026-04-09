@@ -303,6 +303,15 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
         List<string> registered = [];
         foreach (var (contract, implementation) in implementations)
         {
+            if (contract == typeof(IAgentTool) && !HasAutoResolvableConstructor(implementation, out var skipReason))
+            {
+                _logger.LogDebug(
+                    "Skipping auto-registration for tool implementation '{ImplementationType}' because no DI-compatible constructor was found ({Reason}).",
+                    implementation.FullName,
+                    skipReason);
+                continue;
+            }
+
             if (_services.Any(descriptor =>
                     descriptor.ServiceType == contract &&
                     descriptor.ImplementationType == implementation))
@@ -366,16 +375,50 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
     {
         // Use reflection to call IHookDispatcher.Register<TEvent, TResult>(handler)
         var registerMethod = typeof(IHookDispatcher).GetMethod(nameof(IHookDispatcher.Register))!;
+        using var serviceProvider = _services.BuildServiceProvider(new ServiceProviderOptions
+        {
+            ValidateOnBuild = false,
+            ValidateScopes = false
+        });
 
         foreach (var (closedInterface, implementation) in hookHandlerTypes)
         {
             var genericArgs = closedInterface.GetGenericArguments(); // [TEvent, TResult]
-            var instance = Activator.CreateInstance(implementation)!;
+            var instance = ActivatorUtilities.CreateInstance(serviceProvider, implementation);
             var closed = registerMethod.MakeGenericMethod(genericArgs);
             closed.Invoke(_hookDispatcher, [instance]);
             registeredServiceNames.Add($"IHookHandler<{genericArgs[0].Name},{genericArgs[1].Name}>->{implementation.FullName}");
         }
     }
+
+    private static bool HasAutoResolvableConstructor(Type implementation, out string reason)
+    {
+        var constructors = implementation.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
+        if (constructors.Length == 0)
+        {
+            reason = "no public constructors";
+            return false;
+        }
+
+        foreach (var constructor in constructors)
+        {
+            var parameters = constructor.GetParameters();
+            if (parameters.All(IsAutoResolvableParameter))
+            {
+                reason = "has DI-compatible constructor";
+                return true;
+            }
+        }
+
+        reason = "constructors require non-service primitive/concrete parameters without defaults";
+        return false;
+    }
+
+    private static bool IsAutoResolvableParameter(ParameterInfo parameter)
+        => parameter.HasDefaultValue
+            || parameter.ParameterType == typeof(IServiceProvider)
+            || parameter.ParameterType.IsInterface
+            || parameter.ParameterType.IsAbstract;
 
     private sealed record LoadedExtensionRuntime(LoadedExtension LoadedExtension, AssemblyLoadContext LoadContext);
 }

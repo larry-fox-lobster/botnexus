@@ -22,6 +22,7 @@ using BotNexus.Providers.Core.Models;
 using BotNexus.Extensions.Skills;
 using BotNexus.Extensions.Mcp;
 using BotNexus.Extensions.McpInvoke;
+using BotNexus.Extensions.WebTools;
 using BotNexus.Memory;
 using BotNexus.Memory.Tools;
 using Microsoft.Extensions.DependencyInjection;
@@ -166,6 +167,34 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
             tools.Add(mcpInvokeTool);
         }
 
+        // Web Tools extension — web search and URL fetch
+        var webConfig = ResolveExtensionConfig<WebToolsConfig>(descriptor, "botnexus-web");
+        if (webConfig is not null)
+        {
+            var fetchConfig = webConfig.Fetch ?? new WebFetchConfig();
+            tools.Add(new WebFetchTool(fetchConfig));
+
+            if (webConfig.Search is { } searchConfig)
+            {
+                var useCopilotProvider = string.Equals(searchConfig.Provider, "copilot", StringComparison.OrdinalIgnoreCase);
+                var hasApiKey = !string.IsNullOrWhiteSpace(searchConfig.ApiKey);
+
+                if (useCopilotProvider || hasApiKey)
+                {
+                    var copilotApiEndpoint = useCopilotProvider
+                        ? ResolveCopilotMcpEndpoint(_authManager.GetApiEndpoint(descriptor.ApiProvider))
+                        : null;
+
+                    tools.Add(new WebSearchTool(
+                        searchConfig,
+                        copilotApiKeyResolver: useCopilotProvider
+                            ? ct => _authManager.GetApiKeyAsync(descriptor.ApiProvider, ct)
+                            : null,
+                        copilotApiEndpoint: copilotApiEndpoint));
+                }
+            }
+        }
+
         var hookDispatcher = _serviceProvider.GetService<IHookDispatcher>();
         BeforeToolCallDelegate? beforeToolCall = null;
         AfterToolCallDelegate? afterToolCall = null;
@@ -236,7 +265,14 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
             SessionId: context.SessionId);
 
         var agent = new Agent(options);
-        IAgentHandle handle = new InProcessAgentHandle(agent, descriptor.AgentId, context.SessionId, _logger, mcpManager, mcpInvokeTool);
+        IAgentHandle handle = new InProcessAgentHandle(
+            agent,
+            descriptor.AgentId,
+            context.SessionId,
+            _logger,
+            mcpManager,
+            mcpInvokeTool,
+            tools);
 
         _logger.LogDebug("Created in-process agent handle for '{AgentId}' session '{SessionId}'", descriptor.AgentId, context.SessionId);
 
@@ -300,6 +336,32 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
 
         return null;
     }
+
+    private static string ResolveCopilotMcpEndpoint(string? baseEndpoint)
+    {
+        const string fallbackEndpoint = "https://api.githubcopilot.com/mcp";
+        if (string.IsNullOrWhiteSpace(baseEndpoint))
+            return fallbackEndpoint;
+
+        if (Uri.TryCreate(baseEndpoint, UriKind.Absolute, out var absoluteUri))
+        {
+            var path = absoluteUri.AbsolutePath.TrimEnd('/');
+            if (path.EndsWith("/mcp", StringComparison.OrdinalIgnoreCase))
+                return absoluteUri.ToString().TrimEnd('/');
+
+            var builder = new UriBuilder(absoluteUri)
+            {
+                Path = string.IsNullOrEmpty(path) || path == "/" ? "/mcp" : $"{path}/mcp"
+            };
+
+            return builder.Uri.ToString().TrimEnd('/');
+        }
+
+        var trimmed = baseEndpoint.TrimEnd('/');
+        return trimmed.EndsWith("/mcp", StringComparison.OrdinalIgnoreCase)
+            ? trimmed
+            : $"{trimmed}/mcp";
+    }
 }
 
 /// <summary>
@@ -311,8 +373,16 @@ internal sealed class InProcessAgentHandle : IAgentHandle, IHealthCheckable
     private readonly ILogger _logger;
     private readonly McpServerManager? _mcpManager;
     private readonly McpInvokeTool? _mcpInvokeTool;
+    private readonly IReadOnlyList<object> _disposableTools;
 
-    public InProcessAgentHandle(Agent agent, string agentId, string sessionId, ILogger logger, McpServerManager? mcpManager = null, McpInvokeTool? mcpInvokeTool = null)
+    public InProcessAgentHandle(
+        Agent agent,
+        string agentId,
+        string sessionId,
+        ILogger logger,
+        McpServerManager? mcpManager = null,
+        McpInvokeTool? mcpInvokeTool = null,
+        IReadOnlyList<IAgentTool>? tools = null)
     {
         _agent = agent;
         AgentId = agentId;
@@ -320,6 +390,12 @@ internal sealed class InProcessAgentHandle : IAgentHandle, IHealthCheckable
         _logger = logger;
         _mcpManager = mcpManager;
         _mcpInvokeTool = mcpInvokeTool;
+        _disposableTools = tools?
+            .Where(tool => !ReferenceEquals(tool, mcpInvokeTool))
+            .Where(static tool => tool is IAsyncDisposable || tool is IDisposable)
+            .Cast<object>()
+            .ToList()
+            ?? [];
     }
 
     /// <inheritdoc />
@@ -537,6 +613,22 @@ internal sealed class InProcessAgentHandle : IAgentHandle, IHealthCheckable
     {
         try { await _agent.AbortAsync(); }
         catch (Exception ex) { _logger.LogWarning(ex, "Error aborting agent during dispose"); }
+
+        foreach (var tool in _disposableTools)
+        {
+            if (tool is IAsyncDisposable asyncDisposable)
+            {
+                try { await asyncDisposable.DisposeAsync(); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Error disposing async tool {ToolType}", tool.GetType().Name); }
+                continue;
+            }
+
+            if (tool is IDisposable disposable)
+            {
+                try { disposable.Dispose(); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Error disposing tool {ToolType}", tool.GetType().Name); }
+            }
+        }
 
         if (_mcpManager is not null)
         {

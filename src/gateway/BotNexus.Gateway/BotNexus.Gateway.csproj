@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\..\extensions\skills\BotNexus.Extensions.Skills\BotNexus.Extensions.Skills.csproj" />
     <ProjectReference Include="..\..\..\extensions\mcp\BotNexus.Extensions.Mcp\BotNexus.Extensions.Mcp.csproj" />
     <ProjectReference Include="..\..\..\extensions\mcp-invoke\BotNexus.Extensions.McpInvoke\BotNexus.Extensions.McpInvoke.csproj" />
+    <ProjectReference Include="..\..\..\extensions\web\BotNexus.Extensions.WebTools\BotNexus.Extensions.WebTools.csproj" />
   </ItemGroup>
 
   <ItemGroup>
