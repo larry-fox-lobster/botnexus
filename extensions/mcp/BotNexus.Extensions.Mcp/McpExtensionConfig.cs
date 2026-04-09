@@ -37,6 +37,27 @@ public sealed class McpServerConfig
     [JsonPropertyName("workingDirectory")]
     public string? WorkingDirectory { get; set; }
 
+    /// <summary>URL for the MCP server (HTTP/SSE transport).</summary>
+    [JsonPropertyName("url")]
+    public string? Url { get; set; }
+
+    /// <summary>Additional HTTP headers to include in requests to the server.</summary>
+    [JsonPropertyName("headers")]
+    public Dictionary<string, string>? Headers { get; set; }
+
+    /// <summary>
+    /// Whether to inherit the parent process environment variables.
+    /// Default: <c>true</c> for backward compatibility.
+    /// <para>
+    /// <b>Security:</b> Set to <c>false</c> for production MCP servers so that only
+    /// explicitly configured env vars (via <see cref="Env"/>) are available to the
+    /// subprocess. When <c>true</c>, the subprocess inherits all parent env vars which
+    /// may include secrets not intended for the MCP server.
+    /// </para>
+    /// </summary>
+    [JsonPropertyName("inheritEnv")]
+    public bool InheritEnv { get; set; } = true;
+
     /// <summary>Timeout for initialization in milliseconds. Default: 30000.</summary>
     [JsonPropertyName("initTimeoutMs")]
     public int InitTimeoutMs { get; set; } = 30_000;

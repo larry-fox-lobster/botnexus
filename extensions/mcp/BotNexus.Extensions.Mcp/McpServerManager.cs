@@ -24,14 +24,9 @@ public sealed class McpServerManager : IAsyncDisposable
 
         foreach (var (serverId, serverConfig) in config.Servers)
         {
-            if (string.IsNullOrWhiteSpace(serverConfig.Command))
-                continue; // Only stdio transport supported in Phase 1-2
-
-            var transport = new StdioMcpTransport(
-                serverConfig.Command,
-                serverConfig.Args,
-                serverConfig.Env,
-                serverConfig.WorkingDirectory);
+            var transport = CreateTransport(serverConfig);
+            if (transport is null)
+                continue;
 
             var client = new McpClient(transport, serverId);
 
@@ -89,6 +84,31 @@ public sealed class McpServerManager : IAsyncDisposable
         }
 
         _clients.Clear();
+    }
+
+    /// <summary>
+    /// Creates the appropriate transport for a server configuration.
+    /// Returns null if neither command nor URL is configured.
+    /// </summary>
+    internal static IMcpTransport? CreateTransport(McpServerConfig serverConfig)
+    {
+        if (!string.IsNullOrWhiteSpace(serverConfig.Url))
+        {
+            return new HttpSseMcpTransport(
+                new Uri(serverConfig.Url),
+                serverConfig.Headers?.AsReadOnly());
+        }
+
+        if (!string.IsNullOrWhiteSpace(serverConfig.Command))
+        {
+            return new StdioMcpTransport(
+                serverConfig.Command,
+                serverConfig.Args,
+                serverConfig.Env,
+                serverConfig.WorkingDirectory);
+        }
+
+        return null;
     }
 
     /// <inheritdoc />
