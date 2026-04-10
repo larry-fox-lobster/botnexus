@@ -122,7 +122,7 @@ public sealed class GatewayHub : Hub
     public async Task ResetSession(string agentId, string sessionId)
     {
         await _supervisor.StopAsync(agentId, sessionId, CancellationToken.None);
-        await _sessions.DeleteAsync(sessionId, CancellationToken.None);
+        await _sessions.ArchiveAsync(sessionId, CancellationToken.None);
         await Clients.Caller.SendAsync("SessionReset", new { agentId, sessionId });
     }
 

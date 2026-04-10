@@ -126,6 +126,25 @@ public sealed class FileSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
+    public async Task ArchiveAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _cache.Remove(sessionId);
+            var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss");
+            var historyPath = GetHistoryPath(sessionId);
+            var metaPath = GetMetaPath(sessionId);
+
+            if (_fileSystem.File.Exists(historyPath))
+                _fileSystem.File.Move(historyPath, $"{historyPath}.archived.{timestamp}");
+            if (_fileSystem.File.Exists(metaPath))
+                _fileSystem.File.Move(metaPath, $"{metaPath}.archived.{timestamp}");
+        }
+        finally { _lock.Release(); }
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<GatewaySession>> ListAsync(string? agentId = null, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.list", ActivityKind.Internal);

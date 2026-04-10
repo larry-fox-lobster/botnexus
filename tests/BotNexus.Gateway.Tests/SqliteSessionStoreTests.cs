@@ -131,6 +131,24 @@ public sealed class SqliteSessionStoreTests
     }
 
     [Fact]
+    public async Task ArchiveAsync_SetStatusToClosed()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var session = await store.GetOrCreateAsync("s1", "agent-a");
+        await store.SaveAsync(session);
+
+        await store.ArchiveAsync("s1");
+
+        await using var connection = new SqliteConnection(fixture.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT status FROM sessions WHERE id = 's1'";
+        var status = (string?)await command.ExecuteScalarAsync();
+        status.Should().Be(SessionStatus.Closed.ToString());
+    }
+
+    [Fact]
     public async Task ListAsync_WithStoredSessions_ReturnsAllSessions()
     {
         using var fixture = new StoreFixture();

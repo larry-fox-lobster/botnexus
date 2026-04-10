@@ -127,6 +127,30 @@ public sealed class SqliteSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
+    public async Task ArchiveAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
+            _cache.Remove(sessionId);
+
+            var session = await LoadSessionAsync(sessionId, cancellationToken).ConfigureAwait(false);
+            if (session is not null)
+            {
+                session.Status = SessionStatus.Closed;
+                session.UpdatedAt = DateTimeOffset.UtcNow;
+                _cache[sessionId] = session;
+                await using var connection = CreateConnection();
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                await UpsertSessionAsync(connection, session, cancellationToken).ConfigureAwait(false);
+                await ReplaceHistoryAsync(connection, session, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally { _lock.Release(); }
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<GatewaySession>> ListAsync(string? agentId = null, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.list", ActivityKind.Internal);

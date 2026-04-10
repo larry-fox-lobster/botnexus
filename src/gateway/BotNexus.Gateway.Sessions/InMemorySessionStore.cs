@@ -59,6 +59,16 @@ public sealed class InMemorySessionStore : ISessionStore
     }
 
     /// <inheritdoc />
+    public Task ArchiveAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        lock (_sync)
+        {
+            _sessions.Remove(sessionId);
+        }
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
     public Task<IReadOnlyList<GatewaySession>> ListAsync(string? agentId = null, CancellationToken cancellationToken = default)
     {
         lock (_sync)

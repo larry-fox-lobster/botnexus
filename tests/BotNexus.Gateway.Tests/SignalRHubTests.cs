@@ -215,6 +215,29 @@ public sealed class SignalRHubTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task ResetSession_ArchivesInsteadOfDeleting()
+    {
+        var caller = new Mock<ISingleClientProxy>();
+        caller.Setup(proxy => proxy.SendCoreAsync(It.IsAny<string>(), It.IsAny<object?[]>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var clients = new Mock<IHubCallerClients>();
+        clients.SetupGet(value => value.Caller).Returns(caller.Object);
+
+        var sessions = new Mock<ISessionStore>();
+        sessions.Setup(value => value.ArchiveAsync("session-1", CancellationToken.None)).Returns(Task.CompletedTask);
+
+        var supervisor = new Mock<IAgentSupervisor>();
+        supervisor.Setup(value => value.StopAsync("agent-a", "session-1", CancellationToken.None)).Returns(Task.CompletedTask);
+
+        var hub = CreateHub(clients: clients.Object, sessions: sessions.Object, supervisor: supervisor.Object);
+
+        await hub.ResetSession("agent-a", "session-1");
+
+        sessions.Verify(value => value.ArchiveAsync("session-1", CancellationToken.None), Times.Once);
+        sessions.Verify(value => value.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private static GatewayHub CreateHub(
         IHubCallerClients? clients = null,
         IGroupManager? groups = null,

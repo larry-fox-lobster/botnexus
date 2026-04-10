@@ -52,6 +52,17 @@ public sealed class InMemorySessionStoreTests
     }
 
     [Fact]
+    public async Task ArchiveAsync_RemovesFromStore()
+    {
+        var store = new InMemorySessionStore();
+        await store.GetOrCreateAsync("s1", "agent-a");
+
+        await store.ArchiveAsync("s1");
+
+        (await store.GetAsync("s1")).Should().BeNull();
+    }
+
+    [Fact]
     public async Task ListAsync_WithoutFilter_ReturnsAllSessions()
     {
         var store = new InMemorySessionStore();

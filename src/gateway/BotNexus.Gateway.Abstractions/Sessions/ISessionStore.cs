@@ -44,6 +44,11 @@ public interface ISessionStore
     Task DeleteAsync(string sessionId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Archives the session, preserving its data but removing it from active use.
+    /// </summary>
+    Task ArchiveAsync(string sessionId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Lists sessions, optionally filtered by agent ID.
     /// </summary>
     /// <param name="agentId">If set, only returns sessions for this agent.</param>

@@ -76,6 +76,53 @@ public sealed class FileSessionStoreTests
     }
 
     [Fact]
+    public async Task ArchiveAsync_RenamesFiles()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        const string sessionId = "archive-me";
+        var encodedName = Uri.EscapeDataString(sessionId);
+        var session = await store.GetOrCreateAsync(sessionId, "agent-a");
+        session.History.Add(new SessionEntry { Role = "user", Content = "persist-me" });
+        await store.SaveAsync(session);
+
+        await store.ArchiveAsync(sessionId);
+
+        fixture.FileSystem.File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.jsonl")).Should().BeFalse();
+        fixture.FileSystem.File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.meta.json")).Should().BeFalse();
+        fixture.FileSystem.Directory.GetFiles(fixture.StorePath, $"{encodedName}.jsonl.archived.*").Should().ContainSingle();
+        fixture.FileSystem.Directory.GetFiles(fixture.StorePath, $"{encodedName}.meta.json.archived.*").Should().ContainSingle();
+        (await store.GetAsync(sessionId)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ArchiveAsync_WhenNoFilesExist_DoesNotThrow()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+
+        var act = () => store.ArchiveAsync("missing");
+
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task ArchiveAsync_ThenGetOrCreate_ReturnsNewSession()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var oldSession = await store.GetOrCreateAsync("s1", "agent-a");
+        oldSession.History.Add(new SessionEntry { Role = "user", Content = "old-message" });
+        await store.SaveAsync(oldSession);
+
+        await store.ArchiveAsync("s1");
+        var newSession = await store.GetOrCreateAsync("s1", "agent-a");
+
+        newSession.Should().NotBeSameAs(oldSession);
+        newSession.History.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ListAsync_WithAndWithoutFilter_ReturnsExpectedSessions()
     {
         using var fixture = new StoreFixture();
