@@ -318,20 +318,6 @@ body {
     font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);
 }
 
-/* === Thinking indicator (processing dots) === */
-.message.thinking {
-    background: transparent; color: var(--text-muted); font-size: 0.85rem;
-    padding: 6px 14px; align-self: flex-start; animation: fadeIn 0.2s ease-out;
-}
-.typing-indicator { color: var(--text-secondary); }
-.typing-indicator .dots {
-    display: inline-block;
-    width: 20px;
-    animation: thinkingPulse 1.1s infinite;
-}
-.thinking-dots { animation: thinkingPulse 1.4s infinite; display: inline-block; letter-spacing: 2px; }
-@keyframes thinkingPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
-
 /* === Thinking block (collapsible thinking display) === */
 .thinking-block {
     align-self: flex-start; max-width: 85%; margin: 4px 0; border-radius: 6px;

@@ -991,13 +991,7 @@
     // =========================================================================
 
     function showStreamingIndicator() {
-        removeStreamingIndicator();
-        const div = document.createElement('div');
-        div.className = 'message thinking typing-indicator streaming-indicator';
-        div.setAttribute('aria-label', 'Agent is thinking');
-        div.innerHTML = 'Agent is thinking<span class="dots" aria-hidden="true">...</span>';
-        elChatMessages.appendChild(div);
-        scrollToBottom();
+        // Bottom-of-chat indicator removed — status is shown in the processing bar at the top.
     }
 
     function removeStreamingIndicator() {
