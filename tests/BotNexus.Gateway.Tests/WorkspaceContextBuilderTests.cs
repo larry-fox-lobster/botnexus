@@ -2,11 +2,14 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
 using FluentAssertions;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.Gateway.Tests;
 
 public sealed class WorkspaceContextBuilderTests
 {
+    private readonly MockFileSystem _fileSystem = new();
+
     [Fact]
     public async Task BuildSystemPromptAsync_WithExplicitPromptFiles_LoadsInOrderAndDeletesBootstrap()
     {
@@ -18,7 +21,7 @@ public sealed class WorkspaceContextBuilderTests
         try
         {
             var manager = new StubWorkspaceManager(workspacePath);
-            var builder = new WorkspaceContextBuilder(manager);
+            var builder = new WorkspaceContextBuilder(manager, _fileSystem);
 
             var result = await builder.BuildSystemPromptAsync(new AgentDescriptor
             {
@@ -33,11 +36,11 @@ public sealed class WorkspaceContextBuilderTests
             result.Should().Contain("BOOTSTRAP");
             result.Should().Contain("TOOLS");
             result.Should().NotContain("SOUL", "SOUL.md was not in the explicit prompt files list");
-            File.Exists(Path.Combine(workspacePath, "BOOTSTRAP.md")).Should().BeFalse();
+            _fileSystem.File.Exists(Path.Combine(workspacePath, "BOOTSTRAP.md")).Should().BeFalse();
         }
         finally
         {
-            Directory.Delete(Path.GetDirectoryName(workspacePath)!, recursive: true);
+            _fileSystem.Directory.Delete(Path.GetDirectoryName(workspacePath)!, recursive: true);
         }
     }
 
@@ -54,7 +57,7 @@ public sealed class WorkspaceContextBuilderTests
         try
         {
             var manager = new StubWorkspaceManager(workspacePath);
-            var builder = new WorkspaceContextBuilder(manager);
+            var builder = new WorkspaceContextBuilder(manager, _fileSystem);
 
             var result = await builder.BuildSystemPromptAsync(new AgentDescriptor
             {
@@ -71,11 +74,11 @@ public sealed class WorkspaceContextBuilderTests
             result.Should().Contain("BOOTSTRAP");
             result.Should().Contain("IDENTITY");
             result.Should().Contain("USER");
-            File.Exists(Path.Combine(workspacePath, "BOOTSTRAP.md")).Should().BeFalse();
+            _fileSystem.File.Exists(Path.Combine(workspacePath, "BOOTSTRAP.md")).Should().BeFalse();
         }
         finally
         {
-            Directory.Delete(Path.GetDirectoryName(workspacePath)!, recursive: true);
+            _fileSystem.Directory.Delete(Path.GetDirectoryName(workspacePath)!, recursive: true);
         }
     }
 
@@ -87,7 +90,7 @@ public sealed class WorkspaceContextBuilderTests
         try
         {
             var manager = new StubWorkspaceManager(agentRootPath);
-            var builder = new WorkspaceContextBuilder(manager);
+            var builder = new WorkspaceContextBuilder(manager, _fileSystem);
 
             var result = await builder.BuildSystemPromptAsync(new AgentDescriptor
             {
@@ -102,7 +105,7 @@ public sealed class WorkspaceContextBuilderTests
         }
         finally
         {
-            Directory.Delete(agentRootPath, recursive: true);
+            _fileSystem.Directory.Delete(agentRootPath, recursive: true);
         }
     }
 
@@ -125,14 +128,14 @@ public sealed class WorkspaceContextBuilderTests
             => _workspacePath;
     }
 
-    private static string CreateWorkspace(params (string FileName, string Content)[] files)
+    private string CreateWorkspace(params (string FileName, string Content)[] files)
     {
-        var rootPath = Path.Combine(Path.GetTempPath(), "botnexus-workspace-context-tests", Guid.NewGuid().ToString("N"));
+        var rootPath = Path.Combine("C:\\", "botnexus-workspace-context-tests", Guid.NewGuid().ToString("N"));
         var workspacePath = Path.Combine(rootPath, "workspace");
-        Directory.CreateDirectory(workspacePath);
+        _fileSystem.Directory.CreateDirectory(workspacePath);
 
         foreach (var (fileName, content) in files)
-            File.WriteAllText(Path.Combine(workspacePath, fileName), content);
+            _fileSystem.File.WriteAllText(Path.Combine(workspacePath, fileName), content);
 
         return workspacePath;
     }

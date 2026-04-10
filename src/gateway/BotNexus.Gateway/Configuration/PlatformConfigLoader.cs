@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Diagnostics;
+using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -20,7 +21,7 @@ public static class PlatformConfigLoader
     public static event Action<PlatformConfig>? ConfigChanged;
 
     /// <summary>The default platform configuration directory.</summary>
-    public static string DefaultConfigDirectory => new BotNexusHome().RootPath;
+    public static string DefaultConfigDirectory => GetDefaultConfigDirectory(new FileSystem());
 
     /// <summary>The default BotNexus home path (~/.botnexus).</summary>
     public static string DefaultHomePath => DefaultConfigDirectory;
@@ -29,20 +30,31 @@ public static class PlatformConfigLoader
     public static string DefaultConfigPath =>
         Path.Combine(DefaultConfigDirectory, "config.json");
 
+    public static string GetDefaultConfigDirectory(IFileSystem fileSystem)
+        => new BotNexusHome(fileSystem).RootPath;
+
+    public static string GetDefaultHomePath(IFileSystem fileSystem)
+        => GetDefaultConfigDirectory(fileSystem);
+
+    public static string GetDefaultConfigPath(IFileSystem fileSystem)
+        => Path.Combine(GetDefaultConfigDirectory(fileSystem), "config.json");
+
     /// <summary>Loads config from disk and optionally validates it.</summary>
     public static PlatformConfig Load(
         string? configPath = null,
-        bool validateOnLoad = true)
+        bool validateOnLoad = true,
+        IFileSystem? fileSystem = null)
     {
-        var path = configPath ?? DefaultConfigPath;
-        if (!File.Exists(path))
+        var fs = fileSystem ?? new FileSystem();
+        var path = configPath ?? GetDefaultConfigPath(fs);
+        if (!fs.File.Exists(path))
             return new PlatformConfig();
 
         PlatformConfig config;
         string rawJson;
         try
         {
-            using var stream = File.OpenRead(path);
+            using var stream = fs.File.OpenRead(path);
             using var reader = new StreamReader(stream);
             rawJson = reader.ReadToEnd();
             config = JsonSerializer.Deserialize<PlatformConfig>(rawJson, JsonOptions)
@@ -62,7 +74,7 @@ public static class PlatformConfigLoader
             return config;
         }
 
-        var errors = new List<string>(PlatformConfigSchema.ValidateJson(rawJson));
+        var errors = new List<string>(PlatformConfigSchema.ValidateJson(rawJson, fs));
         errors.AddRange(Validate(config));
         if (errors.Count > 0)
             throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), errors);
@@ -75,17 +87,19 @@ public static class PlatformConfigLoader
     public static async Task<PlatformConfig> LoadAsync(
         string? configPath = null,
         CancellationToken cancellationToken = default,
-        bool validateOnLoad = true)
+        bool validateOnLoad = true,
+        IFileSystem? fileSystem = null)
     {
-        var path = configPath ?? DefaultConfigPath;
-        if (!File.Exists(path))
+        var fs = fileSystem ?? new FileSystem();
+        var path = configPath ?? GetDefaultConfigPath(fs);
+        if (!fs.File.Exists(path))
             return new PlatformConfig();
 
         PlatformConfig config;
         string rawJson;
         try
         {
-            await using var stream = File.OpenRead(path);
+            await using var stream = fs.File.OpenRead(path);
             using var reader = new StreamReader(stream);
             rawJson = await reader.ReadToEndAsync(cancellationToken);
             config = JsonSerializer.Deserialize<PlatformConfig>(rawJson, JsonOptions)
@@ -105,7 +119,7 @@ public static class PlatformConfigLoader
             return config;
         }
 
-        var errors = new List<string>(PlatformConfigSchema.ValidateJson(rawJson));
+        var errors = new List<string>(PlatformConfigSchema.ValidateJson(rawJson, fs));
         errors.AddRange(Validate(config));
         if (errors.Count > 0)
             throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), errors);
@@ -171,28 +185,35 @@ public static class PlatformConfigLoader
     }
 
     /// <summary>Ensures the .botnexus directory exists.</summary>
-    public static void EnsureConfigDirectory(string? configDir = null)
+    public static void EnsureConfigDirectory(string? configDir = null, IFileSystem? fileSystem = null)
     {
+        var fs = fileSystem ?? new FileSystem();
+        var defaultConfigDirectory = GetDefaultConfigDirectory(fs);
         if (string.IsNullOrWhiteSpace(configDir) ||
-            string.Equals(Path.GetFullPath(configDir), DefaultConfigDirectory, StringComparison.OrdinalIgnoreCase))
+            string.Equals(Path.GetFullPath(configDir), defaultConfigDirectory, StringComparison.OrdinalIgnoreCase))
         {
-            new BotNexusHome(configDir).Initialize();
+            new BotNexusHome(fs, configDir).Initialize();
             return;
         }
 
-        Directory.CreateDirectory(configDir);
+        fs.Directory.CreateDirectory(configDir);
     }
 
-    public static IDisposable Watch(string? configPath = null, Action<PlatformConfig>? onChanged = null, Action<Exception>? onError = null)
+    public static IDisposable Watch(
+        string? configPath = null,
+        Action<PlatformConfig>? onChanged = null,
+        Action<Exception>? onError = null,
+        IFileSystem? fileSystem = null)
     {
+        var fs = fileSystem ?? new FileSystem();
         var path = string.IsNullOrWhiteSpace(configPath)
-            ? DefaultConfigPath
+            ? GetDefaultConfigPath(fs)
             : Path.GetFullPath(configPath);
 
-        var directory = Path.GetDirectoryName(path) ?? DefaultConfigDirectory;
-        EnsureConfigDirectory(directory);
+        var directory = Path.GetDirectoryName(path) ?? GetDefaultConfigDirectory(fs);
+        EnsureConfigDirectory(directory, fs);
 
-        return new PlatformConfigWatcher(path, onChanged, onError);
+        return new PlatformConfigWatcher(path, fs, onChanged, onError);
     }
 
     private static void ValidatePath(string? path, string fieldName, List<string> errors)
@@ -400,25 +421,25 @@ public static class PlatformConfigLoader
 
     private sealed class PlatformConfigWatcher : IDisposable
     {
-        private readonly FileSystemWatcher _watcher;
+        private readonly IFileSystemWatcher _watcher;
         private readonly Timer _timer;
         private readonly string _configPath;
+        private readonly IFileSystem _fileSystem;
         private readonly Action<PlatformConfig>? _onChanged;
         private readonly Action<Exception>? _onError;
         private readonly Lock _sync = new();
         private bool _disposed;
 
-        public PlatformConfigWatcher(string configPath, Action<PlatformConfig>? onChanged, Action<Exception>? onError)
+        public PlatformConfigWatcher(string configPath, IFileSystem fileSystem, Action<PlatformConfig>? onChanged, Action<Exception>? onError)
         {
             _configPath = configPath;
+            _fileSystem = fileSystem;
             _onChanged = onChanged;
             _onError = onError;
 
-            _watcher = new FileSystemWatcher(Path.GetDirectoryName(configPath)!, Path.GetFileName(configPath))
-            {
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.CreationTime | NotifyFilters.Size,
-                IncludeSubdirectories = false
-            };
+            _watcher = _fileSystem.FileSystemWatcher.New(Path.GetDirectoryName(configPath)!, Path.GetFileName(configPath));
+            _watcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.CreationTime | NotifyFilters.Size;
+            _watcher.IncludeSubdirectories = false;
             _timer = new Timer(OnTimerElapsed, this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
 
             _watcher.Changed += OnFileChanged;
@@ -472,7 +493,7 @@ public static class PlatformConfigLoader
 
             try
             {
-                var config = Load(_configPath);
+                var config = Load(_configPath, fileSystem: _fileSystem);
                 _onChanged?.Invoke(config);
                 ConfigChanged?.Invoke(config);
             }

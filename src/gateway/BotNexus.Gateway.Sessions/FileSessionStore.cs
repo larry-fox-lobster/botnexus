@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Diagnostics;
+using System.IO.Abstractions;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using Microsoft.Extensions.Logging;
@@ -28,6 +29,7 @@ public sealed class FileSessionStore : ISessionStore
 {
     private static readonly ActivitySource ActivitySource = new("BotNexus.Gateway");
     private readonly string _storePath;
+    private readonly IFileSystem _fileSystem;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private readonly Dictionary<string, GatewaySession> _cache = [];
     private readonly ILogger<FileSessionStore> _logger;
@@ -37,11 +39,12 @@ public sealed class FileSessionStore : ISessionStore
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public FileSessionStore(string storePath, ILogger<FileSessionStore> logger)
+    public FileSessionStore(string storePath, ILogger<FileSessionStore> logger, IFileSystem fileSystem)
     {
         _storePath = storePath;
         _logger = logger;
-        Directory.CreateDirectory(storePath);
+        _fileSystem = fileSystem;
+        _fileSystem.Directory.CreateDirectory(storePath);
     }
 
     /// <inheritdoc />
@@ -116,8 +119,8 @@ public sealed class FileSessionStore : ISessionStore
             _cache.Remove(sessionId);
             var historyPath = GetHistoryPath(sessionId);
             var metaPath = GetMetaPath(sessionId);
-            if (File.Exists(historyPath)) File.Delete(historyPath);
-            if (File.Exists(metaPath)) File.Delete(metaPath);
+            if (_fileSystem.File.Exists(historyPath)) _fileSystem.File.Delete(historyPath);
+            if (_fileSystem.File.Exists(metaPath)) _fileSystem.File.Delete(metaPath);
         }
         finally { _lock.Release(); }
     }
@@ -133,7 +136,7 @@ public sealed class FileSessionStore : ISessionStore
         {
             // Load all meta files from disk
             var sessions = new List<GatewaySession>();
-            foreach (var metaFile in Directory.GetFiles(_storePath, "*.meta.json"))
+            foreach (var metaFile in _fileSystem.Directory.GetFiles(_storePath, "*.meta.json"))
             {
                 var sessionId = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(metaFile));
                 var session = _cache.GetValueOrDefault(sessionId) ?? await LoadFromFileAsync(sessionId, cancellationToken).ConfigureAwait(false);
@@ -148,9 +151,9 @@ public sealed class FileSessionStore : ISessionStore
     private async Task<GatewaySession?> LoadFromFileAsync(string sessionId, CancellationToken cancellationToken)
     {
         var metaPath = GetMetaPath(sessionId);
-        if (!File.Exists(metaPath)) return null;
+        if (!_fileSystem.File.Exists(metaPath)) return null;
 
-        var metaJson = await File.ReadAllTextAsync(metaPath, cancellationToken).ConfigureAwait(false);
+        var metaJson = await _fileSystem.File.ReadAllTextAsync(metaPath, cancellationToken).ConfigureAwait(false);
         var meta = JsonSerializer.Deserialize<SessionMeta>(metaJson, JsonOptions);
         if (meta is null) return null;
 
@@ -168,9 +171,9 @@ public sealed class FileSessionStore : ISessionStore
         session.SetStreamReplayState(meta.NextSequenceId, meta.StreamEvents);
 
         var historyPath = GetHistoryPath(sessionId);
-        if (File.Exists(historyPath))
+        if (_fileSystem.File.Exists(historyPath))
         {
-            var lines = await File.ReadAllLinesAsync(historyPath, cancellationToken).ConfigureAwait(false);
+            var lines = await _fileSystem.File.ReadAllLinesAsync(historyPath, cancellationToken).ConfigureAwait(false);
             var entries = new List<SessionEntry>();
             foreach (var line in lines.Where(l => !string.IsNullOrWhiteSpace(l)))
             {
@@ -192,7 +195,7 @@ public sealed class FileSessionStore : ISessionStore
         // Write history as JSONL
         var historyPath = GetHistoryPath(session.SessionId);
         var lines = session.GetHistorySnapshot().Select(e => JsonSerializer.Serialize(e, JsonOptions));
-        await File.WriteAllLinesAsync(historyPath, lines, cancellationToken).ConfigureAwait(false);
+        await _fileSystem.File.WriteAllLinesAsync(historyPath, lines, cancellationToken).ConfigureAwait(false);
 
         // Write metadata sidecar
         var metaPath = GetMetaPath(session.SessionId);
@@ -207,7 +210,7 @@ public sealed class FileSessionStore : ISessionStore
             session.NextSequenceId,
             [.. session.GetStreamEventSnapshot()]);
         var metaJson = JsonSerializer.Serialize(meta, JsonOptions);
-        await File.WriteAllTextAsync(metaPath, metaJson, cancellationToken).ConfigureAwait(false);
+        await _fileSystem.File.WriteAllTextAsync(metaPath, metaJson, cancellationToken).ConfigureAwait(false);
     }
 
     private string GetHistoryPath(string sessionId) => Path.Combine(_storePath, $"{SanitizeFileName(sessionId)}.jsonl");

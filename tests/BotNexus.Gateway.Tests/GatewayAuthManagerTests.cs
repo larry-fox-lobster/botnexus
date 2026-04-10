@@ -2,6 +2,7 @@ using System.Reflection;
 using BotNexus.Gateway.Configuration;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -10,12 +11,14 @@ public sealed class GatewayAuthManagerTests : IDisposable
     private readonly string _rootPath;
     private readonly string _authFilePath;
     private readonly string _legacyAuthFilePath;
+    private readonly MockFileSystem _fileSystem;
     private readonly Dictionary<string, string?> _originalEnvironmentVariables = new(StringComparer.Ordinal);
 
     public GatewayAuthManagerTests()
     {
-        _rootPath = Path.Combine(Path.GetTempPath(), "botnexus-gateway-auth-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_rootPath);
+        _fileSystem = new MockFileSystem();
+        _rootPath = @"C:\botnexus\gateway-auth-tests";
+        _fileSystem.Directory.CreateDirectory(_rootPath);
         _authFilePath = Path.Combine(_rootPath, "auth.json");
         _legacyAuthFilePath = Path.Combine(_rootPath, "legacy-auth.json");
     }
@@ -23,7 +26,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
     [Fact]
     public async Task GetApiKeyAsync_WhenAuthJsonHasValidEntry_ReturnsAccessToken()
     {
-        await File.WriteAllTextAsync(_authFilePath, """
+        await _fileSystem.File.WriteAllTextAsync(_authFilePath, """
                                              {
                                                "openai": {
                                                  "type": "token",
@@ -45,7 +48,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
     [Fact]
     public async Task GetApiKeyAsync_WhenCopilotUsesGithubCopilotEntry_ReturnsAccessToken()
     {
-        await File.WriteAllTextAsync(_authFilePath, """
+        await _fileSystem.File.WriteAllTextAsync(_authFilePath, """
                                              {
                                                "github-copilot": {
                                                  "type": "oauth",
@@ -67,7 +70,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
     [Fact]
     public async Task GetApiKeyAsync_WhenHomeAuthMissing_UsesLegacyRepoAuthFile()
     {
-        await File.WriteAllTextAsync(_legacyAuthFilePath, """
+        await _fileSystem.File.WriteAllTextAsync(_legacyAuthFilePath, """
                                                    {
                                                      "openai": {
                                                        "type": "token",
@@ -100,7 +103,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
     [Fact]
     public async Task GetApiKeyAsync_WhenAuthJsonIsInvalid_FallsBackToEnvironmentVariable()
     {
-        await File.WriteAllTextAsync(_authFilePath, "{ invalid json");
+        await _fileSystem.File.WriteAllTextAsync(_authFilePath, "{ invalid json");
         SetEnvironmentVariable("OPENAI_API_KEY", "env-openai-key");
         var manager = CreateManager(new PlatformConfig());
 
@@ -133,7 +136,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
     public async Task GetApiKeyAsync_WhenPlatformConfigUsesAuthPrefix_ResolvesFromAuthJson()
     {
         SetEnvironmentVariable("OPENAI_API_KEY", null);
-        await File.WriteAllTextAsync(_authFilePath, """
+        await _fileSystem.File.WriteAllTextAsync(_authFilePath, """
                                              {
                                                "github-copilot": {
                                                  "type": "token",
@@ -165,7 +168,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
     public async Task GetApiKeyAsync_WhenPlatformConfigUsesAuthCopilotPrefix_ResolvesGithubCopilotEntry()
     {
         SetEnvironmentVariable("OPENAI_API_KEY", null);
-        await File.WriteAllTextAsync(_authFilePath, """
+        await _fileSystem.File.WriteAllTextAsync(_authFilePath, """
                                              {
                                                "github-copilot": {
                                                  "type": "token",
@@ -206,7 +209,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
     [Fact]
     public void GetApiEndpoint_WhenAuthJsonHasEndpoint_ReturnsEndpoint()
     {
-        File.WriteAllText(_authFilePath, """
+        _fileSystem.File.WriteAllText(_authFilePath, """
                                         {
                                           "openai": {
                                             "type": "token",
@@ -258,13 +261,13 @@ public sealed class GatewayAuthManagerTests : IDisposable
         foreach (var (name, value) in _originalEnvironmentVariables)
             Environment.SetEnvironmentVariable(name, value);
 
-        if (Directory.Exists(_rootPath))
-            Directory.Delete(_rootPath, recursive: true);
+        if (_fileSystem.Directory.Exists(_rootPath))
+            _fileSystem.Directory.Delete(_rootPath, recursive: true);
     }
 
     private GatewayAuthManager CreateManager(PlatformConfig platformConfig, bool usePrimaryAuthPath = true)
     {
-        var manager = new GatewayAuthManager(platformConfig, NullLogger<GatewayAuthManager>.Instance);
+        var manager = new GatewayAuthManager(platformConfig, NullLogger<GatewayAuthManager>.Instance, _fileSystem);
         var authPathField = typeof(GatewayAuthManager).GetField("_authFilePath", BindingFlags.NonPublic | BindingFlags.Instance);
         var legacyAuthPathField = typeof(GatewayAuthManager).GetField("_legacyAuthFilePath", BindingFlags.NonPublic | BindingFlags.Instance);
         authPathField.Should().NotBeNull();
@@ -282,3 +285,4 @@ public sealed class GatewayAuthManagerTests : IDisposable
         Environment.SetEnvironmentVariable(name, value);
     }
 }
+

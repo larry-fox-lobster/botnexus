@@ -2,6 +2,7 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Configuration;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -10,32 +11,34 @@ public sealed class FileAgentConfigurationWriterTests : IDisposable
     private readonly string _rootPath = Path.Combine(Path.GetTempPath(), "botnexus-file-config-writer-tests", Guid.NewGuid().ToString("N"));
     private readonly string _configDirectory;
     private readonly BotNexusHome _home;
+    private readonly MockFileSystem _fileSystem;
 
     public FileAgentConfigurationWriterTests()
     {
-        _home = new BotNexusHome(_rootPath);
+        _fileSystem = new MockFileSystem();
+        _home = new BotNexusHome(_fileSystem, _rootPath);
         _configDirectory = Path.Combine(_rootPath, "agent-config");
-        Directory.CreateDirectory(_configDirectory);
+        _fileSystem.Directory.CreateDirectory(_configDirectory);
     }
 
     [Fact]
     public async Task SaveAsync_WritesConfigAndCreatesWorkspace()
     {
-        var writer = new FileAgentConfigurationWriter(_configDirectory, _home);
+        var writer = new FileAgentConfigurationWriter(_configDirectory, _home, _fileSystem);
         var descriptor = CreateDescriptor("nova");
 
         await writer.SaveAsync(descriptor);
 
         var configPath = Path.Combine(_configDirectory, "nova.json");
-        File.Exists(configPath).Should().BeTrue();
-        Directory.Exists(Path.Combine(_home.AgentsPath, "nova")).Should().BeTrue();
-        File.Exists(Path.Combine(_home.AgentsPath, "nova", "workspace", "SOUL.md")).Should().BeTrue();
+        _fileSystem.File.Exists(configPath).Should().BeTrue();
+        _fileSystem.Directory.Exists(Path.Combine(_home.AgentsPath, "nova")).Should().BeTrue();
+        _fileSystem.File.Exists(Path.Combine(_home.AgentsPath, "nova", "workspace", "SOUL.md")).Should().BeTrue();
     }
 
     [Fact]
     public async Task SaveAsync_UsesCamelCaseAndOmitsNulls()
     {
-        var writer = new FileAgentConfigurationWriter(_configDirectory, _home);
+        var writer = new FileAgentConfigurationWriter(_configDirectory, _home, _fileSystem);
         var descriptor = CreateDescriptor("nova") with
         {
             Description = null,
@@ -46,7 +49,7 @@ public sealed class FileAgentConfigurationWriterTests : IDisposable
 
         await writer.SaveAsync(descriptor);
 
-        var json = await File.ReadAllTextAsync(Path.Combine(_configDirectory, "nova.json"));
+        var json = await _fileSystem.File.ReadAllTextAsync(Path.Combine(_configDirectory, "nova.json"));
         json.Should().Contain("\"agentId\": \"nova\"");
         json.Should().Contain("\"subAgentIds\": [");
         json.Should().Contain("\"toolIds\": [");
@@ -57,12 +60,12 @@ public sealed class FileAgentConfigurationWriterTests : IDisposable
     [Fact]
     public async Task DeleteAsync_RemovesConfigFile()
     {
-        var writer = new FileAgentConfigurationWriter(_configDirectory, _home);
+        var writer = new FileAgentConfigurationWriter(_configDirectory, _home, _fileSystem);
         await writer.SaveAsync(CreateDescriptor("nova"));
 
         await writer.DeleteAsync("nova");
 
-        File.Exists(Path.Combine(_configDirectory, "nova.json")).Should().BeFalse();
+        _fileSystem.File.Exists(Path.Combine(_configDirectory, "nova.json")).Should().BeFalse();
     }
 
     [Fact]
@@ -74,12 +77,13 @@ public sealed class FileAgentConfigurationWriterTests : IDisposable
             IsolationOptions = new Dictionary<string, object?> { ["timeoutMs"] = 1000 }
         };
 
-        var writer = new FileAgentConfigurationWriter(_configDirectory, _home);
+        var writer = new FileAgentConfigurationWriter(_configDirectory, _home, _fileSystem);
         await writer.SaveAsync(descriptor);
 
         var source = new FileAgentConfigurationSource(
             _configDirectory,
-            new NullLogger<FileAgentConfigurationSource>());
+            new NullLogger<FileAgentConfigurationSource>(),
+            _fileSystem);
         var loaded = (await source.LoadAsync()).Should().ContainSingle().Subject;
 
         loaded.AgentId.Should().Be(descriptor.AgentId);
@@ -90,28 +94,7 @@ public sealed class FileAgentConfigurationWriterTests : IDisposable
         loaded.IsolationOptions["timeoutMs"].Should().Be(1000L);
     }
 
-    public void Dispose()
-    {
-        if (!Directory.Exists(_rootPath))
-            return;
-
-        for (var i = 0; i < 3; i++)
-        {
-            try
-            {
-                Directory.Delete(_rootPath, recursive: true);
-                return;
-            }
-            catch (IOException) when (i < 2)
-            {
-                Thread.Sleep(100);
-            }
-            catch
-            {
-                break;
-            }
-        }
-    }
+    public void Dispose() { }
 
     private static AgentDescriptor CreateDescriptor(string agentId)
         => new()

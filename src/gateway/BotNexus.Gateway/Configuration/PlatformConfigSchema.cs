@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Nodes;
+using System.IO.Abstractions;
 using NJsonSchema;
 using NJsonSchema.Generation;
 
@@ -23,19 +24,20 @@ public static class PlatformConfigSchema
     public static string GenerateSchemaJson()
         => CachedSchema.Value.ToJson();
 
-    public static void WriteSchema(string outputPath)
+    public static void WriteSchema(string outputPath, IFileSystem? fileSystem = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        var fs = fileSystem ?? new FileSystem();
 
         var fullPath = Path.GetFullPath(outputPath);
         var directory = Path.GetDirectoryName(fullPath);
         if (!string.IsNullOrWhiteSpace(directory))
-            Directory.CreateDirectory(directory);
+            fs.Directory.CreateDirectory(directory);
 
-        File.WriteAllText(fullPath, GenerateSchemaJson());
+        fs.File.WriteAllText(fullPath, GenerateSchemaJson());
     }
 
-    public static IReadOnlyList<string> ValidateJson(string json)
+    public static IReadOnlyList<string> ValidateJson(string json, IFileSystem? fileSystem = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
 

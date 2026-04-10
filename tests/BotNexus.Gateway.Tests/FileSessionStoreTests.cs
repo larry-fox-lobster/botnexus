@@ -2,6 +2,7 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Sessions;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -70,8 +71,8 @@ public sealed class FileSessionStoreTests
 
         await store.DeleteAsync(sessionId);
 
-        File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.jsonl")).Should().BeFalse();
-        File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.meta.json")).Should().BeFalse();
+        fixture.FileSystem.File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.jsonl")).Should().BeFalse();
+        fixture.FileSystem.File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.meta.json")).Should().BeFalse();
     }
 
     [Fact]
@@ -182,22 +183,24 @@ public sealed class FileSessionStoreTests
     {
         public StoreFixture()
         {
+            FileSystem = new MockFileSystem();
             StorePath = Path.Combine(
-                AppContext.BaseDirectory,
+                "C:\\",
                 "FileSessionStoreTests",
                 Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(StorePath);
+            FileSystem.Directory.CreateDirectory(StorePath);
         }
 
         public string StorePath { get; }
+        public MockFileSystem FileSystem { get; }
 
         public FileSessionStore CreateStore()
-            => new(StorePath, NullLogger<FileSessionStore>.Instance);
+            => new(StorePath, NullLogger<FileSessionStore>.Instance, FileSystem);
 
         public void Dispose()
         {
-            if (Directory.Exists(StorePath))
-                Directory.Delete(StorePath, true);
+            if (FileSystem.Directory.Exists(StorePath))
+                FileSystem.Directory.Delete(StorePath, true);
         }
     }
 }

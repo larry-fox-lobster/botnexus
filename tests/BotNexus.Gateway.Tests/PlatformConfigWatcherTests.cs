@@ -1,6 +1,7 @@
 using BotNexus.Gateway.Configuration;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
+using System.IO.Abstractions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -21,7 +22,7 @@ public sealed class PlatformConfigWatcherTests : IDisposable
     public async Task Watch_WhenConfigChanges_InvokesCallback()
     {
         var callback = new TaskCompletionSource<PlatformConfig>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var watcher = PlatformConfigLoader.Watch(_configPath, config => callback.TrySetResult(config));
+        using var watcher = PlatformConfigLoader.Watch(_configPath, config => callback.TrySetResult(config), fileSystem: new FileSystem());
 
         File.WriteAllText(_configPath, """{"defaultAgentId":"agent-b"}""");
 
@@ -40,7 +41,7 @@ public sealed class PlatformConfigWatcherTests : IDisposable
 
         try
         {
-            using var watcher = PlatformConfigLoader.Watch(_configPath);
+            using var watcher = PlatformConfigLoader.Watch(_configPath, fileSystem: new FileSystem());
             File.WriteAllText(_configPath, """{"defaultAgentId":"agent-c"}""");
 
             var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(10)));
@@ -57,7 +58,7 @@ public sealed class PlatformConfigWatcherTests : IDisposable
     public async Task Watch_WhenConfigBecomesInvalid_InvokesErrorCallback()
     {
         var callback = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var watcher = PlatformConfigLoader.Watch(_configPath, onError: ex => callback.TrySetResult(ex));
+        using var watcher = PlatformConfigLoader.Watch(_configPath, onError: ex => callback.TrySetResult(ex), fileSystem: new FileSystem());
 
         File.WriteAllText(_configPath, "{ invalid json");
 

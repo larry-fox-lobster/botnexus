@@ -1,11 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.IO.Abstractions;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 
 namespace BotNexus.Gateway.Configuration;
 
-public sealed class FileAgentConfigurationWriter(string directoryPath, BotNexusHome botNexusHome) : IAgentConfigurationWriter
+public sealed class FileAgentConfigurationWriter(string directoryPath, BotNexusHome botNexusHome, IFileSystem fileSystem) : IAgentConfigurationWriter
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -16,6 +17,7 @@ public sealed class FileAgentConfigurationWriter(string directoryPath, BotNexusH
 
     private readonly string _directoryPath = Path.GetFullPath(directoryPath);
     private readonly BotNexusHome _botNexusHome = botNexusHome;
+    private readonly IFileSystem _fileSystem = fileSystem;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
 
     public async Task SaveAsync(AgentDescriptor descriptor, CancellationToken cancellationToken = default)
@@ -23,7 +25,7 @@ public sealed class FileAgentConfigurationWriter(string directoryPath, BotNexusH
         ArgumentNullException.ThrowIfNull(descriptor);
         ArgumentException.ThrowIfNullOrWhiteSpace(descriptor.AgentId);
 
-        Directory.CreateDirectory(_directoryPath);
+        _fileSystem.Directory.CreateDirectory(_directoryPath);
         _ = _botNexusHome.GetAgentDirectory(descriptor.AgentId);
 
         var configPath = GetConfigPath(descriptor.AgentId);
@@ -32,17 +34,17 @@ public sealed class FileAgentConfigurationWriter(string directoryPath, BotNexusH
         await _writeGate.WaitAsync(cancellationToken);
         try
         {
-            await using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous))
+            await using (var stream = _fileSystem.FileStream.New(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous))
             {
                 await JsonSerializer.SerializeAsync(stream, AgentConfigurationFile.FromDescriptor(descriptor), JsonOptions, cancellationToken);
             }
 
-            File.Move(tempPath, configPath, overwrite: true);
+            _fileSystem.File.Move(tempPath, configPath, overwrite: true);
         }
         finally
         {
-            if (File.Exists(tempPath))
-                File.Delete(tempPath);
+            if (_fileSystem.File.Exists(tempPath))
+                _fileSystem.File.Delete(tempPath);
 
             _writeGate.Release();
         }
@@ -57,8 +59,8 @@ public sealed class FileAgentConfigurationWriter(string directoryPath, BotNexusH
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (File.Exists(configPath))
-                File.Delete(configPath);
+            if (_fileSystem.File.Exists(configPath))
+                _fileSystem.File.Delete(configPath);
         }
         finally
         {

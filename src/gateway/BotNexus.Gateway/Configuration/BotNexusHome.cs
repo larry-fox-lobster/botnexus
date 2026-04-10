@@ -1,6 +1,8 @@
+using System.IO.Abstractions;
+
 namespace BotNexus.Gateway.Configuration;
 
-public sealed class BotNexusHome(string? homePath = null)
+public sealed class BotNexusHome
 {
     public const string HomeOverrideEnvVar = "BOTNEXUS_HOME";
     private const string HomeDirectoryName = ".botnexus";
@@ -30,7 +32,20 @@ public sealed class BotNexusHome(string? homePath = null)
         "MEMORY.md"
     ];
 
-    public string RootPath { get; } = ResolveHomePath(homePath);
+    private readonly IFileSystem _fileSystem;
+
+    public BotNexusHome(IFileSystem fileSystem, string? homePath = null)
+    {
+        _fileSystem = fileSystem;
+        RootPath = ResolveHomePath(homePath);
+    }
+
+    public BotNexusHome(string? homePath = null)
+        : this(new FileSystem(), homePath)
+    {
+    }
+
+    public string RootPath { get; }
 
     public string AgentsPath => Path.Combine(RootPath, "agents");
 
@@ -50,9 +65,9 @@ public sealed class BotNexusHome(string? homePath = null)
 
     public void Initialize()
     {
-        Directory.CreateDirectory(RootPath);
+        _fileSystem.Directory.CreateDirectory(RootPath);
         foreach (var directory in RequiredDirectories)
-            Directory.CreateDirectory(Path.Combine(RootPath, directory));
+            _fileSystem.Directory.CreateDirectory(Path.Combine(RootPath, directory));
     }
 
     public string GetAgentDirectory(string agentName)
@@ -61,8 +76,8 @@ public sealed class BotNexusHome(string? homePath = null)
 
         Initialize();
         var agentDirectory = Path.Combine(AgentsPath, agentName.Trim());
-        var isFirstCreation = !Directory.Exists(agentDirectory);
-        Directory.CreateDirectory(agentDirectory);
+        var isFirstCreation = !_fileSystem.Directory.Exists(agentDirectory);
+        _fileSystem.Directory.CreateDirectory(agentDirectory);
 
         if (isFirstCreation)
             ScaffoldAgentWorkspace(agentDirectory);
@@ -72,17 +87,17 @@ public sealed class BotNexusHome(string? homePath = null)
         return agentDirectory;
     }
 
-    private static void ScaffoldAgentWorkspace(string agentDirectory)
+    private void ScaffoldAgentWorkspace(string agentDirectory)
     {
         var workspacePath = Path.Combine(agentDirectory, "workspace");
-        Directory.CreateDirectory(workspacePath);
-        Directory.CreateDirectory(Path.Combine(agentDirectory, "data", "sessions"));
+        _fileSystem.Directory.CreateDirectory(workspacePath);
+        _fileSystem.Directory.CreateDirectory(Path.Combine(agentDirectory, "data", "sessions"));
 
         var assembly = typeof(BotNexusHome).Assembly;
         foreach (var file in WorkspaceScaffoldFiles)
         {
             var path = Path.Combine(workspacePath, file);
-            if (File.Exists(path))
+            if (_fileSystem.File.Exists(path))
                 continue;
 
             var resourceName = assembly.GetManifestResourceNames()
@@ -94,37 +109,37 @@ public sealed class BotNexusHome(string? homePath = null)
                 if (stream is not null)
                 {
                     using var reader = new StreamReader(stream);
-                    File.WriteAllText(path, reader.ReadToEnd());
+                    _fileSystem.File.WriteAllText(path, reader.ReadToEnd());
                     continue;
                 }
             }
 
-            File.WriteAllText(path, string.Empty);
+            _fileSystem.File.WriteAllText(path, string.Empty);
         }
     }
 
-    private static void MigrateLegacyWorkspace(string agentDirectory)
+    private void MigrateLegacyWorkspace(string agentDirectory)
     {
         var workspacePath = Path.Combine(agentDirectory, "workspace");
-        if (Directory.Exists(workspacePath))
+        if (_fileSystem.Directory.Exists(workspacePath))
             return;
 
         var hasLegacyFiles = LegacyWorkspaceFiles
-            .Any(f => File.Exists(Path.Combine(agentDirectory, f)));
+            .Any(f => _fileSystem.File.Exists(Path.Combine(agentDirectory, f)));
         if (!hasLegacyFiles)
         {
             ScaffoldAgentWorkspace(agentDirectory);
             return;
         }
 
-        Directory.CreateDirectory(workspacePath);
-        Directory.CreateDirectory(Path.Combine(agentDirectory, "data", "sessions"));
+        _fileSystem.Directory.CreateDirectory(workspacePath);
+        _fileSystem.Directory.CreateDirectory(Path.Combine(agentDirectory, "data", "sessions"));
         foreach (var file in LegacyWorkspaceFiles)
         {
             var src = Path.Combine(agentDirectory, file);
             var dst = Path.Combine(workspacePath, file);
-            if (File.Exists(src))
-                File.Move(src, dst);
+            if (_fileSystem.File.Exists(src))
+                _fileSystem.File.Move(src, dst, overwrite: true);
         }
     }
 }

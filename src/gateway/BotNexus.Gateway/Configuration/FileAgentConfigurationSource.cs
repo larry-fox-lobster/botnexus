@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.IO.Abstractions;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
@@ -10,7 +11,7 @@ namespace BotNexus.Gateway.Configuration;
 /// <summary>
 /// Loads agent descriptors from JSON files in a directory.
 /// </summary>
-public sealed class FileAgentConfigurationSource(string directoryPath, ILogger<FileAgentConfigurationSource> logger)
+public sealed class FileAgentConfigurationSource(string directoryPath, ILogger<FileAgentConfigurationSource> logger, IFileSystem fileSystem)
     : IAgentConfigurationSource
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -20,15 +21,16 @@ public sealed class FileAgentConfigurationSource(string directoryPath, ILogger<F
 
     private readonly string _directoryPath = Path.GetFullPath(directoryPath);
     private readonly ILogger<FileAgentConfigurationSource> _logger = logger;
+    private readonly IFileSystem _fileSystem = fileSystem;
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<AgentDescriptor>> LoadAsync(CancellationToken cancellationToken = default)
     {
-        if (!Directory.Exists(_directoryPath))
+        if (!_fileSystem.Directory.Exists(_directoryPath))
             return [];
 
         List<AgentDescriptor> descriptors = [];
-        foreach (var configPath in Directory.EnumerateFiles(_directoryPath, "*.json", SearchOption.TopDirectoryOnly))
+        foreach (var configPath in _fileSystem.Directory.EnumerateFiles(_directoryPath, "*.json", SearchOption.TopDirectoryOnly))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -45,17 +47,17 @@ public sealed class FileAgentConfigurationSource(string directoryPath, ILogger<F
     {
         ArgumentNullException.ThrowIfNull(onChanged);
 
-        if (!Directory.Exists(_directoryPath))
+        if (!_fileSystem.Directory.Exists(_directoryPath))
             return null;
 
-        return new FileConfigurationWatcher(_directoryPath, onChanged, LoadAsync, _logger);
+        return new FileConfigurationWatcher(_directoryPath, _fileSystem, onChanged, LoadAsync, _logger);
     }
 
     private async Task<AgentDescriptor?> TryLoadDescriptorAsync(string configPath, CancellationToken cancellationToken)
     {
         try
         {
-            await using var stream = File.OpenRead(configPath);
+            await using var stream = _fileSystem.File.Open(configPath, FileMode.Open, FileAccess.Read, FileShare.Read);
             var jsonConfig = await JsonSerializer.DeserializeAsync<AgentConfigurationFile>(stream, JsonOptions, cancellationToken);
             if (jsonConfig is null)
             {
@@ -120,7 +122,7 @@ public sealed class FileAgentConfigurationSource(string directoryPath, ILogger<F
             return null;
         }
 
-        if (!File.Exists(resolvedPath))
+        if (!_fileSystem.File.Exists(resolvedPath))
         {
             _logger.LogWarning(
                 "System prompt file '{SystemPromptFile}' was not found for agent config '{ConfigPath}'.",
@@ -129,7 +131,7 @@ public sealed class FileAgentConfigurationSource(string directoryPath, ILogger<F
             return null;
         }
 
-        return await File.ReadAllTextAsync(resolvedPath, cancellationToken);
+        return await _fileSystem.File.ReadAllTextAsync(resolvedPath, cancellationToken);
     }
 
     private static AgentDescriptor BuildDescriptor(AgentConfigurationFile config)
@@ -188,7 +190,7 @@ public sealed class FileAgentConfigurationSource(string directoryPath, ILogger<F
 
     private sealed class FileConfigurationWatcher : IDisposable
     {
-        private readonly FileSystemWatcher _watcher;
+        private readonly IFileSystemWatcher _watcher;
         private readonly Timer _timer;
         private readonly string _directoryPath;
         private readonly Action<IReadOnlyList<AgentDescriptor>> _onChanged;
@@ -197,21 +199,24 @@ public sealed class FileAgentConfigurationSource(string directoryPath, ILogger<F
         private readonly SemaphoreSlim _reloadGate = new(1, 1);
         private bool _disposed;
 
-        public FileConfigurationWatcher(string directoryPath, Action<IReadOnlyList<AgentDescriptor>> onChanged, Func<CancellationToken, Task<IReadOnlyList<AgentDescriptor>>> loadAsync, ILogger logger)
+        public FileConfigurationWatcher(
+            string directoryPath,
+            IFileSystem fileSystem,
+            Action<IReadOnlyList<AgentDescriptor>> onChanged,
+            Func<CancellationToken, Task<IReadOnlyList<AgentDescriptor>>> loadAsync,
+            ILogger logger)
         {
             _directoryPath = directoryPath;
             _onChanged = onChanged;
             _loadAsync = loadAsync;
             _logger = logger;
 
-            _watcher = new FileSystemWatcher(directoryPath, "*.*")
-            {
-                IncludeSubdirectories = true,
-                NotifyFilter = NotifyFilters.FileName
-                               | NotifyFilters.LastWrite
-                               | NotifyFilters.CreationTime
-                               | NotifyFilters.Size
-            };
+            _watcher = fileSystem.FileSystemWatcher.New(directoryPath, "*.*");
+            _watcher.IncludeSubdirectories = true;
+            _watcher.NotifyFilter = NotifyFilters.FileName
+                                    | NotifyFilters.LastWrite
+                                    | NotifyFilters.CreationTime
+                                    | NotifyFilters.Size;
             _timer = new Timer(OnTimerTick, this, Timeout.Infinite, Timeout.Infinite);
 
             _watcher.Changed += OnChanged;

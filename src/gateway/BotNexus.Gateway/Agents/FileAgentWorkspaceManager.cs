@@ -1,15 +1,18 @@
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Configuration;
+using System.IO.Abstractions;
 
 namespace BotNexus.Gateway.Agents;
 
 public sealed class FileAgentWorkspaceManager : IAgentWorkspaceManager
 {
     private readonly BotNexusHome _botNexusHome;
+    private readonly IFileSystem _fileSystem;
 
-    public FileAgentWorkspaceManager(BotNexusHome botNexusHome)
+    public FileAgentWorkspaceManager(BotNexusHome botNexusHome, IFileSystem fileSystem)
     {
         _botNexusHome = botNexusHome;
+        _fileSystem = fileSystem;
     }
 
     public async Task<AgentWorkspace> LoadWorkspaceAsync(string agentName, CancellationToken cancellationToken = default)
@@ -37,7 +40,7 @@ public sealed class FileAgentWorkspaceManager : IAgentWorkspaceManager
             ? content
             : $"{content}{Environment.NewLine}";
 
-        await File.AppendAllTextAsync(memoryPath, memoryEntry, cancellationToken);
+        await _fileSystem.File.AppendAllTextAsync(memoryPath, memoryEntry, cancellationToken);
     }
 
     public string GetWorkspacePath(string agentName)
@@ -46,11 +49,11 @@ public sealed class FileAgentWorkspaceManager : IAgentWorkspaceManager
         return Path.Combine(_botNexusHome.GetAgentDirectory(agentName.Trim()), "workspace");
     }
 
-    private static async Task<string> ReadFileOrEmptyAsync(string path, CancellationToken cancellationToken)
+    private async Task<string> ReadFileOrEmptyAsync(string path, CancellationToken cancellationToken)
     {
-        if (!File.Exists(path))
+        if (!_fileSystem.File.Exists(path))
             return string.Empty;
 
-        return await File.ReadAllTextAsync(path, cancellationToken);
+        return await _fileSystem.File.ReadAllTextAsync(path, cancellationToken);
     }
 }

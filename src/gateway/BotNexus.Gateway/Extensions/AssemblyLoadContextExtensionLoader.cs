@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
+using System.IO.Abstractions;
 using BotNexus.AgentCore.Tools;
 using BotNexus.Gateway.Abstractions.Activity;
 using BotNexus.Gateway.Abstractions.Agents;
@@ -41,17 +42,20 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
     private readonly IServiceCollection _services;
     private readonly IHookDispatcher _hookDispatcher;
     private readonly ILogger<AssemblyLoadContextExtensionLoader> _logger;
+    private readonly IFileSystem _fileSystem;
     private readonly Lock _sync = new();
     private readonly Dictionary<string, LoadedExtensionRuntime> _loaded = new(StringComparer.OrdinalIgnoreCase);
 
     public AssemblyLoadContextExtensionLoader(
         IServiceCollection services,
         IHookDispatcher hookDispatcher,
-        ILogger<AssemblyLoadContextExtensionLoader> logger)
+        ILogger<AssemblyLoadContextExtensionLoader> logger,
+        IFileSystem fileSystem)
     {
         _services = services;
         _hookDispatcher = hookDispatcher;
         _logger = logger;
+        _fileSystem = fileSystem;
     }
 
     public Task<IReadOnlyList<ExtensionInfo>> DiscoverAsync(string extensionsPath, CancellationToken ct = default)
@@ -60,19 +64,19 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
         ct.ThrowIfCancellationRequested();
 
         var rootPath = Path.GetFullPath(extensionsPath);
-        if (!Directory.Exists(rootPath))
+        if (!_fileSystem.Directory.Exists(rootPath))
         {
             _logger.LogInformation("Extensions directory '{ExtensionsPath}' does not exist. Skipping discovery.", rootPath);
             return Task.FromResult<IReadOnlyList<ExtensionInfo>>([]);
         }
 
         var discovered = new List<ExtensionInfo>();
-        foreach (var extensionDirectory in Directory.GetDirectories(rootPath))
+        foreach (var extensionDirectory in _fileSystem.Directory.GetDirectories(rootPath))
         {
             ct.ThrowIfCancellationRequested();
 
             var manifestPath = Path.Combine(extensionDirectory, "botnexus-extension.json");
-            if (!File.Exists(manifestPath))
+            if (!_fileSystem.File.Exists(manifestPath))
             {
                 _logger.LogDebug("Skipping '{ExtensionDirectory}' because botnexus-extension.json is missing.", extensionDirectory);
                 continue;
@@ -80,9 +84,9 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
 
             try
             {
-                var manifest = ReadAndValidateManifest(manifestPath, extensionDirectory);
+                var manifest = ReadAndValidateManifest(_fileSystem, manifestPath, extensionDirectory);
                 var entryAssemblyPath = ResolveEntryAssemblyPath(extensionDirectory, manifest.EntryAssembly);
-                if (!File.Exists(entryAssemblyPath))
+                if (!_fileSystem.File.Exists(entryAssemblyPath))
                     throw new InvalidOperationException($"Entry assembly '{manifest.EntryAssembly}' does not exist.");
 
                 discovered.Add(new ExtensionInfo
@@ -201,9 +205,9 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
             return _loaded.Values.Select(value => value.LoadedExtension).ToArray();
     }
 
-    private static ExtensionManifest ReadAndValidateManifest(string manifestPath, string extensionDirectory)
+    private static ExtensionManifest ReadAndValidateManifest(IFileSystem fileSystem, string manifestPath, string extensionDirectory)
     {
-        var manifestJson = File.ReadAllText(manifestPath);
+        var manifestJson = fileSystem.File.ReadAllText(manifestPath);
         var manifest = JsonSerializer.Deserialize<ExtensionManifest>(manifestJson, ManifestJsonOptions)
             ?? throw new InvalidOperationException($"Manifest '{manifestPath}' could not be deserialized.");
 

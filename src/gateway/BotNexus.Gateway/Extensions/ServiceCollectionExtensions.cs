@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.IO.Abstractions;
 
 namespace BotNexus.Gateway.Extensions;
 
@@ -17,7 +18,8 @@ public static class ServiceCollectionExtensions
             new AssemblyLoadContextExtensionLoader(
                 services,
                 serviceProvider.GetRequiredService<IHookDispatcher>(),
-                serviceProvider.GetRequiredService<ILogger<AssemblyLoadContextExtensionLoader>>()));
+                serviceProvider.GetRequiredService<ILogger<AssemblyLoadContextExtensionLoader>>(),
+                serviceProvider.GetRequiredService<IFileSystem>()));
         return services;
     }
 
@@ -39,13 +41,14 @@ public static class ServiceCollectionExtensions
             .Select(d => d.ImplementationInstance as IHookDispatcher)
             .FirstOrDefault()
             ?? new HookDispatcher();
-        var loader = new AssemblyLoadContextExtensionLoader(services, hookDispatcher, logger);
+        var fileSystem = new FileSystem();
+        var loader = new AssemblyLoadContextExtensionLoader(services, hookDispatcher, logger, fileSystem);
 
         var extensionsConfig = platformConfig.GetExtensions();
         if (extensionsConfig?.Enabled is false)
             return [];
 
-        var extensionsPath = ResolveExtensionsPath(platformConfig, extensionsConfig);
+        var extensionsPath = ResolveExtensionsPath(platformConfig, extensionsConfig, fileSystem);
         var discovered = await loader.DiscoverAsync(extensionsPath, ct);
 
         IReadOnlyList<ExtensionInfo> ordered;
@@ -72,12 +75,12 @@ public static class ServiceCollectionExtensions
         return results;
     }
 
-    private static string ResolveExtensionsPath(PlatformConfig config, ExtensionsConfig? extensionConfig)
+    private static string ResolveExtensionsPath(PlatformConfig config, ExtensionsConfig? extensionConfig, IFileSystem fileSystem)
     {
         if (!string.IsNullOrWhiteSpace(extensionConfig?.Path))
             return Path.GetFullPath(extensionConfig.Path);
 
-        return Path.Combine(new BotNexusHome().RootPath, "extensions");
+        return Path.Combine(new BotNexusHome(fileSystem).RootPath, "extensions");
     }
 
     private static IReadOnlyList<ExtensionInfo> TopologicallySort(IReadOnlyList<ExtensionInfo> discovered)

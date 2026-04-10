@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.IO.Abstractions;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 
@@ -15,15 +16,17 @@ public sealed class PlatformConfigAgentWriter : IAgentConfigurationWriter
 
     private readonly string _configPath;
     private readonly BotNexusHome _botNexusHome;
+    private readonly IFileSystem _fileSystem;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
 
-    public PlatformConfigAgentWriter(string configPath, BotNexusHome botNexusHome)
+    public PlatformConfigAgentWriter(string configPath, BotNexusHome botNexusHome, IFileSystem fileSystem)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(configPath);
         ArgumentNullException.ThrowIfNull(botNexusHome);
 
         _configPath = Path.GetFullPath(configPath);
         _botNexusHome = botNexusHome;
+        _fileSystem = fileSystem;
     }
 
     public async Task SaveAsync(AgentDescriptor descriptor, CancellationToken cancellationToken = default)
@@ -71,7 +74,7 @@ public sealed class PlatformConfigAgentWriter : IAgentConfigurationWriter
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (!File.Exists(_configPath))
+            if (!_fileSystem.File.Exists(_configPath))
                 return;
 
             var root = await ReadRootAsync(cancellationToken);
@@ -135,29 +138,29 @@ public sealed class PlatformConfigAgentWriter : IAgentConfigurationWriter
 
     private async Task<JsonObject> ReadRootAsync(CancellationToken cancellationToken)
     {
-        if (!File.Exists(_configPath))
+        if (!_fileSystem.File.Exists(_configPath))
             return new JsonObject();
 
-        await using var stream = new FileStream(_configPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous);
+        await using var stream = _fileSystem.FileStream.New(_configPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous);
         var node = await JsonNode.ParseAsync(stream, cancellationToken: cancellationToken);
         return node as JsonObject ?? new JsonObject();
     }
 
     private async Task WriteRootAtomicallyAsync(JsonObject root, CancellationToken cancellationToken)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_configPath)!);
+        _fileSystem.Directory.CreateDirectory(Path.GetDirectoryName(_configPath)!);
 
         var tempPath = _configPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
             var payload = root.ToJsonString(JsonOptions);
-            await File.WriteAllTextAsync(tempPath, payload, cancellationToken);
-            File.Move(tempPath, _configPath, overwrite: true);
+            await _fileSystem.File.WriteAllTextAsync(tempPath, payload, cancellationToken);
+            _fileSystem.File.Move(tempPath, _configPath, overwrite: true);
         }
         finally
         {
-            if (File.Exists(tempPath))
-                File.Delete(tempPath);
+            if (_fileSystem.File.Exists(tempPath))
+                _fileSystem.File.Delete(tempPath);
         }
     }
 

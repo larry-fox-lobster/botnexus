@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Configuration;
 using FluentAssertions;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -10,18 +11,20 @@ public sealed class PlatformConfigAgentWriterTests : IDisposable
     private readonly string _rootPath = Path.Combine(Path.GetTempPath(), "botnexus-platform-agent-writer-tests", Guid.NewGuid().ToString("N"));
     private readonly string _configPath;
     private readonly BotNexusHome _home;
+    private readonly MockFileSystem _fileSystem;
 
     public PlatformConfigAgentWriterTests()
     {
-        _home = new BotNexusHome(_rootPath);
-        Directory.CreateDirectory(_rootPath);
+        _fileSystem = new MockFileSystem();
+        _home = new BotNexusHome(_fileSystem, _rootPath);
+        _fileSystem.Directory.CreateDirectory(_rootPath);
         _configPath = Path.Combine(_rootPath, "config.json");
     }
 
     [Fact]
     public async Task SaveAsync_WritesAgentIntoConfigAndCreatesWorkspace()
     {
-        var writer = new PlatformConfigAgentWriter(_configPath, _home);
+        var writer = new PlatformConfigAgentWriter(_configPath, _home, _fileSystem);
         var descriptor = CreateDescriptor("nova") with
         {
             AllowedModelIds = ["claude-sonnet-4.5"],
@@ -46,14 +49,14 @@ public sealed class PlatformConfigAgentWriterTests : IDisposable
         agent["metadata"]!["owner"]!.GetValue<string>().Should().Be("gateway");
         agent["isolationOptions"]!["timeoutMs"]!.GetValue<int>().Should().Be(1000);
 
-        Directory.Exists(Path.Combine(_home.AgentsPath, "nova")).Should().BeTrue();
-        File.Exists(Path.Combine(_home.AgentsPath, "nova", "workspace", "SOUL.md")).Should().BeTrue();
+        _fileSystem.Directory.Exists(Path.Combine(_home.AgentsPath, "nova")).Should().BeTrue();
+        _fileSystem.File.Exists(Path.Combine(_home.AgentsPath, "nova", "workspace", "SOUL.md")).Should().BeTrue();
     }
 
     [Fact]
     public async Task SaveAsync_PreservesUnknownFieldsAndOmitsEmptyOptionalValues()
     {
-        await File.WriteAllTextAsync(_configPath, """
+        await _fileSystem.File.WriteAllTextAsync(_configPath, """
             {
               "version": 1,
               "customRootField": "preserve-me",
@@ -65,7 +68,7 @@ public sealed class PlatformConfigAgentWriterTests : IDisposable
             }
             """);
 
-        var writer = new PlatformConfigAgentWriter(_configPath, _home);
+        var writer = new PlatformConfigAgentWriter(_configPath, _home, _fileSystem);
         await writer.SaveAsync(CreateDescriptor("nova") with
         {
             Description = null,
@@ -92,7 +95,7 @@ public sealed class PlatformConfigAgentWriterTests : IDisposable
     [Fact]
     public async Task DeleteAsync_RemovesAgentFromConfig()
     {
-        await File.WriteAllTextAsync(_configPath, """
+        await _fileSystem.File.WriteAllTextAsync(_configPath, """
             {
               "agents": {
                 "nova": { "provider": "github-copilot", "model": "gpt-4.1" },
@@ -101,7 +104,7 @@ public sealed class PlatformConfigAgentWriterTests : IDisposable
             }
             """);
 
-        var writer = new PlatformConfigAgentWriter(_configPath, _home);
+        var writer = new PlatformConfigAgentWriter(_configPath, _home, _fileSystem);
         await writer.DeleteAsync("nova");
 
         var root = await ReadConfigAsync();
@@ -111,13 +114,13 @@ public sealed class PlatformConfigAgentWriterTests : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_rootPath))
-            Directory.Delete(_rootPath, recursive: true);
+        if (_fileSystem.Directory.Exists(_rootPath))
+            _fileSystem.Directory.Delete(_rootPath, recursive: true);
     }
 
     private async Task<JsonObject> ReadConfigAsync()
     {
-        await using var stream = File.OpenRead(_configPath);
+        await using var stream = _fileSystem.File.OpenRead(_configPath);
         var node = await JsonNode.ParseAsync(stream);
         return node!.AsObject();
     }

@@ -19,6 +19,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using System.IO.Abstractions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -205,7 +206,7 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
 
     private GatewayAuthManager CreateGatewayAuthManagerWithTempAuthPath()
     {
-        var authManager = new GatewayAuthManager(new PlatformConfig(), NullLogger<GatewayAuthManager>.Instance);
+        var authManager = new GatewayAuthManager(new PlatformConfig(), NullLogger<GatewayAuthManager>.Instance, new FileSystem());
         var authPathField = typeof(GatewayAuthManager).GetField("_authFilePath", BindingFlags.NonPublic | BindingFlags.Instance);
         authPathField.Should().NotBeNull();
         authPathField!.SetValue(authManager, Path.Combine(_configDirectory, "auth.json"));

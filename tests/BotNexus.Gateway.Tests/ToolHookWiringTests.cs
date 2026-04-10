@@ -16,6 +16,7 @@ using BotNexus.Tools;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.IO.Abstractions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -146,7 +147,7 @@ public sealed class ToolHookWiringTests
 
         return new InProcessIsolationStrategy(
             llmClient,
-            new GatewayAuthManager(new PlatformConfig(), NullLogger<GatewayAuthManager>.Instance),
+            new GatewayAuthManager(new PlatformConfig(), NullLogger<GatewayAuthManager>.Instance, new FileSystem()),
             new PassthroughContextBuilder(),
             new StaticToolFactory(),
             new StubWorkspaceManager(),

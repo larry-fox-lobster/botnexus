@@ -4,6 +4,7 @@ using BotNexus.Gateway.Sessions;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using System.IO.Abstractions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -152,7 +153,7 @@ public sealed class SessionLifecycleTests
         public string StorePath { get; }
 
         public FileSessionStore CreateStore()
-            => new(StorePath, NullLogger<FileSessionStore>.Instance);
+            => new(StorePath, NullLogger<FileSessionStore>.Instance, new FileSystem());
 
         public void Dispose()
         {

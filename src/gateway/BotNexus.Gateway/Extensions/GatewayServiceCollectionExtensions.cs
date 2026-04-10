@@ -24,6 +24,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.IO.Abstractions;
 
 namespace BotNexus.Gateway.Extensions;
 
@@ -50,6 +51,7 @@ public static class GatewayServiceCollectionExtensions
             services.Configure(configure);
 
         // Core services
+        services.TryAddSingleton<IFileSystem, FileSystem>();
         services.TryAddSingleton<BotNexusHome>();
         services.TryAddSingleton<IMemoryStoreFactory>(serviceProvider =>
         {
@@ -121,13 +123,14 @@ public static class GatewayServiceCollectionExtensions
                 home.Initialize();
                 return new FileAgentConfigurationSource(
                     home.AgentsPath,
-                    serviceProvider.GetRequiredService<ILogger<FileAgentConfigurationSource>>());
+                    serviceProvider.GetRequiredService<ILogger<FileAgentConfigurationSource>>(),
+                    serviceProvider.GetRequiredService<IFileSystem>());
             });
             services.Replace(ServiceDescriptor.Singleton<IAgentConfigurationWriter>(serviceProvider =>
             {
                 var home = serviceProvider.GetRequiredService<BotNexusHome>();
                 var defaultConfigPath = Path.Combine(home.RootPath, "config.json");
-                return new PlatformConfigAgentWriter(defaultConfigPath, home);
+                return new PlatformConfigAgentWriter(defaultConfigPath, home, serviceProvider.GetRequiredService<IFileSystem>());
             }));
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AgentConfigurationHostedService>());
         }
@@ -143,13 +146,14 @@ public static class GatewayServiceCollectionExtensions
     /// <param name="configPath">Optional explicit path to platform config.</param>
     public static IServiceCollection AddPlatformConfiguration(this IServiceCollection services, string? configPath = null)
     {
+        var fileSystem = new FileSystem();
         var resolvedConfigPath = string.IsNullOrWhiteSpace(configPath)
-            ? PlatformConfigLoader.DefaultConfigPath
+            ? PlatformConfigLoader.GetDefaultConfigPath(fileSystem)
             : Path.GetFullPath(configPath);
-        var configDirectory = Path.GetDirectoryName(resolvedConfigPath) ?? PlatformConfigLoader.DefaultConfigDirectory;
+        var configDirectory = Path.GetDirectoryName(resolvedConfigPath) ?? PlatformConfigLoader.GetDefaultConfigDirectory(fileSystem);
 
-        PlatformConfigLoader.EnsureConfigDirectory(configDirectory);
-        var config = PlatformConfigLoader.Load(resolvedConfigPath);
+        PlatformConfigLoader.EnsureConfigDirectory(configDirectory, fileSystem);
+        var config = PlatformConfigLoader.Load(resolvedConfigPath, fileSystem: fileSystem);
         services.AddOptions<PlatformConfig>()
             .Configure(options => ApplyPlatformConfig(options, config));
         services.Replace(ServiceDescriptor.Singleton(serviceProvider =>
@@ -184,7 +188,7 @@ public static class GatewayServiceCollectionExtensions
         services.Replace(ServiceDescriptor.Singleton<IAgentConfigurationWriter>(serviceProvider =>
         {
             var home = serviceProvider.GetRequiredService<BotNexusHome>();
-            return new PlatformConfigAgentWriter(resolvedConfigPath, home);
+            return new PlatformConfigAgentWriter(resolvedConfigPath, home, serviceProvider.GetRequiredService<IFileSystem>());
         }));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AgentConfigurationHostedService>());
 
@@ -238,11 +242,12 @@ public static class GatewayServiceCollectionExtensions
                 throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), ["gateway.sessionStore.filePath is required when gateway.sessionStore.type is 'File'."]);
 
             var sessionsPath = ResolveConfiguredPath(configDirectory, configuredPath);
-            Directory.CreateDirectory(sessionsPath);
+            new FileSystem().Directory.CreateDirectory(sessionsPath);
             services.Replace(ServiceDescriptor.Singleton<ISessionStore>(serviceProvider =>
                 new FileSessionStore(
                     sessionsPath,
-                    serviceProvider.GetRequiredService<ILogger<FileSessionStore>>())));
+                    serviceProvider.GetRequiredService<ILogger<FileSessionStore>>(),
+                    serviceProvider.GetRequiredService<IFileSystem>())));
             return;
         }
 
@@ -308,12 +313,14 @@ public static class GatewayServiceCollectionExtensions
         {
             return new FileAgentConfigurationSource(
                 ResolvePath(serviceProvider),
-                serviceProvider.GetRequiredService<ILogger<FileAgentConfigurationSource>>());
+                serviceProvider.GetRequiredService<ILogger<FileAgentConfigurationSource>>(),
+                serviceProvider.GetRequiredService<IFileSystem>());
         });
         services.Replace(ServiceDescriptor.Singleton<IAgentConfigurationWriter>(serviceProvider =>
             new FileAgentConfigurationWriter(
                 ResolvePath(serviceProvider),
-                serviceProvider.GetRequiredService<BotNexusHome>())));
+                serviceProvider.GetRequiredService<BotNexusHome>(),
+                serviceProvider.GetRequiredService<IFileSystem>())));
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AgentConfigurationHostedService>());
         return services;

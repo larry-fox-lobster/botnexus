@@ -2,24 +2,28 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Configuration;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using System.IO.Abstractions;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.Gateway.Tests;
 
 public sealed class FileAgentConfigurationSourceTests : IDisposable
 {
     private readonly string _directoryPath;
+    private readonly MockFileSystem _fileSystem;
 
     public FileAgentConfigurationSourceTests()
     {
-        _directoryPath = Path.Combine(Path.GetTempPath(), "botnexus-file-config-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_directoryPath);
+        _fileSystem = new MockFileSystem();
+        _directoryPath = @"C:\botnexus\file-config-tests";
+        _fileSystem.Directory.CreateDirectory(_directoryPath);
     }
 
     [Fact]
     public async Task LoadAsync_WithNoJsonFiles_ReturnsEmptyList()
     {
         var logger = new ListLogger<FileAgentConfigurationSource>();
-        var source = new FileAgentConfigurationSource(_directoryPath, logger);
+        var source = new FileAgentConfigurationSource(_directoryPath, logger, _fileSystem);
 
         var descriptors = await source.LoadAsync();
 
@@ -29,7 +33,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
     [Fact]
     public async Task LoadAsync_WithValidJson_MapsAllFields()
     {
-        File.WriteAllText(
+        _fileSystem.File.WriteAllText(
             Path.Combine(_directoryPath, "agent-a.json"),
             """
             {
@@ -56,7 +60,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
             }
             """);
 
-        var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>());
+        var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>(), _fileSystem);
 
         var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
 
@@ -82,9 +86,9 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
     public async Task LoadAsync_WithRelativeSystemPromptFile_LoadsPromptContent()
     {
         var promptDirectory = Path.Combine(_directoryPath, "prompts");
-        Directory.CreateDirectory(promptDirectory);
-        File.WriteAllText(Path.Combine(promptDirectory, "system.txt"), "Prompt from file");
-        File.WriteAllText(
+        _fileSystem.Directory.CreateDirectory(promptDirectory);
+        _fileSystem.File.WriteAllText(Path.Combine(promptDirectory, "system.txt"), "Prompt from file");
+        _fileSystem.File.WriteAllText(
             Path.Combine(_directoryPath, "agent-a.json"),
             """
             {
@@ -96,7 +100,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
             }
             """);
 
-        var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>());
+        var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>(), _fileSystem);
 
         var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
 
@@ -108,7 +112,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
     public async Task LoadAsync_WithPathTraversalSystemPromptFile_RejectsDescriptor()
     {
         var logger = new ListLogger<FileAgentConfigurationSource>();
-        File.WriteAllText(
+        _fileSystem.File.WriteAllText(
             Path.Combine(_directoryPath, "agent-a.json"),
             """
             {
@@ -120,7 +124,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
             }
             """);
 
-        var source = new FileAgentConfigurationSource(_directoryPath, logger);
+        var source = new FileAgentConfigurationSource(_directoryPath, logger, _fileSystem);
 
         var descriptors = await source.LoadAsync();
 
@@ -135,13 +139,13 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
     {
         var logger = new ListLogger<FileAgentConfigurationSource>();
         var outsideDirectory = Path.Combine(_directoryPath, "..", "outside");
-        Directory.CreateDirectory(outsideDirectory);
+        _fileSystem.Directory.CreateDirectory(outsideDirectory);
         var outsidePromptPath = Path.GetFullPath(Path.Combine(outsideDirectory, "outside-prompt.txt"));
 
         try
         {
-            File.WriteAllText(outsidePromptPath, "Outside prompt");
-            File.WriteAllText(
+            _fileSystem.File.WriteAllText(outsidePromptPath, "Outside prompt");
+            _fileSystem.File.WriteAllText(
                 Path.Combine(_directoryPath, "agent-a.json"),
                 $$"""
                 {
@@ -153,7 +157,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
                 }
                 """);
 
-            var source = new FileAgentConfigurationSource(_directoryPath, logger);
+            var source = new FileAgentConfigurationSource(_directoryPath, logger, _fileSystem);
 
             var descriptors = await source.LoadAsync();
 
@@ -164,8 +168,8 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
         }
         finally
         {
-            if (Directory.Exists(outsideDirectory))
-                Directory.Delete(outsideDirectory, recursive: true);
+            if (_fileSystem.Directory.Exists(outsideDirectory))
+                _fileSystem.Directory.Delete(outsideDirectory, recursive: true);
         }
     }
 
@@ -173,10 +177,10 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
     public async Task LoadAsync_WithAbsoluteSystemPromptFileWithinConfigDirectory_LoadsPromptContent()
     {
         var promptDirectory = Path.Combine(_directoryPath, "prompts");
-        Directory.CreateDirectory(promptDirectory);
+        _fileSystem.Directory.CreateDirectory(promptDirectory);
         var promptPath = Path.GetFullPath(Path.Combine(promptDirectory, "system-absolute.txt"));
-        File.WriteAllText(promptPath, "Absolute prompt from file");
-        File.WriteAllText(
+        _fileSystem.File.WriteAllText(promptPath, "Absolute prompt from file");
+        _fileSystem.File.WriteAllText(
             Path.Combine(_directoryPath, "agent-a.json"),
             $$"""
             {
@@ -188,7 +192,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
             }
             """);
 
-        var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>());
+        var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>(), _fileSystem);
 
         var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
 
@@ -200,8 +204,8 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
     public async Task LoadAsync_WithMalformedJson_SkipsFileAndLogsWarning()
     {
         var logger = new ListLogger<FileAgentConfigurationSource>();
-        File.WriteAllText(Path.Combine(_directoryPath, "bad.json"), "{ \"agentId\": ");
-        File.WriteAllText(
+        _fileSystem.File.WriteAllText(Path.Combine(_directoryPath, "bad.json"), "{ \"agentId\": ");
+        _fileSystem.File.WriteAllText(
             Path.Combine(_directoryPath, "good.json"),
             """
             {
@@ -212,7 +216,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
             }
             """);
 
-        var source = new FileAgentConfigurationSource(_directoryPath, logger);
+        var source = new FileAgentConfigurationSource(_directoryPath, logger, _fileSystem);
 
         var descriptors = await source.LoadAsync();
 
@@ -226,7 +230,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
     public async Task LoadAsync_WithInvalidDescriptor_SkipsDescriptorAndLogsWarning()
     {
         var logger = new ListLogger<FileAgentConfigurationSource>();
-        File.WriteAllText(
+        _fileSystem.File.WriteAllText(
             Path.Combine(_directoryPath, "invalid.json"),
             """
             {
@@ -236,7 +240,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
             }
             """);
 
-        var source = new FileAgentConfigurationSource(_directoryPath, logger);
+        var source = new FileAgentConfigurationSource(_directoryPath, logger, _fileSystem);
 
         var descriptors = await source.LoadAsync();
 
@@ -249,7 +253,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
     [Fact]
     public async Task LoadAsync_WithSubAgentsAndSubAgentIds_MergesDistinctValues()
     {
-        File.WriteAllText(
+        _fileSystem.File.WriteAllText(
             Path.Combine(_directoryPath, "agent-a.json"),
             """
             {
@@ -262,7 +266,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
             }
             """);
 
-        var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>());
+        var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>(), _fileSystem);
 
         var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
 
@@ -272,52 +276,72 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
     [Fact]
     public void Watch_WithExistingDirectory_ReturnsDisposableWatcher()
     {
-        var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>());
+        var watchDirectory = Path.Combine(Path.GetTempPath(), "botnexus-file-config-watch-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(watchDirectory);
+        var source = new FileAgentConfigurationSource(watchDirectory, new ListLogger<FileAgentConfigurationSource>(), new FileSystem());
 
-        var watcher = source.Watch(_ => { });
+        try
+        {
+            var watcher = source.Watch(_ => { });
 
-        watcher.Should().NotBeNull();
-        watcher!.Dispose();
+            watcher.Should().NotBeNull();
+            watcher!.Dispose();
+        }
+        finally
+        {
+            if (Directory.Exists(watchDirectory))
+                Directory.Delete(watchDirectory, recursive: true);
+        }
     }
 
     [Fact]
     public async Task Watch_WhenConfigFileChanges_InvokesCallbackWithUpdatedDescriptors()
     {
-        var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>());
+        var watchDirectory = Path.Combine(Path.GetTempPath(), "botnexus-file-config-watch-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(watchDirectory);
+        var source = new FileAgentConfigurationSource(watchDirectory, new ListLogger<FileAgentConfigurationSource>(), new FileSystem());
         var callback = new TaskCompletionSource<IReadOnlyList<AgentDescriptor>>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var watcher = source.Watch(descriptors => callback.TrySetResult(descriptors));
+        try
+        {
+            using var watcher = source.Watch(descriptors => callback.TrySetResult(descriptors));
 
-        var configPath = Path.Combine(_directoryPath, "agent-a.json");
-        File.WriteAllText(
-            configPath,
-            """
-            {
-              "agentId": "agent-a",
-              "displayName": "Agent A",
-              "modelId": "model",
-              "apiProvider": "provider"
-            }
-            """);
-        await Task.Delay(100);
-        File.AppendAllText(configPath, Environment.NewLine);
+            var configPath = Path.Combine(watchDirectory, "agent-a.json");
+            File.WriteAllText(
+                configPath,
+                """
+                {
+                  "agentId": "agent-a",
+                  "displayName": "Agent A",
+                  "modelId": "model",
+                  "apiProvider": "provider"
+                }
+                """);
+            await Task.Delay(100);
+            File.AppendAllText(configPath, Environment.NewLine);
 
-        var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+            var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(10)));
 
-        completed.Should().Be(callback.Task);
-        var descriptors = await callback.Task;
-        descriptors.Should().ContainSingle(d => d.AgentId == "agent-a");
+            completed.Should().Be(callback.Task);
+            var descriptors = await callback.Task;
+            descriptors.Should().ContainSingle(d => d.AgentId == "agent-a");
+        }
+        finally
+        {
+            if (Directory.Exists(watchDirectory))
+                Directory.Delete(watchDirectory, recursive: true);
+        }
     }
 
     public void Dispose()
     {
-        if (!Directory.Exists(_directoryPath))
+        if (!_fileSystem.Directory.Exists(_directoryPath))
             return;
 
         for (var i = 0; i < 3; i++)
         {
             try
             {
-                Directory.Delete(_directoryPath, recursive: true);
+                _fileSystem.Directory.Delete(_directoryPath, recursive: true);
                 return;
             }
             catch (IOException) when (i < 2)
@@ -359,3 +383,4 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
         }
     }
 }
+

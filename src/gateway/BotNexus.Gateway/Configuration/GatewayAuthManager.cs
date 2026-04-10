@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.IO.Abstractions;
 using BotNexus.Providers.Copilot;
 using BotNexus.Providers.Core;
 using Microsoft.Extensions.Logging;
@@ -14,17 +15,19 @@ public sealed class GatewayAuthManager
     private const string AuthFileName = "auth.json";
     private readonly PlatformConfig _platformConfig;
     private readonly ILogger<GatewayAuthManager> _logger;
+    private readonly IFileSystem _fileSystem;
     private readonly string _authFilePath;
     private readonly string _legacyAuthFilePath;
     private readonly object _sync = new();
     private Dictionary<string, AuthEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
     private bool _loaded;
 
-    public GatewayAuthManager(PlatformConfig platformConfig, ILogger<GatewayAuthManager> logger)
+    public GatewayAuthManager(PlatformConfig platformConfig, ILogger<GatewayAuthManager> logger, IFileSystem fileSystem)
     {
         _platformConfig = platformConfig;
         _logger = logger;
-        _authFilePath = Path.Combine(PlatformConfigLoader.DefaultConfigDirectory, AuthFileName);
+        _fileSystem = fileSystem;
+        _authFilePath = Path.Combine(PlatformConfigLoader.GetDefaultConfigDirectory(_fileSystem), AuthFileName);
         _legacyAuthFilePath = Path.Combine(Environment.CurrentDirectory, ".botnexus-agent", AuthFileName);
     }
 
@@ -192,12 +195,12 @@ public sealed class GatewayAuthManager
             _entries = new Dictionary<string, AuthEntry>(StringComparer.OrdinalIgnoreCase);
             foreach (var candidatePath in new[] { _legacyAuthFilePath, _authFilePath })
             {
-                if (!File.Exists(candidatePath))
+                if (!_fileSystem.File.Exists(candidatePath))
                     continue;
 
                 try
                 {
-                    var json = File.ReadAllText(candidatePath);
+                    var json = _fileSystem.File.ReadAllText(candidatePath);
                     var deserialized = JsonSerializer.Deserialize<Dictionary<string, AuthEntry>>(json, JsonOptions) ??
                         new Dictionary<string, AuthEntry>();
 
@@ -221,11 +224,11 @@ public sealed class GatewayAuthManager
         var directory = Path.GetDirectoryName(_authFilePath);
         if (!string.IsNullOrWhiteSpace(directory))
         {
-            Directory.CreateDirectory(directory);
+            _fileSystem.Directory.CreateDirectory(directory);
         }
 
         var json = JsonSerializer.Serialize(_entries, JsonOptions);
-        File.WriteAllText(_authFilePath, json);
+        _fileSystem.File.WriteAllText(_authFilePath, json);
     }
 
     private static bool TryGetProviderConfig(

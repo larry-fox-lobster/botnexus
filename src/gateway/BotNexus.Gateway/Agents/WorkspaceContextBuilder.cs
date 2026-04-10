@@ -1,6 +1,7 @@
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Hooks;
 using BotNexus.Gateway.Abstractions.Models;
+using System.IO.Abstractions;
 
 namespace BotNexus.Gateway.Agents;
 
@@ -13,18 +14,22 @@ public sealed class WorkspaceContextBuilder : IContextBuilder
     private static readonly string[] DefaultPromptFiles =
         ["AGENTS.md", "SOUL.md", "TOOLS.md", "BOOTSTRAP.md", "IDENTITY.md", "USER.md"];
     private readonly IAgentWorkspaceManager _workspaceManager;
+    private readonly IFileSystem _fileSystem;
     private readonly IHookDispatcher? _hookDispatcher;
 
-    public WorkspaceContextBuilder(IAgentWorkspaceManager workspaceManager)
+    public WorkspaceContextBuilder(IAgentWorkspaceManager workspaceManager, IFileSystem fileSystem)
     {
         _workspaceManager = workspaceManager;
+        _fileSystem = fileSystem;
     }
 
     public WorkspaceContextBuilder(
         IAgentWorkspaceManager workspaceManager,
+        IFileSystem fileSystem,
         IHookDispatcher hookDispatcher)
     {
         _workspaceManager = workspaceManager;
+        _fileSystem = fileSystem;
         _hookDispatcher = hookDispatcher;
     }
 
@@ -34,7 +39,7 @@ public sealed class WorkspaceContextBuilder : IContextBuilder
 
         var workspacePath = ResolveWorkspaceDirectory(_workspaceManager.GetWorkspacePath(descriptor.AgentId));
         var promptFiles = ResolvePromptFiles(descriptor);
-        var contextFiles = await LoadContextFilesAsync(workspacePath, promptFiles, cancellationToken);
+        var contextFiles = await LoadContextFilesAsync(_fileSystem, workspacePath, promptFiles, cancellationToken);
 
         var prompt = SystemPromptBuilder.Build(new SystemPromptParams
         {
@@ -67,6 +72,7 @@ public sealed class WorkspaceContextBuilder : IContextBuilder
     }
 
     private static async Task<ContextFile[]> LoadContextFilesAsync(
+        IFileSystem fileSystem,
         string workspacePath,
         IReadOnlyList<string> promptFiles,
         CancellationToken cancellationToken)
@@ -78,33 +84,33 @@ public sealed class WorkspaceContextBuilder : IContextBuilder
                 continue;
 
             var filePath = Path.GetFullPath(Path.Combine(workspacePath, promptFile));
-            if (!IsPathUnderWorkspace(workspacePath, filePath) || !File.Exists(filePath))
+            if (!IsPathUnderWorkspace(workspacePath, filePath) || !fileSystem.File.Exists(filePath))
                 continue;
 
-            var content = await File.ReadAllTextAsync(filePath, cancellationToken);
+            var content = await fileSystem.File.ReadAllTextAsync(filePath, cancellationToken);
             if (!string.IsNullOrWhiteSpace(content))
                 contextFiles.Add(new ContextFile(promptFile, content.Trim()));
 
             if (Path.GetFileName(promptFile).Equals(BootstrapFileName, StringComparison.OrdinalIgnoreCase))
-                DeleteBootstrapFile(filePath);
+                DeleteBootstrapFile(fileSystem, filePath);
         }
 
         return [.. contextFiles];
     }
 
-    private static string ResolveWorkspaceDirectory(string workspacePath)
+    private string ResolveWorkspaceDirectory(string workspacePath)
     {
         var resolvedPath = Path.GetFullPath(workspacePath);
         if (Path.GetFileName(resolvedPath).Equals("workspace", StringComparison.OrdinalIgnoreCase))
             return resolvedPath;
 
         var nestedWorkspacePath = Path.Combine(resolvedPath, "workspace");
-        return Directory.Exists(nestedWorkspacePath) ? nestedWorkspacePath : resolvedPath;
+        return _fileSystem.Directory.Exists(nestedWorkspacePath) ? nestedWorkspacePath : resolvedPath;
     }
 
-    private static void DeleteBootstrapFile(string filePath)
+    private static void DeleteBootstrapFile(IFileSystem fileSystem, string filePath)
     {
-        try { File.Delete(filePath); }
+        try { fileSystem.File.Delete(filePath); }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
     }
