@@ -215,3 +215,36 @@ Participated in design review ceremony for Phase 3 architecture. All ADs approve
 - Response shapes are the #1 drift source. Tool return values should be documented by reading the actual Serialize() call, not by guessing from the model.
 - Parameter naming inconsistency between design spec (`timeout`) and implementation (`timeoutSeconds`) shows why design specs should be treated as historical, not prescriptive.
 - The `apiProvider` parameter was in code but invisible in docs — new parameters added during implementation need a doc sweep.
+
+---
+
+## Session: Post-Sprint Consistency Review — Session Switching Bug Fix (2026-04-10T10:52:06Z)
+
+**Trigger:** Auto-triggered consistency review after session-switching bug fix sprint (Waves 1-4).
+
+**Scope Reviewed:**
+- src/BotNexus.WebUI/wwwroot/app.js — session guard, per-session state, LRU eviction
+- src/gateway/BotNexus.Gateway.Abstractions/Models/AgentExecution.cs — AgentStreamEvent.SessionId
+- src/gateway/BotNexus.Gateway.Api/Hubs/SignalRChannelAdapter.cs — sessionId enrichment
+- 	ests/BotNexus.Gateway.Tests/Sessions/SessionSwitchingTests.cs — 6 integration tests
+- docs/planning/bug-session-switching-ui/design-spec.md
+
+**Findings (2 issues, both fixed):**
+
+1. **P0 — SessionReset handler missing session guard (bug):**
+   The SessionReset SignalR handler in pp.js was the only event handler without isEventForCurrentSession() guard. Backend sends { agentId, sessionId } in the payload, but the client ignored it. If a reset response arrived after the user switched sessions, it would null out currentSessionId and clear the wrong session's view. Fixed: added session guard + cleanupSessionState() call.
+
+2. **P1 — Design spec scope section incorrect:**
+   Spec said "Frontend only — No backend/gateway changes needed" but implementation added AgentStreamEvent.SessionId property and SignalRChannelAdapter.SendStreamEventAsync enrichment. Updated scope to "Primarily frontend" with backend enrichment noted.
+
+**Verified OK (no fix needed):**
+- AgentStreamEvent.SessionId properly populated: SignalRChannelAdapter.SendStreamEventAsync enriches via streamEvent with { SessionId = conversationId }. GatewayHost dispatches through IStreamEventChannelAdapter which routes to this method. ✅
+- Session guard covers all streaming event types: MessageStart, ContentDelta, ThinkingDelta, ToolStart, ToolEnd, MessageEnd, Error, and all 4 SubAgent* events. ✅
+- Per-session state migration complete: all 6 deprecated globals (isStreaming, ctiveMessageId, ctiveToolCalls, ctiveToolCount, 	hinkingBuffer, 	oolCallDepth) fully migrated to getSessionState(). Zero lingering global reads. ✅
+- ctiveSubAgents properly cleared/re-fetched on session switch via clearSubAgentPanel() + etchSubAgents(). ✅
+- Tests match implementation: 6 tests cover leave-old-group, join-new-group, no-orphan, scoped-events, agent-continues, independent-state. All pass. ✅
+- Design spec requirements 1-6 (Must Fix + Should Fix) met by implementation. ✅
+
+**Commit:** ix: consistency review — session switching alignment
+**Build:** 0 errors, 0 warnings
+**Tests:** 1,798/1,798 pass (16 test projects)
