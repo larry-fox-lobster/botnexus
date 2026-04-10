@@ -113,9 +113,13 @@ public sealed class GlobTool : IAgentTool
         var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
         matcher.AddInclude(pattern);
 
-        var matches = matcher.GetResultsInFullPath(baseDirectory)
+        var allMatches = matcher.GetResultsInFullPath(baseDirectory)
             .Where(path => File.Exists(path))
-            .Where(path => !PathUtils.IsGitIgnored(path, _workingDirectory))
+            .Select(path => Path.GetFullPath(path))
+            .ToList();
+        var ignoredPaths = PathUtils.GetGitIgnoredPaths(allMatches, _workingDirectory);
+        var matches = allMatches
+            .Where(path => !ignoredPaths.Contains(path))
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .Select(path => PathUtils.GetRelativePath(path, _workingDirectory))
             .ToList();
