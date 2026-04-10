@@ -795,12 +795,8 @@ body {
 /* === Send group (steer/follow-up mode) === */
 .send-group {
     display: flex;
-    align-items: flex-end;
+    align-items: stretch;
     flex-shrink: 0;
-}
-.send-group .btn-primary {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
 }
 .btn-send-mode {
     background: var(--accent);
