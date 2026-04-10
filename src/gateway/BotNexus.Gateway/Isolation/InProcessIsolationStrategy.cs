@@ -27,6 +27,7 @@ using BotNexus.Memory;
 using BotNexus.Memory.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using AgentCoreUserMessage = BotNexus.AgentCore.Types.UserMessage;
 using GatewayBeforeToolCallResult = BotNexus.Gateway.Abstractions.Hooks.BeforeToolCallResult;
 using GatewayAfterToolCallResult = BotNexus.Gateway.Abstractions.Hooks.AfterToolCallResult;
@@ -135,6 +136,28 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         {
             var (sessionAccessLevel, sessionAllowedAgents) = ResolveSessionAccess(descriptor);
             tools.Add(new SessionTool(sessionStore, descriptor.AgentId, sessionAccessLevel, sessionAllowedAgents));
+        }
+
+        var subAgentOptions = _serviceProvider.GetService<IOptions<GatewayOptions>>()?.Value.SubAgents;
+        var subAgentManager = _serviceProvider.GetService<ISubAgentManager>();
+        var isSubAgentSession = context.SessionId.Contains("::subagent::", StringComparison.OrdinalIgnoreCase);
+        if (subAgentManager is not null &&
+            subAgentOptions is { MaxDepth: > 0 } &&
+            !isSubAgentSession)
+        {
+            var includeSpawn = descriptor.ToolIds.Count == 0
+                || descriptor.ToolIds.Contains("spawn_subagent", StringComparer.OrdinalIgnoreCase);
+            var includeList = descriptor.ToolIds.Count == 0
+                || descriptor.ToolIds.Contains("list_subagents", StringComparer.OrdinalIgnoreCase);
+            var includeManage = descriptor.ToolIds.Count == 0
+                || descriptor.ToolIds.Contains("manage_subagent", StringComparer.OrdinalIgnoreCase);
+
+            if (includeSpawn)
+                tools.Add(new SubAgentSpawnTool(subAgentManager, descriptor.AgentId, context.SessionId));
+            if (includeList)
+                tools.Add(new SubAgentListTool(subAgentManager, context.SessionId));
+            if (includeManage)
+                tools.Add(new SubAgentManageTool(subAgentManager, context.SessionId));
         }
 
         // TODO: SkillTool is hardcoded here because it needs agent-specific discovery paths.

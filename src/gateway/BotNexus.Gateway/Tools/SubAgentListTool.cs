@@ -7,7 +7,7 @@ using BotNexus.Providers.Core.Models;
 namespace BotNexus.Gateway.Tools;
 
 public sealed class SubAgentListTool(
-    ISubAgentManager manager,
+    ISubAgentManager subAgentManager,
     string sessionId) : IAgentTool
 {
     public string Name => "list_subagents";
@@ -15,7 +15,7 @@ public sealed class SubAgentListTool(
 
     public Tool Definition => new(
         Name,
-        "List active sub-agents spawned by this session.",
+        "List active and completed sub-agents for the current session.",
         JsonDocument.Parse("""
             {
               "type": "object",
@@ -37,26 +37,10 @@ public sealed class SubAgentListTool(
         CancellationToken cancellationToken = default,
         AgentToolUpdateCallback? onUpdate = null)
     {
-        var subAgents = await manager.ListAsync(sessionId, cancellationToken);
-        var summaries = subAgents.Select(info => new
-        {
-            info.SubAgentId,
-            info.Name,
-            info.Status,
-            info.Model,
-            info.StartedAt,
-            info.TurnsUsed,
-            TaskPreview = Truncate(info.Task, 200)
-        });
-
-        return TextResult(JsonSerializer.Serialize(summaries, JsonOptions));
+        var subAgents = await subAgentManager.ListAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        var result = JsonSerializer.Serialize(new { SubAgents = subAgents }, JsonOptions);
+        return new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, result)]);
     }
-
-    private static string Truncate(string text, int maxLength)
-        => text.Length <= maxLength ? text : text[..maxLength] + "...";
-
-    private static AgentToolResult TextResult(string text)
-        => new([new AgentToolContent(AgentToolContentType.Text, text)]);
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

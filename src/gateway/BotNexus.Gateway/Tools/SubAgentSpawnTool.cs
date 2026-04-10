@@ -8,7 +8,7 @@ using BotNexus.Providers.Core.Models;
 namespace BotNexus.Gateway.Tools;
 
 public sealed class SubAgentSpawnTool(
-    ISubAgentManager manager,
+    ISubAgentManager subAgentManager,
     string agentId,
     string sessionId) : IAgentTool
 {
@@ -17,40 +17,23 @@ public sealed class SubAgentSpawnTool(
 
     public Tool Definition => new(
         Name,
-        "Spawn a background sub-agent to perform work independently and report results back.",
+        "Spawn a background sub-agent to work on a delegated task.",
         JsonDocument.Parse("""
             {
               "type": "object",
               "properties": {
-                "task": {
-                  "type": "string",
-                  "description": "Task description / initial prompt for the sub-agent"
-                },
-                "name": {
-                  "type": "string",
-                  "description": "Human-readable label"
-                },
-                "model": {
-                  "type": "string",
-                  "description": "Model override"
-                },
+                "task": { "type": "string", "description": "Task prompt for the sub-agent." },
+                "name": { "type": "string", "description": "Optional friendly name for this sub-agent run." },
+                "model": { "type": "string", "description": "Optional model override for the sub-agent run." },
+                "apiProvider": { "type": "string", "description": "Optional API provider override for the sub-agent run." },
                 "tools": {
                   "type": "array",
                   "items": { "type": "string" },
-                  "description": "Tool allowlist"
+                  "description": "Optional allowlist of tool names for the sub-agent."
                 },
-                "systemPrompt": {
-                  "type": "string",
-                  "description": "Additional system prompt"
-                },
-                "maxTurns": {
-                  "type": "integer",
-                  "description": "Max turns before auto-stop"
-                },
-                "timeout": {
-                  "type": "integer",
-                  "description": "Timeout in seconds"
-                }
+                "systemPrompt": { "type": "string", "description": "Optional system prompt override." },
+                "maxTurns": { "type": "integer", "minimum": 1, "description": "Optional max turn budget." },
+                "timeoutSeconds": { "type": "integer", "minimum": 1, "description": "Optional timeout in seconds." }
               },
               "required": ["task"]
             }
@@ -61,7 +44,6 @@ public sealed class SubAgentSpawnTool(
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
         var task = ReadString(arguments, "task");
         if (string.IsNullOrWhiteSpace(task))
             throw new ArgumentException("Missing required argument: task.");
@@ -75,30 +57,33 @@ public sealed class SubAgentSpawnTool(
         CancellationToken cancellationToken = default,
         AgentToolUpdateCallback? onUpdate = null)
     {
+        var task = ReadString(arguments, "task")
+            ?? throw new ArgumentException("Missing required argument: task.");
+
         var request = new SubAgentSpawnRequest
         {
             ParentAgentId = agentId,
             ParentSessionId = sessionId,
-            Task = ReadString(arguments, "task")!.Trim(),
+            Task = task,
             Name = ReadString(arguments, "name"),
             ModelOverride = ReadString(arguments, "model"),
+            ApiProviderOverride = ReadString(arguments, "apiProvider"),
             ToolIds = ReadStringArray(arguments, "tools"),
             SystemPromptOverride = ReadString(arguments, "systemPrompt"),
             MaxTurns = ReadInt(arguments, "maxTurns", 30),
-            TimeoutSeconds = ReadInt(arguments, "timeout", 600)
+            TimeoutSeconds = ReadInt(arguments, "timeoutSeconds", 600)
         };
 
-        var info = await manager.SpawnAsync(request, cancellationToken);
-
-        var result = new
+        var spawned = await subAgentManager.SpawnAsync(request, cancellationToken).ConfigureAwait(false);
+        var result = JsonSerializer.Serialize(new
         {
-            info.SubAgentId,
-            SessionId = info.ChildSessionId,
-            info.Status,
-            info.Name
-        };
+            spawned.SubAgentId,
+            SessionId = spawned.ChildSessionId,
+            spawned.Status,
+            spawned.Name
+        }, JsonOptions);
 
-        return TextResult(JsonSerializer.Serialize(result, JsonOptions));
+        return TextResult(result);
     }
 
     private static string? ReadString(IReadOnlyDictionary<string, object?> args, string key)
@@ -121,10 +106,10 @@ public sealed class SubAgentSpawnTool(
 
         return value switch
         {
-            JsonElement { ValueKind: JsonValueKind.Number } el when el.TryGetInt32(out var i) => i,
-            JsonElement { ValueKind: JsonValueKind.String } el when int.TryParse(el.GetString(), out var i) => i,
-            int i => i,
-            string s when int.TryParse(s, out var i) => i,
+            JsonElement { ValueKind: JsonValueKind.Number } el when el.TryGetInt32(out var number) => number,
+            JsonElement { ValueKind: JsonValueKind.String } el when int.TryParse(el.GetString(), out var number) => number,
+            int number => number,
+            string text when int.TryParse(text, out var number) => number,
             _ => defaultValue
         };
     }
@@ -134,15 +119,15 @@ public sealed class SubAgentSpawnTool(
         if (!args.TryGetValue(key, out var value) || value is null)
             return null;
 
-        if (value is JsonElement { ValueKind: JsonValueKind.Array } element)
+        if (value is JsonElement { ValueKind: JsonValueKind.Array } array)
         {
-            var items = element
+            var items = array
                 .EnumerateArray()
-                .Select(item => item.ValueKind == JsonValueKind.String ? item.GetString() : item.ToString())
+                .Where(item => item.ValueKind == JsonValueKind.String)
+                .Select(item => item.GetString())
                 .Where(item => !string.IsNullOrWhiteSpace(item))
                 .Select(item => item!)
                 .ToArray();
-
             return items.Length == 0 ? null : items;
         }
 

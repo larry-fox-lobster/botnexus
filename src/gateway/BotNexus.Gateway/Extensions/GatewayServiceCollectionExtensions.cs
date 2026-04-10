@@ -57,6 +57,9 @@ public static class GatewayServiceCollectionExtensions
             services.Configure(configure);
         if (config is not null)
         {
+            services.Configure<GatewayOptions>(config.GetSection("gateway"));
+            services.Configure<SubAgentOptions>(config.GetSection("gateway:subAgents"));
+
             var compactionSection = config.GetSection("gateway:compaction");
             if (compactionSection.Exists())
             {
@@ -88,8 +91,9 @@ public static class GatewayServiceCollectionExtensions
          services.AddSingleton<IContextBuilder, WorkspaceContextBuilder>();
          services.AddSingleton<IAgentRegistry, DefaultAgentRegistry>();
          services.TryAddSingleton<IAgentConfigurationWriter, NoOpAgentConfigurationWriter>();
-         services.AddSingleton<IAgentSupervisor, DefaultAgentSupervisor>();
-         services.AddSingleton<IAgentCommunicator, DefaultAgentCommunicator>();
+        services.AddSingleton<IAgentSupervisor, DefaultAgentSupervisor>();
+        services.AddSingleton<IAgentCommunicator, DefaultAgentCommunicator>();
+        services.AddSingleton<ISubAgentManager, DefaultSubAgentManager>();
         services.TryAddSingleton<SessionLifecycleEvents>();
         services.TryAddSingleton<ISessionLifecycleEvents>(serviceProvider =>
             serviceProvider.GetRequiredService<SessionLifecycleEvents>());

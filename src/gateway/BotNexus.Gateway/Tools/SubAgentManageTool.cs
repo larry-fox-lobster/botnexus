@@ -7,7 +7,7 @@ using BotNexus.Providers.Core.Models;
 namespace BotNexus.Gateway.Tools;
 
 public sealed class SubAgentManageTool(
-    ISubAgentManager manager,
+    ISubAgentManager subAgentManager,
     string sessionId) : IAgentTool
 {
     public string Name => "manage_subagent";
@@ -15,19 +15,19 @@ public sealed class SubAgentManageTool(
 
     public Tool Definition => new(
         Name,
-        "Get status or terminate a running sub-agent.",
+        "Get status or kill a sub-agent for this session.",
         JsonDocument.Parse("""
             {
               "type": "object",
               "properties": {
                 "subAgentId": {
                   "type": "string",
-                  "description": "The sub-agent to manage"
+                  "description": "Sub-agent identifier."
                 },
                 "action": {
                   "type": "string",
                   "enum": ["status", "kill"],
-                  "description": "Action to perform"
+                  "description": "Management action."
                 }
               },
               "required": ["subAgentId", "action"]
@@ -39,7 +39,6 @@ public sealed class SubAgentManageTool(
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
         var subAgentId = ReadString(arguments, "subAgentId");
         if (string.IsNullOrWhiteSpace(subAgentId))
             throw new ArgumentException("Missing required argument: subAgentId.");
@@ -47,7 +46,7 @@ public sealed class SubAgentManageTool(
         var action = ReadString(arguments, "action");
         if (!string.Equals(action, "status", StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(action, "kill", StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("Invalid argument: action must be 'status' or 'kill'.");
+            throw new ArgumentException("Argument 'action' must be 'status' or 'kill'.");
 
         return Task.FromResult(arguments);
     }
@@ -58,24 +57,34 @@ public sealed class SubAgentManageTool(
         CancellationToken cancellationToken = default,
         AgentToolUpdateCallback? onUpdate = null)
     {
-        var subAgentId = ReadString(arguments, "subAgentId")!.Trim();
-        var action = ReadString(arguments, "action")!.ToLowerInvariant();
+        var subAgentId = ReadString(arguments, "subAgentId")
+            ?? throw new ArgumentException("Missing required argument: subAgentId.");
+        var action = ReadString(arguments, "action")
+            ?? throw new ArgumentException("Missing required argument: action.");
 
-        if (action == "status")
+        if (string.Equals(action, "kill", StringComparison.OrdinalIgnoreCase))
         {
-            var info = await manager.GetAsync(subAgentId, cancellationToken)
-                ?? throw new KeyNotFoundException($"Sub-agent '{subAgentId}' not found.");
-            return TextResult(JsonSerializer.Serialize(info, JsonOptions));
+            var killed = await subAgentManager.KillAsync(subAgentId, sessionId, cancellationToken).ConfigureAwait(false);
+            var response = JsonSerializer.Serialize(new { SubAgentId = subAgentId, Killed = killed }, JsonOptions);
+            return new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, response)]);
         }
 
-        var killed = await manager.KillAsync(subAgentId, sessionId, cancellationToken);
-        var result = new
-        {
-            SubAgentId = subAgentId,
-            Success = killed
-        };
+        var info = await subAgentManager.GetAsync(subAgentId, cancellationToken).ConfigureAwait(false);
+        if (info is null)
+            throw new KeyNotFoundException($"Sub-agent '{subAgentId}' was not found.");
+        if (!string.Equals(info.ParentSessionId, sessionId, StringComparison.OrdinalIgnoreCase))
+            throw new UnauthorizedAccessException("Sub-agent does not belong to the current session.");
 
-        return TextResult(JsonSerializer.Serialize(result, JsonOptions));
+        var result = JsonSerializer.Serialize(new
+        {
+            info.SubAgentId,
+            info.Status,
+            info.ResultSummary,
+            info.StartedAt,
+            info.CompletedAt
+        }, JsonOptions);
+
+        return new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, result)]);
     }
 
     private static string? ReadString(IReadOnlyDictionary<string, object?> args, string key)
@@ -85,14 +94,11 @@ public sealed class SubAgentManageTool(
 
         return value switch
         {
-            JsonElement { ValueKind: JsonValueKind.String } el => el.GetString(),
-            JsonElement el => el.ToString(),
+            JsonElement { ValueKind: JsonValueKind.String } element => element.GetString(),
+            JsonElement element => element.ToString(),
             _ => value.ToString()
         };
     }
-
-    private static AgentToolResult TextResult(string text)
-        => new([new AgentToolContent(AgentToolContentType.Text, text)]);
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
