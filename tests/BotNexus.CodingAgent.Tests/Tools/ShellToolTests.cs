@@ -191,12 +191,13 @@ public sealed class ShellToolTests
     [Fact]
     public async Task ExecuteAsync_WhenProcessAlreadyCompleted_BeforeCancellation_ReturnsNormalResult()
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        using var cts = new CancellationTokenSource();
 
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?>
         {
             ["command"] = "python -c \"print('done')\""
         }, cts.Token);
+        cts.Cancel();
 
         result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
         result.Details.As<ShellTool.ShellToolDetails>().ExitCode.Should().Be(0);

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using BotNexus.AgentCore.Types;
@@ -70,7 +71,7 @@ public class ExecToolTests : IDisposable
             ? ["cmd.exe", "/c", "ping -n 30 127.0.0.1"]
             : ["/bin/bash", "-c", "sleep 30"];
 
-        var args = BuildArgs(command, timeoutMs: 500);
+        var args = BuildArgs(command, timeoutMs: 2_000);
         var result = await _tool.ExecuteAsync("test-timeout", args);
 
         var text = GetResultText(result);
@@ -94,7 +95,9 @@ public class ExecToolTests : IDisposable
 
         var text = GetResultText(result);
         var json = JsonDocument.Parse(text);
-        json.RootElement.GetProperty("pid").GetInt32().Should().BeGreaterThan(0);
+        var pid = json.RootElement.GetProperty("pid").GetInt32();
+        await WaitForProcessStartAsync(pid);
+        pid.Should().BeGreaterThan(0);
         json.RootElement.GetProperty("status").GetString().Should().Be("running");
 
         var details = result.Details as ExecTool.ExecToolDetails;
@@ -236,6 +239,31 @@ public class ExecToolTests : IDisposable
         {
             // Process may have already exited
         }
+    }
+
+    private static async Task WaitForProcessStartAsync(int pid)
+    {
+        var timeoutAt = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < timeoutAt)
+        {
+            try
+            {
+                using var process = Process.GetProcessById(pid);
+                if (!process.HasExited)
+                {
+                    return;
+                }
+            }
+            catch (ArgumentException)
+            {
+                // Process has not started or exited before lookup.
+            }
+
+            await Task.Delay(100);
+        }
+
+        using var finalProcess = Process.GetProcessById(pid);
+        finalProcess.HasExited.Should().BeFalse();
     }
 
     #endregion

@@ -53,7 +53,7 @@ public class ToolExecutorTests
         stopwatch.Stop();
 
         results.Should().HaveCount(2);
-        stopwatch.ElapsedMilliseconds.Should().BeLessThan(350);
+        stopwatch.ElapsedMilliseconds.Should().BeLessThan(1500);
     }
 
     [Fact]

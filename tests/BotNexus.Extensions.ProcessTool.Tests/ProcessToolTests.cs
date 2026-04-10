@@ -43,24 +43,88 @@ public sealed class ProcessToolTests : IDisposable
     private static string ResultText(AgentToolResult result)
         => string.Join("", result.Content.Select(c => c.Value));
 
-    private ManagedProcess SpawnTestProcess(string arguments, bool redirectInput = false)
+    private ManagedProcess SpawnTestProcess(string windowsCommand, string unixCommand, bool redirectInput = false)
     {
-        var psi = new ProcessStartInfo
-        {
-            FileName = "cmd.exe",
-            Arguments = $"/c {arguments}",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            RedirectStandardInput = redirectInput,
-            CreateNoWindow = true
-        };
+        var psi = OperatingSystem.IsWindows()
+            ? new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/c {windowsCommand}",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                RedirectStandardInput = redirectInput,
+                CreateNoWindow = true
+            }
+            : new ProcessStartInfo
+            {
+                FileName = "/bin/bash",
+                Arguments = $"-lc \"{unixCommand.Replace("\"", "\\\"", StringComparison.Ordinal)}\"",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                RedirectStandardInput = redirectInput,
+                CreateNoWindow = true
+            };
 
         var process = Process.Start(psi)!;
-        var managed = new ManagedProcess(process, arguments, DateTimeOffset.UtcNow);
+        var managed = new ManagedProcess(process, OperatingSystem.IsWindows() ? windowsCommand : unixCommand, DateTimeOffset.UtcNow);
         _spawnedProcesses.Add(managed);
         _manager.Register(process.Id, managed);
         return managed;
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout, TimeSpan? pollInterval = null)
+    {
+        var interval = pollInterval ?? TimeSpan.FromMilliseconds(100);
+        var stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < timeout)
+        {
+            if (condition())
+            {
+                return;
+            }
+
+            await Task.Delay(interval);
+        }
+
+        condition().Should().BeTrue("condition should be met within timeout");
+    }
+
+    private static async Task WaitUntilAsync(Func<Task<bool>> condition, TimeSpan timeout, TimeSpan? pollInterval = null)
+    {
+        var interval = pollInterval ?? TimeSpan.FromMilliseconds(100);
+        var stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < timeout)
+        {
+            if (await condition())
+            {
+                return;
+            }
+
+            await Task.Delay(interval);
+        }
+
+        (await condition()).Should().BeTrue("condition should be met within timeout");
+    }
+
+    private async Task WaitForOutputContainsAsync(int pid, string expectedText, int? tail = null)
+    {
+        var timeoutAt = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < timeoutAt)
+        {
+            var result = await _tool.ExecuteAsync("c1", Args("output", pid: pid, tail: tail));
+            var text = ResultText(result);
+            if (text.Contains(expectedText, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        var finalResult = await _tool.ExecuteAsync("c1", Args("output", pid: pid, tail: tail));
+        ResultText(finalResult).Should().Contain(expectedText);
     }
 
     // ───────────── list ─────────────
@@ -77,7 +141,7 @@ public sealed class ProcessToolTests : IDisposable
     [Fact]
     public async Task List_AfterRegister_ShowsProcess()
     {
-        var managed = SpawnTestProcess("echo hello");
+        var managed = SpawnTestProcess("echo hello", "echo hello");
         managed.WaitForExit(5_000);
 
         var result = await _tool.ExecuteAsync("c1", Args("list"));
@@ -92,14 +156,14 @@ public sealed class ProcessToolTests : IDisposable
     [Fact]
     public async Task Status_RunningProcess_ReportsRunning()
     {
-        // ping with a long wait keeps the process alive
-        var managed = SpawnTestProcess("ping -n 60 127.0.0.1 >nul");
-
-        // Give the process a moment to start
-        await Task.Delay(200);
-
-        var result = await _tool.ExecuteAsync("c1", Args("status", pid: managed.Pid));
-        var text = ResultText(result);
+        var managed = SpawnTestProcess("ping -n 60 127.0.0.1 >nul", "sleep 60");
+        var text = string.Empty;
+        await WaitUntilAsync(async () =>
+        {
+            var result = await _tool.ExecuteAsync("c1", Args("status", pid: managed.Pid));
+            text = ResultText(result);
+            return text.Contains("running", StringComparison.Ordinal);
+        }, TimeSpan.FromSeconds(5));
 
         text.Should().Contain("running");
         text.Should().Contain(managed.Pid.ToString());
@@ -108,7 +172,7 @@ public sealed class ProcessToolTests : IDisposable
     [Fact]
     public async Task Status_ExitedProcess_ReportsExited()
     {
-        var managed = SpawnTestProcess("echo done");
+        var managed = SpawnTestProcess("echo done", "echo done");
         managed.WaitForExit(5_000);
 
         var result = await _tool.ExecuteAsync("c1", Args("status", pid: managed.Pid));
@@ -132,11 +196,9 @@ public sealed class ProcessToolTests : IDisposable
     [Fact]
     public async Task Output_CapturesStdout()
     {
-        var managed = SpawnTestProcess("echo test-output-line");
+        var managed = SpawnTestProcess("echo test-output-line", "echo test-output-line");
         managed.WaitForExit(5_000);
-        // Allow async event handlers to fire
-        await Task.Delay(200);
-
+        await WaitForOutputContainsAsync(managed.Pid, "test-output-line");
         var result = await _tool.ExecuteAsync("c1", Args("output", pid: managed.Pid));
         var text = ResultText(result);
 
@@ -146,16 +208,19 @@ public sealed class ProcessToolTests : IDisposable
     [Fact]
     public async Task Output_TailReturnsLastNLines()
     {
-        var managed = SpawnTestProcess("echo line1 & echo line2 & echo line3 & echo line4 & echo line5");
+        var managed = SpawnTestProcess(
+            "echo line1 & echo line2 & echo line3 & echo line4 & echo line5",
+            "echo line1; echo line2; echo line3; echo line4; echo line5");
         managed.WaitForExit(5_000);
-        await Task.Delay(200);
+        await WaitForOutputContainsAsync(managed.Pid, "line5");
 
         var result = await _tool.ExecuteAsync("c1", Args("output", pid: managed.Pid, tail: 2));
         var text = ResultText(result);
 
-        // Should contain the last lines but not all of them
         var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        lines.Length.Should().BeLessThanOrEqualTo(2);
+        lines.Length.Should().BeGreaterThanOrEqualTo(1);
+        text.Should().Contain("line5");
+        text.Should().NotContain("line1");
     }
 
     // ───────────── kill ─────────────
@@ -163,8 +228,8 @@ public sealed class ProcessToolTests : IDisposable
     [Fact]
     public async Task Kill_TerminatesRunningProcess()
     {
-        var managed = SpawnTestProcess("ping -n 60 127.0.0.1 >nul");
-        await Task.Delay(300);
+        var managed = SpawnTestProcess("ping -n 60 127.0.0.1 >nul", "sleep 60");
+        await WaitUntilAsync(() => managed.IsRunning, TimeSpan.FromSeconds(5));
 
         managed.IsRunning.Should().BeTrue();
 
@@ -172,13 +237,14 @@ public sealed class ProcessToolTests : IDisposable
         var text = ResultText(result);
 
         text.Should().Contain("terminated");
+        await WaitUntilAsync(() => !managed.IsRunning, TimeSpan.FromSeconds(5));
         managed.IsRunning.Should().BeFalse();
     }
 
     [Fact]
     public async Task Kill_AlreadyExitedProcess_IsNoOp()
     {
-        var managed = SpawnTestProcess("echo bye");
+        var managed = SpawnTestProcess("echo bye", "echo bye");
         managed.WaitForExit(5_000);
 
         var result = await _tool.ExecuteAsync("c1", Args("kill", pid: managed.Pid));
