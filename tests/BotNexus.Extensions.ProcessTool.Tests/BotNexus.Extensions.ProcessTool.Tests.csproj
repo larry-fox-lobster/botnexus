@@ -26,4 +26,8 @@
     <ProjectReference Include="..\..\extensions\tools\process\BotNexus.Extensions.ProcessTool\BotNexus.Extensions.ProcessTool.csproj" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

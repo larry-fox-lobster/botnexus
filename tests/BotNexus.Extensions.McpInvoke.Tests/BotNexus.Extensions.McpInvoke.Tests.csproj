@@ -25,4 +25,8 @@
     <ProjectReference Include="..\..\extensions\mcp-invoke\BotNexus.Extensions.McpInvoke\BotNexus.Extensions.McpInvoke.csproj" />
     <ProjectReference Include="..\..\extensions\mcp\BotNexus.Extensions.Mcp\BotNexus.Extensions.Mcp.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

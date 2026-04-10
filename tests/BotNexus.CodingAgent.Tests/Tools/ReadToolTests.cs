@@ -3,14 +3,14 @@ using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests.Tools;
 
-public sealed class ReadToolTests : IDisposable
+public sealed class ReadToolTests : IClassFixture<ToolTempDirectoryFixture>
 {
-    private readonly string _tempDirectory = Path.Combine(Path.GetTempPath(), $"botnexus-readtool-{Guid.NewGuid():N}");
+    private readonly string _tempDirectory;
     private readonly ReadTool _tool;
 
-    public ReadToolTests()
+    public ReadToolTests(ToolTempDirectoryFixture fixture)
     {
-        Directory.CreateDirectory(_tempDirectory);
+        _tempDirectory = fixture.CreateDirectory("readtool");
         _tool = new ReadTool(_tempDirectory);
     }
 
@@ -96,11 +96,4 @@ public sealed class ReadToolTests : IDisposable
         result.Content[0].Value.Should().Contain("Use offset=");
     }
 
-    public void Dispose()
-    {
-        if (Directory.Exists(_tempDirectory))
-        {
-            Directory.Delete(_tempDirectory, recursive: true);
-        }
-    }
 }

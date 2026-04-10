@@ -16,6 +16,10 @@
     <ProjectReference Include="..\..\..\..\src\providers\BotNexus.Providers.Core\BotNexus.Providers.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="TestableIO.System.IO.Abstractions.Wrappers" Version="*" />
+  </ItemGroup>
+
   <!-- Copy extension output + manifest to artifacts/extensions/ for dev-time discovery -->
   <Target Name="CopyExtensionToArtifacts" AfterTargets="Build">
     <PropertyGroup>

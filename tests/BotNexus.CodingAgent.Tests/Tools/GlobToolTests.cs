@@ -53,7 +53,7 @@ public sealed class GlobToolTests : IDisposable
         Directory.CreateDirectory(Path.Combine(_tempDirectory, "many"));
         for (var index = 0; index < 1005; index++)
         {
-            await File.WriteAllTextAsync(Path.Combine(_tempDirectory, "many", $"{index}.txt"), "x");
+            File.WriteAllText(Path.Combine(_tempDirectory, "many", $"{index}.txt"), "x");
         }
 
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?>

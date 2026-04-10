@@ -82,7 +82,7 @@ public sealed class ListDirectoryToolTests : IDisposable
     {
         for (var i = 0; i < 550; i++)
         {
-            await File.WriteAllTextAsync(Path.Combine(_tempDirectory, $"file-{i:D3}.txt"), "x");
+            File.WriteAllText(Path.Combine(_tempDirectory, $"file-{i:D3}.txt"), "x");
         }
 
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "." });

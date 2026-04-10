@@ -25,4 +25,8 @@
     <ProjectReference Include="..\..\src\providers\BotNexus.Providers.Copilot\BotNexus.Providers.Copilot.csproj" />
     <ProjectReference Include="..\..\src\providers\BotNexus.Providers.OpenAI\BotNexus.Providers.OpenAI.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
