@@ -127,3 +127,18 @@
   - `dotnet build Q:\repos\botnexus\tests\BotNexus.Gateway.Tests\BotNexus.Gateway.Tests.csproj --verbosity quiet` ✅
   - `dotnet test Q:\repos\botnexus\tests\BotNexus.Gateway.Tests\BotNexus.Gateway.Tests.csproj --filter "FullyQualifiedName~SessionSwitch" --verbosity minimal` ✅ (11/11)
   - Targeted new-test execution ✅ (`Hub_SessionSwitch_ConcurrentClientsDifferentSessions_ReceiveOnlyOwnEvents`)
+
+## 2026-04-10 - WebUI Playwright E2E project scaffold for session switching
+- Created new `tests/BotNexus.WebUI.Tests` xUnit project with `Microsoft.Playwright`, `Microsoft.Playwright.Xunit`, `FluentAssertions`, and `Microsoft.AspNetCore.Mvc.Testing`.
+- Added project reference to `src/gateway/BotNexus.Gateway.Api/BotNexus.Gateway.Api.csproj` and added project to `BotNexus.slnx`.
+- Added E2E infrastructure (`WebUiE2ETestHost`, custom Kestrel `WebApplicationFactory`, recording supervisor/handle) and authored five session-switch scenarios in `SessionSwitchingE2ETests.cs`:
+  - basic switch + send
+  - switch back + send
+  - rapid switch + send
+  - send during loading
+  - inbound event isolation
+- Added `PlaywrightFactAttribute` skip gate (`BOTNEXUS_RUN_PLAYWRIGHT_E2E=1`) and `xunit.runner.json` to disable parallel test execution for browser safety.
+- Validation:
+  - `dotnet build tests\BotNexus.WebUI.Tests\BotNexus.WebUI.Tests.csproj --verbosity quiet` ✅
+  - `pwsh tests\BotNexus.WebUI.Tests\bin\Debug\net10.0\playwright.ps1 install chromium` ✅
+  - default `dotnet test` run passes with E2E tests skipped unless env flag is enabled ✅
