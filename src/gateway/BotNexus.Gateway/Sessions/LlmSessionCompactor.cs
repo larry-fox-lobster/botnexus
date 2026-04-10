@@ -170,7 +170,7 @@ public sealed class LlmSessionCompactor : ISessionCompactor
         CompactionOptions options,
         CancellationToken cancellationToken)
     {
-        var model = ResolveModel(options.SummarizationModel);
+        var model = ResolveModel(options.SummarizationModel, options.SummarizationProvider);
         var context = new Context(
             SystemPrompt: null,
             Messages:
@@ -191,10 +191,18 @@ public sealed class LlmSessionCompactor : ISessionCompactor
                 .Where(text => !string.IsNullOrWhiteSpace(text)));
     }
 
-    private LlmModel ResolveModel(string? requestedModelId)
+    private LlmModel ResolveModel(string? requestedModelId, string? preferredProvider = null)
     {
         if (!string.IsNullOrWhiteSpace(requestedModelId))
         {
+            // If provider specified, look there first
+            if (!string.IsNullOrWhiteSpace(preferredProvider))
+            {
+                var providerMatch = _llmClient.Models.GetModel(preferredProvider, requestedModelId);
+                if (providerMatch is not null)
+                    return providerMatch;
+            }
+
             var exact = FindModel(requestedModelId);
             if (exact is not null)
             {
@@ -206,6 +214,14 @@ public sealed class LlmSessionCompactor : ISessionCompactor
 
         foreach (var modelId in DefaultSummaryModelIds)
         {
+            // Prefer the configured provider
+            if (!string.IsNullOrWhiteSpace(preferredProvider))
+            {
+                var providerMatch = _llmClient.Models.GetModel(preferredProvider, modelId);
+                if (providerMatch is not null)
+                    return providerMatch;
+            }
+
             var preferred = FindModel(modelId);
             if (preferred is not null)
             {

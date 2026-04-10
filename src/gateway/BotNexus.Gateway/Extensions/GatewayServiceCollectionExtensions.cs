@@ -66,7 +66,8 @@ public static class GatewayServiceCollectionExtensions
                     MaxSummaryChars = ParseInt(compactionSection["maxSummaryChars"], new CompactionOptions().MaxSummaryChars),
                     TokenThresholdRatio = ParseDouble(compactionSection["tokenThresholdRatio"], new CompactionOptions().TokenThresholdRatio),
                     ContextWindowTokens = ParseInt(compactionSection["contextWindowTokens"], new CompactionOptions().ContextWindowTokens),
-                    SummarizationModel = ParseString(compactionSection["summarizationModel"], new CompactionOptions().SummarizationModel)
+                    SummarizationModel = ParseString(compactionSection["summarizationModel"], new CompactionOptions().SummarizationModel),
+                    SummarizationProvider = ParseString(compactionSection["summarizationProvider"], new CompactionOptions().SummarizationProvider)
                 }));
             }
         }

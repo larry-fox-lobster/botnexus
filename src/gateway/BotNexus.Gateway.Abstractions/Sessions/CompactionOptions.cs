@@ -21,4 +21,7 @@ public sealed record CompactionOptions
 
     /// <summary>Model to use for summarization. If null, uses the session's model.</summary>
     public string? SummarizationModel { get; init; }
+
+    /// <summary>Provider to use for summarization (e.g., "github-copilot"). If null, auto-detected from registered providers.</summary>
+    public string? SummarizationProvider { get; init; }
 }
