@@ -84,6 +84,112 @@ public sealed class SignalRHubTests
         HasPropertyValue([result], "sessionId", "s1").Should().BeTrue();
         HasPropertyValue([result], "agentId", "agent-a").Should().BeTrue();
         HasPropertyValue([result], "connectionId", "conn-1").Should().BeTrue();
+        GetPropertyValue<int>(result, "messageCount").Should().Be(0);
+        GetPropertyValue<bool>(result, "isResumed").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task JoinSession_NewSession_ReturnsIsResumedFalse()
+    {
+        var groups = new Mock<IGroupManager>();
+        groups.Setup(value => value.AddToGroupAsync("conn-1", "session:new-session", It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var sessions = new Mock<ISessionStore>();
+        sessions.Setup(value => value.GetOrCreateAsync("new-session", "agent-a", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GatewaySession
+            {
+                SessionId = "new-session",
+                AgentId = "agent-a",
+                History = []
+            });
+
+        var hub = CreateHub(groups: groups.Object, sessions: sessions.Object, connectionId: "conn-1");
+
+        var result = await hub.JoinSession("agent-a", "new-session");
+
+        GetPropertyValue<bool>(result, "isResumed").Should().BeFalse();
+        GetPropertyValue<int>(result, "messageCount").Should().Be(0);
+    }
+
+    [Fact]
+    public async Task JoinSession_ExistingSessionWithHistory_ReturnsIsResumedTrue()
+    {
+        var sessions = new Mock<ISessionStore>();
+        sessions.Setup(value => value.GetOrCreateAsync("existing", "agent-a", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GatewaySession
+            {
+                SessionId = "existing",
+                AgentId = "agent-a",
+                History =
+                [
+                    new SessionEntry { Role = "user", Content = "hello" },
+                    new SessionEntry { Role = "assistant", Content = "hi" }
+                ]
+            });
+
+        var hub = CreateHub(sessions: sessions.Object, connectionId: "conn-1");
+
+        var result = await hub.JoinSession("agent-a", "existing");
+
+        GetPropertyValue<bool>(result, "isResumed").Should().BeTrue();
+        GetPropertyValue<int>(result, "messageCount").Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task JoinSession_ExpiredSession_ReactivatesAndReturnsResumed()
+    {
+        var expiredSession = new GatewaySession
+        {
+            SessionId = "expired",
+            AgentId = "agent-a",
+            Status = SessionStatus.Expired,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+            History =
+            [
+                new SessionEntry { Role = "user", Content = "persisted" }
+            ]
+        };
+
+        var sessions = new Mock<ISessionStore>();
+        sessions.Setup(value => value.GetOrCreateAsync("expired", "agent-a", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expiredSession);
+        sessions.Setup(value => value.SaveAsync(expiredSession, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var hub = CreateHub(sessions: sessions.Object, connectionId: "conn-1");
+
+        var result = await hub.JoinSession("agent-a", "expired");
+
+        expiredSession.Status.Should().Be(SessionStatus.Active);
+        expiredSession.ExpiresAt.Should().BeNull();
+        sessions.Verify(value => value.SaveAsync(expiredSession, It.IsAny<CancellationToken>()), Times.Once);
+        GetPropertyValue<bool>(result, "isResumed").Should().BeTrue();
+        GetPropertyValue<string>(result, "status").Should().Be(SessionStatus.Active.ToString());
+    }
+
+    [Fact]
+    public async Task JoinSession_ReturnsStatusAndTimestamps()
+    {
+        var createdAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var updatedAt = DateTimeOffset.UtcNow;
+        var sessions = new Mock<ISessionStore>();
+        sessions.Setup(value => value.GetOrCreateAsync("s1", "agent-a", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GatewaySession
+            {
+                SessionId = "s1",
+                AgentId = "agent-a",
+                CreatedAt = createdAt,
+                UpdatedAt = updatedAt
+            });
+
+        var hub = CreateHub(sessions: sessions.Object, connectionId: "conn-1");
+
+        var result = await hub.JoinSession("agent-a", "s1");
+
+        GetPropertyValue<string>(result, "status").Should().Be(SessionStatus.Active.ToString());
+        GetPropertyValue<DateTimeOffset>(result, "createdAt").Should().Be(createdAt);
+        GetPropertyValue<DateTimeOffset>(result, "updatedAt").Should().Be(updatedAt);
     }
 
     [Fact]
@@ -145,6 +251,16 @@ public sealed class SignalRHubTests
         property.Should().NotBeNull();
 
         return string.Equals(property!.GetValue(payload)?.ToString(), expectedValue, StringComparison.Ordinal);
+    }
+
+    private static T GetPropertyValue<T>(object payload, string propertyName)
+    {
+        var property = payload.GetType().GetProperty(propertyName);
+        property.Should().NotBeNull();
+
+        var value = property!.GetValue(payload);
+        value.Should().NotBeNull();
+        return (T)value!;
     }
 
     private sealed class TestHubCallerContext(string connectionId) : HubCallerContext

@@ -46,12 +46,24 @@ public sealed class GatewayHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, GetSessionGroup(sessionId));
 
         var session = await _sessions.GetOrCreateAsync(sessionId, agentId, Context.ConnectionAborted);
+        if (session.Status == SessionStatus.Expired)
+        {
+            _logger.LogInformation("Reactivating expired session {SessionId} on join", sessionId);
+            session.Status = SessionStatus.Active;
+            session.ExpiresAt = null;
+            await _sessions.SaveAsync(session, Context.ConnectionAborted);
+        }
+
         return new
         {
             sessionId,
             agentId,
             connectionId = Context.ConnectionId,
-            messageCount = session.History.Count
+            messageCount = session.History.Count,
+            isResumed = session.History.Count > 0,
+            status = session.Status.ToString(),
+            createdAt = session.CreatedAt,
+            updatedAt = session.UpdatedAt
         };
     }
 

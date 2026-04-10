@@ -614,6 +614,9 @@
                 currentSessionId = result.sessionId;
                 currentAgentId = result.agentId || agentId;
                 debugLog('session', `Joined v${myVersion}: session=${currentSessionId} agent=${currentAgentId}`);
+                if (result.isResumed && result.messageCount > 0) {
+                    appendSystemMessage(`Session resumed (${result.messageCount} messages).`);
+                }
                 updateSessionIdDisplay();
             }
         } catch (err) {
