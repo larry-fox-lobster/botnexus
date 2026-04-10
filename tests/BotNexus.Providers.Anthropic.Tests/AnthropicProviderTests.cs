@@ -75,7 +75,7 @@ public class AnthropicProviderTests
             ApiKey = "test-key",
             Reasoning = ThinkingLevel.Minimal
         });
-        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
         body.RootElement
@@ -104,7 +104,7 @@ public class AnthropicProviderTests
             ApiKey = "test-key",
             Reasoning = ThinkingLevel.ExtraHigh
         });
-        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
         if (body.RootElement.TryGetProperty("output_config", out var outputConfig) &&

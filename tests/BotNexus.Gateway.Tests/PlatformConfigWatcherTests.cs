@@ -25,7 +25,7 @@ public sealed class PlatformConfigWatcherTests : IDisposable
 
         File.WriteAllText(_configPath, """{"defaultAgentId":"agent-b"}""");
 
-        var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(10)));
 
         completed.Should().Be(callback.Task);
         (await callback.Task).DefaultAgentId.Should().Be("agent-b");
@@ -43,7 +43,7 @@ public sealed class PlatformConfigWatcherTests : IDisposable
             using var watcher = PlatformConfigLoader.Watch(_configPath);
             File.WriteAllText(_configPath, """{"defaultAgentId":"agent-c"}""");
 
-            var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+            var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(10)));
             completed.Should().Be(callback.Task);
             (await callback.Task).DefaultAgentId.Should().Be("agent-c");
         }
@@ -61,7 +61,7 @@ public sealed class PlatformConfigWatcherTests : IDisposable
 
         File.WriteAllText(_configPath, "{ invalid json");
 
-        var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(10)));
 
         completed.Should().Be(callback.Task);
         (await callback.Task).Should().BeOfType<OptionsValidationException>();

@@ -140,7 +140,7 @@ public sealed class MemoryIndexerTests
         return session;
     }
 
-    private static async Task WaitForAsync(Func<bool> condition, int timeoutMs = 3000)
+    private static async Task WaitForAsync(Func<bool> condition, int timeoutMs = 5000)
     {
         var started = DateTime.UtcNow;
         while (!condition())

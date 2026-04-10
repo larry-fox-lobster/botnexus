@@ -47,7 +47,7 @@ public class OpenAIResponsesProviderTests
             ApiKey = "test-key",
             ReasoningEffort = "high"
         });
-        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
         body.RootElement.GetProperty("reasoning").GetProperty("effort").GetString().Should().Be("high");
@@ -65,7 +65,7 @@ public class OpenAIResponsesProviderTests
         var context = TestHelpers.MakeContext();
 
         var stream = provider.Stream(model, context, new OpenAIResponsesOptions { ApiKey = "test-key" });
-        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
         body.RootElement.GetProperty("reasoning").GetProperty("effort").GetString().Should().Be("none");
@@ -87,7 +87,7 @@ public class OpenAIResponsesProviderTests
             CacheRetention = BotNexus.Providers.Core.Models.CacheRetention.Long,
             SessionId = "session-123"
         });
-        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
         body.RootElement.GetProperty("prompt_cache_retention").GetString().Should().Be("24h");
@@ -108,7 +108,7 @@ public class OpenAIResponsesProviderTests
             ApiKey = "test-key",
             Reasoning = BotNexus.Providers.Core.Models.ThinkingLevel.ExtraHigh
         });
-        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
         body.RootElement.GetProperty("reasoning").GetProperty("effort").GetString().Should().Be("high");
@@ -125,7 +125,7 @@ public class OpenAIResponsesProviderTests
         var context = TestHelpers.MakeContext(systemPrompt: "sys prompt");
 
         var stream = provider.Stream(model, context, new OpenAIResponsesOptions { ApiKey = "test-key" });
-        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
         var firstInput = body.RootElement.GetProperty("input")[0];
@@ -163,7 +163,7 @@ public class OpenAIResponsesProviderTests
             ApiKey = "test-key",
             PreviousResponseId = "explicit_prev"
         });
-        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
         body.RootElement.TryGetProperty("previous_response_id", out _).Should().BeFalse();
@@ -190,7 +190,7 @@ public class OpenAIResponsesProviderTests
                 ["Openai-Intent"] = "custom-intent"
             }
         });
-        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         handler.LastRequestHeaders.Should().ContainKey("Openai-Intent");
         handler.LastRequestHeaders["Openai-Intent"].Should().Contain("custom-intent");

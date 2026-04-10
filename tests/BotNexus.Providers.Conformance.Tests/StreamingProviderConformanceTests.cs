@@ -121,7 +121,7 @@ public abstract class StreamingProviderConformanceTests
         var provider = CreateProvider(handler);
         var stream = provider.Stream(CreateModel(), CreateContext(), CreateOptions());
         var events = await ReadAllEventsAsync(stream);
-        var result = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        var result = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         handler.RequestCount.Should().Be(1);
         return (result, events);

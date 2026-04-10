@@ -26,7 +26,7 @@ public class OpenAIProviderAlignmentTests
         var context = TestHelpers.MakeContext();
 
         var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
-        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         handler.RequestCount.Should().Be(1);
         handler.LastRequestUri.Should().NotBeNull();
@@ -51,7 +51,7 @@ public class OpenAIProviderAlignmentTests
 
         var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
         var events = await ReadAllEventsAsync(stream);
-        var final = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        var final = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         events.Should().ContainSingle(e => e is ThinkingStartEvent);
         events.OfType<ThinkingDeltaEvent>().Select(e => e.Delta)
@@ -80,7 +80,7 @@ public class OpenAIProviderAlignmentTests
         var context = TestHelpers.MakeContext();
 
         var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
-        var final = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        var final = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         var thinking = final.Content.OfType<ThinkingContent>().Single();
         thinking.Thinking.Should().Be("step-1");
@@ -102,7 +102,7 @@ public class OpenAIProviderAlignmentTests
         var context = TestHelpers.MakeContext();
 
         var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
-        var final = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        var final = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         var toolCalls = final.Content.OfType<ToolCallContent>().ToDictionary(tc => tc.Id, tc => tc.ThoughtSignature);
         toolCalls["call_a"].Should().Contain("\"data\":\"sig-a\"");

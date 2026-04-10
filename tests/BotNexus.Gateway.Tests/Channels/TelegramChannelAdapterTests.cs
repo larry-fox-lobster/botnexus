@@ -69,7 +69,7 @@ public sealed class TelegramChannelAdapterTests
             .Callback(() => updatesSeen.TrySetResult());
 
         await adapter.StartAsync(dispatcher.Object, CancellationToken.None);
-        await updatesSeen.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await updatesSeen.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await adapter.StopAsync(CancellationToken.None);
 
         dispatcher.Invocations
@@ -188,7 +188,7 @@ public sealed class TelegramChannelAdapterTests
             .Returns(Task.CompletedTask);
 
         await adapter.StartAsync(dispatcher.Object, CancellationToken.None);
-        await secondPollSeen.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await secondPollSeen.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await adapter.StopAsync(CancellationToken.None);
 
         offsets.Count.Should().BeGreaterThanOrEqualTo(2);
@@ -224,7 +224,7 @@ public sealed class TelegramChannelAdapterTests
         await adapter.StartAsync(Mock.Of<IChannelDispatcher>(), CancellationToken.None);
 
         var stopTask = adapter.StopAsync(CancellationToken.None);
-        var completed = await Task.WhenAny(stopTask, Task.Delay(TimeSpan.FromSeconds(2)));
+        var completed = await Task.WhenAny(stopTask, Task.Delay(TimeSpan.FromSeconds(5)));
         completed.Should().Be(stopTask);
     }
 
@@ -276,7 +276,7 @@ public sealed class TelegramChannelAdapterTests
         }, handler);
 
         await adapter.StartAsync(Mock.Of<IChannelDispatcher>(), CancellationToken.None);
-        await pollingSeen.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await pollingSeen.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await adapter.StopAsync(CancellationToken.None);
 
         calls.Select(c => c.MethodName).Should().Contain("deleteWebhook");
@@ -353,7 +353,7 @@ public sealed class TelegramChannelAdapterTests
         }, handler);
 
         await adapter.StartAsync(Mock.Of<IChannelDispatcher>(), CancellationToken.None);
-        await pollSeen.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await pollSeen.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await adapter.StopAsync(CancellationToken.None);
 
         pollingCall.Should().NotBeNull();

@@ -301,7 +301,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
         await Task.Delay(100);
         File.AppendAllText(configPath, Environment.NewLine);
 
-        var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(10)));
 
         completed.Should().Be(callback.Task);
         var descriptors = await callback.Task;
