@@ -1,13 +1,13 @@
 ---
-updated_at: 2026-04-10T17:35:00Z
-focus_area: Session Switching Bug Delivered
+updated_at: 2026-04-10T21:10:00Z
+focus_area: Session Switching Bug Fully Delivered with Playwright E2E
 active_issues: []
-status: session_switching_delivered
+status: session_switching_complete_with_e2e
 ---
 
 # What We're Focused On
 
-**Session switching bug delivered (2026-04-10 17:35Z).** 4-wave concurrent pipeline: Wave 1 (Fry: core fix + guards + orphan cleanup), Wave 2 (Fry: backend sessionId), Wave 3 (Fry: per-session state Map), Wave 4 (Hermes: 7 tests). Design review led by Leela: 3 patterns confirmed, 6 decisions. Build green. Commits: 8fadbbd, b549fb5.
+**Session switching bug fully delivered including Playwright E2E (2026-04-10 21:10Z).** Follow-up sprint: Fry fixed send-during-switch race condition (sessionSwitchInProgress flag, input disable, sendMessage guard — commit 84b0350). Hermes expanded SignalR tests (4 new scenarios, commit f18e476) + built Playwright E2E suite (BotNexus.WebUI.Tests, 5 scenarios, commit bc855e1). Build green.
 
 **Previous:** Sub-Agent Spawning feature delivered (2026-04-10 16:30Z). 4-wave concurrent delivery: Wave 1 (abstractions + config), Wave 2 (runtime implementation), Wave 3 (tools), Wave 4 (REST + WebUI + docs). 51 SubAgent tests all passing. Commits: f57b157, b614205, ff63957, 4d4b6a7, 25c8876, ad72475, c75a033, 91f11c3, 041d65a.
 

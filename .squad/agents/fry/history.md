@@ -252,3 +252,18 @@ The `showStreamingIndicator()` function appended an "Agent is thinking..." div t
 1. **(W3.1)** Introduced `sessionState` Map + `getSessionState(sessionId)` helper. Returns existing state or creates defaults. LRU ordering: accessing existing entries moves them to end.
 2. **(W3.2)** Migrated 7 globals (`isStreaming`, `activeMessageId`, `activeToolCalls`, `activeToolCount`, `thinkingBuffer`, `toolCallDepth`, `toolStartTimes`) from flat variables to per-session state. Added `isCurrentSessionStreaming()` convenience function. Old globals kept as deprecated stubs. Key design: `openAgentTimeline` clears UI elements but does NOT clear outgoing session's per-session state (it may still be streaming server-side).
 3. **(W3.3)** LRU eviction caps `sessionState` at 20 entries. `cleanupSessionState(sessionId)` for explicit removal.
+
+### Send-During-Switch Race Condition Fix (2026-07-24)
+**Timestamp:** 2026-07-24
+**Status:** ✅ Complete
+**Commit:** 84b0350 — fix(webui): prevent message send during session switch race window
+
+**Bug:** After Wave 1 fix, a race window remained: `openAgentTimeline()` nulls `currentSessionId` early, then does async work (fetch sessions, render history, join new session). If user types and hits Enter during that gap, `sendMessage()` sees `currentSessionId === null` and calls `joinSession(agentId, null)`, creating an orphan session. Or with unlucky timing, sends to the wrong session.
+
+**Fix (Option B from Nova's research):**
+1. **`sessionSwitchInProgress` flag** — New module-scoped boolean, default `false`.
+2. **`openAgentTimeline()` wrapped in try/finally** — Sets flag `true` at entry, `false` in `finally` after `joinSession` completes. Early returns (no sessions, no matching channels) also clear the flag via `finally`.
+3. **`sendMessage()` guarded** — Returns immediately if `sessionSwitchInProgress` is true, preventing any message dispatch during the async gap.
+4. **Input disabled during switch** — `updateSendButtonState()` checks the flag: disables both `elBtnSend` and `elChatInput` while switching. Re-enables in `finally` via `updateSendButtonState()`. User sees "Loading timeline..." so disabled input is natural UX.
+
+**Pattern Established:** Any new function that sends messages to the server should check `sessionSwitchInProgress` before dispatching.
