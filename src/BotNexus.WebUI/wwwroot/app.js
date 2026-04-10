@@ -499,6 +499,9 @@
         // JoinSession returns the data directly via invoke result.
 
         connection.on('SessionReset', (data) => {
+            // Guard: ignore resets for sessions we've already left
+            if (data?.sessionId && data.sessionId !== currentSessionId) return;
+            cleanupSessionState(currentSessionId);
             currentSessionId = null;
             updateSessionIdDisplay();
             clearSubAgentPanel();

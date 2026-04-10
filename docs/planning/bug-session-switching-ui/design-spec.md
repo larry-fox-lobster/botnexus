@@ -8,6 +8,7 @@ created: 2026-04-10
 updated: 2026-04-10
 author: nova
 tags: [webui, session, ux, multi-agent, critical-ux]
+blocks: [feature-subagent-ui-visibility]
 ---
 
 # Design Spec: Session Switching Broken During Active Agent Work
@@ -158,6 +159,6 @@ function onAgentCompleted(sessionId: string) {
 
 ## Scope
 
-- **Frontend only** — this is a WebUI rendering/state management bug
-- No backend/gateway changes needed
+- **Primarily frontend** — the core bug is a WebUI rendering/state management issue
+- **Minor backend enrichment** — `AgentStreamEvent.SessionId` property added for client-side routing verification; `SignalRChannelAdapter.SendStreamEventAsync` enriches outbound events with `sessionId`
 - Agent work continues unaffected in background
