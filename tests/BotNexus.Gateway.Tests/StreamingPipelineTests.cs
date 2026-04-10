@@ -18,7 +18,7 @@ public sealed class StreamingPipelineTests
     {
         var sessionStore = new InMemorySessionStore();
         var channel = CreateStreamingChannel();
-        var host = CreateStreamingHost(
+        await using var host = CreateStreamingHost(
             [
                 new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "stream " },
                 new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "works" }
@@ -38,7 +38,7 @@ public sealed class StreamingPipelineTests
     {
         var sessionStore = new InMemorySessionStore();
         var channel = CreateStreamingChannel();
-        var host = CreateStreamingHost(
+        await using var host = CreateStreamingHost(
             [
                 new AgentStreamEvent { Type = AgentStreamEventType.ToolStart, ToolCallId = "call-1", ToolName = "clock" },
                 new AgentStreamEvent { Type = AgentStreamEventType.ToolEnd, ToolCallId = "call-1", ToolName = "clock", ToolResult = "12:00" },
@@ -60,7 +60,7 @@ public sealed class StreamingPipelineTests
     {
         var sessionStore = new InMemorySessionStore();
         var channel = CreateStreamingChannel();
-        var host = CreateStreamingHost(
+        await using var host = CreateStreamingHost(
             [
                 new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "The answer is " },
                 new AgentStreamEvent { Type = AgentStreamEventType.ToolStart, ToolCallId = "call-1", ToolName = "math" },
@@ -85,7 +85,7 @@ public sealed class StreamingPipelineTests
         var handle = new CancellableStreamHandle();
         var activity = new RecordingActivityBroadcaster();
         var channel = CreateStreamingChannel();
-        var host = CreateStreamingHost(
+        await using var host = CreateStreamingHost(
             handle.Stream(),
             sessionStore,
             channel.Object,
@@ -102,7 +102,7 @@ public sealed class StreamingPipelineTests
     {
         var sessionStore = new InMemorySessionStore();
         var channel = CreateStreamingChannel();
-        var host = CreateStreamingHost([], sessionStore, channel.Object, out _);
+        await using var host = CreateStreamingHost([], sessionStore, channel.Object, out _);
 
         await host.DispatchAsync(CreateMessage("empty"));
         var session = await sessionStore.GetAsync("session-1");

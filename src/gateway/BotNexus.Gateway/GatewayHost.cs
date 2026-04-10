@@ -20,7 +20,7 @@ namespace BotNexus.Gateway;
 /// The central Gateway orchestration service. Manages the lifecycle of channel adapters,
 /// listens for inbound messages, routes them to agents, and streams responses back.
 /// </summary>
-public sealed class GatewayHost : BackgroundService, IChannelDispatcher
+public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncDisposable
 {
     private const int DefaultSessionQueueCapacity = 64;
     private const string BusyMessage = "Session is busy processing messages. Please retry shortly.";
@@ -232,8 +232,9 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
             if (TryGetControlCommand(message, out var controlCommand) &&
                 string.Equals(controlCommand, ControlSteer, StringComparison.OrdinalIgnoreCase))
             {
-                await HandleSteeringAsync(message, agentId, sessionId, cancellationToken);
-                continue;
+                if (await HandleSteeringAsync(message, agentId, sessionId, cancellationToken))
+                    continue;
+                // Agent not running — fall through to normal message processing.
             }
 
             session.AddEntry(new SessionEntry { Role = "user", Content = message.Content });
@@ -379,7 +380,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
         }, cancellationToken);
     }
 
-    private async Task HandleSteeringAsync(
+    private async Task<bool> HandleSteeringAsync(
         InboundMessage message,
         string agentId,
         string sessionId,
@@ -398,26 +399,16 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
         }
 
         // If no handle or agent is not actively running, steering can't be
-        // injected mid-turn. Re-dispatch as a normal message to start a new run.
+        // injected mid-turn. Return false so the caller falls through to
+        // normal message processing (avoiding a recursive DispatchAsync
+        // deadlock on the single-reader session queue).
         if (handle is null || !handle.IsRunning)
         {
             _logger.LogInformation(
-                "Steering received but agent is not running (instance={HasInstance}, running={IsRunning}). Re-dispatching as normal message for session {SessionId}",
+                "Steering received but agent is not running (instance={HasInstance}, running={IsRunning}). Falling through to normal processing for session {SessionId}",
                 instance is not null, handle?.IsRunning ?? false, sessionId);
 
-            var normalMessage = new InboundMessage
-            {
-                ChannelType = message.ChannelType,
-                SenderId = message.SenderId,
-                ConversationId = message.ConversationId,
-                SessionId = message.SessionId,
-                TargetAgentId = message.TargetAgentId,
-                Content = message.Content,
-                Metadata = new Dictionary<string, object?>()
-            };
-
-            await DispatchAsync(normalMessage, cancellationToken);
-            return;
+            return false;
         }
 
         // Record steering message in session history
@@ -428,6 +419,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
         await handle.SteerAsync(message.Content, cancellationToken);
 
         _logger.LogInformation("Steering message injected for agent {AgentId} session {SessionId}", agentId, sessionId);
+        return true;
     }
 
     private static bool TryGetControlCommand(InboundMessage message, out string? command)
@@ -505,6 +497,16 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher
         {
             _logger.LogDebug(ex, "One or more session queue workers completed with errors during shutdown.");
         }
+    }
+
+    /// <summary>
+    /// Drains any session queue workers that were started by DispatchAsync but never
+    /// cleaned up via the BackgroundService shutdown path (e.g., in unit tests).
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        await CompleteSessionQueuesAsync();
+        base.Dispose();
     }
 
     private IChannelAdapter? ResolveChannelAdapter(string channelType)

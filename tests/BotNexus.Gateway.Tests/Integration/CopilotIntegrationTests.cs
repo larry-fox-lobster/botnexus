@@ -29,7 +29,7 @@ public sealed class CopilotIntegrationTests
         if (auth is null)
             return;
 
-        var harness = CreateHarness(auth, supportsStreaming: false);
+        await using var harness = CreateHarness(auth, supportsStreaming: false);
         await harness.Host.DispatchAsync(CreateMessage("Reply with one short sentence."));
 
         if (ShouldSkipForLiveIssue(harness.Activity))
@@ -49,7 +49,7 @@ public sealed class CopilotIntegrationTests
         if (auth is null)
             return;
 
-        var harness = CreateHarness(auth, supportsStreaming: true);
+        await using var harness = CreateHarness(auth, supportsStreaming: true);
         await harness.Host.DispatchAsync(CreateMessage("Answer with a short greeting."));
 
         if (ShouldSkipForLiveIssue(harness.Activity))
@@ -69,7 +69,7 @@ public sealed class CopilotIntegrationTests
         if (auth is null)
             return;
 
-        var harness = CreateHarness(auth, supportsStreaming: false);
+        await using var harness = CreateHarness(auth, supportsStreaming: false);
         await harness.Host.DispatchAsync(CreateMessage("Remember this token: ORION."));
         await harness.Host.DispatchAsync(CreateMessage("Reply with exactly one short sentence."));
 
@@ -91,7 +91,7 @@ public sealed class CopilotIntegrationTests
         if (auth is null)
             return;
 
-        var harness = CreateHarness(auth, supportsStreaming: true);
+        await using var harness = CreateHarness(auth, supportsStreaming: true);
         await harness.Host.DispatchAsync(CreateMessage("Provide a concise two-word greeting."));
 
         if (ShouldSkipForLiveIssue(harness.Activity))
@@ -114,7 +114,7 @@ public sealed class CopilotIntegrationTests
             return;
 
         var invalidAuth = new CopilotAuth("invalid-token", auth.Endpoint);
-        var harness = CreateHarness(invalidAuth, supportsStreaming: false);
+        await using var harness = CreateHarness(invalidAuth, supportsStreaming: false);
         await harness.Host.DispatchAsync(CreateMessage("This should fail auth."));
 
         harness.Channel.SentMessages.Should().BeEmpty();
@@ -131,7 +131,7 @@ public sealed class CopilotIntegrationTests
         if (auth is null)
             return;
 
-        var harness = CreateHarness(auth, supportsStreaming: false);
+        await using var harness = CreateHarness(auth, supportsStreaming: false);
         await harness.Host.DispatchAsync(CreateMessage("Reply with one word."));
 
         if (ShouldSkipForLiveIssue(harness.Activity))
@@ -157,7 +157,7 @@ public sealed class CopilotIntegrationTests
             return;
 
         var webUiChannel = new WebUiRecordingChannelAdapter(supportsStreaming: false);
-        var harness = CreateHarness(auth, supportsStreaming: false, channel: webUiChannel);
+        await using var harness = CreateHarness(auth, supportsStreaming: false, channel: webUiChannel);
         await harness.Host.DispatchAsync(CreateMessage("Reply with a short acknowledgement."));
 
         if (ShouldSkipForLiveIssue(harness.Activity))
@@ -269,7 +269,7 @@ public sealed class CopilotIntegrationTests
         InMemorySessionStore sessions,
         RecordingActivityBroadcaster activity,
         Mock<IMessageRouter> router,
-        Mock<IAgentSupervisor> supervisor)
+        Mock<IAgentSupervisor> supervisor) : IAsyncDisposable
     {
         public GatewayHost Host { get; } = host;
         public RecordingChannelAdapter Channel { get; } = channel;
@@ -277,6 +277,8 @@ public sealed class CopilotIntegrationTests
         public RecordingActivityBroadcaster Activity { get; } = activity;
         public Mock<IMessageRouter> Router { get; } = router;
         public Mock<IAgentSupervisor> Supervisor { get; } = supervisor;
+
+        public async ValueTask DisposeAsync() => await Host.DisposeAsync();
     }
 
     private sealed class CopilotAgentHandle(CopilotAuth auth) : IAgentHandle

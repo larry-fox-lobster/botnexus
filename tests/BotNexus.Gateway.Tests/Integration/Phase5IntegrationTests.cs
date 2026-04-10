@@ -159,7 +159,7 @@ public sealed class Phase5IntegrationTests
         manager.Setup(m => m.Get("web")).Returns(channel);
 
         var activity = new RecordingActivityBroadcaster();
-        var host = new GatewayHost(
+        await using var host = new GatewayHost(
             supervisor.Object,
             router.Object,
             sessions,

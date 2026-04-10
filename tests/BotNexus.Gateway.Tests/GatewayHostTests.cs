@@ -31,7 +31,7 @@ public sealed class GatewayHostTests
             .Returns(Task.CompletedTask);
         var activity = new RecordingActivityBroadcaster();
         var channel = CreateChannelAdapter("web", supportsStreaming: false);
-        var host = CreateHost(supervisor.Object, router.Object, sessions.Object, activity, CreateChannelManager(channel.Object));
+        await using var host = CreateHost(supervisor.Object, router.Object, sessions.Object, activity, CreateChannelManager(channel.Object));
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
@@ -70,7 +70,7 @@ public sealed class GatewayHostTests
         sessions.Setup(s => s.SaveAsync(session, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var channel = CreateChannelAdapter("web", supportsStreaming: true);
-        var host = CreateHost(supervisor.Object, router.Object, sessions.Object, new RecordingActivityBroadcaster(), CreateChannelManager(channel.Object));
+        await using var host = CreateHost(supervisor.Object, router.Object, sessions.Object, new RecordingActivityBroadcaster(), CreateChannelManager(channel.Object));
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
@@ -88,7 +88,7 @@ public sealed class GatewayHostTests
             .ReturnsAsync([]);
         var supervisor = new Mock<IAgentSupervisor>();
         var sessions = new Mock<ISessionStore>();
-        var host = CreateHost(
+        await using var host = CreateHost(
             supervisor.Object,
             router.Object,
             sessions.Object,
@@ -114,7 +114,7 @@ public sealed class GatewayHostTests
         var sessions = new InMemorySessionStore();
         var activity = new RecordingActivityBroadcaster();
         var channel = CreateChannelAdapter("web", supportsStreaming: false);
-        var host = CreateHost(supervisor.Object, router.Object, sessions, activity, CreateChannelManager(channel.Object));
+        await using var host = CreateHost(supervisor.Object, router.Object, sessions, activity, CreateChannelManager(channel.Object));
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
@@ -142,7 +142,7 @@ public sealed class GatewayHostTests
         var sessions = new InMemorySessionStore();
         var channel = CreateChannelAdapter("web", supportsStreaming: false);
         var activity = new RecordingActivityBroadcaster();
-        var host = CreateHost(supervisor.Object, router.Object, sessions, activity, CreateChannelManager(channel.Object));
+        await using var host = CreateHost(supervisor.Object, router.Object, sessions, activity, CreateChannelManager(channel.Object));
 
         var dispatches = Enumerable.Range(1, 20)
             .Select(i => host.DispatchAsync(CreateMessage($"m{i}", conversationId: $"conv-{i}")));
@@ -174,7 +174,7 @@ public sealed class GatewayHostTests
         sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
         var activity = new RecordingActivityBroadcaster();
-        var host = CreateHost(supervisor.Object, router.Object, sessions.Object, activity, CreateChannelManager());
+        await using var host = CreateHost(supervisor.Object, router.Object, sessions.Object, activity, CreateChannelManager());
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
@@ -197,7 +197,7 @@ public sealed class GatewayHostTests
             .ReturnsAsync(new GatewaySession { SessionId = "web:conv-1:agent-a", AgentId = "agent-a" });
         sessions.Setup(s => s.SaveAsync(It.IsAny<GatewaySession>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        var host = CreateHost(supervisor.Object, router.Object, sessions.Object, new RecordingActivityBroadcaster(), CreateChannelManager());
+        await using var host = CreateHost(supervisor.Object, router.Object, sessions.Object, new RecordingActivityBroadcaster(), CreateChannelManager());
 
         await host.DispatchAsync(CreateMessage("hello"));
 
@@ -223,7 +223,7 @@ public sealed class GatewayHostTests
         sessions.Setup(s => s.SaveAsync(session, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var host = CreateHost(
+        await using var host = CreateHost(
             supervisor.Object,
             router.Object,
             sessions.Object,
@@ -248,7 +248,7 @@ public sealed class GatewayHostTests
             .ReturnsAsync(session);
         var channel = CreateChannelAdapter("web", supportsStreaming: false);
         var activity = new RecordingActivityBroadcaster();
-        var host = CreateHost(supervisor.Object, router.Object, sessions.Object, activity, CreateChannelManager(channel.Object));
+        await using var host = CreateHost(supervisor.Object, router.Object, sessions.Object, activity, CreateChannelManager(channel.Object));
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
@@ -280,7 +280,7 @@ public sealed class GatewayHostTests
         sessions.Setup(s => s.SaveAsync(session, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var host = CreateHost(
+        await using var host = CreateHost(
             supervisor.Object,
             router.Object,
             sessions.Object,
@@ -312,7 +312,7 @@ public sealed class GatewayHostTests
         sessions.Setup(s => s.SaveAsync(session, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var host = CreateHost(
+        await using var host = CreateHost(
             supervisor.Object,
             router.Object,
             sessions.Object,
@@ -333,6 +333,7 @@ public sealed class GatewayHostTests
         var handle = new Mock<IAgentHandle>();
         handle.SetupGet(h => h.AgentId).Returns("agent-a");
         handle.SetupGet(h => h.SessionId).Returns("session-1");
+        handle.SetupGet(h => h.IsRunning).Returns(true);
         var supervisor = new Mock<IAgentSupervisor>();
         supervisor.Setup(s => s.GetInstance("agent-a", "session-1"))
             .Returns(new AgentInstance
@@ -347,17 +348,52 @@ public sealed class GatewayHostTests
         var sessions = new Mock<ISessionStore>();
         sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new GatewaySession { SessionId = "session-1", AgentId = "agent-a" });
-        var channel = CreateChannelAdapter("web", supportsStreaming: false);
-        var host = CreateHost(supervisor.Object, router.Object, sessions.Object, new RecordingActivityBroadcaster(), CreateChannelManager(channel.Object));
+        await using var host = CreateHost(supervisor.Object, router.Object, sessions.Object, new RecordingActivityBroadcaster(), CreateChannelManager());
 
         await host.DispatchAsync(CreateMessage("nudge", sessionId: "session-1", metadata: new Dictionary<string, object?> { ["control"] = "steer" }));
 
         handle.Verify(h => h.SteerAsync("nudge", It.IsAny<CancellationToken>()), Times.Once);
         handle.Verify(h => h.PromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-        channel.Verify(c => c.SendAsync(
-                It.Is<OutboundMessage>(m => m.Content.Contains("Steering", StringComparison.OrdinalIgnoreCase)),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
+    }
+
+    [Fact]
+    public async Task DispatchAsync_WithSteerControl_WhenAgentNotRunning_FallsThroughToNormalProcessing()
+    {
+        var router = new Mock<IMessageRouter>();
+        router.Setup(r => r.ResolveAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["agent-a"]);
+        var handle = new Mock<IAgentHandle>();
+        handle.SetupGet(h => h.AgentId).Returns("agent-a");
+        handle.SetupGet(h => h.SessionId).Returns("session-1");
+        handle.SetupGet(h => h.IsRunning).Returns(false);
+        handle.Setup(h => h.PromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentResponse { Content = "response" });
+        var supervisor = new Mock<IAgentSupervisor>();
+        supervisor.Setup(s => s.GetInstance("agent-a", "session-1"))
+            .Returns(new AgentInstance
+            {
+                InstanceId = "agent-a::session-1",
+                AgentId = "agent-a",
+                SessionId = "session-1",
+                IsolationStrategy = "in-process"
+            });
+        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(handle.Object);
+        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a" };
+        var sessions = new Mock<ISessionStore>();
+        sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+        sessions.Setup(s => s.SaveAsync(session, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var channel = CreateChannelAdapter("web", supportsStreaming: false);
+        await using var host = CreateHost(supervisor.Object, router.Object, sessions.Object, new RecordingActivityBroadcaster(), CreateChannelManager(channel.Object));
+
+        await host.DispatchAsync(CreateMessage("nudge", sessionId: "session-1", metadata: new Dictionary<string, object?> { ["control"] = "steer" }));
+
+        // Steering was NOT called because agent is not running
+        handle.Verify(h => h.SteerAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        // Instead, message was processed normally via PromptAsync
+        handle.Verify(h => h.PromptAsync("nudge", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -383,7 +419,7 @@ public sealed class GatewayHostTests
         await sessions.GetOrCreateAsync("session-1", "agent-a");
 
         var channel = CreateChannelAdapter("web", supportsStreaming: false);
-        var host = CreateHost(
+        await using var host = CreateHost(
             supervisor.Object,
             router.Object,
             sessions,
@@ -431,7 +467,7 @@ public sealed class GatewayHostTests
         var sessions = new InMemorySessionStore();
         await sessions.GetOrCreateAsync("session-1", "agent-a");
         var channel = CreateChannelAdapter("web", supportsStreaming: false);
-        var host = CreateHost(
+        await using var host = CreateHost(
             supervisor.Object,
             router.Object,
             sessions,
@@ -462,7 +498,7 @@ public sealed class GatewayHostTests
         sessions.Setup(s => s.GetAsync("session-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
         var channel = CreateChannelAdapter("web", supportsStreaming: false);
-        var host = CreateHost(supervisor.Object, router.Object, sessions.Object, new RecordingActivityBroadcaster(), CreateChannelManager(channel.Object));
+        await using var host = CreateHost(supervisor.Object, router.Object, sessions.Object, new RecordingActivityBroadcaster(), CreateChannelManager(channel.Object));
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
         await host.DispatchAsync(CreateMessage("again", sessionId: "session-1"));
@@ -501,7 +537,7 @@ public sealed class GatewayHostTests
                     ? secondChannel.Object
                     : null);
 
-        var host = new GatewayHost(
+        await using var host = new GatewayHost(
             supervisor.Object,
             Mock.Of<IMessageRouter>(),
             new InMemorySessionStore(),
