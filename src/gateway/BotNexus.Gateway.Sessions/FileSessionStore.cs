@@ -196,8 +196,15 @@ public sealed class FileSessionStore : ISessionStore
             var entries = new List<SessionEntry>();
             foreach (var line in lines.Where(l => !string.IsNullOrWhiteSpace(l)))
             {
-                var entry = JsonSerializer.Deserialize<SessionEntry>(line, JsonOptions);
-                if (entry is not null) entries.Add(entry);
+                try
+                {
+                    var entry = JsonSerializer.Deserialize<SessionEntry>(line, JsonOptions);
+                    if (entry is not null) entries.Add(entry);
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "Skipping malformed session history entry for session {SessionId}", sessionId);
+                }
             }
 
             if (entries.Count > 0)
