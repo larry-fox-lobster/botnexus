@@ -193,3 +193,8 @@
 - Implemented spawn/list/get/kill lifecycle with child session IDs in the format `{parentSessionId}::subagent::{uniqueId}`, ownership checks for kills, and per-session concurrent spawn limit enforcement from `GatewayOptions.SubAgents.MaxConcurrentPerSession`.
 - Added background prompt execution with timeout CTS (`CancelAfter`), completion/failure/timeout status transitions, and parent delivery via `IAgentHandle.FollowUpAsync()` in `OnCompletedAsync`.
 - Validation: `dotnet build Q:\repos\botnexus\src\gateway\BotNexus.Gateway\BotNexus.Gateway.csproj --verbosity quiet` ✅
+### 2026-04-10 — Wave 3 sub-agent tools (spawn/list/manage)
+- Implemented `SubAgentSpawnTool`, `SubAgentListTool`, and `SubAgentManageTool` in `src\gateway\BotNexus.Gateway\Tools\` following the existing `SessionTool` pattern (Tool definition schema, argument prep, execution dispatch, helper methods, and text JSON responses).
+- `spawn_subagent` now builds `SubAgentSpawnRequest` with parent agent/session context and returns `{ subAgentId, sessionId, status, name }` from manager results.
+- `list_subagents` returns scoped sub-agent summaries for the current parent session including status/model/turn counts and task previews; `manage_subagent` supports `status` and `kill` actions with validation.
+- Validation: `dotnet build Q:\repos\botnexus\src\gateway\BotNexus.Gateway\BotNexus.Gateway.csproj --verbosity quiet` ✅
