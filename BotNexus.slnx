@@ -60,6 +60,7 @@
     <Project Path="tests/BotNexus.Providers.Copilot.Tests/BotNexus.Providers.Copilot.Tests.csproj" />
     <Project Path="tests/BotNexus.CodingAgent.Tests/BotNexus.CodingAgent.Tests.csproj" />
     <Project Path="tests/BotNexus.Cron.Tests/BotNexus.Cron.Tests.csproj" />
+    <Project Path="tests/BotNexus.Extensions.WebTools.Tests/BotNexus.Extensions.WebTools.Tests.csproj" />
     <Project Path="tests/BotNexus.Gateway.Tests/BotNexus.Gateway.Tests.csproj" />
     <Project Path="tests/BotNexus.Skills.Tests/BotNexus.Skills.Tests.csproj" />
     <Project Path="tests/BotNexus.Extensions.Mcp.Tests/BotNexus.Extensions.Mcp.Tests.csproj" />
