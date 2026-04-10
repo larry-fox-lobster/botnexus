@@ -187,3 +187,9 @@
 ### 2026-04-09 — Extension loader DI safety for tools + hook handlers
 - Updated `AssemblyLoadContextExtensionLoader` to skip auto-registering `IAgentTool` implementations unless they expose at least one DI-compatible constructor (interfaces/abstract deps, IServiceProvider, or optional defaults).
 - Switched extension hook handler activation from `Activator.CreateInstance` to `ActivatorUtilities.CreateInstance` using a temporary service provider built from the current `IServiceCollection`, so constructor-injected hook handlers can load safely.
+
+### 2026-04-11 — DefaultSubAgentManager core orchestration
+- Added `DefaultSubAgentManager` in `src\gateway\BotNexus.Gateway\Agents\` implementing `ISubAgentManager` with in-memory `ConcurrentDictionary` tracking for sub-agent state and parent→children mappings.
+- Implemented spawn/list/get/kill lifecycle with child session IDs in the format `{parentSessionId}::subagent::{uniqueId}`, ownership checks for kills, and per-session concurrent spawn limit enforcement from `GatewayOptions.SubAgents.MaxConcurrentPerSession`.
+- Added background prompt execution with timeout CTS (`CancelAfter`), completion/failure/timeout status transitions, and parent delivery via `IAgentHandle.FollowUpAsync()` in `OnCompletedAsync`.
+- Validation: `dotnet build Q:\repos\botnexus\src\gateway\BotNexus.Gateway\BotNexus.Gateway.csproj --verbosity quiet` ✅
