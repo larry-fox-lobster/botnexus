@@ -54,11 +54,24 @@ public sealed class GatewayHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, GetSessionGroup(sessionId));
 
         var session = await _sessions.GetOrCreateAsync(sessionId, agentId, Context.ConnectionAborted);
+
+        var needsSave = false;
         if (session.Status == SessionStatus.Expired)
         {
             _logger.LogInformation("Reactivating expired session {SessionId} on join", sessionId);
             session.Status = SessionStatus.Active;
             session.ExpiresAt = null;
+            needsSave = true;
+        }
+
+        if (session.ChannelType is null)
+        {
+            session.ChannelType = "signalr";
+            needsSave = true;
+        }
+
+        if (needsSave)
+        {
             await _sessions.SaveAsync(session, Context.ConnectionAborted);
         }
 
@@ -70,6 +83,7 @@ public sealed class GatewayHub : Hub
             messageCount = session.History.Count,
             isResumed = session.History.Count > 0,
             status = session.Status.ToString(),
+            channelType = session.ChannelType,
             createdAt = session.CreatedAt,
             updatedAt = session.UpdatedAt
         };

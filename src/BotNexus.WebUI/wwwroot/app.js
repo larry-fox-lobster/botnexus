@@ -1690,7 +1690,7 @@
             );
             const latestByChannel = new Map();
             for (const s of agentSessions) {
-                const key = (s.channelType || 'signalr').toLowerCase();
+                const key = normalizeChannelKey(s.channelType);
                 if (!latestByChannel.has(key)) latestByChannel.set(key, s);
             }
 
@@ -1713,16 +1713,16 @@
                 channelsDiv.appendChild(emptyChannelEl);
             } else {
                 for (const latestSession of latestByChannel.values()) {
-                    const channelType = latestSession.channelType || 'signalr';
+                    const channelType = normalizeChannelKey(latestSession.channelType);
                     const displayName = channelDisplayName(channelType);
                     const isActive = currentAgentId === agentId &&
-                        currentChannelType && currentChannelType.toLowerCase() === channelType.toLowerCase();
+                        currentChannelType && normalizeChannelKey(currentChannelType) === channelType;
 
                     const channelEl = document.createElement('div');
                     channelEl.className = 'list-item' + (isActive ? ' active' : '');
                     channelEl.dataset.sessionId = latestSession.sessionId;
                     channelEl.dataset.agentId = agentId;
-                    channelEl.dataset.channelType = channelType.toLowerCase();
+                    channelEl.dataset.channelType = channelType;
 
                     const timeStr = relativeTime(latestSession.updatedAt || latestSession.createdAt);
                     const emoji = channelEmoji(channelType);
@@ -1802,7 +1802,7 @@
         elSessionsList.querySelectorAll('.list-item').forEach(el => {
             el.classList.toggle('active',
                 el.dataset.agentId === agentId &&
-                (el.dataset.channelType || '').toLowerCase() === channelType.toLowerCase());
+                normalizeChannelKey(el.dataset.channelType) === normalizeChannelKey(channelType));
         });
 
         showView('chat-view');
@@ -1827,8 +1827,9 @@
         }
 
         // Filter to matching channel type and sort oldest-first
+        const normalizedChannel = normalizeChannelKey(channelType);
         const channelSessions = allSessions
-            .filter(s => (s.channelType || 'signalr').toLowerCase() === channelType.toLowerCase())
+            .filter(s => normalizeChannelKey(s.channelType) === normalizedChannel)
             .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
 
         if (channelSessions.length === 0) {
@@ -2032,6 +2033,13 @@
     function channelEmoji(name) {
         const map = { websocket: '🌐', signalr: '🌐', 'web-chat': '💬', 'web chat': '💬', telegram: '✈️', discord: '🎮', slack: '💼', tui: '🖥️' };
         return map[(name || '').toLowerCase()] || '📡';
+    }
+
+    /** Normalize raw channel type to a canonical key used for grouping and filtering. */
+    function normalizeChannelKey(raw) {
+        const n = (raw || '').toLowerCase();
+        if (!n || n === 'signalr' || n === 'web-chat') return 'web chat';
+        return n;
     }
 
     function channelDisplayName(name) {
