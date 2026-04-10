@@ -6,14 +6,6 @@ description: >-
   you have a spec ready and want the entire team to plan and deliver it
   with all ceremonies.
 agent: squad
-tools:
-  - task
-  - powershell
-  - view
-  - edit
-  - create
-  - grep
-  - glob
 ---
 
 # Deliver Spec — Full Squad Cycle
