@@ -13,6 +13,7 @@
     let currentSessionId = null;
     let currentAgentId = null;
     let currentChannelType = null;
+    let sessionSwitchInProgress = false;
     let connectionId = null;
     let responseTimeoutTimer = null;
     let steerIndicatorTimer = null;
@@ -257,10 +258,12 @@
 
     function updateSendButtonState() {
         const hasText = !!elChatInput.value.trim();
-        if (isRestRequestInFlight) {
+        if (sessionSwitchInProgress || isRestRequestInFlight) {
             elBtnSend.disabled = true;
+            elChatInput.disabled = sessionSwitchInProgress;
             return;
         }
+        elChatInput.disabled = false;
         if (isCurrentSessionStreaming() && connection?.state === signalR.HubConnectionState.Connected) {
             elBtnSend.disabled = !hasText;
             if (sendModeFollowUp) {
@@ -1497,8 +1500,9 @@
     // =========================================================================
 
     async function sendMessage() {
+        if (sessionSwitchInProgress || !currentAgentId) return;
         const text = elChatInput.value.trim();
-        if (!text || !currentAgentId) return;
+        if (!text) return;
 
         // Intercept slash commands
         if (text.startsWith('/')) {
@@ -1776,6 +1780,9 @@
     }
 
     async function openAgentTimeline(agentId, channelType) {
+        sessionSwitchInProgress = true;
+        updateSendButtonState();
+        try {
         // W1.1 + W3.2: Clear UI display state on session switch.
         // Don't clear outgoing session's per-session state — it may still be streaming.
         clearResponseTimeout();
@@ -1876,6 +1883,10 @@
         elChatInput.focus();
         updateSendButtonState();
         loadChatHeaderModels();
+        } finally {
+            sessionSwitchInProgress = false;
+            updateSendButtonState();
+        }
     }
 
     function renderSessionDivider(session) {
