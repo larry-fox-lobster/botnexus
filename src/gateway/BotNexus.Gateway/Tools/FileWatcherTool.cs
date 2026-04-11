@@ -194,9 +194,14 @@ public sealed class FileWatcherTool(IOptions<FileWatcherToolOptions> options) : 
         return value switch
         {
             JsonElement { ValueKind: JsonValueKind.Number } element when element.TryGetInt32(out var number) => number,
+            JsonElement { ValueKind: JsonValueKind.Number } element => (int)element.GetDouble(),
             JsonElement { ValueKind: JsonValueKind.String } element when int.TryParse(element.GetString(), out var parsed) => parsed,
+            JsonElement { ValueKind: JsonValueKind.String } element when double.TryParse(element.GetString(), out var d) => (int)d,
             int number => number,
+            long l => (int)l,
+            double d => (int)d,
             string text when int.TryParse(text, out var parsed) => parsed,
+            string text when double.TryParse(text, out var d) => (int)d,
             _ => defaultValue
         };
     }
