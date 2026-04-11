@@ -186,3 +186,9 @@
   - dotnet build tests\BotNexus.WebUI.Tests --verbosity quiet ✅
   - BOTNEXUS_RUN_PLAYWRIGHT_E2E=1 dotnet test tests\BotNexus.WebUI.Tests --no-build --filter "FullyQualifiedName~SessionSwitching" --verbosity normal ✅ (7/7)
   - BOTNEXUS_RUN_PLAYWRIGHT_E2E=1 dotnet test tests\BotNexus.WebUI.Tests --no-build --verbosity minimal ✅ (83/83)
+## 2026-04-11 - DelayTool unit test suite (Hermes)
+- Added `tests/BotNexus.Gateway.Tests/Tools/DelayToolTests.cs` with 9 tests from design spec: metadata, duration wait, max clamp, min clamp, success message, cancellation behavior, reason propagation, configured max, and required-argument validation.
+- Validation:
+  - `dotnet build tests\BotNexus.Gateway.Tests --verbosity quiet` ✅
+  - `dotnet test tests\BotNexus.Gateway.Tests --filter "FullyQualifiedName~DelayTool" --verbosity minimal` ❌ (9 total, 8 passed, 1 failed)
+- Current failing test: `DelayTool_IncludesReasonInResult` (tool currently returns `"Waited 1 seconds. Ready to continue."` without reason text).
