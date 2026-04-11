@@ -141,6 +141,9 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         var delayToolOptions = _serviceProvider.GetService<IOptions<DelayToolOptions>>() ?? Options.Create(new DelayToolOptions());
         tools.Add(new DelayTool(delayToolOptions));
 
+        var fileWatcherToolOptions = _serviceProvider.GetService<IOptions<FileWatcherToolOptions>>() ?? Options.Create(new FileWatcherToolOptions());
+        tools.Add(new FileWatcherTool(fileWatcherToolOptions));
+
         var subAgentOptions = _serviceProvider.GetService<IOptions<GatewayOptions>>()?.Value.SubAgents;
         var subAgentManager = _serviceProvider.GetService<ISubAgentManager>();
         var isSubAgentSession = context.SessionId.Contains("::subagent::", StringComparison.OrdinalIgnoreCase);

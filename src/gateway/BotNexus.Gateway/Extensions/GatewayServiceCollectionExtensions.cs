@@ -54,6 +54,7 @@ public static class GatewayServiceCollectionExtensions
         services.AddOptions<SessionCleanupOptions>();
         services.AddOptions<SessionWarmupOptions>();
         services.AddOptions<DelayToolOptions>();
+        services.AddOptions<FileWatcherToolOptions>();
         services.AddOptions<CompactionOptions>();
         if (configure is not null)
             services.Configure(configure);
@@ -63,6 +64,7 @@ public static class GatewayServiceCollectionExtensions
             services.Configure<SessionWarmupOptions>(config.GetSection("gateway:sessionWarmup"));
             services.Configure<SubAgentOptions>(config.GetSection("gateway:subAgents"));
             services.Configure<DelayToolOptions>(config.GetSection("gateway:delayTool"));
+            services.Configure<FileWatcherToolOptions>(config.GetSection("gateway:fileWatcherTool"));
 
             var compactionSection = config.GetSection("gateway:compaction");
             if (compactionSection.Exists())
