@@ -49,32 +49,28 @@ public sealed class ErrorHandlingE2ETests
     }
 
     [PlaywrightFact(Timeout = 90000)]
-    public async Task JoinSessionFailed_ShowsSystemMessage()
+    public async Task SubscribeAllFailed_DoesNotBlockOpeningTimeline()
     {
         await using var host = await _fixture.CreatePageAsync();
         await host.Page.AddInitScriptAsync(
             @"() => {
                 const proto = window.signalR?.HubConnection?.prototype;
-                if (!proto || proto.__joinFailPatched) return;
+                if (!proto || proto.__subscribeAllFailPatched) return;
                 const original = proto.invoke;
                 proto.invoke = function(method, ...args) {
-                    if (method === 'JoinSession') {
-                        return Promise.reject(new Error('join failed (test)'));
+                    if (method === 'SubscribeAll') {
+                        return Promise.reject(new Error('subscribe all failed (test)'));
                     }
                     return original.call(this, method, ...args);
                 };
-                proto.__joinFailPatched = true;
+                proto.__subscribeAllFailPatched = true;
             }");
         await host.Page.ReloadAsync();
         await host.WaitForAgentEntryAsync(AgentA);
 
         await host.Page.ClickAsync($"#sessions-list .list-item[data-agent-id='{AgentA}'][data-channel-type='web chat']");
-        await Task.Delay(500);
-        var chatText = await host.Page.Locator("#chat-messages").InnerTextAsync();
-        if (chatText.Contains("Failed to join session", StringComparison.OrdinalIgnoreCase))
-            return;
-
         await Assertions.Expect(host.Page.Locator("#chat-view")).ToBeVisibleAsync();
+        await Assertions.Expect(host.Page.Locator("#chat-input")).ToBeEditableAsync();
     }
 
     private async Task<WebUiE2ETestHost> OpenChatAsync()

@@ -26,6 +26,7 @@ internal sealed class WebUiE2ETestHost : IAsyncDisposable
     private readonly TestSubAgentManager _subAgentManager;
     private readonly IBrowserContext _browserContext;
     private readonly IPage _page;
+    private readonly ConcurrentQueue<string> _consoleMessages = new();
 
     internal WebUiE2ETestHost(
         RecordingAgentSupervisor supervisor,
@@ -41,6 +42,7 @@ internal sealed class WebUiE2ETestHost : IAsyncDisposable
         BaseUrl = baseUrl;
         _browserContext = browserContext;
         _page = page;
+        _page.Console += (_, message) => _consoleMessages.Enqueue(message.Text);
     }
 
     public HttpClient ApiClient { get; }
@@ -110,6 +112,25 @@ internal sealed class WebUiE2ETestHost : IAsyncDisposable
         }
 
         throw new TimeoutException($"Timed out waiting for {expectedCount} dispatches. Saw {Supervisor.Dispatches.Count(d => d.Kind == DispatchKind.Send)}.");
+    }
+
+    public int GetHubInvocationCount(string method)
+    {
+        var marker = $"[BotNexus:hub] → {method}";
+        return _consoleMessages.Count(message => message.Contains(marker, StringComparison.Ordinal));
+    }
+
+    public async Task WaitForConsoleMessageAsync(string fragment, int timeoutMs = 15000)
+    {
+        var start = DateTimeOffset.UtcNow;
+        while ((DateTimeOffset.UtcNow - start).TotalMilliseconds < timeoutMs)
+        {
+            if (_consoleMessages.Any(message => message.Contains(fragment, StringComparison.Ordinal)))
+                return;
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"Timed out waiting for console message containing '{fragment}'.");
     }
 
     public Task WaitForProcessingBarAsync(int timeoutMs = 15000)

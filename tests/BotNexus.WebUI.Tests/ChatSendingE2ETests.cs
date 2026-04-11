@@ -59,7 +59,7 @@ public sealed class ChatSendingE2ETests
     {
         var host = await OpenChatAsync();
         await host.SendMessageAsync("bubble-check");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .message.user")).ToContainTextAsync("bubble-check");
+        await Assertions.Expect(host.Page.Locator("#chat-messages .message.user").Last).ToContainTextAsync("bubble-check");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -82,7 +82,7 @@ public sealed class ChatSendingE2ETests
     }
 
     [PlaywrightFact(Timeout = 90000)]
-    public async Task SendButton_DisabledDuringSessionSwitch()
+    public async Task SendButton_RemainsEnabledDuringSessionSwitch()
     {
         var host = await OpenChatAsync();
         await host.SendMessageAsync("switch-seed-a");
@@ -92,8 +92,9 @@ public sealed class ChatSendingE2ETests
         await host.WaitForStreamingCompleteAsync();
 
         await host.Page.Locator($"#sessions-list .list-item[data-agent-id='{AgentA}'][data-channel-type='web chat']").First.ClickAsync();
-        await Assertions.Expect(host.Page.Locator("#chat-input")).ToBeDisabledAsync(new() { Timeout = 5000 });
-        await Assertions.Expect(host.Page.Locator("#btn-send")).ToBeDisabledAsync(new() { Timeout = 5000 });
+        await Assertions.Expect(host.Page.Locator("#chat-input")).ToBeEditableAsync(new() { Timeout = 5000 });
+        await host.Page.FillAsync("#chat-input", "switch-ready");
+        await Assertions.Expect(host.Page.Locator("#btn-send")).ToBeEnabledAsync(new() { Timeout = 5000 });
     }
 
     private async Task<WebUiE2ETestHost> OpenChatAsync()

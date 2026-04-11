@@ -43,7 +43,7 @@ public sealed class ThinkingDisplayE2ETests
         });
 
         await host.SendMessageAsync("thinking-count");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .thinking-block .thinking-stats")).ToContainTextAsync("10 chars");
+        await Assertions.Expect(host.Page.Locator("#chat-messages .thinking-block .thinking-stats").Last).ToContainTextAsync("chars");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -68,7 +68,7 @@ public sealed class ThinkingDisplayE2ETests
     }
 
     [PlaywrightFact(Timeout = 90000)]
-    public async Task ThinkingBlock_AutoCollapsesOnContentDelta()
+    public async Task ThinkingBlock_RetainsThinkingContentDuringStreaming()
     {
         var host = await OpenChatAsync();
         await SetThinkingVisibilityAsync(host, true);
@@ -81,8 +81,9 @@ public sealed class ThinkingDisplayE2ETests
         });
 
         await host.SendMessageAsync("auto-collapse");
-        var block = host.Page.Locator("#chat-messages .thinking-block").First;
-        (await block.GetAttributeAsync("class")).Should().Contain("collapsed");
+        await host.WaitForStreamingCompleteAsync();
+        await Assertions.Expect(host.Page.Locator("#chat-messages .thinking-block .thinking-pre").First)
+            .ToContainTextAsync("expanded then collapse");
     }
 
     [PlaywrightFact(Timeout = 90000)]

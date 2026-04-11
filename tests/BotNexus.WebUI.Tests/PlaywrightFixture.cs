@@ -88,6 +88,9 @@ public sealed class PlaywrightFixture : IAsyncLifetime
         await DisposeInfrastructureAsync();
     }
 
+    internal void SeedHistoricalSessions(string agentId, int additionalSessionCount)
+        => _sessionStore?.SeedAdditionalSessions(agentId, additionalSessionCount);
+
     private async Task RestartInfrastructureAsync()
     {
         await DisposeInfrastructureAsync();
@@ -174,6 +177,18 @@ public sealed class PlaywrightFixture : IAsyncLifetime
 
                 services.RemoveAll<ISubAgentManager>();
                 services.AddSingleton<ISubAgentManager>(subAgentManager);
+
+                services.RemoveAll<ISessionWarmupService>();
+                services.AddSingleton<ISessionWarmupService>(new TestSessionWarmupService(sessionStore));
+
+                services.PostConfigure<PlatformConfig>(config =>
+                {
+                    config.RateLimit = new RateLimitConfig
+                    {
+                        RequestsPerMinute = 10000,
+                        WindowSeconds = 60
+                    };
+                });
             });
         });
     }
@@ -283,4 +298,59 @@ internal sealed class ResettableInMemorySessionStore : ISessionStore
             }
         }
     }
+
+    public void SeedAdditionalSessions(string agentId, int additionalSessionCount)
+    {
+        if (additionalSessionCount <= 0)
+            return;
+
+        lock (_sync)
+        {
+            var baseTime = DateTimeOffset.UtcNow.AddMinutes(-additionalSessionCount - 1);
+            for (var i = 0; i < additionalSessionCount; i++)
+            {
+                var sessionId = $"{agentId}-history-{Guid.NewGuid():N}";
+                _sessions[sessionId] = new GatewaySession
+                {
+                    SessionId = sessionId,
+                    AgentId = agentId,
+                    ChannelType = "web chat",
+                    CallerId = "playwright-tests",
+                    CreatedAt = baseTime.AddMinutes(i),
+                    UpdatedAt = baseTime.AddMinutes(i)
+                };
+            }
+        }
+    }
+}
+
+internal sealed class TestSessionWarmupService(ResettableInMemorySessionStore sessionStore) : ISessionWarmupService
+{
+    public async Task<IReadOnlyList<SessionSummary>> GetAvailableSessionsAsync(CancellationToken ct = default)
+    {
+        var sessions = await sessionStore.ListAsync(null, ct);
+        return sessions
+            .OrderByDescending(session => session.UpdatedAt)
+            .Select(ToSummary)
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<SessionSummary>> GetAvailableSessionsAsync(string agentId, CancellationToken ct = default)
+    {
+        var sessions = await sessionStore.ListAsync(agentId, ct);
+        return sessions
+            .OrderByDescending(session => session.UpdatedAt)
+            .Select(ToSummary)
+            .ToArray();
+    }
+
+    private static SessionSummary ToSummary(GatewaySession session)
+        => new(
+            session.SessionId,
+            session.AgentId,
+            session.ChannelType,
+            session.Status,
+            session.MessageCount,
+            session.CreatedAt,
+            session.UpdatedAt);
 }

@@ -18,7 +18,7 @@ public sealed class HistoryPaginationE2ETests
     public async Task TimelineLoad_ShowsSessionDividers()
     {
         await using var host = await _fixture.CreatePageAsync();
-        await SeedSessionsAsync(host, 2);
+        _fixture.SeedHistoricalSessions(AgentA, 3);
         await host.OpenAgentTimelineAsync(AgentA);
 
         var dividerCount = await host.Page.Locator("#chat-messages .session-divider").CountAsync();
@@ -29,7 +29,7 @@ public sealed class HistoryPaginationE2ETests
     public async Task LoadOlderSessions_ExpandsHistory()
     {
         await using var host = await _fixture.CreatePageAsync();
-        await SeedSessionsAsync(host, 4);
+        _fixture.SeedHistoricalSessions(AgentA, 5);
         await host.OpenAgentTimelineAsync(AgentA);
 
         var loadOlder = host.Page.Locator("#chat-messages .load-more-history").First;
@@ -40,23 +40,6 @@ public sealed class HistoryPaginationE2ETests
         await Assertions.Expect(host.Page.Locator("#chat-messages .load-more-history")).ToHaveCountAsync(0, new() { Timeout = 15000 });
         var after = await host.Page.Locator("#chat-messages .session-divider").CountAsync();
         after.Should().BeGreaterThan(before);
-    }
-
-    private static async Task SeedSessionsAsync(WebUiE2ETestHost host, int sessionCount)
-    {
-        await host.OpenAgentTimelineAsync(AgentA);
-        for (var i = 0; i < sessionCount; i++)
-        {
-            await host.SendMessageAsync($"seed-session-{i}");
-            await host.WaitForStreamingCompleteAsync();
-
-            if (i < sessionCount - 1)
-            {
-                await host.Page.FillAsync("#chat-input", "/new");
-                await host.Page.PressAsync("#chat-input", "Enter");
-                await Assertions.Expect(host.Page.Locator("#chat-messages")).ToContainTextAsync("New session started");
-            }
-        }
     }
 }
 
