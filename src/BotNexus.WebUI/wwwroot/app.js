@@ -13,37 +13,26 @@
     let currentSessionId = null;
     let currentAgentId = null;
     let currentChannelType = null;
-    let sessionSwitchInProgress = false;
-    let timelineSwitchVersion = 0;
     let connectionId = null;
     let responseTimeoutTimer = null;
     let steerIndicatorTimer = null;
-    let isStreaming = false; // DEPRECATED — use isCurrentSessionStreaming(); kept for back-compat reads
     let hasReceivedResponse = false;
     let isRestRequestInFlight = false;
-    let activeMessageId = null; // DEPRECATED — use getSessionState(currentSessionId).activeMessageId
     let showTools = false;
     let showThinking = false;
     let isActivitySubscribed = false;
-    /** @type {Object<string, {toolName:string, args:string, result:string, status:string}>} */
-    let activeToolCalls = {}; // DEPRECATED — use getSessionState(currentSessionId).activeToolCalls
-    let activeToolCount = 0; // DEPRECATED — use getSessionState(currentSessionId).activeToolCount
     /** @type {Array} */
     let agentsCache = [];
     /** @type {Array} */
     let providersCache = [];
     /** @type {Array} */
     let modelsCache = [];
-    /** @type {string} */
-    let thinkingBuffer = ''; // DEPRECATED — use getSessionState(currentSessionId).thinkingBuffer
     /** @type {function|null} */
     let confirmCallback = null;
     /** @type {number} */
     let messageQueueCount = 0;
     /** @type {Array<string>} */
     let pendingQueuedMessages = [];
-    /** @type {number} */
-    let toolCallDepth = 0; // DEPRECATED — use getSessionState(currentSessionId).toolCallDepth
     /** @type {boolean} */
     let sendModeFollowUp = false;
     /** @type {WebSocket|null} */
@@ -62,6 +51,10 @@
         if (!sessionId) {
             return { isStreaming: false, activeMessageId: null, activeToolCalls: {}, activeToolCount: 0, thinkingBuffer: '', toolCallDepth: 0, toolStartTimes: {} };
         }
+        // Route through SessionStore if available
+        const store = storeManager.getStore(sessionId);
+        if (store) return store.streamState;
+        // Fallback to legacy Map for sessions not yet in store
         if (sessionState.has(sessionId)) {
             const state = sessionState.get(sessionId);
             sessionState.delete(sessionId);
@@ -83,6 +76,160 @@
 
     function cleanupSessionState(sessionId) {
         sessionState.delete(sessionId);
+    }
+
+    // ─── Multi-Session Store (Phase 2) ──────────────────────────
+    // All SignalR events route to per-session stores.
+    // switchView() is synchronous DOM re-render — no join/leave on switch.
+
+    class SessionStore {
+        constructor(sessionId, info = {}) {
+            this.sessionId = sessionId;
+            this.agentId = info.agentId || null;
+            this.channelType = info.channelType || null;
+            this.streamState = {
+                isStreaming: false,
+                activeMessageId: null,
+                activeToolCalls: {},
+                activeToolCount: 0,
+                thinkingBuffer: '',
+                toolCallDepth: 0,
+                toolStartTimes: {},
+            };
+            this.cachedDom = null;
+            this.timelineMeta = null;
+            this.lastViewed = null;
+            this.unreadCount = 0;
+        }
+        get isStreaming() { return this.streamState.isStreaming; }
+    }
+
+    class SessionStoreManager {
+        #stores = new Map();
+        #maxStores = 20;
+        #activeViewId = null;
+
+        get activeViewId() { return this.#activeViewId; }
+
+        subscribe(sessions) {
+            for (const info of sessions) {
+                this.getOrCreateStore(info.sessionId, info);
+            }
+        }
+
+        switchView(sessionId) {
+            // Save current view's DOM before switching away
+            if (this.#activeViewId && this.#activeViewId !== sessionId) {
+                const oldStore = this.#stores.get(this.#activeViewId);
+                if (oldStore && elChatMessages.children.length > 0) {
+                    oldStore.cachedDom = document.createDocumentFragment();
+                    while (elChatMessages.firstChild) {
+                        oldStore.cachedDom.appendChild(elChatMessages.firstChild);
+                    }
+                    oldStore.timelineMeta = elChatMeta.textContent;
+                }
+            }
+
+            this.#activeViewId = sessionId;
+            const store = this.#stores.get(sessionId);
+            if (!store) return false;
+            store.unreadCount = 0;
+            store.lastViewed = new Date();
+
+            // Update backward-compat aliases
+            currentSessionId = sessionId;
+            currentAgentId = store.agentId;
+            currentChannelType = store.channelType;
+
+            // Restore cached DOM if available (warm switch — zero server calls)
+            if (store.cachedDom) {
+                elChatMessages.innerHTML = '';
+                elChatMessages.appendChild(store.cachedDom);
+                store.cachedDom = null;
+                if (store.timelineMeta) elChatMeta.textContent = store.timelineMeta;
+                updateSessionIdDisplay();
+                updateSidebarBadge(sessionId, 0);
+                return true; // warm switch completed
+            }
+
+            updateSessionIdDisplay();
+            return false; // cold start — caller loads content
+        }
+
+        routeEvent(evt) {
+            const sessionId = evt?.sessionId || this.#activeViewId;
+            if (!sessionId) return { isActive: false };
+            const store = this.getOrCreateStore(sessionId);
+            const isActive = sessionId === this.#activeViewId;
+            if (!isActive) {
+                store.unreadCount++;
+                updateSidebarBadge(sessionId, store.unreadCount);
+            }
+            return { isActive };
+        }
+
+        setActiveView(sessionId, agentId, channelType) {
+            this.#activeViewId = sessionId;
+            currentSessionId = sessionId;
+            currentAgentId = agentId;
+            currentChannelType = channelType;
+        }
+
+        getOrCreateStore(sessionId, info = {}) {
+            if (this.#stores.has(sessionId)) {
+                const s = this.#stores.get(sessionId);
+                this.#stores.delete(sessionId);
+                this.#stores.set(sessionId, s);
+                if (info.agentId && !s.agentId) s.agentId = info.agentId;
+                if (info.channelType && !s.channelType) s.channelType = info.channelType;
+                return s;
+            }
+            const store = new SessionStore(sessionId, info);
+            this.#stores.set(sessionId, store);
+            if (this.#stores.size > this.#maxStores) {
+                for (const [id, s] of this.#stores) {
+                    if (!s.isStreaming && id !== this.#activeViewId) {
+                        this.#stores.delete(id);
+                        break;
+                    }
+                }
+            }
+            return store;
+        }
+
+        findStoreForAgent(agentId, channelType) {
+            const normalized = normalizeChannelKey(channelType);
+            let latest = null;
+            for (const store of this.#stores.values()) {
+                if (store.agentId === agentId &&
+                    normalizeChannelKey(store.channelType) === normalized) {
+                    latest = store;
+                }
+            }
+            return latest;
+        }
+
+        getStore(sessionId) {
+            return this.#stores.get(sessionId) || null;
+        }
+    }
+
+    const storeManager = new SessionStoreManager();
+
+    function updateSidebarBadge(sessionId, count) {
+        const el = elSessionsList.querySelector(`.list-item[data-session-id="${CSS.escape(sessionId)}"]`);
+        if (!el) return;
+        let badge = el.querySelector('.unread-badge');
+        if (count > 0) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'unread-badge';
+                el.querySelector('.list-item-row')?.appendChild(badge);
+            }
+            badge.textContent = count > 99 ? '99+' : count;
+        } else if (badge) {
+            badge.remove();
+        }
     }
 
     // --- DOM refs ---
@@ -259,9 +406,8 @@
 
     function updateSendButtonState() {
         const hasText = !!elChatInput.value.trim();
-        if (sessionSwitchInProgress || isRestRequestInFlight) {
+        if (isRestRequestInFlight) {
             elBtnSend.disabled = true;
-            elChatInput.disabled = sessionSwitchInProgress;
             return;
         }
         elChatInput.disabled = false;
@@ -480,12 +626,6 @@
 
         debugLog('init', `SignalR hub builder created (client v${CLIENT_VERSION})`);
 
-        // Session guard — drop stale events from a session we've already left
-        function isEventForCurrentSession(evt) {
-            if (evt?.sessionId && evt.sessionId !== currentSessionId) return false;
-            return true;
-        }
-
         // Server → Client methods
         connection.on('Connected', (data) => {
             connectionId = data.connectionId;
@@ -493,8 +633,23 @@
             setStatus('connected');
             hideConnectionBanner();
             debugLog('lifecycle', 'Connected! connectionId:', connectionId);
-            // Defer session join to next tick to avoid re-entrant hub calls
-            if (currentSessionId && currentAgentId) {
+
+            // Phase 2: Subscribe to all sessions (multi-session model)
+            if (data.capabilities?.multiSession) {
+                hubInvoke('SubscribeAll').then(result => {
+                    if (result?.sessions) {
+                        storeManager.subscribe(result.sessions);
+                        debugLog('lifecycle', `SubscribeAll: ${result.sessions.length} sessions`);
+                    }
+                }).catch(err => {
+                    debugLog('lifecycle', 'SubscribeAll failed, falling back:', err.message);
+                    // Fallback: re-join current session if active
+                    if (currentSessionId && currentAgentId) {
+                        setTimeout(() => joinSession(currentAgentId, currentSessionId), 0);
+                    }
+                });
+            } else if (currentSessionId && currentAgentId) {
+                // Legacy fallback for servers without multi-session
                 setTimeout(() => joinSession(currentAgentId, currentSessionId), 0);
             }
         });
@@ -503,9 +658,9 @@
         // JoinSession returns the data directly via invoke result.
 
         connection.on('SessionReset', (data) => {
-            // Guard: ignore resets for sessions we've already left
-            if (data?.sessionId && data.sessionId !== currentSessionId) return;
-            cleanupSessionState(currentSessionId);
+            const sid = data?.sessionId || storeManager.activeViewId;
+            cleanupSessionState(sid);
+            if (sid !== storeManager.activeViewId) return;
             currentSessionId = null;
             updateSessionIdDisplay();
             clearSubAgentPanel();
@@ -515,23 +670,24 @@
         });
 
         connection.on('MessageStart', (evt) => {
-            if (!isEventForCurrentSession(evt)) return;
-            // Finalize any previous streaming message before starting new one
-            const prevStreaming = elChatMessages.querySelector('.message.assistant.streaming');
-            if (prevStreaming) {
-                prevStreaming.classList.remove('streaming', 'message-streaming');
-                const timeEl = prevStreaming.querySelector('.msg-time');
-                if (timeEl) timeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            }
-            
+            const sid = evt?.sessionId || storeManager.activeViewId;
             {
-                const ss = getSessionState(currentSessionId);
+                const ss = getSessionState(sid);
                 ss.activeMessageId = evt.messageId;
                 ss.isStreaming = true;
                 ss.activeToolCount = 0;
                 ss.thinkingBuffer = '';
                 ss.toolCallDepth = 0;
                 ss.toolStartTimes = {};
+            }
+            const { isActive } = storeManager.routeEvent(evt);
+            if (!isActive) return;
+            // Finalize any previous streaming message before starting new one
+            const prevStreaming = elChatMessages.querySelector('.message.assistant.streaming');
+            if (prevStreaming) {
+                prevStreaming.classList.remove('streaming', 'message-streaming');
+                const timeEl = prevStreaming.querySelector('.msg-time');
+                if (timeEl) timeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }
             setSendingState(false);
             elBtnAbort.classList.remove('hidden');
@@ -543,7 +699,8 @@
         });
 
         connection.on('ContentDelta', (evt) => {
-            if (!isEventForCurrentSession(evt)) return;
+            const { isActive } = storeManager.routeEvent(evt);
+            if (!isActive) return;
             removeStreamingIndicator();
             markResponseReceived();
             autoCollapseThinking();
@@ -554,21 +711,50 @@
         });
 
         connection.on('ThinkingDelta', (evt) => {
-            if (!isEventForCurrentSession(evt)) return;
-            showProcessingStatus('Thinking...', '💭');
+            const sid = evt?.sessionId || storeManager.activeViewId;
+            const ss = getSessionState(sid);
             const text = evt?.thinkingContent || evt?.delta || '';
+            if (text) ss.thinkingBuffer += text;
+            const { isActive } = storeManager.routeEvent(evt);
+            if (!isActive) return;
+            showProcessingStatus('Thinking...', '💭');
             if (text) handleThinkingDelta({ delta: text });
         });
 
         connection.on('ToolStart', (evt) => {
-            if (!isEventForCurrentSession(evt)) return;
+            const sid = evt?.sessionId || storeManager.activeViewId;
+            const { isActive } = storeManager.routeEvent(evt);
+            if (!isActive) {
+                // Update store state even for background sessions
+                const ss = getSessionState(sid);
+                const callId = evt.toolCallId || `tc-${Date.now()}`;
+                ss.activeToolCount++;
+                ss.toolStartTimes[callId] = Date.now();
+                ss.activeToolCalls[callId] = {
+                    toolName: evt.toolName || 'unknown', args: evt.toolArgs || '',
+                    result: '', status: 'running', depth: evt.depth || ss.toolCallDepth
+                };
+                return;
+            }
             showProcessingStatus(`Using tool: ${evt.toolName || 'tool'}`, '🔧');
             handleToolStart(evt);
             trackActivity('tool', currentAgentId, `🔧 ${evt.toolName || 'tool'} started`);
         });
 
         connection.on('ToolEnd', (evt) => {
-            if (!isEventForCurrentSession(evt)) return;
+            const sid = evt?.sessionId || storeManager.activeViewId;
+            const { isActive } = storeManager.routeEvent(evt);
+            if (!isActive) {
+                // Update store state even for background sessions
+                const ss = getSessionState(sid);
+                const callId = evt.toolCallId || 'unknown';
+                if (ss.activeToolCalls[callId]) {
+                    ss.activeToolCalls[callId].result = evt.toolResult || '';
+                    ss.activeToolCalls[callId].status = evt.toolIsError ? 'error' : 'complete';
+                }
+                delete ss.toolStartTimes[callId];
+                return;
+            }
             handleToolEnd(evt);
             const remainingTools = Object.values(getSessionState(currentSessionId).activeToolCalls).filter(t => t.status === 'running');
             if (remainingTools.length > 0) {
@@ -579,7 +765,19 @@
         });
 
         connection.on('MessageEnd', (evt) => {
-            if (!isEventForCurrentSession(evt)) return;
+            const sid = evt?.sessionId || storeManager.activeViewId;
+            const ss = getSessionState(sid);
+            ss.isStreaming = false;
+            ss.activeMessageId = null;
+            const { isActive } = storeManager.routeEvent(evt);
+            if (!isActive) {
+                ss.activeToolCalls = {};
+                ss.activeToolCount = 0;
+                ss.toolCallDepth = 0;
+                ss.toolStartTimes = {};
+                ss.thinkingBuffer = '';
+                return;
+            }
             markResponseReceived();
             trackActivity('response', currentAgentId, 'Response complete');
             hideProcessingStatus();
@@ -587,7 +785,10 @@
         });
 
         connection.on('Error', (evt) => {
-            if (!isEventForCurrentSession(evt)) return;
+            const sid = evt?.sessionId || storeManager.activeViewId;
+            getSessionState(sid).isStreaming = false;
+            const { isActive } = storeManager.routeEvent(evt);
+            if (!isActive) return;
             markResponseReceived();
             trackActivity('error', currentAgentId, evt?.message || 'Error');
             hideProcessingStatus();
@@ -596,7 +797,7 @@
 
         // Sub-agent lifecycle events
         connection.on('SubAgentSpawned', (evt) => {
-            if (!isEventForCurrentSession(evt)) return;
+            const { isActive } = storeManager.routeEvent(evt);
             if (!evt?.subAgentId) return;
             activeSubAgents.set(evt.subAgentId, {
                 subAgentId: evt.subAgentId,
@@ -609,12 +810,13 @@
                 turnsUsed: 0,
                 resultSummary: null
             });
+            if (!isActive) return;
             renderSubAgentPanel();
             trackActivity('tool', currentAgentId, `🚀 Sub-agent spawned: ${evt.name || evt.subAgentId}`);
         });
 
         connection.on('SubAgentCompleted', (evt) => {
-            if (!isEventForCurrentSession(evt)) return;
+            const { isActive } = storeManager.routeEvent(evt);
             if (!evt?.subAgentId) return;
             const sa = activeSubAgents.get(evt.subAgentId);
             if (sa) {
@@ -623,12 +825,13 @@
                 sa.turnsUsed = evt.turnsUsed || sa.turnsUsed;
                 sa.resultSummary = evt.resultSummary || null;
             }
+            if (!isActive) return;
             renderSubAgentPanel();
             trackActivity('response', currentAgentId, `✅ Sub-agent completed: ${evt.name || evt.subAgentId}`);
         });
 
         connection.on('SubAgentFailed', (evt) => {
-            if (!isEventForCurrentSession(evt)) return;
+            const { isActive } = storeManager.routeEvent(evt);
             if (!evt?.subAgentId) return;
             const sa = activeSubAgents.get(evt.subAgentId);
             if (sa) {
@@ -636,19 +839,21 @@
                 sa.completedAt = evt.completedAt || new Date().toISOString();
                 sa.resultSummary = evt.error || evt.resultSummary || null;
             }
+            if (!isActive) return;
             renderSubAgentPanel();
             const icon = evt.timedOut ? '⏱' : '❌';
             trackActivity('error', currentAgentId, `${icon} Sub-agent failed: ${evt.name || evt.subAgentId}`);
         });
 
         connection.on('SubAgentKilled', (evt) => {
-            if (!isEventForCurrentSession(evt)) return;
+            const { isActive } = storeManager.routeEvent(evt);
             if (!evt?.subAgentId) return;
             const sa = activeSubAgents.get(evt.subAgentId);
             if (sa) {
                 sa.status = 'Killed';
                 sa.completedAt = evt.completedAt || new Date().toISOString();
             }
+            if (!isActive) return;
             renderSubAgentPanel();
             trackActivity('tool', currentAgentId, `🛑 Sub-agent killed: ${evt.name || evt.subAgentId}`);
         });
@@ -663,9 +868,15 @@
             setStatus('connected');
             hideConnectionBanner();
             debugLog('lifecycle', 'Reconnected');
-            if (currentSessionId && currentAgentId) {
-                setTimeout(() => joinSession(currentAgentId, currentSessionId), 0);
-            }
+            // Phase 2: Re-subscribe to all sessions on reconnect
+            hubInvoke('SubscribeAll').then(result => {
+                if (result?.sessions) {
+                    storeManager.subscribe(result.sessions);
+                    debugLog('lifecycle', `Reconnect SubscribeAll: ${result.sessions.length} sessions`);
+                }
+            }).catch(err => {
+                debugLog('lifecycle', 'Reconnect SubscribeAll failed:', err.message);
+            });
         });
 
         connection.onclose(() => {
@@ -694,46 +905,32 @@
         }
     }
 
-    let joinSessionVersion = 0;
-
     async function joinSession(agentId, sessionId) {
         if (!connection || connection.state !== signalR.HubConnectionState.Connected) {
             debugLog('session', 'Cannot join — not connected');
             return;
         }
 
-        // Increment version — any in-flight join with older version will be ignored
-        const myVersion = ++joinSessionVersion;
-        debugLog('session', `Join v${myVersion}: ${agentId} ${sessionId || '(new)'}`);
-
-        // Update agent immediately so SendMessage uses the right agent
+        debugLog('session', `Join: ${agentId} ${sessionId || '(new)'}`);
         currentAgentId = agentId;
-
-        // Leave previous session group
-        if (currentSessionId && currentSessionId !== sessionId) {
-            clearSubAgentPanel();
-            try { await hubInvoke('LeaveSession', currentSessionId); } catch {}
-        }
-
-        // If a newer join was requested while we were leaving, abort
-        if (myVersion !== joinSessionVersion) {
-            debugLog('session', `Join v${myVersion} superseded by v${joinSessionVersion}`);
-            return;
-        }
 
         try {
             const result = await hubInvoke('JoinSession', agentId, sessionId || null);
 
-            // If a newer join was requested while we were joining, discard result
-            if (myVersion !== joinSessionVersion) {
-                debugLog('session', `Join v${myVersion} result discarded (v${joinSessionVersion} active)`);
-                return;
-            }
-
             if (result?.sessionId) {
                 currentSessionId = result.sessionId;
                 currentAgentId = result.agentId || agentId;
-                debugLog('session', `Joined v${myVersion}: session=${currentSessionId} agent=${currentAgentId}`);
+                debugLog('session', `Joined: session=${currentSessionId} agent=${currentAgentId}`);
+
+                // Subscribe to the new session's SignalR group
+                try { await hubInvoke('Subscribe', currentSessionId); } catch {}
+
+                // Register in store manager
+                storeManager.getOrCreateStore(currentSessionId, {
+                    agentId: currentAgentId,
+                    channelType: currentChannelType || 'Web Chat'
+                });
+
                 if (result.isResumed && result.messageCount > 0) {
                     appendSystemMessage(`Session resumed (${result.messageCount} messages).`);
                 }
@@ -741,10 +938,8 @@
                 fetchSubAgents();
             }
         } catch (err) {
-            if (myVersion === joinSessionVersion) {
-                debugLog('session', 'Join failed:', err.message);
-                appendSystemMessage(`Failed to join session: ${err.message}`, 'error');
-            }
+            debugLog('session', 'Join failed:', err.message);
+            appendSystemMessage(`Failed to join session: ${err.message}`, 'error');
         }
     }
 
@@ -1501,7 +1696,7 @@
     // =========================================================================
 
     async function sendMessage() {
-        if (sessionSwitchInProgress || !currentAgentId) return;
+        if (!currentAgentId) return;
         const text = elChatInput.value.trim();
         if (!text) return;
 
@@ -1781,47 +1976,16 @@
     }
 
     async function openAgentTimeline(agentId, channelType) {
-        const myVersion = ++timelineSwitchVersion;
-        sessionSwitchInProgress = true;
-        updateSendButtonState();
-
-        // Safety net: if openAgentTimeline hangs for any reason (slow REST,
-        // SignalR timeout, etc.), force-clear the switch flag after 8 seconds
-        // so the user can always type.  The finally block also clears it, but
-        // this catches truly stuck awaits.
-        const safetyTimer = setTimeout(() => {
-            if (sessionSwitchInProgress && myVersion === timelineSwitchVersion) {
-                sessionSwitchInProgress = false;
-                updateSendButtonState();
-                debugLog('session', `openAgentTimeline safety-net fired for v${myVersion}`);
-            }
-        }, 8000);
-
-        try {
-        // Reset global sending/queue state from the outgoing session so the UI
-        // never stays stuck in "Sending" or "N messages queued" after a switch.
+        // Clean up outgoing session UI state
         if (isRestRequestInFlight) setSendingState(false);
         resetQueue();
-
-        // W1.1 + W3.2: Clear UI display state on session switch.
-        // Don't clear outgoing session's per-session state — it may still be streaming.
         clearResponseTimeout();
         stopToolElapsedTimer();
         hideProcessingStatus();
         elBtnAbort.classList.add('hidden');
         removeStreamingIndicator();
 
-        elChatMessages.innerHTML = '<div class="loading">Loading timeline...</div>';
-
-        // W1.2: Leave old session without creating a throwaway one
-        if (currentSessionId) {
-            try { await hubInvoke('LeaveSession', currentSessionId); } catch(e) {}
-            currentSessionId = null;
-        }
-
-        // Bail if a newer switch was requested while we were leaving
-        if (myVersion !== timelineSwitchVersion) return;
-
+        // Highlight sidebar
         elSessionsList.querySelectorAll('.list-item').forEach(el => {
             el.classList.toggle('active',
                 el.dataset.agentId === agentId &&
@@ -1829,7 +1993,6 @@
         });
 
         showView('chat-view');
-
         if (agentId) elAgentSelect.value = agentId;
         elAgentSelect.classList.add('hidden');
         currentAgentId = agentId;
@@ -1837,9 +2000,24 @@
 
         elChatTitle.textContent = `${agentId} — ${channelDisplayName(channelType)}`;
 
-        // Fetch all sessions for this agent
+        // Warm cache — instant switch, zero server calls
+        const existingStore = storeManager.findStoreForAgent(agentId, channelType);
+        if (existingStore && existingStore.sessionId) {
+            const warm = storeManager.switchView(existingStore.sessionId);
+            if (warm) {
+                scrollToBottom();
+                elChatInput.focus();
+                updateSendButtonState();
+                loadChatHeaderModels();
+                fetchSubAgents();
+                return;
+            }
+        }
+
+        // Cold start — fetch session list
+        elChatMessages.innerHTML = '<div class="loading">Loading timeline...</div>';
+
         const allSessions = await fetchJson(`/sessions?agentId=${encodeURIComponent(agentId)}`);
-        if (myVersion !== timelineSwitchVersion) return;
         if (!allSessions || allSessions.length === 0) {
             elChatMessages.innerHTML = '';
             elChatMeta.textContent = `Agent: ${agentId} · No sessions yet`;
@@ -1850,7 +2028,6 @@
             return;
         }
 
-        // Filter to matching channel type and sort oldest-first
         const normalizedChannel = normalizeChannelKey(channelType);
         const channelSessions = allSessions
             .filter(s => normalizeChannelKey(s.channelType) === normalizedChannel)
@@ -1866,9 +2043,17 @@
             return;
         }
 
+        // Set the latest session as active — no JoinSession call
+        const latestSession = channelSessions[channelSessions.length - 1];
+        storeManager.getOrCreateStore(latestSession.sessionId, {
+            agentId: agentId,
+            channelType: channelType
+        });
+        storeManager.switchView(latestSession.sessionId);
+
         elChatMessages.innerHTML = '';
 
-        // Show only the most recent sessions to keep initial load fast
+        // Render timeline (recent sessions)
         const maxInitialSessions = 3;
         const recentSessions = channelSessions.slice(-maxInitialSessions);
         const olderCount = channelSessions.length - recentSessions.length;
@@ -1893,33 +2078,19 @@
             const count = session.messageCount || 0;
             totalMessages += count;
             await renderSessionMessages(session.sessionId, count);
-            if (myVersion !== timelineSwitchVersion) return;
+            // If user switched away during REST call, bail early
+            if (storeManager.activeViewId !== latestSession.sessionId) return;
         }
 
-        // Join the most recent session for sending new messages
-        const latestSession = channelSessions[channelSessions.length - 1];
-        await joinSession(agentId, latestSession.sessionId);
-        if (myVersion !== timelineSwitchVersion) return;
-
-        // W1.4: Restore agent status if it's still working
+        // Check if agent is still running
         await checkAgentRunningStatus(agentId, latestSession.sessionId);
-        if (myVersion !== timelineSwitchVersion) return;
 
-        elChatMeta.textContent =`Agent: ${agentId} · ${totalMessages} messages across ${channelSessions.length} session${channelSessions.length > 1 ? 's' : ''}`;
+        elChatMeta.textContent = `Agent: ${agentId} · ${totalMessages} messages across ${channelSessions.length} session${channelSessions.length > 1 ? 's' : ''}`;
         updateSessionIdDisplay();
         scrollToBottom();
         elChatInput.focus();
         updateSendButtonState();
         loadChatHeaderModels();
-        } finally {
-            clearTimeout(safetyTimer);
-            // Only the most recent switch should clear the in-progress flag;
-            // superseded calls must not reset it while the newer one is still running.
-            if (myVersion === timelineSwitchVersion) {
-                sessionSwitchInProgress = false;
-                updateSendButtonState();
-            }
-        }
     }
 
     function renderSessionDivider(session) {
