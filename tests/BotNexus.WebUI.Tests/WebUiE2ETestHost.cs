@@ -25,24 +25,28 @@ internal sealed class WebUiE2ETestHost : IAsyncDisposable
     private const string AgentA = "agent-a";
     private const string AgentB = "agent-b";
     private readonly RecordingAgentSupervisor _supervisor;
+    private readonly TestSubAgentManager _subAgentManager;
     private KestrelWebApplicationFactory<Program>? _factory;
     private IPlaywright? _playwright;
     private IBrowser? _browser;
 
-    private WebUiE2ETestHost(RecordingAgentSupervisor supervisor)
+    private WebUiE2ETestHost(RecordingAgentSupervisor supervisor, TestSubAgentManager subAgentManager)
     {
         _supervisor = supervisor;
+        _subAgentManager = subAgentManager;
     }
 
     public required HttpClient ApiClient { get; init; }
     public required IPage Page { get; init; }
     public required string BaseUrl { get; init; }
     public RecordingAgentSupervisor Supervisor => _supervisor;
+    public TestSubAgentManager SubAgentManager => _subAgentManager;
 
     public static async Task<WebUiE2ETestHost> StartAsync()
     {
         var supervisor = new RecordingAgentSupervisor();
-        var factory = CreateFactory(supervisor);
+        var subAgentManager = new TestSubAgentManager();
+        var factory = CreateFactory(supervisor, subAgentManager);
         var apiClient = factory.CreateKestrelClient();
 
         await RegisterAgentAsync(apiClient, AgentA);
@@ -69,7 +73,7 @@ internal sealed class WebUiE2ETestHost : IAsyncDisposable
         await page.GotoAsync(baseUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
         await page.Locator("#connection-status.connected").WaitForAsync(new LocatorWaitForOptions { Timeout = 15000 });
 
-        var host = new WebUiE2ETestHost(supervisor)
+        var host = new WebUiE2ETestHost(supervisor, subAgentManager)
         {
             ApiClient = apiClient,
             Page = page,
@@ -213,7 +217,7 @@ internal sealed class WebUiE2ETestHost : IAsyncDisposable
             await _factory.DisposeAsync();
     }
 
-    private static KestrelWebApplicationFactory<Program> CreateFactory(RecordingAgentSupervisor supervisor)
+    private static KestrelWebApplicationFactory<Program> CreateFactory(RecordingAgentSupervisor supervisor, TestSubAgentManager subAgentManager)
     {
         var rootUri = GetEphemeralLoopbackUrl();
         return new KestrelWebApplicationFactory<Program>(rootUri, builder =>
@@ -233,6 +237,9 @@ internal sealed class WebUiE2ETestHost : IAsyncDisposable
 
                 services.RemoveAll<ISessionStore>();
                 services.AddSingleton<ISessionStore, InMemorySessionStore>();
+
+                services.RemoveAll<ISubAgentManager>();
+                services.AddSingleton<ISubAgentManager>(subAgentManager);
             });
         });
     }
@@ -628,4 +635,142 @@ internal sealed class RecordingAgentHandle(string agentId, string sessionId, Rec
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}
+
+internal sealed class TestSubAgentManager : ISubAgentManager
+{
+    private readonly object _gate = new();
+    private readonly Dictionary<string, List<SubAgentInfo>> _byParentSession = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, SubAgentInfo> _bySubAgentId = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<(string SubAgentId, string RequestingSessionId)> _killRequests = [];
+
+    public IReadOnlyList<(string SubAgentId, string RequestingSessionId)> KillRequests
+    {
+        get
+        {
+            lock (_gate)
+                return _killRequests.ToList();
+        }
+    }
+
+    public void SetSubAgents(string parentSessionId, params SubAgentInfo[] subAgents)
+    {
+        lock (_gate)
+        {
+            _byParentSession[parentSessionId] = subAgents.ToList();
+            foreach (var subAgent in subAgents)
+                _bySubAgentId[subAgent.SubAgentId] = subAgent;
+        }
+    }
+
+    public Task<SubAgentInfo> SpawnAsync(SubAgentSpawnRequest request, CancellationToken ct = default)
+    {
+        var subAgent = new SubAgentInfo
+        {
+            SubAgentId = $"subagent-{Guid.NewGuid():N}",
+            ParentSessionId = request.ParentSessionId,
+            ChildSessionId = request.ParentSessionId,
+            Name = request.Name,
+            Task = request.Task,
+            Model = request.ModelOverride,
+            Status = SubAgentStatus.Running,
+            StartedAt = DateTimeOffset.UtcNow
+        };
+
+        lock (_gate)
+        {
+            if (!_byParentSession.TryGetValue(request.ParentSessionId, out var existing))
+            {
+                existing = [];
+                _byParentSession[request.ParentSessionId] = existing;
+            }
+
+            existing.Add(subAgent);
+            _bySubAgentId[subAgent.SubAgentId] = subAgent;
+        }
+
+        return Task.FromResult(subAgent);
+    }
+
+    public Task<IReadOnlyList<SubAgentInfo>> ListAsync(string parentSessionId, CancellationToken ct = default)
+    {
+        lock (_gate)
+        {
+            if (_byParentSession.TryGetValue(parentSessionId, out var subAgents))
+                return Task.FromResult<IReadOnlyList<SubAgentInfo>>(subAgents.ToList());
+        }
+
+        return Task.FromResult<IReadOnlyList<SubAgentInfo>>([]);
+    }
+
+    public Task<SubAgentInfo?> GetAsync(string subAgentId, CancellationToken ct = default)
+    {
+        lock (_gate)
+        {
+            _bySubAgentId.TryGetValue(subAgentId, out var subAgent);
+            return Task.FromResult(subAgent);
+        }
+    }
+
+    public Task<bool> KillAsync(string subAgentId, string requestingSessionId, CancellationToken ct = default)
+    {
+        lock (_gate)
+        {
+            _killRequests.Add((subAgentId, requestingSessionId));
+            if (!_bySubAgentId.TryGetValue(subAgentId, out var current))
+                return Task.FromResult(false);
+
+            var updated = current with
+            {
+                Status = SubAgentStatus.Killed,
+                CompletedAt = DateTimeOffset.UtcNow
+            };
+            _bySubAgentId[subAgentId] = updated;
+
+            if (_byParentSession.TryGetValue(updated.ParentSessionId, out var subAgents))
+            {
+                for (var i = 0; i < subAgents.Count; i++)
+                {
+                    if (string.Equals(subAgents[i].SubAgentId, subAgentId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        subAgents[i] = updated;
+                        break;
+                    }
+                }
+            }
+
+            return Task.FromResult(true);
+        }
+    }
+
+    public Task OnCompletedAsync(string subAgentId, string resultSummary, CancellationToken ct = default)
+    {
+        lock (_gate)
+        {
+            if (!_bySubAgentId.TryGetValue(subAgentId, out var current))
+                return Task.CompletedTask;
+
+            var updated = current with
+            {
+                Status = SubAgentStatus.Completed,
+                CompletedAt = DateTimeOffset.UtcNow,
+                ResultSummary = resultSummary
+            };
+            _bySubAgentId[subAgentId] = updated;
+
+            if (_byParentSession.TryGetValue(updated.ParentSessionId, out var subAgents))
+            {
+                for (var i = 0; i < subAgents.Count; i++)
+                {
+                    if (string.Equals(subAgents[i].SubAgentId, subAgentId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        subAgents[i] = updated;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return Task.CompletedTask;
+    }
 }
