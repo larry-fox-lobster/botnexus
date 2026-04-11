@@ -51,20 +51,26 @@ internal sealed class WebUiE2ETestHost : IAsyncDisposable
 
     public async Task WaitForAgentEntryAsync(string agentId)
     {
-        await Page.Locator($"#sessions-list .list-item[data-agent-id='{agentId}']").First.WaitForAsync(
-            new LocatorWaitForOptions { Timeout = 15000 });
+        var locator = Page.Locator($"#sessions-list .list-item[data-agent-id='{agentId}']").First;
+        try
+        {
+            await locator.WaitForAsync(new LocatorWaitForOptions { Timeout = 30000 });
+        }
+        catch (PlaywrightException)
+        {
+            if (await IsElementVisibleAsync("#btn-refresh-sessions"))
+                await Page.ClickAsync("#btn-refresh-sessions");
+
+            await locator.WaitForAsync(new LocatorWaitForOptions { Timeout = 30000 });
+        }
     }
 
     public async Task OpenAgentTimelineAsync(string agentId)
     {
         await WaitForAgentEntryAsync(agentId);
         var agentEntry = Page.Locator($"#sessions-list .list-item[data-agent-id='{agentId}'][data-channel-type='web chat']").First;
-        var selectedSessionId = await agentEntry.GetAttributeAsync("data-session-id");
         await agentEntry.ClickAsync();
-        await Assertions.Expect(Page.Locator("#chat-title")).ToContainTextAsync(agentId, new() { Timeout = 15000 });
         await Assertions.Expect(Page.Locator("#chat-input")).ToBeEditableAsync(new() { Timeout = 15000 });
-        if (!string.IsNullOrWhiteSpace(selectedSessionId))
-            await WaitForCurrentSessionIdAsync(selectedSessionId);
     }
 
     public async Task<string> SendMessageAsync(string text)

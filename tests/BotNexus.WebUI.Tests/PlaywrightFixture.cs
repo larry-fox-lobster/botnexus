@@ -276,7 +276,9 @@ internal sealed class ResettableInMemorySessionStore : ISessionStore
                 _sessions[sessionId] = new GatewaySession
                 {
                     SessionId = sessionId,
-                    AgentId = agentId
+                    AgentId = agentId,
+                    ChannelType = "web chat",
+                    CallerId = "playwright-tests"
                 };
             }
         }
