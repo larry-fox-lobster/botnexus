@@ -49,6 +49,150 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Hub_SubscribeAll_ReturnsSessionManifest()
+    {
+        await using var factory = CreateTestFactory();
+        using var cts = CreateTimeout();
+        await RegisterAgentAsync(factory, cts.Token);
+
+        await SeedSessionAsync(factory, new GatewaySession
+        {
+            SessionId = "manifest-1",
+            AgentId = TestAgentId,
+            Status = SessionStatus.Active,
+            ChannelType = "signalr"
+        }, cts.Token);
+
+        await using var connection = await CreateStartedConnection(factory, cts.Token);
+        var result = await connection.InvokeAsync<JsonElement>("SubscribeAll", cts.Token);
+        var sessions = result.GetProperty("sessions").EnumerateArray().ToList();
+
+        sessions.Should().ContainSingle(s => s.GetProperty("sessionId").GetString() == "manifest-1");
+    }
+
+    [Fact]
+    public async Task Hub_SubscribeAll_JoinsAllGroups()
+    {
+        await using var factory = CreateTestFactory();
+        using var cts = CreateTimeout();
+        await RegisterAgentAsync(factory, cts.Token);
+
+        const string sessionA = "subscribe-all-a";
+        const string sessionB = "subscribe-all-b";
+        await SeedSessionAsync(factory, new GatewaySession { SessionId = sessionA, AgentId = TestAgentId, Status = SessionStatus.Active }, cts.Token);
+        await SeedSessionAsync(factory, new GatewaySession { SessionId = sessionB, AgentId = TestAgentId, Status = SessionStatus.Active }, cts.Token);
+
+        await using var connection = await CreateStartedConnection(factory, cts.Token);
+        await connection.InvokeAsync<JsonElement>("SubscribeAll", cts.Token);
+
+        var eventA = new TaskCompletionSource<AgentStreamEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var eventB = new TaskCompletionSource<AgentStreamEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var _ = connection.On<AgentStreamEvent>("ContentDelta", payload =>
+        {
+            if (payload.ContentDelta == "all-a")
+                eventA.TrySetResult(payload);
+            if (payload.ContentDelta == "all-b")
+                eventB.TrySetResult(payload);
+        });
+
+        var adapter = factory.Services.GetRequiredService<SignalRChannelAdapter>();
+        await adapter.SendStreamEventAsync(sessionA, new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "all-a" }, cts.Token);
+        await adapter.SendStreamEventAsync(sessionB, new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "all-b" }, cts.Token);
+
+        (await eventA.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("all-a");
+        (await eventB.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("all-b");
+    }
+
+    [Fact]
+    public async Task Hub_Subscribe_JoinsSingleGroup()
+    {
+        await using var factory = CreateTestFactory();
+        using var cts = CreateTimeout();
+        await RegisterAgentAsync(factory, cts.Token);
+
+        const string sessionTarget = "subscribe-one-target";
+        const string sessionOther = "subscribe-one-other";
+        await SeedSessionAsync(factory, new GatewaySession { SessionId = sessionTarget, AgentId = TestAgentId, Status = SessionStatus.Active }, cts.Token);
+        await SeedSessionAsync(factory, new GatewaySession { SessionId = sessionOther, AgentId = TestAgentId, Status = SessionStatus.Active }, cts.Token);
+
+        await using var connection = await CreateStartedConnection(factory, cts.Token);
+        var subscribed = await connection.InvokeAsync<JsonElement>("Subscribe", sessionTarget, cts.Token);
+        subscribed.GetProperty("sessionId").GetString().Should().Be(sessionTarget);
+
+        var targetReceived = new TaskCompletionSource<AgentStreamEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var crossReceived = false;
+        using var _ = connection.On<AgentStreamEvent>("ContentDelta", payload =>
+        {
+            if (payload.ContentDelta == "target-only")
+                targetReceived.TrySetResult(payload);
+            if (payload.ContentDelta == "other-should-not-arrive")
+                crossReceived = true;
+        });
+
+        var adapter = factory.Services.GetRequiredService<SignalRChannelAdapter>();
+        await adapter.SendStreamEventAsync(sessionTarget, new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "target-only" }, cts.Token);
+        await adapter.SendStreamEventAsync(sessionOther, new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "other-should-not-arrive" }, cts.Token);
+
+        (await targetReceived.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("target-only");
+        await Task.Delay(250, cts.Token);
+        crossReceived.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Hub_Connected_IncludesMultiSessionCapability()
+    {
+        await using var factory = CreateTestFactory();
+        using var cts = CreateTimeout();
+        await RegisterAgentAsync(factory, cts.Token);
+
+        await using var connection = CreateHubConnection(factory);
+        var connectedTcs = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var _ = connection.On<JsonElement>("Connected", payload => connectedTcs.TrySetResult(payload));
+
+        await connection.StartAsync(cts.Token);
+        var connected = await connectedTcs.Task.WaitAsync(cts.Token);
+
+        connected.GetProperty("capabilities").GetProperty("multiSession").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Hub_SubscribeAll_WithExistingJoinSession_BothWork()
+    {
+        await using var factory = CreateTestFactory();
+        using var cts = CreateTimeout();
+        await RegisterAgentAsync(factory, cts.Token);
+
+        const string joinedSession = "legacy-join-session";
+        const string subscribedSession = "legacy-subscribe-session";
+        await SeedSessionAsync(factory, new GatewaySession { SessionId = subscribedSession, AgentId = TestAgentId, Status = SessionStatus.Active }, cts.Token);
+
+        await using var connection = await CreateStartedConnection(factory, cts.Token);
+        var joinResult = await connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, joinedSession, cts.Token);
+        joinResult.GetProperty("sessionId").GetString().Should().Be(joinedSession);
+
+        var subscribeAllResult = await connection.InvokeAsync<JsonElement>("SubscribeAll", cts.Token);
+        subscribeAllResult.GetProperty("sessions").EnumerateArray()
+            .Should().Contain(item => item.GetProperty("sessionId").GetString() == subscribedSession);
+
+        var joinedTcs = new TaskCompletionSource<AgentStreamEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var subscribedTcs = new TaskCompletionSource<AgentStreamEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var _ = connection.On<AgentStreamEvent>("ContentDelta", payload =>
+        {
+            if (payload.ContentDelta == "legacy-join-event")
+                joinedTcs.TrySetResult(payload);
+            if (payload.ContentDelta == "subscribe-all-event")
+                subscribedTcs.TrySetResult(payload);
+        });
+
+        var adapter = factory.Services.GetRequiredService<SignalRChannelAdapter>();
+        await adapter.SendStreamEventAsync(joinedSession, new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "legacy-join-event" }, cts.Token);
+        await adapter.SendStreamEventAsync(subscribedSession, new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "subscribe-all-event" }, cts.Token);
+
+        (await joinedTcs.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("legacy-join-event");
+        (await subscribedTcs.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("subscribe-all-event");
+    }
+
+    [Fact]
     public async Task Hub_JoinSession_ReturnsSessionData()
     {
         await using var factory = CreateTestFactory();
@@ -659,6 +803,12 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
 
         var response = await client.PostAsJsonAsync("/api/agents", descriptor, CancellationToken.None);
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Created, HttpStatusCode.Conflict);
+    }
+
+    private static async Task SeedSessionAsync(WebApplicationFactory<Program> factory, GatewaySession session, CancellationToken cancellationToken)
+    {
+        var store = factory.Services.GetRequiredService<ISessionStore>();
+        await store.SaveAsync(session, cancellationToken);
     }
 
     private static CancellationTokenSource CreateTimeout()

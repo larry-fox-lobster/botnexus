@@ -164,3 +164,17 @@
 - Extended WebUiE2ETestHost with TestSubAgentManager injection so sub-agent list/kill behaviors are deterministic in tests.
 - Updated src/BotNexus.WebUI/wwwroot/app.js sub-agent status rendering to handle numeric enum payloads from API responses (Running/Completed/Failed/Killed/TimedOut mapping).
 - Validation: dotnet build tests\BotNexus.WebUI.Tests\BotNexus.WebUI.Tests.csproj --verbosity quiet ✅ and BOTNEXUS_RUN_PLAYWRIGHT_E2E=1 dotnet test tests\BotNexus.WebUI.Tests\BotNexus.WebUI.Tests.csproj --verbosity minimal --tl:off ✅ (81/81 passed).
+
+## 2026-04-11 - Playwright shared fixture refactor (in progress)
+- Refactored WebUI E2E tests from per-test `IAsyncLifetime` startup to shared xUnit collection fixture (`PlaywrightFixture`) with one Kestrel host + one browser.
+- Added per-test page creation (`CreatePageAsync`) and host disposal for isolation; moved registration/startup logic into fixture.
+- Added `RecordingAgentSupervisor.Reset()` and `TestSubAgentManager.Reset()` for state cleanup between tests.
+- Updated all 18 `*E2ETests.cs` classes to `[Collection("Playwright")]` and constructor injection of `PlaywrightFixture`.
+- Validation status: `dotnet build tests\BotNexus.WebUI.Tests --verbosity quiet` passes. Full E2E currently at 73/81 passing (8 failing) with remaining session-entry timing flakes.
+## 2026-04-11 - Phase 1 multi-session warmup + subscribe tests (Hermes)
+- Added SessionWarmupServiceTests with six Phase 1 scenarios: startup load, active+recent filtering, per-agent cap, all sessions query, agent-filtered query, and disabled behavior.
+- Added five SignalR multi-session tests in Integration/SignalRIntegrationTests.cs: SubscribeAll manifest/group join/backward-compat, Subscribe single-group join, and Connected multiSession capability.
+- Validation:
+  - dotnet build tests\BotNexus.Gateway.Tests --verbosity quiet ✅
+  - dotnet test tests\BotNexus.Gateway.Tests --filter "FullyQualifiedName~Warmup|FullyQualifiedName~SubscribeAll" --verbosity minimal ❌ (9 total, 6 passed, 3 failed)
+- Failure detail: SubscribeAll integration tests fail during host startup due DI registration error in GatewayServiceCollectionExtensions (Implementation type cannot be 'IHostedService').
