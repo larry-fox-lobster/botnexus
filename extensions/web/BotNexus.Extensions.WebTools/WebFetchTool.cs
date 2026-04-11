@@ -193,7 +193,10 @@ public sealed class WebFetchTool : IAgentTool, IDisposable
             int i => i,
             long l when l is >= int.MinValue and <= int.MaxValue => (int)l,
             JsonElement { ValueKind: JsonValueKind.Number } el when el.TryGetInt32(out var parsed) => parsed,
+            JsonElement { ValueKind: JsonValueKind.Number } element => (int)element.GetDouble(),
             JsonElement { ValueKind: JsonValueKind.String } el when int.TryParse(el.GetString(), out var parsed) => parsed,
+            JsonElement { ValueKind: JsonValueKind.String } element when double.TryParse(element.GetString(), out var d) => (int)d,
+            double d => (int)d,
             string text when int.TryParse(text, out var parsed) => parsed,
             _ => throw new ArgumentException($"Argument '{key}' must be an integer.")
         };

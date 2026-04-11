@@ -107,8 +107,11 @@ public sealed class SubAgentSpawnTool(
         return value switch
         {
             JsonElement { ValueKind: JsonValueKind.Number } el when el.TryGetInt32(out var number) => number,
+            JsonElement { ValueKind: JsonValueKind.Number } element => (int)element.GetDouble(),
             JsonElement { ValueKind: JsonValueKind.String } el when int.TryParse(el.GetString(), out var number) => number,
+            JsonElement { ValueKind: JsonValueKind.String } element when double.TryParse(element.GetString(), out var d) => (int)d,
             int number => number,
+            double d => (int)d,
             string text when int.TryParse(text, out var number) => number,
             _ => defaultValue
         };

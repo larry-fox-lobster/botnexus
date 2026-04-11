@@ -247,8 +247,11 @@ public sealed class SessionTool(
         return value switch
         {
             JsonElement { ValueKind: JsonValueKind.Number } el when el.TryGetInt32(out var i) => i,
+            JsonElement { ValueKind: JsonValueKind.Number } element => (int)element.GetDouble(),
             JsonElement { ValueKind: JsonValueKind.String } el when int.TryParse(el.GetString(), out var i) => i,
+            JsonElement { ValueKind: JsonValueKind.String } element when double.TryParse(element.GetString(), out var d) => (int)d,
             int i => i,
+            double d => (int)d,
             string s when int.TryParse(s, out var i) => i,
             _ => defaultValue
         };
