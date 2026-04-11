@@ -304,3 +304,31 @@ Jon identified a fundamental design flaw: session switching requires 2 server ro
 **Risk Register:** 8 risks tracked (memory pressure, bandwidth, group explosion, event ordering, new session creation race, store size, E2E rewrite scope, replay buffer interaction)
 
 **Deliverable:** `docs/planning/feature-multi-session-connection/architecture-proposal.md` (748 lines)
+
+## 2026-07-17 — Agent Delay/Wait Tool Design Spec (Lead)
+
+**Status:** ✅ Spec written
+**Requested by:** Jon Bullen
+**Scope:** Design spec for an in-session delay/wait tool that lets any agent pause for a specified duration then resume
+
+**Context:**
+Jon wants agents to be able to call `delay(seconds)` mid-session — e.g., "wait 5 minutes then do X", "check the build in 30 seconds". Not cron. Not a new session. Just an async pause inside `ExecuteAsync` using `Task.Delay` with the existing `CancellationToken`.
+
+**Key Design Decisions:**
+- D1: Standard `IAgentTool` — no changes to agent loop, no new infrastructure
+- D2: `Task.Delay` with cancellation token — zero thread cost, cancellable by steering/abort
+- D3: Graceful cancellation — returns informational text result (not exception) so model can react
+- D4: Clamped, not rejected — values outside range are clamped to avoid model retry loops
+- D5: `onUpdate` callback surfaces "waiting" state to UI
+- D6: Global config only for v1 (`BotNexus:Tools:Delay:MaxSeconds`, default 1800)
+
+**Tool Shape:**
+- Name: `delay`, params: `seconds` (required int, 1–1800), `reason` (optional string)
+- Returns: text result with elapsed/requested duration
+- On cancel: text result with elapsed-of-requested and cancel reason
+
+**Work Breakdown:** ~4 days across 7 tasks (impl, registration, config, unit tests, integration tests, UI, docs)
+
+**Open Questions:** 3 (WebSocket progress events, per-agent max override, steering delivery semantics — all have recommended answers)
+
+**Deliverable:** `docs/planning/feature-agent-delay-tool/design-spec.md`
