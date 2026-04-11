@@ -296,9 +296,13 @@ public sealed class ReadTool : IAgentTool
         {
             int i => i,
             long l when l is >= int.MinValue and <= int.MaxValue => (int)l,
+            double d => (int)d,
             JsonElement { ValueKind: JsonValueKind.Number } element when element.TryGetInt32(out var parsedInt) => parsedInt,
+            JsonElement { ValueKind: JsonValueKind.Number } element => (int)element.GetDouble(),
             JsonElement { ValueKind: JsonValueKind.String } element when int.TryParse(element.GetString(), out var parsedText) => parsedText,
+            JsonElement { ValueKind: JsonValueKind.String } element when double.TryParse(element.GetString(), out var parsedDouble) => (int)parsedDouble,
             string text when int.TryParse(text, out var parsedText) => parsedText,
+            string text when double.TryParse(text, out var parsedDouble) => (int)parsedDouble,
             _ => throw new ArgumentException($"Argument '{argumentName}' must be an integer.")
         };
     }
