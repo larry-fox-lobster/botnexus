@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Memory.Models;
@@ -132,8 +133,8 @@ public sealed class MemoryIndexerTests
     {
         var session = new GatewaySession
         {
-            SessionId = sessionId,
-            AgentId = agentId
+            SessionId = SessionId.From(sessionId),
+            AgentId = AgentId.From(agentId)
         };
 
         session.AddEntries(entries);

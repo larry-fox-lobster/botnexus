@@ -19,7 +19,7 @@ public sealed class AgentDescriptorValidatorTests
     [Fact]
     public void Validate_WithoutAgentId_ReturnsAgentIdError()
     {
-        var descriptor = CreateValidDescriptor() with { AgentId = string.Empty };
+        var descriptor = CreateValidDescriptor() with { AgentId = default };
 
         var errors = AgentDescriptorValidator.Validate(descriptor);
 
@@ -107,7 +107,7 @@ public sealed class AgentDescriptorValidatorTests
     private static AgentDescriptor CreateValidDescriptor()
         => new()
         {
-            AgentId = "agent-a",
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             DisplayName = "Agent A",
             ModelId = "model",
             ApiProvider = "provider",

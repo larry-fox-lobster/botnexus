@@ -35,14 +35,10 @@ public sealed class SessionStoreEdgeCaseTests
         var store = fixture.CreateStore();
 
         var nullAct = async () => await store.GetOrCreateAsync(null!, "agent-a");
-        await nullAct.Should().ThrowAsync<ArgumentNullException>();
+        await nullAct.Should().ThrowAsync<ArgumentException>();
 
-        var emptySession = await store.GetOrCreateAsync(string.Empty, "agent-a");
-        await store.SaveAsync(emptySession);
-        var reloaded = await fixture.CreateStore().GetAsync(string.Empty);
-
-        reloaded.Should().NotBeNull();
-        reloaded!.SessionId.Should().BeEmpty();
+        var emptyAct = async () => await store.GetOrCreateAsync(string.Empty, "agent-a");
+        await emptyAct.Should().ThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -107,4 +103,3 @@ public sealed class SessionStoreEdgeCaseTests
         }
     }
 }
-

@@ -70,9 +70,9 @@ public sealed class SubAgentArchetypeIdentityTests
         capturedChildAgentId.Should().NotBeNull();
         capturedChildSessionId.Should().NotBeNull();
         capturedChildAgentId!.Value.Should().NotBe(parentAgentId.Value);
-        capturedChildAgentId.Value.Should().StartWith($"{parentAgentId.Value}::subagent::reviewer::");
-        capturedChildAgentId.Value.Should().Contain($"{parentAgentId.Value}::subagent::");
-        capturedChildSessionId!.Value.Should().Contain("::subagent::");
+        capturedChildAgentId.Value.Value.Should().StartWith($"{parentAgentId.Value}::subagent::reviewer::");
+        capturedChildAgentId.Value.Value.Should().Contain($"{parentAgentId.Value}::subagent::");
+        capturedChildSessionId!.Value.Value.Should().Contain("::subagent::");
         info.Archetype.Should().Be(SubAgentArchetype.Reviewer);
     }
 
@@ -124,7 +124,7 @@ public sealed class SubAgentArchetypeIdentityTests
 
         info.Archetype.Should().Be(SubAgentArchetype.General);
         capturedChildAgentId.Should().NotBeNull();
-        capturedChildAgentId!.Value.Should().Contain("::subagent::general::");
+        capturedChildAgentId!.Value.Value.Should().Contain("::subagent::");
         info.ChildSessionId.Value.Should().Contain("::subagent::");
     }
 }

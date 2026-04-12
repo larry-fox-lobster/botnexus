@@ -179,6 +179,6 @@ public sealed class GatewaySessionThreadSafetyTests
     }
 
     private static GatewaySession CreateSession()
-        => new() { SessionId = $"session-{Guid.NewGuid():N}", AgentId = "agent-a" };
+        => new() { SessionId = $"session-{Guid.NewGuid():N}", AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
 }
 

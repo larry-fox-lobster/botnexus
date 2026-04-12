@@ -101,7 +101,7 @@ public sealed class CronControllerTests
             Name = "Test Job",
             Schedule = "*/1 * * * *",
             ActionType = actionType,
-            AgentId = "agent-a",
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             Message = "run",
             Enabled = true,
             CreatedBy = "tester",

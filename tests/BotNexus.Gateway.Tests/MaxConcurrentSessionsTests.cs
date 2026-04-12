@@ -71,7 +71,7 @@ public sealed class MaxConcurrentSessionsTests
         var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
         var descriptor = new AgentDescriptor
         {
-            AgentId = "agent-a",
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             DisplayName = "Agent A",
             ModelId = "test-model",
             ApiProvider = "test-provider",

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Configuration;
@@ -13,13 +14,13 @@ public sealed class DefaultSubAgentManagerTests
     public async Task SpawnAsync_CreatesSubAgentSession()
     {
         var childHandle = CreateHandle();
-        string? capturedSessionId = null;
+        SessionId? capturedSessionId = null;
         var supervisor = new Mock<IAgentSupervisor>();
         supervisor
-            .Setup(s => s.GetOrCreateAsync("parent-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, CancellationToken>((_, sessionId, _) =>
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("parent-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
+            .Callback<AgentId, SessionId, CancellationToken>((_, sessionId, _) =>
             {
-                if (sessionId.Contains("::sub::", StringComparison.Ordinal))
+                if (sessionId.Value.Contains("::subagent::", StringComparison.Ordinal))
                 {
                     capturedSessionId = sessionId;
                 }
@@ -31,7 +32,7 @@ public sealed class DefaultSubAgentManagerTests
         await manager.SpawnAsync(CreateSpawnRequest());
 
         capturedSessionId.Should().NotBeNull();
-        capturedSessionId.Should().StartWith("parent-session::sub::");
+        capturedSessionId!.Value.Value.Should().StartWith("parent-session::subagent::");
     }
 
     [Fact]
@@ -40,7 +41,7 @@ public sealed class DefaultSubAgentManagerTests
         var childHandle = CreateHandle();
         var supervisor = new Mock<IAgentSupervisor>();
         supervisor
-            .Setup(s => s.GetOrCreateAsync("parent-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("parent-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(childHandle.Object);
 
         var manager = CreateScaffoldManager(supervisor.Object);
@@ -49,7 +50,7 @@ public sealed class DefaultSubAgentManagerTests
 
         result.SubAgentId.Should().NotBeNullOrWhiteSpace();
         result.ParentSessionId.Should().Be("parent-session");
-        result.ChildSessionId.Should().StartWith("parent-session::sub::");
+        result.ChildSessionId.Value.Should().StartWith("parent-session::subagent::");
         result.Task.Should().Be("Investigate timeout");
         result.Status.Should().Be(SubAgentStatus.Running);
     }
@@ -60,7 +61,7 @@ public sealed class DefaultSubAgentManagerTests
         var hangingHandle = CreateHangingHandle();
         var supervisor = new Mock<IAgentSupervisor>();
         supervisor
-            .Setup(s => s.GetOrCreateAsync("parent-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("parent-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(hangingHandle.Object);
 
         var manager = CreateScaffoldManager(
@@ -80,7 +81,7 @@ public sealed class DefaultSubAgentManagerTests
         var childHandle = CreateHandle();
         var supervisor = new Mock<IAgentSupervisor>();
         supervisor
-            .Setup(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(childHandle.Object);
 
         var manager = CreateScaffoldManager(supervisor.Object);
@@ -89,7 +90,7 @@ public sealed class DefaultSubAgentManagerTests
         _ = await manager.SpawnAsync(CreateSpawnRequest(parentSessionId: "parent-a"));
         _ = await manager.SpawnAsync(CreateSpawnRequest(parentSessionId: "parent-b"));
 
-        var result = await manager.ListAsync("parent-a");
+        var result = await manager.ListAsync(SessionId.From("parent-a"));
 
         result.Should().HaveCount(2);
         result.Should().OnlyContain(info => info.ParentSessionId == "parent-a");
@@ -100,7 +101,7 @@ public sealed class DefaultSubAgentManagerTests
     {
         var manager = CreateScaffoldManager(new Mock<IAgentSupervisor>().Object);
 
-        var result = await manager.ListAsync("missing-parent");
+        var result = await manager.ListAsync(SessionId.From("missing-parent"));
 
         result.Should().BeEmpty();
     }
@@ -111,16 +112,16 @@ public sealed class DefaultSubAgentManagerTests
         var childHandle = CreateHangingHandle();
         var supervisor = new Mock<IAgentSupervisor>();
         supervisor
-            .Setup(s => s.GetOrCreateAsync("parent-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("parent-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(childHandle.Object);
         supervisor
-            .Setup(s => s.StopAsync("parent-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.StopAsync(AgentId.From("parent-agent"), It.IsAny<SessionId>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var manager = CreateScaffoldManager(supervisor.Object);
         var spawned = await manager.SpawnAsync(CreateSpawnRequest());
 
-        var killed = await manager.KillAsync(spawned.SubAgentId, "parent-session");
+        var killed = await manager.KillAsync(spawned.SubAgentId, SessionId.From("parent-session"));
         var updated = await manager.GetAsync(spawned.SubAgentId);
 
         killed.Should().BeTrue();
@@ -135,7 +136,7 @@ public sealed class DefaultSubAgentManagerTests
         var supervisor = new Mock<IAgentSupervisor>(MockBehavior.Strict);
         var manager = CreateScaffoldManager(supervisor.Object);
 
-        var result = await manager.KillAsync("missing-sub-agent", "parent-session");
+        var result = await manager.KillAsync("missing-sub-agent", SessionId.From("parent-session"));
 
         result.Should().BeFalse();
     }
@@ -146,16 +147,16 @@ public sealed class DefaultSubAgentManagerTests
         var childHandle = CreateHangingHandle();
         var supervisor = new Mock<IAgentSupervisor>();
         supervisor
-            .Setup(s => s.GetOrCreateAsync("parent-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("parent-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(childHandle.Object);
 
         var manager = CreateScaffoldManager(supervisor.Object);
         var spawned = await manager.SpawnAsync(CreateSpawnRequest());
 
-        var result = await manager.KillAsync(spawned.SubAgentId, "other-parent-session");
+        var result = await manager.KillAsync(spawned.SubAgentId, SessionId.From("other-parent-session"));
 
         result.Should().BeFalse();
-        supervisor.Verify(s => s.StopAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        supervisor.Verify(s => s.StopAsync(It.IsAny<AgentId>(), It.IsAny<SessionId>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -165,10 +166,10 @@ public sealed class DefaultSubAgentManagerTests
         var parentHandle = CreateHandle();
         var supervisor = new Mock<IAgentSupervisor>();
         supervisor
-            .Setup(s => s.GetOrCreateAsync("parent-agent", It.Is<string>(id => id.StartsWith("parent-session::sub::", StringComparison.Ordinal)), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(AgentId.From("parent-agent"), It.Is<SessionId>(id => id.Value.StartsWith("parent-session::subagent::", StringComparison.Ordinal)), It.IsAny<CancellationToken>()))
             .ReturnsAsync(childHandle.Object);
         supervisor
-            .Setup(s => s.GetOrCreateAsync("parent-agent", "parent-session", It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("parent-agent"), BotNexus.Domain.Primitives.SessionId.From("parent-session"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(parentHandle.Object);
 
         var manager = CreateScaffoldManager(supervisor.Object);
@@ -195,7 +196,7 @@ public sealed class DefaultSubAgentManagerTests
         var hangingHandle = CreateHangingHandle();
         var supervisor = new Mock<IAgentSupervisor>();
         supervisor
-            .Setup(s => s.GetOrCreateAsync("parent-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("parent-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(hangingHandle.Object);
 
         var manager = CreateScaffoldManager(supervisor.Object);
@@ -214,13 +215,13 @@ public sealed class DefaultSubAgentManagerTests
     }
 
     private static SubAgentSpawnRequest CreateSpawnRequest(
-        string parentAgentId = "parent-agent",
-        string parentSessionId = "parent-session",
+        BotNexus.Domain.Primitives.AgentId? parentAgentId = null,
+        BotNexus.Domain.Primitives.SessionId? parentSessionId = null,
         int timeoutSeconds = 600)
         => new()
         {
-            ParentAgentId = parentAgentId,
-            ParentSessionId = parentSessionId,
+            ParentAgentId = parentAgentId ?? BotNexus.Domain.Primitives.AgentId.From("parent-agent"),
+            ParentSessionId = parentSessionId ?? BotNexus.Domain.Primitives.SessionId.From("parent-session"),
             Task = "Investigate timeout",
             TimeoutSeconds = timeoutSeconds
         };
@@ -228,8 +229,8 @@ public sealed class DefaultSubAgentManagerTests
     private static Mock<IAgentHandle> CreateHandle()
     {
         var handle = new Mock<IAgentHandle>();
-        handle.SetupGet(h => h.AgentId).Returns("parent-agent");
-        handle.SetupGet(h => h.SessionId).Returns("session");
+        handle.SetupGet(h => h.AgentId).Returns(BotNexus.Domain.Primitives.AgentId.From("parent-agent"));
+        handle.SetupGet(h => h.SessionId).Returns(BotNexus.Domain.Primitives.SessionId.From("session"));
         handle.SetupGet(h => h.IsRunning).Returns(false);
         handle.Setup(h => h.PromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AgentResponse { Content = "done" });
@@ -289,7 +290,7 @@ public sealed class DefaultSubAgentManagerTests
         public async Task<SubAgentInfo> SpawnAsync(SubAgentSpawnRequest request, CancellationToken ct = default)
         {
             var runningCount = entries.Values.Count(entry =>
-                entry.Info.ParentSessionId.Equals(request.ParentSessionId, StringComparison.Ordinal) &&
+                entry.Info.ParentSessionId.Value.Equals(request.ParentSessionId.Value, StringComparison.Ordinal) &&
                 entry.Info.Status == SubAgentStatus.Running);
 
             if (runningCount >= options.MaxConcurrentPerSession)
@@ -298,7 +299,7 @@ public sealed class DefaultSubAgentManagerTests
             }
 
             var subAgentId = Guid.NewGuid().ToString("N");
-            var childSessionId = $"{request.ParentSessionId}::sub::{subAgentId}";
+            var childSessionId = SessionId.ForSubAgent(request.ParentSessionId, subAgentId);
             var handle = await supervisor.GetOrCreateAsync(request.ParentAgentId, childSessionId, ct);
             var startedAt = DateTimeOffset.UtcNow;
             var timeoutSeconds = request.TimeoutSeconds > 0 ? request.TimeoutSeconds : options.DefaultTimeoutSeconds;
@@ -323,11 +324,11 @@ public sealed class DefaultSubAgentManagerTests
             return info;
         }
 
-        public Task<IReadOnlyList<SubAgentInfo>> ListAsync(string parentSessionId, CancellationToken ct = default)
+        public Task<IReadOnlyList<SubAgentInfo>> ListAsync(SessionId parentSessionId, CancellationToken ct = default)
         {
             var results = entries.Values
                 .Select(entry => entry.Info)
-                .Where(info => info.ParentSessionId.Equals(parentSessionId, StringComparison.Ordinal))
+                .Where(info => info.ParentSessionId.Value.Equals(parentSessionId.Value, StringComparison.Ordinal))
                 .OrderBy(info => info.StartedAt)
                 .ToArray();
 
@@ -340,14 +341,14 @@ public sealed class DefaultSubAgentManagerTests
             return Task.FromResult(runtime?.Info);
         }
 
-        public async Task<bool> KillAsync(string subAgentId, string requestingSessionId, CancellationToken ct = default)
+        public async Task<bool> KillAsync(string subAgentId, SessionId requestingSessionId, CancellationToken ct = default)
         {
             if (!entries.TryGetValue(subAgentId, out var runtime))
             {
                 return false;
             }
 
-            if (!runtime.Info.ParentSessionId.Equals(requestingSessionId, StringComparison.Ordinal))
+            if (!runtime.Info.ParentSessionId.Value.Equals(requestingSessionId.Value, StringComparison.Ordinal))
             {
                 return false;
             }

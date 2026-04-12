@@ -11,7 +11,7 @@ public sealed class StreamingSessionHelperTests
     [Fact]
     public async Task ProcessAndSaveAsync_AccumulatesAssistantContentAndToolHistory()
     {
-        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-1" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-1") };
         var store = new Mock<ISessionStore>();
 
         await StreamingSessionHelper.ProcessAndSaveAsync(
@@ -41,7 +41,7 @@ public sealed class StreamingSessionHelperTests
     public async Task ProcessAndSaveAsync_DoesNotPersistThinkingContent()
     {
         var callbackTypes = new List<AgentStreamEventType>();
-        var session = new GatewaySession { SessionId = "session-2", AgentId = "agent-1" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-2"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-1") };
         var store = new Mock<ISessionStore>();
 
         await StreamingSessionHelper.ProcessAndSaveAsync(
@@ -67,7 +67,7 @@ public sealed class StreamingSessionHelperTests
     [Fact]
     public async Task ProcessAndSaveAsync_WithEmptyStream_DoesNotPersistAssistantEntry()
     {
-        var session = new GatewaySession { SessionId = "session-3", AgentId = "agent-1" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-3"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-1") };
         var store = new Mock<ISessionStore>();
 
         await StreamingSessionHelper.ProcessAndSaveAsync(

@@ -1,4 +1,5 @@
 using BotNexus.Extensions.Mcp.Transport;
+using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Hooks;
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Configuration;
@@ -136,7 +137,7 @@ public sealed class McpSecurityTests
             NullLogger<ToolPolicyHookHandler>.Instance);
 
         var evt = new BeforeToolCallEvent(
-            "agent-1", "github_search_repositories", "tc-1",
+            AgentId.From("agent-1"), "github_search_repositories", "tc-1",
             new Dictionary<string, object?> { ["query"] = "test" });
 
         var result = await handler.HandleAsync(evt);

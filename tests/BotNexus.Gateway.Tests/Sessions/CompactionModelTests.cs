@@ -30,7 +30,7 @@ public sealed class CompactionModelTests
     [Fact]
     public void GatewaySession_ReplaceHistory_ClearsAndSetsNewEntries()
     {
-        var session = new GatewaySession { SessionId = "session-a", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-a"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         session.AddEntries([
             new SessionEntry { Role = MessageRole.User, Content = "old-1" },
             new SessionEntry { Role = MessageRole.Assistant, Content = "old-2" }
@@ -49,7 +49,7 @@ public sealed class CompactionModelTests
     [Fact]
     public void GatewaySession_ReplaceHistory_UpdatesTimestamp()
     {
-        var session = new GatewaySession { SessionId = "session-a", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-a"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var initialUpdatedAt = session.UpdatedAt;
         Thread.Sleep(10);
 

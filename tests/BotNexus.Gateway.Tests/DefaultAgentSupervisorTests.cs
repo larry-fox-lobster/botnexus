@@ -16,7 +16,7 @@ public sealed class DefaultAgentSupervisorTests
         var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
         registry.Register(new AgentDescriptor
         {
-            AgentId = "agent-a",
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             DisplayName = "Agent A",
             ModelId = "test-model",
             ApiProvider = "test-provider",
@@ -47,7 +47,7 @@ public sealed class DefaultAgentSupervisorTests
         var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
         registry.Register(new AgentDescriptor
         {
-            AgentId = "agent-a",
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             DisplayName = "Agent A",
             ModelId = "test-model",
             ApiProvider = "test-provider",
@@ -72,7 +72,7 @@ public sealed class DefaultAgentSupervisorTests
         var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
         registry.Register(new AgentDescriptor
         {
-            AgentId = "agent-a",
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             DisplayName = "Agent A",
             ModelId = "test-model",
             ApiProvider = "test-provider",
@@ -100,7 +100,7 @@ public sealed class DefaultAgentSupervisorTests
         var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
         registry.Register(new AgentDescriptor
         {
-            AgentId = "agent-a",
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             DisplayName = "Agent A",
             ModelId = "test-model",
             ApiProvider = "test-provider",

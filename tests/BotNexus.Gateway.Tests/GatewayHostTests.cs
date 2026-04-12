@@ -22,11 +22,11 @@ public sealed class GatewayHostTests
             .ReturnsAsync(["agent-a"]);
         var handle = CreatePromptHandle("agent-a", "session-1", "agent-response");
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
-        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
         sessions.Setup(s => s.SaveAsync(session, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -36,7 +36,7 @@ public sealed class GatewayHostTests
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
-        supervisor.Verify(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()), Times.Once);
+        supervisor.Verify(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()), Times.Once);
         channel.Verify(c => c.SendAsync(
                 It.Is<OutboundMessage>(m => m.Content == "agent-response" && m.SessionId == "session-1"),
                 It.IsAny<CancellationToken>()),
@@ -62,11 +62,11 @@ public sealed class GatewayHostTests
                 new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "world" }
             ]));
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
-        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
         sessions.Setup(s => s.SaveAsync(session, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -98,8 +98,8 @@ public sealed class GatewayHostTests
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
-        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-        sessions.Verify(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()), Times.Never);
+        sessions.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class GatewayHostTests
             .ReturnsAsync(["agent-a"]);
         var handle = CreatePromptHandle("agent-a", "session-1", "ok");
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
         var sessions = new InMemorySessionStore();
         var activity = new RecordingActivityBroadcaster();
@@ -138,7 +138,7 @@ public sealed class GatewayHostTests
         handle.Setup(h => h.PromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string msg, CancellationToken _) => new AgentResponse { Content = $"echo:{msg}" });
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
         var sessions = new InMemorySessionStore();
         var channel = CreateChannelAdapter("web", supportsStreaming: false);
@@ -168,11 +168,11 @@ public sealed class GatewayHostTests
         handle.Setup(h => h.PromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
-        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
         var activity = new RecordingActivityBroadcaster();
         await using var host = CreateHost(supervisor.Object, router.Object, sessions.Object, activity, CreateChannelManager());
@@ -191,18 +191,18 @@ public sealed class GatewayHostTests
             .ReturnsAsync(["agent-a"]);
         var handle = CreatePromptHandle("agent-a", "web:conv-1:agent-a", "ok");
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "web:conv-1:agent-a", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("web:conv-1:agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(s => s.GetOrCreateAsync("web:conv-1:agent-a", "agent-a", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GatewaySession { SessionId = "web:conv-1:agent-a", AgentId = "agent-a" });
+        sessions.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("web:conv-1:agent-a"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("web:conv-1:agent-a"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") });
         sessions.Setup(s => s.SaveAsync(It.IsAny<GatewaySession>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         await using var host = CreateHost(supervisor.Object, router.Object, sessions.Object, new RecordingActivityBroadcaster(), CreateChannelManager());
 
         await host.DispatchAsync(CreateMessage("hello"));
 
-        sessions.Verify(s => s.GetOrCreateAsync("web:conv-1:agent-a", "agent-a", It.IsAny<CancellationToken>()), Times.Once);
+        sessions.Verify(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("web:conv-1:agent-a"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -214,12 +214,12 @@ public sealed class GatewayHostTests
 
         var handle = CreatePromptHandle("agent-a", "cron:job-1:run-1", "ok");
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "cron:job-1:run-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("cron:job-1:run-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
 
-        var session = new GatewaySession { SessionId = "cron:job-1:run-1", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("cron:job-1:run-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(s => s.GetOrCreateAsync("cron:job-1:run-1", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("cron:job-1:run-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
         sessions.Setup(s => s.SaveAsync(session, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -244,7 +244,7 @@ public sealed class GatewayHostTests
             .ReturnsAsync(["agent-a"]);
         var handle = CreatePromptHandle("agent-a", "session-1", "agent-response");
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
 
         var sessions = new InMemorySessionStore();
@@ -285,7 +285,7 @@ public sealed class GatewayHostTests
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
-        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()), Times.Never);
         channel.Verify(c => c.SendAsync(
                 It.Is<OutboundMessage>(m => m.Content.Contains("cannot accept", StringComparison.OrdinalIgnoreCase)),
                 It.IsAny<CancellationToken>()),
@@ -308,7 +308,7 @@ public sealed class GatewayHostTests
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
-        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()), Times.Never);
         channel.Verify(c => c.SendAsync(
                 It.Is<OutboundMessage>(m => m.Content.Contains("suspended", StringComparison.OrdinalIgnoreCase)),
                 It.IsAny<CancellationToken>()),
@@ -323,7 +323,7 @@ public sealed class GatewayHostTests
             .ReturnsAsync(["agent-a"]);
         var handle = CreatePromptHandle("agent-a", "session-1", "ok");
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
         var sessions = new InMemorySessionStore();
         var session = await sessions.GetOrCreateAsync("session-1", "agent-a");
@@ -347,9 +347,9 @@ public sealed class GatewayHostTests
         router.Setup(r => r.ResolveAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(["agent-a"]);
         var supervisor = new Mock<IAgentSupervisor>();
-        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a", Status = SessionStatus.Suspended };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"), Status = SessionStatus.Suspended };
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
         var channel = CreateChannelAdapter("web", supportsStreaming: false);
         var activity = new RecordingActivityBroadcaster();
@@ -357,7 +357,7 @@ public sealed class GatewayHostTests
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
-        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()), Times.Never);
         channel.Verify(c => c.SendAsync(
                 It.Is<OutboundMessage>(m => m.Content.Contains("suspended", StringComparison.OrdinalIgnoreCase)),
                 It.IsAny<CancellationToken>()),
@@ -373,12 +373,12 @@ public sealed class GatewayHostTests
 
         var handle = CreatePromptHandle("agent-a", "session-1", "ok");
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
-        supervisor.Setup(s => s.StopAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.StopAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var sessions = new Mock<ISessionStore>();
         sessions.Setup(s => s.GetAsync("session-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
@@ -394,7 +394,7 @@ public sealed class GatewayHostTests
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
-        supervisor.Verify(s => s.StopAsync("agent-a", "session-1", It.IsAny<CancellationToken>()), Times.Once);
+        supervisor.Verify(s => s.StopAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -406,10 +406,10 @@ public sealed class GatewayHostTests
 
         var handle = CreatePromptHandle("agent-a", "session-1", "ok");
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
 
-        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         session.Metadata["systemPromptInitialized"] = true;
         var sessions = new Mock<ISessionStore>();
         sessions.Setup(s => s.GetAsync("session-1", It.IsAny<CancellationToken>()))
@@ -426,7 +426,7 @@ public sealed class GatewayHostTests
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
-        supervisor.Verify(s => s.StopAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        supervisor.Verify(s => s.StopAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -440,19 +440,19 @@ public sealed class GatewayHostTests
         handle.SetupGet(h => h.SessionId).Returns("session-1");
         handle.SetupGet(h => h.IsRunning).Returns(true);
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetInstance("agent-a", "session-1"))
+        supervisor.Setup(s => s.GetInstance(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1")))
             .Returns(new AgentInstance
             {
                 InstanceId = "agent-a::session-1",
-                AgentId = "agent-a",
-                SessionId = "session-1",
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"),
                 IsolationStrategy = "in-process"
             });
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GatewaySession { SessionId = "session-1", AgentId = "agent-a" });
+        sessions.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") });
         await using var host = CreateHost(supervisor.Object, router.Object, sessions.Object, new RecordingActivityBroadcaster(), CreateChannelManager());
 
         await host.DispatchAsync(CreateMessage("nudge", sessionId: "session-1", metadata: new Dictionary<string, object?> { ["control"] = "steer" }));
@@ -474,19 +474,19 @@ public sealed class GatewayHostTests
         handle.Setup(h => h.PromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AgentResponse { Content = "response" });
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetInstance("agent-a", "session-1"))
+        supervisor.Setup(s => s.GetInstance(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1")))
             .Returns(new AgentInstance
             {
                 InstanceId = "agent-a::session-1",
-                AgentId = "agent-a",
-                SessionId = "session-1",
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"),
                 IsolationStrategy = "in-process"
             });
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
-        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
         sessions.Setup(s => s.SaveAsync(session, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -509,11 +509,11 @@ public sealed class GatewayHostTests
             .ReturnsAsync(["agent-a"]);
         var handle = CreatePromptHandle("agent-a", "session-1", "ok");
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
-        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
         sessions.Setup(s => s.SaveAsync(session, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -543,11 +543,11 @@ public sealed class GatewayHostTests
             .ReturnsAsync(["agent-a"]);
         var handle = CreatePromptHandle("agent-a", "session-1", "ok");
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
-        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
         sessions.Setup(s => s.SaveAsync(session, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -575,11 +575,11 @@ public sealed class GatewayHostTests
             .ReturnsAsync(["agent-a"]);
         var handle = CreatePromptHandle("agent-a", "session-1", "agent-response");
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
-        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
         sessions.Setup(s => s.SaveAsync(session, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -621,7 +621,7 @@ public sealed class GatewayHostTests
                 return new AgentResponse { Content = "ok" };
             });
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
 
         var sessions = new InMemorySessionStore();
@@ -670,7 +670,7 @@ public sealed class GatewayHostTests
                 return new AgentResponse { Content = $"echo:{message}" };
             });
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
 
         var sessions = new InMemorySessionStore();
@@ -700,9 +700,9 @@ public sealed class GatewayHostTests
         router.Setup(r => r.ResolveAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(["agent-a"]);
         var supervisor = new Mock<IAgentSupervisor>();
-        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a", Status = SessionStatus.Sealed };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"), Status = SessionStatus.Sealed };
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(s => s.GetOrCreateAsync("session-1", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
         sessions.Setup(s => s.GetAsync("session-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
@@ -712,7 +712,7 @@ public sealed class GatewayHostTests
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
         await host.DispatchAsync(CreateMessage("again", sessionId: "session-1"));
 
-        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()), Times.Never);
         channel.Verify(c => c.SendAsync(
                 It.Is<OutboundMessage>(m => m.Content.Contains("cannot accept", StringComparison.OrdinalIgnoreCase)),
                 It.IsAny<CancellationToken>()),
@@ -863,6 +863,5 @@ public sealed class GatewayHostTests
         }
     }
 }
-
 
 

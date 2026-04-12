@@ -25,8 +25,8 @@ public sealed class SubAgentModelsTests
     {
         var request = new SubAgentSpawnRequest
         {
-            ParentAgentId = "parent-agent",
-            ParentSessionId = "parent-session",
+            ParentAgentId = BotNexus.Domain.Primitives.AgentId.From("parent-agent"),
+            ParentSessionId = BotNexus.Domain.Primitives.SessionId.From("parent-session"),
             Task = "Analyze issue"
         };
 
@@ -45,8 +45,8 @@ public sealed class SubAgentModelsTests
     {
         var baseline = new SubAgentSpawnRequest
         {
-            ParentAgentId = "parent-agent",
-            ParentSessionId = "parent-session",
+            ParentAgentId = BotNexus.Domain.Primitives.AgentId.From("parent-agent"),
+            ParentSessionId = BotNexus.Domain.Primitives.SessionId.From("parent-session"),
             Task = "Analyze issue",
             Name = "researcher"
         };
@@ -75,9 +75,9 @@ public sealed class SubAgentModelsTests
     {
         var info = new SubAgentInfo
         {
-            SubAgentId = "sub-123",
-            ParentSessionId = "parent-session",
-            ChildSessionId = "parent-session::sub::sub-123",
+            SubAgentId = BotNexus.Domain.Primitives.AgentId.From("sub-123"),
+            ParentSessionId = BotNexus.Domain.Primitives.SessionId.From("parent-session"),
+            ChildSessionId = BotNexus.Domain.Primitives.SessionId.From("parent-session::sub::sub-123"),
             Task = "Analyze issue"
         };
 
@@ -101,9 +101,9 @@ public sealed class SubAgentModelsTests
     {
         var running = new SubAgentInfo
         {
-            SubAgentId = "sub-123",
-            ParentSessionId = "parent-session",
-            ChildSessionId = "parent-session::sub::sub-123",
+            SubAgentId = BotNexus.Domain.Primitives.AgentId.From("sub-123"),
+            ParentSessionId = BotNexus.Domain.Primitives.SessionId.From("parent-session"),
+            ChildSessionId = BotNexus.Domain.Primitives.SessionId.From("parent-session::sub::sub-123"),
             Task = "Analyze issue",
             Status = SubAgentStatus.Running,
             StartedAt = DateTimeOffset.UtcNow

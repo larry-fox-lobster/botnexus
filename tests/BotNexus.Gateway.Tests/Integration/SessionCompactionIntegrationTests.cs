@@ -156,7 +156,7 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
     [Fact]
     public async Task LlmSessionCompactor_SplitHistory_PreservesExactTurns()
     {
-        var session = new GatewaySession { SessionId = "split-preserve", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("split-preserve"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var originalEntries = new List<SessionEntry>();
         for (var turn = 1; turn <= 10; turn++)
         {
@@ -187,7 +187,7 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
     [Fact]
     public async Task LlmSessionCompactor_WithToolEntries_GroupsCorrectly()
     {
-        var session = new GatewaySession { SessionId = "tool-grouping", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("tool-grouping"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         session.AddEntries(
         [
             new SessionEntry { Role = MessageRole.User, Content = "u1" },
@@ -213,7 +213,7 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
     [Fact]
     public async Task CompactThenSendMessage_HistoryIsCoherent()
     {
-        var session = new GatewaySession { SessionId = "compact-send", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("compact-send"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         session.AddEntries(
         [
             new SessionEntry { Role = MessageRole.User, Content = "u1" },
@@ -310,7 +310,7 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
     [Trait("Category", "Security")]
     public void ShouldCompact_EmptySession_ReturnsFalse()
     {
-        var session = new GatewaySession { SessionId = "empty", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("empty"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var compactor = CreateCompactor("unused");
 
         compactor.ShouldCompact(session, new CompactionOptions()).Should().BeFalse();
@@ -320,7 +320,7 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
     [Trait("Category", "Security")]
     public void ShouldCompact_SessionWithOnlyCompactionEntry_ReturnsFalse()
     {
-        var session = new GatewaySession { SessionId = "only-summary", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("only-summary"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         session.AddEntry(new SessionEntry { Role = MessageRole.System, Content = "summary", IsCompactionSummary = true });
         var compactor = CreateCompactor("unused");
 
@@ -331,7 +331,7 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
     [Trait("Category", "Security")]
     public async Task CompactAsync_ConcurrentAccess_NoCorruption()
     {
-        var session = new GatewaySession { SessionId = "concurrent", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("concurrent"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         for (var i = 0; i < 12; i++)
         {
             session.AddEntry(new SessionEntry { Role = MessageRole.User, Content = $"u-{i}" });
@@ -395,7 +395,7 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
 
     private static GatewaySession BuildCompactionSession()
     {
-        var session = new GatewaySession { SessionId = Guid.NewGuid().ToString("N"), AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = Guid.NewGuid().ToString("N"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         session.AddEntries(
         [
             new SessionEntry { Role = MessageRole.User, Content = "older-user" },

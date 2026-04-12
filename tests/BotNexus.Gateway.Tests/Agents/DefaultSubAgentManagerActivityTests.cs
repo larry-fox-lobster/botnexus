@@ -74,26 +74,26 @@ public sealed class DefaultSubAgentManagerActivityTests
         supervisor = new Mock<IAgentSupervisor>();
         supervisor
             .Setup(s => s.GetOrCreateAsync(
-                It.Is<string>(id => id.StartsWith("parent-agent::subagent::", StringComparison.Ordinal)),
-                It.Is<string>(id => id.Contains("::subagent::", StringComparison.Ordinal)),
+                It.Is<BotNexus.Domain.Primitives.AgentId>(id => id.Value.StartsWith("parent-agent::subagent::", StringComparison.Ordinal)),
+                It.Is<BotNexus.Domain.Primitives.SessionId>(id => id.Value.Contains("::subagent::", StringComparison.Ordinal)),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(childHandle.Object);
         supervisor
-            .Setup(s => s.GetOrCreateAsync("parent-agent", "parent-session", It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("parent-agent"), BotNexus.Domain.Primitives.SessionId.From("parent-session"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessfulHandle().Object);
         supervisor
             .Setup(s => s.StopAsync(
-                It.Is<string>(id => id.StartsWith("parent-agent::subagent::", StringComparison.Ordinal)),
-                It.IsAny<string>(),
+                It.Is<BotNexus.Domain.Primitives.AgentId>(id => id.Value.StartsWith("parent-agent::subagent::", StringComparison.Ordinal)),
+                It.IsAny<BotNexus.Domain.Primitives.SessionId>(),
                 It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var registry = new Mock<IAgentRegistry>();
         registry
-            .Setup(r => r.Get("parent-agent"))
+            .Setup(r => r.Get(BotNexus.Domain.Primitives.AgentId.From("parent-agent")))
             .Returns(new AgentDescriptor
             {
-                AgentId = "parent-agent",
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("parent-agent"),
                 DisplayName = "Parent Agent",
                 ModelId = "gpt-5-mini",
                 ApiProvider = "copilot"
@@ -111,8 +111,8 @@ public sealed class DefaultSubAgentManagerActivityTests
     private static SubAgentSpawnRequest CreateSpawnRequest()
         => new()
         {
-            ParentAgentId = "parent-agent",
-            ParentSessionId = "parent-session",
+            ParentAgentId = BotNexus.Domain.Primitives.AgentId.From("parent-agent"),
+            ParentSessionId = BotNexus.Domain.Primitives.SessionId.From("parent-session"),
             Task = "Do background work"
         };
 

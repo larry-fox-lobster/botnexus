@@ -159,7 +159,7 @@ public sealed class SqliteSessionStoreTests
 
         var sessions = await store.ListAsync();
 
-        sessions.Select(s => s.SessionId).Should().BeEquivalentTo("s1", "s2", "s3");
+        sessions.Select(s => s.SessionId.Value).Should().BeEquivalentTo("s1", "s2", "s3");
     }
 
     [Fact]
@@ -185,28 +185,28 @@ public sealed class SqliteSessionStoreTests
         var store = fixture.CreateStore();
         await store.SaveAsync(new GatewaySession
         {
-            SessionId = "s-old",
-            AgentId = "agent-a",
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("s-old"),
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             ChannelType = ChannelKey.From("web chat"),
             CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-5)
         });
         await store.SaveAsync(new GatewaySession
         {
-            SessionId = "s-new",
-            AgentId = "agent-a",
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("s-new"),
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             ChannelType = ChannelKey.From("web chat"),
             CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1)
         });
         await store.SaveAsync(new GatewaySession
         {
-            SessionId = "s-other-channel",
-            AgentId = "agent-a",
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("s-other-channel"),
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             ChannelType = ChannelKey.From("telegram")
         });
         await store.SaveAsync(new GatewaySession
         {
-            SessionId = "s-null-channel",
-            AgentId = "agent-a"
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("s-null-channel"),
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a")
         });
 
         var sessions = await store.ListByChannelAsync("agent-a", ChannelKey.From("web chat"));
@@ -361,7 +361,6 @@ public sealed class SqliteSessionStoreTests
         }
     }
 }
-
 
 
 

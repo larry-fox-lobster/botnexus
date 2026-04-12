@@ -19,10 +19,10 @@ public sealed class DefaultAgentCommunicatorTests
         var registry = new Mock<IAgentRegistry>();
         var supervisor = new Mock<IAgentSupervisor>();
         var handle = new Mock<IAgentHandle>();
-        string? capturedSessionId = null;
+        BotNexus.Domain.Primitives.SessionId? capturedSessionId = null;
         supervisor
-            .Setup(s => s.GetOrCreateAsync("child-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, CancellationToken>((_, sessionId, _) => capturedSessionId = sessionId)
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("child-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
+            .Callback<BotNexus.Domain.Primitives.AgentId, BotNexus.Domain.Primitives.SessionId, CancellationToken>((_, sessionId, _) => capturedSessionId = sessionId)
             .ReturnsAsync(handle.Object);
         handle.Setup(h => h.PromptAsync("hello", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AgentResponse { Content = "ok" });
@@ -30,7 +30,7 @@ public sealed class DefaultAgentCommunicatorTests
 
         await communicator.CallSubAgentAsync("parent-agent", "parent-session", "child-agent", "hello");
 
-        capturedSessionId.Should().Be("parent-session::sub::child-agent");
+        capturedSessionId!.Value.Value.Should().Be("parent-session::subagent::child-agent");
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public sealed class DefaultAgentCommunicatorTests
         strategy.SetupGet(s => s.Name).Returns("in-process");
         strategy.Setup(s => s.CreateAsync(
                 descriptor,
-                It.Is<AgentExecutionContext>(ctx => ctx.SessionId.StartsWith("caller-agent::cross::target-agent::", StringComparison.Ordinal)),
+                It.Is<AgentExecutionContext>(ctx => ctx.SessionId.Value.StartsWith("xagent::caller-agent::target-agent", StringComparison.Ordinal)),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
 
@@ -66,12 +66,12 @@ public sealed class DefaultAgentCommunicatorTests
     public async Task CallCrossAgentAsync_WhenRecursiveChainDetected_ThrowsInvalidOperationException()
     {
         var registry = new Mock<IAgentRegistry>();
-        registry.Setup(r => r.Contains(It.IsAny<string>())).Returns(true);
+        registry.Setup(r => r.Contains(It.IsAny<BotNexus.Domain.Primitives.AgentId>())).Returns(true);
 
         var supervisor = new Mock<IAgentSupervisor>();
         DefaultAgentCommunicator? communicator = null;
         supervisor
-            .Setup(s => s.GetOrCreateAsync("agent-b", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-b"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
                 await communicator!.CallCrossAgentAsync("agent-b", string.Empty, "agent-a", "loop");
@@ -108,7 +108,7 @@ public sealed class DefaultAgentCommunicatorTests
         registry.Setup(r => r.Contains("target-agent")).Returns(true);
         var supervisor = new Mock<IAgentSupervisor>();
         supervisor
-            .Setup(s => s.GetOrCreateAsync("target-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("target-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("failed to create handle"));
         var communicator = new DefaultAgentCommunicator(registry.Object, supervisor.Object, NullLogger<DefaultAgentCommunicator>.Instance);
 
@@ -124,17 +124,17 @@ public sealed class DefaultAgentCommunicatorTests
         var registry = new Mock<IAgentRegistry>();
         registry.Setup(r => r.Contains("target-agent")).Returns(true);
         var handle = CreateHandle("target-agent");
-        string? capturedSessionId = null;
+        BotNexus.Domain.Primitives.SessionId? capturedSessionId = null;
         var supervisor = new Mock<IAgentSupervisor>();
         supervisor
-            .Setup(s => s.GetOrCreateAsync("target-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, CancellationToken>((_, sessionId, _) => capturedSessionId = sessionId)
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("target-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
+            .Callback<BotNexus.Domain.Primitives.AgentId, BotNexus.Domain.Primitives.SessionId, CancellationToken>((_, sessionId, _) => capturedSessionId = sessionId)
             .ReturnsAsync(handle.Object);
         var communicator = new DefaultAgentCommunicator(registry.Object, supervisor.Object, NullLogger<DefaultAgentCommunicator>.Instance);
 
         await communicator.CallCrossAgentAsync("caller-agent", string.Empty, "target-agent", "hello");
 
-        capturedSessionId.Should().StartWith("caller-agent::cross::target-agent::");
+        capturedSessionId!.Value.Value.Should().StartWith("xagent::caller-agent::target-agent");
     }
 
     [Fact]
@@ -146,13 +146,13 @@ public sealed class DefaultAgentCommunicatorTests
         var seenSessionIds = new ConcurrentBag<string>();
         var supervisor = new Mock<IAgentSupervisor>();
         supervisor
-            .Setup(s => s.GetOrCreateAsync("target-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns((string _, string sessionId, CancellationToken _) =>
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("target-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
+            .Returns((BotNexus.Domain.Primitives.AgentId _, BotNexus.Domain.Primitives.SessionId sessionId, CancellationToken _) =>
             {
-                seenSessionIds.Add(sessionId);
+                seenSessionIds.Add(sessionId.Value);
                 var handle = new Mock<IAgentHandle>();
                 handle.Setup(h => h.PromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                    .ReturnsAsync(new AgentResponse { Content = sessionId });
+                    .ReturnsAsync(new AgentResponse { Content = sessionId.Value });
                 return Task.FromResult(handle.Object);
             });
 
@@ -164,7 +164,7 @@ public sealed class DefaultAgentCommunicatorTests
 
         seenSessionIds.Should().HaveCount(20);
         seenSessionIds.Distinct(StringComparer.Ordinal).Should().HaveCount(20);
-        seenSessionIds.Should().OnlyContain(sessionId => sessionId.StartsWith("caller-agent::cross::target-agent::", StringComparison.Ordinal));
+        seenSessionIds.Should().OnlyContain(sessionId => sessionId.StartsWith("xagent::caller-agent::target-agent", StringComparison.Ordinal));
         results.Select(response => response.Content).Distinct(StringComparer.Ordinal).Should().HaveCount(20);
     }
 
@@ -172,12 +172,12 @@ public sealed class DefaultAgentCommunicatorTests
     public async Task CallCrossAgentAsync_WhenDepthExceedsConfiguredMaximum_ThrowsInvalidOperationException()
     {
         var registry = new Mock<IAgentRegistry>();
-        registry.Setup(r => r.Contains(It.IsAny<string>())).Returns(true);
+        registry.Setup(r => r.Contains(It.IsAny<BotNexus.Domain.Primitives.AgentId>())).Returns(true);
 
         var supervisor = new Mock<IAgentSupervisor>();
         DefaultAgentCommunicator? communicator = null;
         supervisor
-            .Setup(s => s.GetOrCreateAsync("agent-b", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-b"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
                 await communicator!.CallCrossAgentAsync("agent-b", string.Empty, "agent-c", "loop");
@@ -200,19 +200,19 @@ public sealed class DefaultAgentCommunicatorTests
     public async Task CallCrossAgentAsync_WhenDepthIsWithinConfiguredLimit_Succeeds()
     {
         var registry = new Mock<IAgentRegistry>();
-        registry.Setup(r => r.Contains(It.IsAny<string>())).Returns(true);
+        registry.Setup(r => r.Contains(It.IsAny<BotNexus.Domain.Primitives.AgentId>())).Returns(true);
 
         var supervisor = new Mock<IAgentSupervisor>();
         DefaultAgentCommunicator? communicator = null;
         supervisor
-            .Setup(s => s.GetOrCreateAsync("agent-b", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-b"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
                 await communicator!.CallCrossAgentAsync("agent-b", string.Empty, "agent-c", "nested");
                 return CreateHandle("agent-b").Object;
             });
         supervisor
-            .Setup(s => s.GetOrCreateAsync("agent-c", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-c"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateHandle("agent-c").Object);
 
         communicator = new DefaultAgentCommunicator(
@@ -230,19 +230,19 @@ public sealed class DefaultAgentCommunicatorTests
     public async Task CallCrossAgentAsync_AfterDepthFailure_AllowsNewIndependentCallChain()
     {
         var registry = new Mock<IAgentRegistry>();
-        registry.Setup(r => r.Contains(It.IsAny<string>())).Returns(true);
+        registry.Setup(r => r.Contains(It.IsAny<BotNexus.Domain.Primitives.AgentId>())).Returns(true);
 
         var supervisor = new Mock<IAgentSupervisor>();
         DefaultAgentCommunicator? communicator = null;
         supervisor
-            .Setup(s => s.GetOrCreateAsync("agent-b", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-b"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
                 await communicator!.CallCrossAgentAsync("agent-b", string.Empty, "agent-c", "loop");
                 return CreateHandle("agent-b").Object;
             });
         supervisor
-            .Setup(s => s.GetOrCreateAsync("agent-d", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-d"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateHandle("agent-d").Object);
 
         communicator = new DefaultAgentCommunicator(
@@ -273,7 +273,7 @@ public sealed class DefaultAgentCommunicatorTests
             });
 
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("target-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("target-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
 
         var communicator = new DefaultAgentCommunicator(
@@ -299,7 +299,7 @@ public sealed class DefaultAgentCommunicatorTests
             .ReturnsAsync(new AgentResponse { Content = "done" });
 
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("target-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("target-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
 
         var communicator = new DefaultAgentCommunicator(
@@ -338,7 +338,7 @@ public sealed class DefaultAgentCommunicatorTests
             });
 
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("target-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("target-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
 
         var communicator = new DefaultAgentCommunicator(

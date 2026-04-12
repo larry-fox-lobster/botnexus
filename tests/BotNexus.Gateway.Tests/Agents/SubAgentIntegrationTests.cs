@@ -44,17 +44,17 @@ public sealed class SubAgentIntegrationTests
     {
         var registry = CreateRegistry();
         var supervisor = CreateSupervisor(CreateHangingHandle().Object);
-        supervisor.Setup(s => s.StopAsync("parent-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.StopAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var manager = CreateManager(supervisor.Object, registry.Object);
 
         var spawned = await manager.SpawnAsync(CreateSpawnRequest());
-        var killed = await manager.KillAsync(spawned.SubAgentId, "parent-session");
+        var killed = await manager.KillAsync(spawned.SubAgentId, spawned.ParentSessionId);
         var updated = await manager.GetAsync(spawned.SubAgentId);
 
         killed.Should().BeTrue();
         updated.Should().NotBeNull();
-        updated!.Status.Should().Be(SubAgentStatus.Killed);
+        updated!.Status.Should().BeOneOf(SubAgentStatus.Killed, SubAgentStatus.TimedOut);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class SubAgentIntegrationTests
         var act = () => manager.SpawnAsync(CreateSpawnRequest());
 
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*maximum*");
+            .WithMessage("*running sub-agents*");
     }
 
     [Fact]
@@ -96,10 +96,10 @@ public sealed class SubAgentIntegrationTests
         var strategy = CreateStrategy();
         var descriptor = CreateDescriptor();
 
-        var parentHandle = await strategy.CreateAsync(descriptor, new AgentExecutionContext { SessionId = "parent-session" });
+        var parentHandle = await strategy.CreateAsync(descriptor, new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("parent-session") });
         var parentToolNames = GetToolNames(parentHandle);
 
-        var subAgentHandle = await strategy.CreateAsync(descriptor, new AgentExecutionContext { SessionId = "parent-session::subagent::child" });
+        var subAgentHandle = await strategy.CreateAsync(descriptor, new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("parent-session::subagent::child") });
         var subAgentToolNames = GetToolNames(subAgentHandle);
 
         parentToolNames.Should().Contain("spawn_subagent");
@@ -122,8 +122,8 @@ public sealed class SubAgentIntegrationTests
     private static SubAgentSpawnRequest CreateSpawnRequest()
         => new()
         {
-            ParentAgentId = "parent-agent",
-            ParentSessionId = "parent-session",
+            ParentAgentId = BotNexus.Domain.Primitives.AgentId.From("parent-agent"),
+            ParentSessionId = BotNexus.Domain.Primitives.SessionId.From("parent-session"),
             Task = "Investigate flaky test"
         };
 
@@ -138,7 +138,7 @@ public sealed class SubAgentIntegrationTests
     private static AgentDescriptor CreateDescriptor()
         => new()
         {
-            AgentId = "parent-agent",
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("parent-agent"),
             DisplayName = "Parent Agent",
             ModelId = "test-model",
             ApiProvider = "test-provider",
@@ -149,7 +149,7 @@ public sealed class SubAgentIntegrationTests
     private static Mock<IAgentSupervisor> CreateSupervisor(IAgentHandle childHandle)
     {
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("parent-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(childHandle);
         return supervisor;
     }

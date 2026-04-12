@@ -100,7 +100,7 @@ public sealed class LlmSessionCompactorTests
     [Fact]
     public async Task CompactAsync_EmptyHistory_ReturnsEmptyResult()
     {
-        var session = new GatewaySession { SessionId = "s1", AgentId = "a1" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("s1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("a1") };
         var compactor = CreateCompactor("summary");
 
         var result = await compactor.CompactAsync(session, new CompactionOptions());
@@ -207,7 +207,7 @@ public sealed class LlmSessionCompactorTests
         var session = new GatewaySession
         {
             SessionId = Guid.NewGuid().ToString("N"),
-            AgentId = "agent"
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent")
         };
 
         session.AddEntries(entries.Select(entry => new SessionEntry

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using BotNexus.Domain.Primitives;
 using BotNexus.Channels.Core;
 using BotNexus.Channels.Tui;
 using BotNexus.Gateway;
@@ -27,6 +28,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
+using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
 
 namespace BotNexus.Gateway.Tests.Integration;
 
@@ -60,7 +62,7 @@ public sealed class Phase5IntegrationTests
     {
         var store = new InMemorySessionStore();
         var session = await store.GetOrCreateAsync("phase5-session", "agent-a");
-        session.Status = SessionStatus.Active;
+        session.Status = GatewaySessionStatus.Active;
         session.UpdatedAt = DateTimeOffset.UtcNow - TimeSpan.FromHours(2);
         await store.SaveAsync(session);
 
@@ -73,7 +75,7 @@ public sealed class Phase5IntegrationTests
 
         var reloaded = await store.GetAsync("phase5-session");
         reloaded.Should().NotBeNull();
-        reloaded!.Status.Should().Be(SessionStatus.Expired);
+        reloaded!.Status.Should().Be(GatewaySessionStatus.Expired);
         reloaded.ExpiresAt.Should().NotBeNull();
     }
 
@@ -152,7 +154,7 @@ public sealed class Phase5IntegrationTests
             .ReturnsAsync(["copilot-agent"]);
 
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("copilot-agent", "phase5-live", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("copilot-agent"), BotNexus.Domain.Primitives.SessionId.From("phase5-live"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new LiveCopilotAgentHandle(auth.Value));
 
         var manager = new Mock<IChannelManager>();
@@ -175,7 +177,7 @@ public sealed class Phase5IntegrationTests
             ChannelType = ChannelKey.From("web"),
             SenderId = "phase5-tester",
             ConversationId = "phase5-live-conv",
-            SessionId = "phase5-live",
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("phase5-live"),
             Content = "Reply with a short greeting."
         });
 
@@ -241,8 +243,8 @@ public sealed class Phase5IntegrationTests
     {
         private readonly HttpClient _client = new();
 
-        public string AgentId => "copilot-agent";
-        public string SessionId => "phase5-live";
+        public BotNexus.Domain.Primitives.AgentId AgentId => BotNexus.Domain.Primitives.AgentId.From("copilot-agent");
+        public BotNexus.Domain.Primitives.SessionId SessionId => BotNexus.Domain.Primitives.SessionId.From("phase5-live");
         public bool IsRunning => false;
 
         public Task<AgentResponse> PromptAsync(string message, CancellationToken cancellationToken = default)
@@ -381,7 +383,7 @@ public sealed class Phase5IntegrationTests
                 var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
                 registry.Register(new AgentDescriptor
                 {
-                    AgentId = "agent-a",
+                    AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
                     DisplayName = "Agent A",
                     ModelId = "gpt-4.1",
                     ApiProvider = "copilot",

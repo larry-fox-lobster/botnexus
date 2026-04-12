@@ -30,7 +30,7 @@ public sealed class SignalRHubTests
         registry.Setup(value => value.GetAll()).Returns([
             new AgentDescriptor
             {
-                AgentId = "assistant",
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("assistant"),
                 DisplayName = "Assistant",
                 ModelId = "gpt-4.1",
                 ApiProvider = "copilot"
@@ -70,8 +70,8 @@ public sealed class SignalRHubTests
             .Returns(Task.CompletedTask);
 
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync("s1", "agent-a", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GatewaySession { SessionId = "s1", AgentId = "agent-a" });
+        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("s1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("s1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") });
 
         var hub = CreateHub(
             groups: groups.Object,
@@ -81,7 +81,7 @@ public sealed class SignalRHubTests
         var result = await hub.JoinSession("agent-a", "s1");
 
         groups.Verify(value => value.AddToGroupAsync("conn-1", "session:s1", It.IsAny<CancellationToken>()), Times.Once);
-        sessions.Verify(value => value.GetOrCreateAsync("s1", "agent-a", It.IsAny<CancellationToken>()), Times.Once);
+        sessions.Verify(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("s1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()), Times.Once);
         HasPropertyValue([result], "sessionId", "s1").Should().BeTrue();
         HasPropertyValue([result], "agentId", "agent-a").Should().BeTrue();
         HasPropertyValue([result], "connectionId", "conn-1").Should().BeTrue();
@@ -97,11 +97,11 @@ public sealed class SignalRHubTests
             .Returns(Task.CompletedTask);
 
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync("new-session", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("new-session"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new GatewaySession
             {
-                SessionId = "new-session",
-                AgentId = "agent-a",
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("new-session"),
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
                 History = []
             });
 
@@ -117,11 +117,11 @@ public sealed class SignalRHubTests
     public async Task JoinSession_ExistingSessionWithHistory_ReturnsIsResumedTrue()
     {
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync("existing", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("existing"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new GatewaySession
             {
-                SessionId = "existing",
-                AgentId = "agent-a",
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("existing"),
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
                 History =
                 [
                     new SessionEntry { Role = MessageRole.User, Content = "hello" },
@@ -142,8 +142,8 @@ public sealed class SignalRHubTests
     {
         var expiredSession = new GatewaySession
         {
-            SessionId = "expired",
-            AgentId = "agent-a",
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("expired"),
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             Status = SessionStatus.Expired,
             ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1),
             History =
@@ -153,7 +153,7 @@ public sealed class SignalRHubTests
         };
 
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync("expired", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("expired"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(expiredSession);
         sessions.Setup(value => value.SaveAsync(expiredSession, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -175,11 +175,11 @@ public sealed class SignalRHubTests
         var createdAt = DateTimeOffset.UtcNow.AddMinutes(-5);
         var updatedAt = DateTimeOffset.UtcNow;
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync("s1", "agent-a", It.IsAny<CancellationToken>()))
+        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("s1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new GatewaySession
             {
-                SessionId = "s1",
-                AgentId = "agent-a",
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("s1"),
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
                 CreatedAt = createdAt,
                 UpdatedAt = updatedAt
             });
@@ -229,20 +229,20 @@ public sealed class SignalRHubTests
         sessions.Setup(value => value.ArchiveAsync("session-1", CancellationToken.None)).Returns(Task.CompletedTask);
 
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(value => value.StopAsync("agent-a", "session-1", CancellationToken.None)).Returns(Task.CompletedTask);
+        supervisor.Setup(value => value.StopAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), CancellationToken.None)).Returns(Task.CompletedTask);
 
         var hub = CreateHub(clients: clients.Object, sessions: sessions.Object, supervisor: supervisor.Object);
 
         await hub.ResetSession("agent-a", "session-1");
 
         sessions.Verify(value => value.ArchiveAsync("session-1", CancellationToken.None), Times.Once);
-        sessions.Verify(value => value.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        sessions.Verify(value => value.DeleteAsync(It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task CompactSession_Hub_ReturnsCompactionStats()
     {
-        var session = new GatewaySession { SessionId = "session-1", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var sessions = new Mock<ISessionStore>();
         sessions.Setup(value => value.GetAsync("session-1", CancellationToken.None)).ReturnsAsync(session);
         sessions.Setup(value => value.SaveAsync(session, CancellationToken.None)).Returns(Task.CompletedTask);
@@ -351,5 +351,4 @@ public sealed class SignalRHubTests
         public override void Abort() { }
     }
 }
-
 

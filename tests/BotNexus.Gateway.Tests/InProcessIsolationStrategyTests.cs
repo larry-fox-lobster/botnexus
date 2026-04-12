@@ -29,7 +29,7 @@ public sealed class InProcessIsolationStrategyTests
 
         var handle = await strategy.CreateAsync(
             CreateDescriptor(),
-            new AgentExecutionContext { SessionId = "session-1" });
+            new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1") });
 
         handle.Should().NotBeNull();
     }
@@ -51,7 +51,7 @@ public sealed class InProcessIsolationStrategyTests
 
         var act = () => strategy.CreateAsync(
             CreateDescriptor(modelId: "missing-model"),
-            new AgentExecutionContext { SessionId = "session-1" });
+            new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1") });
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
@@ -63,7 +63,7 @@ public sealed class InProcessIsolationStrategyTests
 
         var handle = await strategy.CreateAsync(
             CreateDescriptor(),
-            new AgentExecutionContext { SessionId = "session-123" });
+            new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-123") });
 
         handle.AgentId.Should().Be("agent-a");
         handle.SessionId.Should().Be("session-123");
@@ -108,7 +108,7 @@ public sealed class InProcessIsolationStrategyTests
     private static AgentDescriptor CreateDescriptor(string modelId = "test-model")
         => new()
         {
-            AgentId = "agent-a",
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             DisplayName = "Agent A",
             ModelId = modelId,
             ApiProvider = "test-provider",

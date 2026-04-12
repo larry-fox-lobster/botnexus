@@ -1,5 +1,6 @@
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Configuration;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -27,7 +28,7 @@ public sealed class AgentConfigurationHostedServiceTests
 
         await service.StartAsync(CancellationToken.None);
 
-        registry.GetAll().Select(d => d.AgentId).Should().BeEquivalentTo(["agent-a", "agent-b"]);
+        registry.GetAll().Select(d => d.AgentId.Value).Should().BeEquivalentTo(["agent-a", "agent-b"]);
     }
 
     [Fact]
@@ -110,7 +111,7 @@ public sealed class AgentConfigurationHostedServiceTests
     private static AgentDescriptor CreateDescriptor(string agentId, string? displayName = null)
         => new()
         {
-            AgentId = agentId,
+            AgentId = AgentId.From(agentId),
             DisplayName = displayName ?? $"Display {agentId}",
             ModelId = "model",
             ApiProvider = "provider"
@@ -143,19 +144,19 @@ public sealed class AgentConfigurationHostedServiceTests
             RegisterOperations.Add(descriptor.AgentId);
         }
 
-        public void Unregister(string agentId)
+        public void Unregister(AgentId agentId)
         {
             _agents.Remove(agentId);
             UnregisterOperations.Add(agentId);
         }
 
-        public AgentDescriptor? Get(string agentId)
+        public AgentDescriptor? Get(AgentId agentId)
             => _agents.TryGetValue(agentId, out var descriptor) ? descriptor : null;
 
         public IReadOnlyList<AgentDescriptor> GetAll()
             => _agents.Values.ToArray();
 
-        public bool Contains(string agentId)
+        public bool Contains(AgentId agentId)
             => _agents.ContainsKey(agentId);
     }
 }

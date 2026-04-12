@@ -69,9 +69,9 @@ public sealed class SessionsControllerTests
         {
             new SubAgentInfo
             {
-                SubAgentId = "sub-1",
-                ParentSessionId = "s1",
-                ChildSessionId = "s1::subagent::sub-1",
+                SubAgentId = BotNexus.Domain.Primitives.AgentId.From("sub-1"),
+                ParentSessionId = BotNexus.Domain.Primitives.SessionId.From("s1"),
+                ChildSessionId = BotNexus.Domain.Primitives.SessionId.From("s1::subagent::sub-1"),
                 Task = "task",
                 Status = SubAgentStatus.Running,
                 StartedAt = DateTimeOffset.UtcNow
@@ -101,9 +101,9 @@ public sealed class SessionsControllerTests
             .Setup(manager => manager.GetAsync("sub-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new SubAgentInfo
             {
-                SubAgentId = "sub-1",
-                ParentSessionId = "different-session",
-                ChildSessionId = "different-session::subagent::sub-1",
+                SubAgentId = BotNexus.Domain.Primitives.AgentId.From("sub-1"),
+                ParentSessionId = BotNexus.Domain.Primitives.SessionId.From("different-session"),
+                ChildSessionId = BotNexus.Domain.Primitives.SessionId.From("different-session::subagent::sub-1"),
                 Task = "task",
                 Status = SubAgentStatus.Running,
                 StartedAt = DateTimeOffset.UtcNow
@@ -142,9 +142,9 @@ public sealed class SessionsControllerTests
             .Setup(manager => manager.GetAsync("sub-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new SubAgentInfo
             {
-                SubAgentId = "sub-1",
-                ParentSessionId = "s1",
-                ChildSessionId = "s1::subagent::sub-1",
+                SubAgentId = BotNexus.Domain.Primitives.AgentId.From("sub-1"),
+                ParentSessionId = BotNexus.Domain.Primitives.SessionId.From("s1"),
+                ChildSessionId = BotNexus.Domain.Primitives.SessionId.From("s1::subagent::sub-1"),
                 Task = "task",
                 Status = SubAgentStatus.Running,
                 StartedAt = DateTimeOffset.UtcNow

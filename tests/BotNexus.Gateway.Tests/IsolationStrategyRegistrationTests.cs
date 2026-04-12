@@ -43,7 +43,7 @@ public sealed class IsolationStrategyRegistrationTests
 
         var descriptor = new BotNexus.Gateway.Abstractions.Models.AgentDescriptor
         {
-            AgentId = "agent-a",
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             DisplayName = "Agent A",
             ModelId = "model",
             ApiProvider = "provider",
@@ -52,7 +52,7 @@ public sealed class IsolationStrategyRegistrationTests
 
         var context = new BotNexus.Gateway.Abstractions.Models.AgentExecutionContext
         {
-            SessionId = "session-1"
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1")
         };
 
         var act = () => strategy.CreateAsync(descriptor, context);

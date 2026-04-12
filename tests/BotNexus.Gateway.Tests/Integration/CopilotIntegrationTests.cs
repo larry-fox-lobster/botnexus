@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Activity;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Channels;
@@ -144,7 +145,7 @@ public sealed class CopilotIntegrationTests
             return;
 
         harness.Router.Verify(r => r.ResolveAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()), Times.Once);
-        harness.Supervisor.Verify(s => s.GetOrCreateAsync("copilot-agent", "integration-session", It.IsAny<CancellationToken>()), Times.Once);
+        harness.Supervisor.Verify(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("copilot-agent"), BotNexus.Domain.Primitives.SessionId.From("integration-session"), It.IsAny<CancellationToken>()), Times.Once);
         harness.Channel.SentMessages.Should().ContainSingle();
         harness.Activity.Activities.Select(a => a.Type).Should().ContainInOrder(
             GatewayActivityType.MessageReceived,
@@ -183,7 +184,7 @@ public sealed class CopilotIntegrationTests
             .ReturnsAsync(["copilot-agent"]);
 
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("copilot-agent", "integration-session", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("copilot-agent"), BotNexus.Domain.Primitives.SessionId.From("integration-session"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CopilotAgentHandle(auth));
 
         var channels = new Mock<IChannelManager>();
@@ -214,7 +215,7 @@ public sealed class CopilotIntegrationTests
             SenderId = "integration-user",
             ConversationId = "copilot-integration-conversation",
             Content = content,
-            SessionId = "integration-session"
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("integration-session")
         };
 
     private static CopilotAuth? TryLoadAuth()
@@ -293,8 +294,8 @@ public sealed class CopilotIntegrationTests
     {
         private readonly HttpClient _httpClient = new();
 
-        public string AgentId => "copilot-agent";
-        public string SessionId => "integration-session";
+        public BotNexus.Domain.Primitives.AgentId AgentId => BotNexus.Domain.Primitives.AgentId.From("copilot-agent");
+        public BotNexus.Domain.Primitives.SessionId SessionId => BotNexus.Domain.Primitives.SessionId.From("integration-session");
         public bool IsRunning => false;
 
         public async Task<AgentResponse> PromptAsync(string message, CancellationToken cancellationToken = default)

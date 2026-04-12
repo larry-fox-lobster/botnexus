@@ -90,8 +90,8 @@ public sealed class SubAgentPanelE2ETests
         => new()
         {
             SubAgentId = subAgentId,
-            ParentSessionId = sessionId,
-            ChildSessionId = $"child-{subAgentId}",
+            ParentSessionId = BotNexus.Domain.Primitives.SessionId.From(sessionId),
+            ChildSessionId = BotNexus.Domain.Primitives.SessionId.From($"child-{subAgentId}"),
             Name = $"worker-{subAgentId}",
             Task = "Investigate issue",
             Model = "gpt-4.1",

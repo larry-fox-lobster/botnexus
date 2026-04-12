@@ -23,7 +23,7 @@ public sealed class SessionWarmupServiceTests
         await service.StartAsync(CancellationToken.None);
         var sessions = await service.GetAvailableSessionsAsync(CancellationToken.None);
 
-        store.Verify(value => value.ListAsync("agent-a", It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+        store.Verify(value => value.ListAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         sessions.Should().ContainSingle(summary => summary.SessionId == "startup-1");
     }
 
@@ -119,7 +119,7 @@ public sealed class SessionWarmupServiceTests
         var available = await service.GetAvailableSessionsAsync(CancellationToken.None);
 
         available.Should().BeEmpty();
-        store.Verify(value => value.ListAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        store.Verify(value => value.ListAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static SessionWarmupService CreateService(
@@ -135,9 +135,9 @@ public sealed class SessionWarmupServiceTests
     private static Mock<ISessionStore> CreateSessionStore(params GatewaySession[] sessions)
     {
         var store = new Mock<ISessionStore>();
-        store.Setup(value => value.ListAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string? agentId, CancellationToken _) =>
-                sessions.Where(session => agentId is null || session.AgentId == agentId).ToList());
+        store.Setup(value => value.ListAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((BotNexus.Domain.Primitives.AgentId? agentId, CancellationToken _) =>
+                sessions.Where(session => !agentId.HasValue || session.AgentId == agentId.Value).ToList());
         return store;
     }
 

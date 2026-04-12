@@ -647,7 +647,7 @@ public sealed class PlatformConfigurationTests
             {
                 Gateway = new GatewaySettingsConfig
                 {
-                    DefaultAgentId = "config-agent",
+                    DefaultAgentId = BotNexus.Domain.Primitives.AgentId.From("config-agent"),
                     AgentsDirectory = "agents",
                     SessionsDirectory = "sessions",
                     LogLevel = "Information",

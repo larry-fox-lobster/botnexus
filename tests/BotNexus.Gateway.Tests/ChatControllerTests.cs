@@ -16,7 +16,7 @@ public sealed class ChatControllerTests
     public async Task Steer_WhenSessionMissing_ReturnsNotFound()
     {
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetInstance("agent-a", "session-1")).Returns((AgentInstance?)null);
+        supervisor.Setup(s => s.GetInstance(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"))).Returns((AgentInstance?)null);
         var controller = new ChatController(supervisor.Object, Mock.Of<ISessionStore>());
 
         var result = await controller.Steer(new AgentControlRequest("agent-a", "session-1", "adjust"), CancellationToken.None);
@@ -29,15 +29,15 @@ public sealed class ChatControllerTests
     {
         var handle = new Mock<IAgentHandle>();
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetInstance("agent-a", "session-1"))
+        supervisor.Setup(s => s.GetInstance(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1")))
             .Returns(new AgentInstance
             {
                 InstanceId = "agent-a::session-1",
-                AgentId = "agent-a",
-                SessionId = "session-1",
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"),
                 IsolationStrategy = "in-process"
             });
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
         var controller = new ChatController(supervisor.Object, Mock.Of<ISessionStore>());
 
@@ -52,15 +52,15 @@ public sealed class ChatControllerTests
     {
         var handle = new Mock<IAgentHandle>();
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetInstance("agent-a", "session-1"))
+        supervisor.Setup(s => s.GetInstance(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1")))
             .Returns(new AgentInstance
             {
                 InstanceId = "agent-a::session-1",
-                AgentId = "agent-a",
-                SessionId = "session-1",
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"),
                 IsolationStrategy = "in-process"
             });
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
         var controller = new ChatController(supervisor.Object, Mock.Of<ISessionStore>());
 
@@ -74,15 +74,15 @@ public sealed class ChatControllerTests
     public async Task Send_WhenAgentConcurrencyLimitReached_ReturnsTooManyRequests()
     {
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new AgentConcurrencyLimitExceededException("agent-a", 1));
 
         var sessionStore = new Mock<ISessionStore>();
-        sessionStore.Setup(s => s.GetOrCreateAsync(It.IsAny<string>(), "agent-a", It.IsAny<CancellationToken>()))
+        sessionStore.Setup(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.SessionId>(), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new GatewaySession
             {
-                SessionId = "session-1",
-                AgentId = "agent-a"
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"),
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a")
             });
 
         var controller = new ChatController(supervisor.Object, sessionStore.Object);
@@ -97,7 +97,7 @@ public sealed class ChatControllerTests
     public async Task Send_WhenAgentIsUnknown_ReturnsNotFound()
     {
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("missing-agent", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("missing-agent"), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException("Agent 'missing-agent' is not registered."));
         var sessionStore = new Mock<ISessionStore>();
         var controller = new ChatController(supervisor.Object, sessionStore.Object);
@@ -105,7 +105,7 @@ public sealed class ChatControllerTests
         var result = await controller.Send(new ChatRequest("missing-agent", "hello"), CancellationToken.None);
 
         result.Result.Should().BeOfType<NotFoundObjectResult>();
-        sessionStore.Verify(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        sessionStore.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public sealed class ChatControllerTests
         var result = await controller.Send(new ChatRequest("agent-a", ""), CancellationToken.None);
 
         result.Result.Should().BeOfType<BadRequestObjectResult>();
-        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-        sessionStore.Verify(s => s.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()), Times.Never);
+        sessionStore.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

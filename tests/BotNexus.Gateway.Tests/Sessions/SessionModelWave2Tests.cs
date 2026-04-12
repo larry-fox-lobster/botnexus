@@ -120,8 +120,8 @@ public sealed class SessionModelWave2Tests
     {
         var session = new GatewaySession
         {
-            SessionId = "s-typed",
-            AgentId = "agent-a",
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("s-typed"),
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             SessionType = SessionType.Cron
         };
 
@@ -216,6 +216,6 @@ public sealed class SessionModelWave2Tests
     }
 
     private static GatewaySession CreateSession()
-        => new() { SessionId = $"s-{Guid.NewGuid():N}", AgentId = "agent-a" };
+        => new() { SessionId = $"s-{Guid.NewGuid():N}", AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
 }
 

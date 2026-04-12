@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
+using BotNexus.Domain.Primitives;
 using BotNexus.Gateway;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
@@ -210,7 +211,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime
     {
         var descriptor = new AgentDescriptor
         {
-            AgentId = agentId,
+            AgentId = AgentId.From(agentId),
             DisplayName = $"Test Agent {agentId}",
             ModelId = "gpt-4.1",
             ApiProvider = "copilot",
@@ -224,16 +225,16 @@ public sealed class PlaywrightFixture : IAsyncLifetime
 
 internal sealed class ResettableInMemorySessionStore : ISessionStore
 {
-    private readonly Dictionary<string, GatewaySession> _sessions = [];
+    private readonly Dictionary<SessionId, GatewaySession> _sessions = [];
     private readonly Lock _sync = new();
 
-    public Task<GatewaySession?> GetAsync(string sessionId, CancellationToken cancellationToken = default)
+    public Task<GatewaySession?> GetAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         lock (_sync)
             return Task.FromResult(_sessions.GetValueOrDefault(sessionId));
     }
 
-    public Task<GatewaySession> GetOrCreateAsync(string sessionId, string agentId, CancellationToken cancellationToken = default)
+    public Task<GatewaySession> GetOrCreateAsync(SessionId sessionId, AgentId agentId, CancellationToken cancellationToken = default)
     {
         lock (_sync)
         {
@@ -253,21 +254,21 @@ internal sealed class ResettableInMemorySessionStore : ISessionStore
         return Task.CompletedTask;
     }
 
-    public Task DeleteAsync(string sessionId, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         lock (_sync)
             _sessions.Remove(sessionId);
         return Task.CompletedTask;
     }
 
-    public Task ArchiveAsync(string sessionId, CancellationToken cancellationToken = default)
+    public Task ArchiveAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         lock (_sync)
             _sessions.Remove(sessionId);
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<GatewaySession>> ListAsync(string? agentId = null, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<GatewaySession>> ListAsync(AgentId? agentId = null, CancellationToken cancellationToken = default)
     {
         lock (_sync)
         {
@@ -279,7 +280,7 @@ internal sealed class ResettableInMemorySessionStore : ISessionStore
     }
 
     public Task<IReadOnlyList<GatewaySession>> ListByChannelAsync(
-        string agentId,
+        AgentId agentId,
         ChannelKey channelType,
         CancellationToken cancellationToken = default)
     {
@@ -307,11 +308,11 @@ internal sealed class ResettableInMemorySessionStore : ISessionStore
             _sessions.Clear();
             foreach (var agentId in agentIds)
             {
-                var sessionId = $"{agentId}-{Guid.NewGuid():N}";
-                _sessions[sessionId] = new GatewaySession
+                var sessionId = SessionId.From($"{agentId}-{Guid.NewGuid():N}");
+                _sessions[BotNexus.Domain.Primitives.SessionId.From(sessionId)] = new GatewaySession
                 {
                     SessionId = sessionId,
-                    AgentId = agentId,
+                    AgentId = AgentId.From(agentId),
                     ChannelType = ChannelKey.From("web chat"),
                     CallerId = "playwright-tests"
                 };
@@ -332,8 +333,8 @@ internal sealed class ResettableInMemorySessionStore : ISessionStore
                 var sessionId = $"{agentId}-history-{Guid.NewGuid():N}";
                 _sessions[sessionId] = new GatewaySession
                 {
-                    SessionId = sessionId,
-                    AgentId = agentId,
+                    SessionId = BotNexus.Domain.Primitives.SessionId.From(sessionId),
+                    AgentId = BotNexus.Domain.Primitives.AgentId.From(agentId),
                     ChannelType = ChannelKey.From("web chat"),
                     CallerId = "playwright-tests",
                     CreatedAt = baseTime.AddMinutes(i),
@@ -357,8 +358,8 @@ internal sealed class ResettableInMemorySessionStore : ISessionStore
                 var sessionId = $"{agentId}-scrollback-{sessionOrdinal}-{Guid.NewGuid():N}";
                 var session = new GatewaySession
                 {
-                    SessionId = sessionId,
-                    AgentId = agentId,
+                    SessionId = BotNexus.Domain.Primitives.SessionId.From(sessionId),
+                    AgentId = BotNexus.Domain.Primitives.AgentId.From(agentId),
                     ChannelType = ChannelKey.From("web chat"),
                     CallerId = "playwright-tests",
                     CreatedAt = createdAt,
@@ -376,7 +377,7 @@ internal sealed class ResettableInMemorySessionStore : ISessionStore
                 }
 
                 session.UpdatedAt = createdAt.AddSeconds(entriesPerSession + 1);
-                _sessions[sessionId] = session;
+                _sessions[BotNexus.Domain.Primitives.SessionId.From(sessionId)] = session;
             }
         }
     }
@@ -396,7 +397,7 @@ internal sealed class TestSessionWarmupService(ResettableInMemorySessionStore se
 
     public async Task<IReadOnlyList<SessionSummary>> GetAvailableSessionsAsync(string agentId, CancellationToken ct = default)
     {
-        var sessions = await sessionStore.ListAsync(agentId, ct);
+        var sessions = await sessionStore.ListAsync(BotNexus.Domain.Primitives.AgentId.From(agentId), ct);
         return sessions
             .OrderByDescending(session => session.UpdatedAt)
             .Select(ToSummary)

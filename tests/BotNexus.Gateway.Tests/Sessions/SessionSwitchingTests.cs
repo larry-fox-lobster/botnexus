@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using BotNexus.Domain.Primitives;
 using BotNexus.Gateway;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
@@ -112,7 +113,7 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
         var store = factory.Services.GetRequiredService<ISessionStore>();
         var sessions = await store.ListAsync(TestAgentId, cts.Token);
 
-        sessions.Select(s => s.SessionId).Should().BeEquivalentTo([sessionA, sessionB]);
+        sessions.Select(s => s.SessionId.Value).Should().BeEquivalentTo([sessionA, sessionB]);
     }
 
     [Fact]
@@ -259,7 +260,7 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
         using var client = factory.CreateClient();
         var descriptor = new AgentDescriptor
         {
-            AgentId = TestAgentId,
+            AgentId = AgentId.From(TestAgentId),
             DisplayName = "Test Agent",
             ModelId = "gpt-4.1",
             ApiProvider = "copilot",
@@ -279,8 +280,8 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
     {
         private readonly AgentInstance _instance = new()
         {
-            AgentId = agentId,
-            SessionId = sessionId,
+            AgentId = AgentId.From(agentId),
+            SessionId = SessionId.From(sessionId),
             InstanceId = $"{agentId}::{sessionId}",
             IsolationStrategy = "in-process",
             Status = AgentInstanceStatus.Running
@@ -288,16 +289,16 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
 
         public bool StopCalled { get; private set; }
 
-        public Task<IAgentHandle> GetOrCreateAsync(string requestedAgentId, string requestedSessionId, CancellationToken cancellationToken = default)
+        public Task<IAgentHandle> GetOrCreateAsync(AgentId requestedAgentId, SessionId requestedSessionId, CancellationToken cancellationToken = default)
             => Task.FromResult<IAgentHandle>(new NoOpAgentHandle(requestedAgentId, requestedSessionId));
 
-        public Task StopAsync(string requestedAgentId, string requestedSessionId, CancellationToken cancellationToken = default)
+        public Task StopAsync(AgentId requestedAgentId, SessionId requestedSessionId, CancellationToken cancellationToken = default)
         {
             StopCalled = true;
             return Task.CompletedTask;
         }
 
-        public AgentInstance? GetInstance(string requestedAgentId, string requestedSessionId)
+        public AgentInstance? GetInstance(AgentId requestedAgentId, SessionId requestedSessionId)
             => requestedAgentId == _instance.AgentId && requestedSessionId == _instance.SessionId ? _instance : null;
 
         public IReadOnlyList<AgentInstance> GetAllInstances() => [_instance];
@@ -305,10 +306,10 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
         public Task StopAllAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
-    private sealed class NoOpAgentHandle(string agentId, string sessionId) : IAgentHandle
+    private sealed class NoOpAgentHandle(AgentId agentId, SessionId sessionId) : IAgentHandle
     {
-        public string AgentId { get; } = agentId;
-        public string SessionId { get; } = sessionId;
+        public BotNexus.Domain.Primitives.AgentId AgentId { get; } = agentId;
+        public BotNexus.Domain.Primitives.SessionId SessionId { get; } = sessionId;
         public bool IsRunning => true;
 
         public Task<AgentResponse> PromptAsync(string message, CancellationToken cancellationToken = default)
@@ -326,4 +327,3 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }
-

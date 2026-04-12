@@ -46,7 +46,7 @@ public sealed class ToolHookWiringTests
 
         var handle = await strategy.CreateAsync(
             CreateDescriptor(),
-            new AgentExecutionContext { SessionId = "session-hook-1" });
+            new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-hook-1") });
 
         // The handle should be created with hook delegates wired.
         handle.Should().NotBeNull();
@@ -64,7 +64,7 @@ public sealed class ToolHookWiringTests
                 priority: 0,
                 evt =>
                 {
-                    evt.AgentId.Should().NotBeNullOrEmpty();
+                    evt.AgentId.Value.Should().NotBeNullOrEmpty();
                     return new AfterToolCallResult();
                 }));
 
@@ -72,7 +72,7 @@ public sealed class ToolHookWiringTests
 
         var handle = await strategy.CreateAsync(
             CreateDescriptor(),
-            new AgentExecutionContext { SessionId = "session-hook-2" });
+            new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-hook-2") });
 
         handle.Should().NotBeNull();
         // AfterToolCall is wired — it fires during actual tool execution,
@@ -90,7 +90,7 @@ public sealed class ToolHookWiringTests
 
         var handle = await strategy.CreateAsync(
             CreateDescriptor(),
-            new AgentExecutionContext { SessionId = "session-hook-3" });
+            new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-hook-3") });
 
         handle.Should().NotBeNull();
     }
@@ -119,7 +119,7 @@ public sealed class ToolHookWiringTests
 
         var handle = await strategy.CreateAsync(
             CreateDescriptor(),
-            new AgentExecutionContext { SessionId = "session-hook-4" });
+            new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-hook-4") });
 
         handle.Should().NotBeNull();
     }
@@ -161,7 +161,7 @@ public sealed class ToolHookWiringTests
     private static AgentDescriptor CreateDescriptor()
         => new()
         {
-            AgentId = "agent-hook",
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-hook"),
             DisplayName = "Hook Test Agent",
             ModelId = "test-model",
             ApiProvider = "test-provider",

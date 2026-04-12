@@ -161,7 +161,7 @@ public sealed class StreamingPipelineTests
         handle.Setup(h => h.StreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(streamEvents);
         var supervisor = new Mock<IAgentSupervisor>();
-        supervisor.Setup(s => s.GetOrCreateAsync("agent-a", "session-1", It.IsAny<CancellationToken>()))
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
         var channelManager = new Mock<IChannelManager>();
         channelManager.SetupGet(c => c.Adapters).Returns(streamingChannel is null ? [] : [streamingChannel]);
@@ -184,7 +184,7 @@ public sealed class StreamingPipelineTests
             SenderId = "sender-1",
             ConversationId = "conv-1",
             Content = content,
-            SessionId = "session-1"
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1")
         };
 
     private static async IAsyncEnumerable<AgentStreamEvent> ToAsyncEnumerable(IEnumerable<AgentStreamEvent> events)

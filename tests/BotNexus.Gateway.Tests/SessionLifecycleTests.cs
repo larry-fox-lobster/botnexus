@@ -13,7 +13,7 @@ public sealed class SessionLifecycleTests
     [Fact]
     public void NewSession_HasActiveStatus()
     {
-        var session = new GatewaySession { SessionId = "s1", AgentId = "agent-a" };
+        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("s1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
 
         session.Status.Should().Be(SessionStatus.Active);
         session.ExpiresAt.Should().BeNull();

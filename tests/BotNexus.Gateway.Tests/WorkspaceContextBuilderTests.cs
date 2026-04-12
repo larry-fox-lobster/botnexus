@@ -25,7 +25,7 @@ public sealed class WorkspaceContextBuilderTests
 
             var result = await builder.BuildSystemPromptAsync(new AgentDescriptor
             {
-                AgentId = "farnsworth",
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("farnsworth"),
                 DisplayName = "Farnsworth",
                 ModelId = "test-model",
                 ApiProvider = "test-provider",
@@ -61,7 +61,7 @@ public sealed class WorkspaceContextBuilderTests
 
             var result = await builder.BuildSystemPromptAsync(new AgentDescriptor
             {
-                AgentId = "farnsworth",
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("farnsworth"),
                 DisplayName = "Farnsworth",
                 ModelId = "test-model",
                 ApiProvider = "test-provider",
@@ -94,7 +94,7 @@ public sealed class WorkspaceContextBuilderTests
 
             var result = await builder.BuildSystemPromptAsync(new AgentDescriptor
             {
-                AgentId = "farnsworth",
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("farnsworth"),
                 DisplayName = "Farnsworth",
                 ModelId = "test-model",
                 ApiProvider = "test-provider"

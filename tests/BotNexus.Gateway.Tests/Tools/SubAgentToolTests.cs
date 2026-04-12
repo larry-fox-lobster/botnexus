@@ -262,16 +262,16 @@ public sealed class SubAgentToolTests
         => result.Content.Single(c => c.Type == AgentToolContentType.Text).Value;
 
     private static SubAgentInfo CreateSubAgentInfo(
-        string subAgentId = "sub-default",
-        string childSessionId = "parent-session::subagent::sub-default",
+        string? subAgentId = null,
+        BotNexus.Domain.Primitives.SessionId? childSessionId = null,
         string? name = null,
         SubAgentStatus status = SubAgentStatus.Running,
         string? resultSummary = null)
         => new()
         {
-            SubAgentId = subAgentId,
-            ParentSessionId = "parent-session",
-            ChildSessionId = childSessionId,
+            SubAgentId = subAgentId ?? "sub-default",
+            ParentSessionId = BotNexus.Domain.Primitives.SessionId.From("parent-session"),
+            ChildSessionId = childSessionId ?? BotNexus.Domain.Primitives.SessionId.From("parent-session::subagent::sub-default"),
             Name = name,
             Task = "Investigate issue",
             Model = "gpt-5-mini",

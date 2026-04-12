@@ -92,7 +92,7 @@ public sealed class ModelsControllerTests
         var agentRegistry = new Mock<IAgentRegistry>();
         agentRegistry.Setup(registry => registry.Get("agent-a")).Returns(new AgentDescriptor
         {
-            AgentId = "agent-a",
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             DisplayName = "Agent A",
             ApiProvider = "openai",
             ModelId = "gpt-4o",
@@ -129,7 +129,7 @@ public sealed class ModelsControllerTests
         var agentRegistry = new Mock<IAgentRegistry>();
         agentRegistry.Setup(registry => registry.Get("agent-a")).Returns(new AgentDescriptor
         {
-            AgentId = "agent-a",
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
             DisplayName = "Agent A",
             ApiProvider = "openai",
             ModelId = "gpt-4o"
@@ -151,7 +151,7 @@ public sealed class ModelsControllerTests
     private static ModelsController CreateController(IModelFilter modelFilter)
     {
         var agentRegistry = new Mock<IAgentRegistry>();
-        agentRegistry.Setup(registry => registry.Get(It.IsAny<string>())).Returns((AgentDescriptor?)null);
+        agentRegistry.Setup(registry => registry.Get(It.IsAny<BotNexus.Domain.Primitives.AgentId>())).Returns((AgentDescriptor?)null);
         return new ModelsController(modelFilter, agentRegistry.Object);
     }
 }

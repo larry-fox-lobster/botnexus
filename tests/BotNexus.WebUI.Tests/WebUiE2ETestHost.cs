@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
+using BotNexus.Domain.Primitives;
 using BotNexus.Gateway;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
@@ -300,27 +301,27 @@ internal sealed class RecordingStreamPlan
 
 internal sealed class RecordingAgentSupervisor : IAgentSupervisor
 {
-    private readonly ConcurrentDictionary<(string AgentId, string SessionId), RecordingAgentHandle> _handles = new();
+    private readonly ConcurrentDictionary<(AgentId AgentId, SessionId SessionId), RecordingAgentHandle> _handles = new();
     private readonly ConcurrentQueue<DispatchRecord> _dispatches = new();
-    private readonly ConcurrentDictionary<(string AgentId, string SessionId), AgentInstanceStatus> _statuses = new();
+    private readonly ConcurrentDictionary<(AgentId AgentId, SessionId SessionId), AgentInstanceStatus> _statuses = new();
     private readonly ConcurrentDictionary<string, ConcurrentQueue<RecordingStreamPlan>> _agentPlans = new();
-    private readonly ConcurrentDictionary<(string AgentId, string SessionId), ConcurrentQueue<RecordingStreamPlan>> _sessionPlans = new();
+    private readonly ConcurrentDictionary<(AgentId AgentId, SessionId SessionId), ConcurrentQueue<RecordingStreamPlan>> _sessionPlans = new();
 
     public IReadOnlyList<DispatchRecord> Dispatches => _dispatches.ToList();
 
-    public Task<IAgentHandle> GetOrCreateAsync(string agentId, string sessionId, CancellationToken cancellationToken = default)
+    public Task<IAgentHandle> GetOrCreateAsync(AgentId agentId, SessionId sessionId, CancellationToken cancellationToken = default)
     {
         var handle = _handles.GetOrAdd((agentId, sessionId), key => new RecordingAgentHandle(key.AgentId, key.SessionId, this));
         return Task.FromResult<IAgentHandle>(handle);
     }
 
-    public Task StopAsync(string agentId, string sessionId, CancellationToken cancellationToken = default)
+    public Task StopAsync(AgentId agentId, SessionId sessionId, CancellationToken cancellationToken = default)
     {
         _statuses[(agentId, sessionId)] = AgentInstanceStatus.Stopped;
         return Task.CompletedTask;
     }
 
-    public AgentInstance? GetInstance(string agentId, string sessionId)
+    public AgentInstance? GetInstance(AgentId agentId, SessionId sessionId)
     {
         if (!_handles.ContainsKey((agentId, sessionId)))
             return null;
@@ -360,11 +361,11 @@ internal sealed class RecordingAgentSupervisor : IAgentSupervisor
         => _agentPlans.GetOrAdd(agentId, _ => new ConcurrentQueue<RecordingStreamPlan>()).Enqueue(plan);
 
     public void EnqueueSessionStreamPlan(string agentId, string sessionId, RecordingStreamPlan plan)
-        => _sessionPlans.GetOrAdd((agentId, sessionId), _ => new ConcurrentQueue<RecordingStreamPlan>()).Enqueue(plan);
+        => _sessionPlans.GetOrAdd((AgentId.From(agentId), SessionId.From(sessionId)), _ => new ConcurrentQueue<RecordingStreamPlan>()).Enqueue(plan);
 
     public RecordingStreamPlan GetStreamPlan(string agentId, string sessionId, string message)
     {
-        if (_sessionPlans.TryGetValue((agentId, sessionId), out var sessionQueue) &&
+        if (_sessionPlans.TryGetValue((AgentId.From(agentId), SessionId.From(sessionId)), out var sessionQueue) &&
             sessionQueue.TryDequeue(out var sessionPlan))
         {
             return sessionPlan;
@@ -380,7 +381,7 @@ internal sealed class RecordingAgentSupervisor : IAgentSupervisor
     }
 
     public void SetStatus(string agentId, string sessionId, AgentInstanceStatus status)
-        => _statuses[(agentId, sessionId)] = status;
+        => _statuses[(AgentId.From(agentId), SessionId.From(sessionId))] = status;
 
     public void Reset()
     {
@@ -390,13 +391,13 @@ internal sealed class RecordingAgentSupervisor : IAgentSupervisor
     }
 }
 
-internal sealed class RecordingAgentHandle(string agentId, string sessionId, RecordingAgentSupervisor supervisor) : IAgentHandle
+internal sealed class RecordingAgentHandle(AgentId agentId, SessionId sessionId, RecordingAgentSupervisor supervisor) : IAgentHandle
 {
     private readonly ConcurrentQueue<string> _followUps = new();
     private volatile bool _abortRequested;
 
-    public string AgentId { get; } = agentId;
-    public string SessionId { get; } = sessionId;
+    public AgentId AgentId { get; } = agentId;
+    public SessionId SessionId { get; } = sessionId;
     public bool IsRunning { get; private set; }
 
     public Task<AgentResponse> PromptAsync(string message, CancellationToken cancellationToken = default)
@@ -577,11 +578,11 @@ internal sealed class RecordingAgentHandle(string agentId, string sessionId, Rec
 internal sealed class TestSubAgentManager : ISubAgentManager
 {
     private readonly object _gate = new();
-    private readonly Dictionary<string, List<SubAgentInfo>> _byParentSession = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<SessionId, List<SubAgentInfo>> _byParentSession = [];
     private readonly Dictionary<string, SubAgentInfo> _bySubAgentId = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<(string SubAgentId, string RequestingSessionId)> _killRequests = [];
+    private readonly List<(string SubAgentId, SessionId RequestingSessionId)> _killRequests = [];
 
-    public IReadOnlyList<(string SubAgentId, string RequestingSessionId)> KillRequests
+    public IReadOnlyList<(string SubAgentId, SessionId RequestingSessionId)> KillRequests
     {
         get
         {
@@ -594,7 +595,7 @@ internal sealed class TestSubAgentManager : ISubAgentManager
     {
         lock (_gate)
         {
-            _byParentSession[parentSessionId] = subAgents.ToList();
+            _byParentSession[SessionId.From(parentSessionId)] = subAgents.ToList();
             foreach (var subAgent in subAgents)
                 _bySubAgentId[subAgent.SubAgentId] = subAgent;
         }
@@ -629,7 +630,7 @@ internal sealed class TestSubAgentManager : ISubAgentManager
         return Task.FromResult(subAgent);
     }
 
-    public Task<IReadOnlyList<SubAgentInfo>> ListAsync(string parentSessionId, CancellationToken ct = default)
+    public Task<IReadOnlyList<SubAgentInfo>> ListAsync(SessionId parentSessionId, CancellationToken ct = default)
     {
         lock (_gate)
         {
@@ -649,7 +650,7 @@ internal sealed class TestSubAgentManager : ISubAgentManager
         }
     }
 
-    public Task<bool> KillAsync(string subAgentId, string requestingSessionId, CancellationToken ct = default)
+    public Task<bool> KillAsync(string subAgentId, SessionId requestingSessionId, CancellationToken ct = default)
     {
         lock (_gate)
         {

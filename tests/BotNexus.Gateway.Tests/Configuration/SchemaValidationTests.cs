@@ -14,7 +14,7 @@ public sealed class SchemaValidationTests
             Gateway = new GatewaySettingsConfig
             {
                 ListenUrl = "http://localhost:5005",
-                DefaultAgentId = "assistant",
+                DefaultAgentId = BotNexus.Domain.Primitives.AgentId.From("assistant"),
                 AgentsDirectory = "agents",
                 SessionsDirectory = "sessions",
                 LogLevel = "Information",

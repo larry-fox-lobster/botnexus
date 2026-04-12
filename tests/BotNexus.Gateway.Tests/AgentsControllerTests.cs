@@ -73,7 +73,7 @@ public sealed class AgentsControllerTests
         var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
         registry.Register(CreateDescriptor("agent-a"));
         var controller = CreateController(registry);
-        var payload = CreateDescriptor("agent-a") with { AgentId = string.Empty };
+        var payload = CreateDescriptor("agent-a") with { AgentId = default };
 
         var result = await controller.Update("agent-a", payload, CancellationToken.None);
         var updated = (result.Result as OkObjectResult)?.Value as AgentDescriptor;
@@ -165,8 +165,8 @@ public sealed class AgentsControllerTests
             new AgentInstance
             {
                 InstanceId = "agent-a::s1",
-                AgentId = "agent-a",
-                SessionId = "s1",
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("s1"),
                 IsolationStrategy = "in-process"
             }
         ]);
@@ -176,7 +176,7 @@ public sealed class AgentsControllerTests
         handle.SetupGet(h => h.SessionId).Returns("s1");
 
         supervisor.As<IAgentHandleInspector>()
-            .Setup(s => s.GetHandle("agent-a", "s1"))
+            .Setup(s => s.GetHandle(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("s1")))
             .Returns(handle.Object);
 
         var controller = CreateController(registry, supervisor.Object);
@@ -200,8 +200,8 @@ public sealed class AgentsControllerTests
             new AgentInstance
             {
                 InstanceId = "agent-a::s1",
-                AgentId = "agent-a",
-                SessionId = "s1",
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("s1"),
                 IsolationStrategy = "in-process"
             }
         ]);
@@ -214,7 +214,7 @@ public sealed class AgentsControllerTests
             .ReturnsAsync(true);
 
         supervisor.As<IAgentHandleInspector>()
-            .Setup(s => s.GetHandle("agent-a", "s1"))
+            .Setup(s => s.GetHandle(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("s1")))
             .Returns(handle.Object);
 
         var controller = CreateController(registry, supervisor.Object);
@@ -238,8 +238,8 @@ public sealed class AgentsControllerTests
             new AgentInstance
             {
                 InstanceId = "agent-a::s1",
-                AgentId = "agent-a",
-                SessionId = "s1",
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("s1"),
                 IsolationStrategy = "in-process"
             }
         ]);
@@ -252,7 +252,7 @@ public sealed class AgentsControllerTests
             .ReturnsAsync(false);
 
         supervisor.As<IAgentHandleInspector>()
-            .Setup(s => s.GetHandle("agent-a", "s1"))
+            .Setup(s => s.GetHandle(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("s1")))
             .Returns(handle.Object);
 
         var controller = CreateController(registry, supervisor.Object);

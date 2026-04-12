@@ -247,7 +247,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
         descriptors.Should().BeEmpty();
         logger.Entries.Should().Contain(e =>
             e.Level == LogLevel.Warning &&
-            e.Message.Contains("validation errors", StringComparison.Ordinal));
+            e.Message.Contains("Failed to load agent config file", StringComparison.Ordinal));
     }
 
     [Fact]

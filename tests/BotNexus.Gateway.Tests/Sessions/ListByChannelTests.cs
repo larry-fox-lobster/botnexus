@@ -18,7 +18,7 @@ public sealed class ListByChannelTests
 
         var sessions = await InvokeListByChannelAsync(store, "agent-a", ChannelKey.From("web"));
 
-        sessions.Select(s => s.SessionId).Should().BeEquivalentTo(["match"]);
+        sessions.Select(s => s.SessionId.Value).Should().BeEquivalentTo(["match"]);
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public sealed class ListByChannelTests
 
         var sessions = await InvokeListByChannelAsync(store, "agent-a", ChannelKey.From("web"));
 
-        sessions.Select(s => s.SessionId).Should().ContainInOrder("newest", "middle", "oldest");
+        sessions.Select(s => s.SessionId.Value).Should().ContainInOrder("newest", "middle", "oldest");
         sessions.Select(s => s.CreatedAt).Should().BeInDescendingOrder();
     }
 
@@ -44,7 +44,7 @@ public sealed class ListByChannelTests
 
         var sessions = await InvokeListByChannelAsync(store, "agent-a", ChannelKey.From("web"));
 
-        sessions.Select(s => s.SessionId).Should().BeEquivalentTo(["web"]);
+        sessions.Select(s => s.SessionId.Value).Should().BeEquivalentTo(["web"]);
     }
 
     private static async Task SaveSessionAsync(
@@ -74,10 +74,10 @@ public sealed class ListByChannelTests
         var method = store.GetType().GetMethod(
             "ListByChannelAsync",
             BindingFlags.Instance | BindingFlags.Public,
-            [typeof(string), typeof(ChannelKey), typeof(CancellationToken)]);
+            [typeof(BotNexus.Domain.Primitives.AgentId), typeof(ChannelKey), typeof(CancellationToken)]);
 
         method.Should().NotBeNull("ListByChannelAsync must exist on session store implementations.");
-        var invocationResult = method!.Invoke(store, [agentId, channelType, CancellationToken.None]);
+        var invocationResult = method!.Invoke(store, [BotNexus.Domain.Primitives.AgentId.From(agentId), channelType, CancellationToken.None]);
         invocationResult.Should().BeAssignableTo<Task>();
 
         var task = (Task)invocationResult!;

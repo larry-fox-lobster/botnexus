@@ -180,7 +180,7 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
 
         var handle = await strategy.CreateAsync(
             descriptor,
-            new AgentExecutionContext { SessionId = "session-1" });
+            new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1") });
 
         handle.AgentId.Should().Be("assistant");
         handle.SessionId.Should().Be("session-1");

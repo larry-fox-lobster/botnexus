@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using BotNexus.Domain.Primitives;
 using BotNexus.Gateway;
 using BotNexus.Gateway.Abstractions.Activity;
 using BotNexus.Gateway.Abstractions.Agents;
@@ -19,6 +20,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
 
 namespace BotNexus.Gateway.Tests.Integration;
 
@@ -57,9 +59,9 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
 
         await SeedSessionAsync(factory, new GatewaySession
         {
-            SessionId = "manifest-1",
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("manifest-1"),
             AgentId = TestAgentId,
-            Status = SessionStatus.Active,
+            Status = GatewaySessionStatus.Active,
             ChannelType = ChannelKey.From("signalr")
         }, cts.Token);
 
@@ -79,8 +81,8 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
 
         const string sessionA = "subscribe-all-a";
         const string sessionB = "subscribe-all-b";
-        await SeedSessionAsync(factory, new GatewaySession { SessionId = sessionA, AgentId = TestAgentId, Status = SessionStatus.Active }, cts.Token);
-        await SeedSessionAsync(factory, new GatewaySession { SessionId = sessionB, AgentId = TestAgentId, Status = SessionStatus.Active }, cts.Token);
+        await SeedSessionAsync(factory, new GatewaySession { SessionId = sessionA, AgentId = TestAgentId, Status = GatewaySessionStatus.Active }, cts.Token);
+        await SeedSessionAsync(factory, new GatewaySession { SessionId = sessionB, AgentId = TestAgentId, Status = GatewaySessionStatus.Active }, cts.Token);
 
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         await connection.InvokeAsync<JsonElement>("SubscribeAll", cts.Token);
@@ -112,8 +114,8 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
 
         const string sessionTarget = "subscribe-one-target";
         const string sessionOther = "subscribe-one-other";
-        await SeedSessionAsync(factory, new GatewaySession { SessionId = sessionTarget, AgentId = TestAgentId, Status = SessionStatus.Active }, cts.Token);
-        await SeedSessionAsync(factory, new GatewaySession { SessionId = sessionOther, AgentId = TestAgentId, Status = SessionStatus.Active }, cts.Token);
+        await SeedSessionAsync(factory, new GatewaySession { SessionId = sessionTarget, AgentId = TestAgentId, Status = GatewaySessionStatus.Active }, cts.Token);
+        await SeedSessionAsync(factory, new GatewaySession { SessionId = sessionOther, AgentId = TestAgentId, Status = GatewaySessionStatus.Active }, cts.Token);
 
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         var subscribed = await connection.InvokeAsync<JsonElement>("Subscribe", sessionTarget, cts.Token);
@@ -164,7 +166,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
 
         const string joinedSession = "legacy-join-session";
         const string subscribedSession = "legacy-subscribe-session";
-        await SeedSessionAsync(factory, new GatewaySession { SessionId = subscribedSession, AgentId = TestAgentId, Status = SessionStatus.Active }, cts.Token);
+        await SeedSessionAsync(factory, new GatewaySession { SessionId = subscribedSession, AgentId = TestAgentId, Status = GatewaySessionStatus.Active }, cts.Token);
 
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         var joinResult = await connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, joinedSession, cts.Token);
@@ -794,7 +796,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         using var client = factory.CreateClient();
         var descriptor = new AgentDescriptor
         {
-            AgentId = agentId,
+            AgentId = AgentId.From(agentId),
             DisplayName = $"Test Agent {agentId}",
             ModelId = "gpt-4.1",
             ApiProvider = "copilot",
@@ -834,8 +836,8 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
     {
         private readonly AgentInstance _instance = new()
         {
-            AgentId = agentId,
-            SessionId = sessionId,
+            AgentId = AgentId.From(agentId),
+            SessionId = SessionId.From(sessionId),
             InstanceId = $"{agentId}::{sessionId}",
             IsolationStrategy = "in-process",
             Status = AgentInstanceStatus.Running
@@ -844,7 +846,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         public AbortAwareHandle Handle { get; } = new(agentId, sessionId);
         public bool GetOrCreateCalled { get; private set; }
 
-        public Task<IAgentHandle> GetOrCreateAsync(string requestedAgentId, string requestedSessionId, CancellationToken cancellationToken = default)
+        public Task<IAgentHandle> GetOrCreateAsync(AgentId requestedAgentId, SessionId requestedSessionId, CancellationToken cancellationToken = default)
         {
             GetOrCreateCalled = true;
             requestedAgentId.Should().Be(agentId);
@@ -852,10 +854,10 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
             return Task.FromResult<IAgentHandle>(Handle);
         }
 
-        public Task StopAsync(string requestedAgentId, string requestedSessionId, CancellationToken cancellationToken = default)
+        public Task StopAsync(AgentId requestedAgentId, SessionId requestedSessionId, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
 
-        public AgentInstance? GetInstance(string requestedAgentId, string requestedSessionId)
+        public AgentInstance? GetInstance(AgentId requestedAgentId, SessionId requestedSessionId)
             => requestedAgentId == agentId && requestedSessionId == sessionId ? _instance : null;
 
         public IReadOnlyList<AgentInstance> GetAllInstances() => [_instance];
@@ -863,10 +865,10 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         public Task StopAllAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
-    private sealed class AbortAwareHandle(string agentId, string sessionId) : IAgentHandle
+    private sealed class AbortAwareHandle(AgentId agentId, SessionId sessionId) : IAgentHandle
     {
-        public string AgentId { get; } = agentId;
-        public string SessionId { get; } = sessionId;
+        public BotNexus.Domain.Primitives.AgentId AgentId { get; } = agentId;
+        public BotNexus.Domain.Primitives.SessionId SessionId { get; } = sessionId;
         public bool IsRunning => true;
         public bool AbortCalled { get; private set; }
 
