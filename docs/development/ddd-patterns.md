@@ -448,7 +448,7 @@ This table tracks all DDD types being introduced in BotNexus. Follow this roadma
 | Type | Category | Pattern | Status | Phase Intro | Notes |
 |------|----------|---------|--------|------------|-------|
 | `SessionParticipant` | Domain Entity | Record | ✅ Done | 2.0 | Captures `ParticipantType` (User/Agent), participant ID, optional world ID, optional role. Replaces `CallerId`-only model. |
-| `SubAgentArchetype` | Discriminator | Smart Enum | ✅ Done | 2.0 | Known values: General, Researcher, Executor, Coordinator. Extensible. |
+| `SubAgentArchetype` | Discriminator | Smart Enum | ✅ Done | 2.0 | Known values: Researcher, Coder, Planner, Reviewer, Writer, General. Extensible. |
 | `TriggerType` | Discriminator | Smart Enum | ✅ Done | 2.0 | Known values: Channel, Cron, SystemTimer. Extensible. Now `IInternalTrigger` interface decouples Cron from `IChannelAdapter`. |
 
 ### Phase 3-4: Advanced (Deferred)
@@ -512,7 +512,7 @@ Wave 2-3 delivered the full session model redesign and completed the DDD foundat
 - Session stores, wire protocols, and all APIs updated
 
 **7. Sub-Agent Archetype Identity**
-- Sub-agents now have `SubAgentArchetype` smart enum (General, Researcher, Executor, Coordinator)
+- Sub-agents now have `SubAgentArchetype` smart enum (Researcher, Coder, Planner, Reviewer, Writer, General)
 - Enables distinct child agent identities with specialized behavior
 - Archetypes extensible via registry for custom sub-agent types
 
