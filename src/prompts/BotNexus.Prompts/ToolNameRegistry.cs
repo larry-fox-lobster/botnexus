@@ -1,5 +1,8 @@
 namespace BotNexus.Prompts;
 
+/// <summary>
+/// Represents tool name registry.
+/// </summary>
 public sealed class ToolNameRegistry
 {
     private readonly Dictionary<string, string> _canonicalByNormalized = new(StringComparer.OrdinalIgnoreCase);
@@ -22,12 +25,22 @@ public sealed class ToolNameRegistry
 
     public IReadOnlyList<string> RawTools => _canonicalByNormalized.Values.ToList();
 
+    /// <summary>
+    /// Executes resolve.
+    /// </summary>
+    /// <param name="normalizedName">The normalized name.</param>
+    /// <returns>The resolve result.</returns>
     public string Resolve(string normalizedName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(normalizedName);
         return _canonicalByNormalized.TryGetValue(normalizedName, out var canonical) ? canonical : normalizedName;
     }
 
+    /// <summary>
+    /// Executes contains.
+    /// </summary>
+    /// <param name="normalizedName">The normalized name.</param>
+    /// <returns>The contains result.</returns>
     public bool Contains(string normalizedName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(normalizedName);

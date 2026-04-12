@@ -1,5 +1,8 @@
 namespace BotNexus.Prompts;
 
+/// <summary>
+/// Specifies supported values for prompt section.
+/// </summary>
 public enum PromptSection
 {
     Tools = 100,

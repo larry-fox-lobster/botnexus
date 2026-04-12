@@ -1,7 +1,15 @@
 namespace BotNexus.Prompts;
 
+/// <summary>
+/// Represents skills parser.
+/// </summary>
 public static class SkillsParser
 {
+    /// <summary>
+    /// Executes parse.
+    /// </summary>
+    /// <param name="raw">The raw.</param>
+    /// <returns>The parse result.</returns>
     public static SkillDocument Parse(string raw)
     {
         var content = raw.Trim();

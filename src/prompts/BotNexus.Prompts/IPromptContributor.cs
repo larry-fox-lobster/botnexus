@@ -1,5 +1,8 @@
 namespace BotNexus.Prompts;
 
+/// <summary>
+/// Defines the contract for iprompt contributor.
+/// </summary>
 public interface IPromptContributor
 {
     PromptSection? Target { get; }

@@ -1,7 +1,15 @@
 namespace BotNexus.Prompts;
 
+/// <summary>
+/// Represents prompt text.
+/// </summary>
 public static class PromptText
 {
+    /// <summary>
+    /// Executes normalize structured section.
+    /// </summary>
+    /// <param name="value">The value.</param>
+    /// <returns>The normalize structured section result.</returns>
     public static string NormalizeStructuredSection(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -14,6 +22,11 @@ public static class PromptText
         return string.Join("\n", lines).Trim();
     }
 
+    /// <summary>
+    /// Executes normalize capability ids.
+    /// </summary>
+    /// <param name="capabilities">The capabilities.</param>
+    /// <returns>The normalize capability ids result.</returns>
     public static IReadOnlyList<string> NormalizeCapabilityIds(IEnumerable<string> capabilities)
     {
         ArgumentNullException.ThrowIfNull(capabilities);

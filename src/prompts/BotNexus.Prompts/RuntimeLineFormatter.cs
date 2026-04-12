@@ -1,7 +1,15 @@
 namespace BotNexus.Prompts;
 
+/// <summary>
+/// Represents runtime line formatter.
+/// </summary>
 public static class RuntimeLineFormatter
 {
+    /// <summary>
+    /// Executes build runtime line.
+    /// </summary>
+    /// <param name="runtime">The runtime.</param>
+    /// <returns>The build runtime line result.</returns>
     public static string BuildRuntimeLine(PromptRuntimeInfo? runtime)
     {
         var normalizedCapabilities = PromptText.NormalizeCapabilityIds(runtime?.Capabilities ?? []);

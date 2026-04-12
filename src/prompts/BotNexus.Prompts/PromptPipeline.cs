@@ -1,10 +1,18 @@
 namespace BotNexus.Prompts;
 
+/// <summary>
+/// Represents prompt pipeline.
+/// </summary>
 public sealed class PromptPipeline
 {
     private readonly List<IPromptSection> _sections = [];
     private readonly List<IPromptContributor> _contributors = [];
 
+    /// <summary>
+    /// Executes add.
+    /// </summary>
+    /// <param name="section">The section.</param>
+    /// <returns>The add result.</returns>
     public PromptPipeline Add(IPromptSection section)
     {
         ArgumentNullException.ThrowIfNull(section);
@@ -12,6 +20,11 @@ public sealed class PromptPipeline
         return this;
     }
 
+    /// <summary>
+    /// Executes add contributors.
+    /// </summary>
+    /// <param name="contributors">The contributors.</param>
+    /// <returns>The add contributors result.</returns>
     public PromptPipeline AddContributors(IEnumerable<IPromptContributor> contributors)
     {
         ArgumentNullException.ThrowIfNull(contributors);
@@ -19,11 +32,21 @@ public sealed class PromptPipeline
         return this;
     }
 
+    /// <summary>
+    /// Executes build.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <returns>The build result.</returns>
     public string Build(PromptContext context)
     {
         return string.Join("\n", BuildLines(context));
     }
 
+    /// <summary>
+    /// Executes build lines.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <returns>The build lines result.</returns>
     public IReadOnlyList<string> BuildLines(PromptContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
