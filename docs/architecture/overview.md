@@ -1529,77 +1529,121 @@ For detailed workspace and memory documentation, see [Agent Workspace and Memory
 
 ## 12. Session Management
 
-Conversations are persisted to disk in a structured format, enabling session recovery and history inspection.
+Conversations are persisted in a sophisticated model that supports multiple session types, participants, and lifecycle states.
 
-### SessionManager
+### GatewaySession Model (Wave 2-3 Redesign)
 
-**File:** `BotNexus.Session/SessionManager.cs`
+**File:** `BotNexus.Gateway.Abstractions/Models/GatewaySession.cs`
 
-- **Storage**: File-backed JSONL (one file per session)
-- **Location**: `~/.botnexus/workspace/sessions` (resolved from `AgentDefaults.Workspace`)
-- **Thread-Safety**: Per-session `SemaphoreSlim` lock
-- **Caching**: In-memory cache with weak references
-- **Key Encoding**: URI escaping (`%` → `_`) to sanitize filesystem paths
-
-### Session Model
-
-**File:** `BotNexus.Core/Models/Session.cs`
+The session model now uses typed value objects and smart enums throughout:
 
 ```csharp
-public class Session
+public sealed class GatewaySession
 {
-    public string Key { get; set; }           // Unique identifier
-    public string AgentName { get; set; }    // Which agent
-    public DateTimeOffset CreatedAt { get; set; }
+    public required SessionId SessionId { get; init; }        // Typed session ID
+    public required AgentId AgentId { get; set; }            // Typed agent ID
+    public ChannelKey? ChannelType { get; set; }             // Typed channel key (e.g., "discord")
+    public string? CallerId { get; set; }                     // Legacy: caller-specific ID within channel
+    
+    public SessionType SessionType { get; set; }             // Discriminator: UserAgent, Cron, Soul, etc.
+    public bool IsInteractive => SessionType.Equals(SessionType.UserAgent);  // Computed property
+    
+    public List<SessionParticipant> Participants { get; init; } = [];  // Structured participants (NEW Wave 2-3)
+    
+    public SessionStatus Status { get; set; }                // Active, Suspended, Sealed (renamed Wave 2-3)
+    public DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset UpdatedAt { get; set; }
-    public List<SessionEntry> History { get; set; }
+    
+    public List<SessionEntry> History { get; init; } = [];   // Conversation history
+    public Dictionary<string, object?> Metadata { get; init; } = [];
 }
 
-public class SessionEntry
+public sealed record SessionEntry
 {
-    public MessageRole Role { get; set; }     // User, Assistant, Tool, System
-    public string Content { get; set; }
-    public DateTimeOffset Timestamp { get; set; }
-    public string? ToolName { get; set; }     // If tool call
-    public string? ToolCallId { get; set; }
+    public required MessageRole Role { get; init; }  // Typed: User, Assistant, System, Tool
+    public required string Content { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+    public string? ToolName { get; init; }
+    public string? ToolCallId { get; init; }
+    public bool IsCompactionSummary { get; init; }
+}
+
+public sealed record SessionParticipant
+{
+    public required ParticipantType Type { get; init; }  // User or Agent
+    public required string Id { get; init; }
+    public string? WorldId { get; init; }                // Cross-world reference
+    public string? Role { get; init; }                   // Custom role metadata
 }
 ```
 
-### Session Key Format
+### Session Type Discriminators (Wave 2-3)
 
-Default format: `{Channel}:{ChatId}`
+Sessions are now classified by interaction pattern:
 
-Example: `discord:12345` → Conversation between Discord user 12345 and the agent
+| Type | Created By | Participants | Interactive | Use Case |
+|------|-----------|--------------|------------|----------|
+| **UserAgent** | Channel | User + Agent | ✅ Yes | Regular user conversations |
+| **AgentSelf** | Agent | Agent only | ❌ No | Agent internal work/multitasking |
+| **AgentSubAgent** | Agent | Parent + Child | ❌ No | Sub-agent delegation |
+| **AgentAgent** | Agent | Two agents | ❌ No | Peer agent collaboration |
+| **Soul** | Trigger | Agent only | ❌ No | Scheduled daily reflection |
+| **Cron** | Scheduler | Agent only | ❌ No | Background automation |
 
-Can be overridden via `InboundMessage.SessionKeyOverride` for custom session grouping.
+The `IsInteractive` property returns `true` only for `UserAgent` sessions, enabling compile-time filtering of interactive vs. programmatic sessions.
 
-### File Layout
+### Session Lifecycle States (Wave 2-3)
 
-```
-sessions/
-├── discord_12345.jsonl
-├── slack_U123ABC.jsonl
-├── telegram_999.jsonl
-├── websocket_abc123_history.jsonl
-└── custom_session_key.jsonl
-```
+- **Active** — Accepting messages, running normally
+- **Suspended** — Paused temporarily, can be resumed  
+- **Sealed** — Closed permanently (replaces old "Closed" naming; sealed implies terminal and preserved)
 
-### JSONL Format
+### Session Storage
 
-Each line is a `SessionEntry` JSON object:
+**File:** `BotNexus.Gateway.Sessions/SqliteSessionStore.cs` or `FileSessionStore.cs`
 
-```jsonl
-{"role":"System","content":"You are a helpful assistant","timestamp":"2026-04-01T10:00:00Z"}
-{"role":"User","content":"What is 2+2?","timestamp":"2026-04-01T10:00:05Z"}
-{"role":"Assistant","content":"2+2 equals 4","timestamp":"2026-04-01T10:00:06Z"}
-{"role":"Tool","content":"{\"result\":true}","toolName":"Calculator","toolCallId":"call_123","timestamp":"2026-04-01T10:00:06Z"}
-```
+- **Storage**: SQLite or JSONL (pluggable via `ISessionStore`)
+- **Location**: `~/.botnexus/sessions/` or configured path
+- **Thread-Safety**: Per-session lock + bounded replay buffer (1000 entries default)
+- **Replay**: WebSocket reconnect recovery via `SessionReplayBuffer`
+
+### Backward Compatibility
+
+- `CallerId` property retained on `GatewaySession` for legacy code
+- `Participants` list is the new canonical model
+- Implicit string conversion on `SessionId` and `AgentId` preserves existing code
 
 ---
 
 ## 13. Cron and Scheduling
 
 BotNexus provides a centralized **cron service** (`ICronService`) that schedules and executes jobs on a fixed tick interval, enabling automated agent prompts, system actions, and maintenance tasks.
+
+### IInternalTrigger Interface (Wave 2-3)
+
+**File:** `BotNexus.Gateway.Abstractions/Triggers/IInternalTrigger.cs`
+
+Wave 2-3 decoupled Cron from `IChannelAdapter` by introducing `IInternalTrigger`, a first-class abstraction for non-channel session creation:
+
+```csharp
+public interface IInternalTrigger
+{
+    TriggerType Type { get; }
+    string DisplayName { get; }
+    Task<SessionId> CreateSessionAsync(AgentId agentId, string prompt, CancellationToken ct = default);
+}
+```
+
+**Trigger Types** (smart enum):
+- **Channel** — User-initiated via Discord, Slack, Telegram, WebSocket
+- **Cron** — Scheduled background execution
+- **SystemTimer** — One-off system timers
+- Extensible for custom triggers
+
+This separation means:
+- Channels create **interactive sessions** → `SessionType.UserAgent`
+- Internal triggers create **programmatic sessions** → `SessionType.Cron`, `SessionType.Soul`, etc.
+- Gateway routes inbound messages to either channel or trigger handler transparently
 
 ### CronService Overview
 
@@ -1611,6 +1655,7 @@ BotNexus provides a centralized **cron service** (`ICronService`) that schedules
 - **Persistence**: In-memory execution history per job (configurable size, default 100 entries)
 - **Correlation**: Every execution gets a unique correlation ID for tracing
 - **Activity Events**: Publishes `cron.started`, `cron.completed`, `cron.failed` events
+- **IInternalTrigger**: Implements trigger interface for session creation
 
 ### Job Types
 
@@ -1620,7 +1665,8 @@ There are three job types, each with distinct execution models:
 
 Execute a prompt through the agent runner pipeline.
 
-- **Trigger**: Cron schedule
+- **Trigger**: Cron schedule (via IInternalTrigger)
+- **Session Type**: `SessionType.Cron` (non-interactive, programmatic)
 - **Execution**: Agent runner processes prompt, routes output to channels
 - **Session Modes**: `new` (isolated), `persistent` (accumulated), or `named:<key>` (custom)
 - **Output**: Agent response optionally routed to channels (Slack, Discord, email, etc.)
@@ -1629,7 +1675,8 @@ Execute a prompt through the agent runner pipeline.
 
 Execute a built-in or custom system action (non-LLM).
 
-- **Trigger**: Cron schedule
+- **Trigger**: Cron schedule (via IInternalTrigger)
+- **Session Type**: `SessionType.Cron` (non-interactive)
 - **Execution**: System action registry resolves action by name and executes
 - **Built-in Actions**: `check-updates`, `health-audit`, `extension-scan`
 - **Output**: Action result optionally routed to channels
@@ -1638,11 +1685,11 @@ Execute a built-in or custom system action (non-LLM).
 
 Execute internal housekeeping tasks.
 
-- **Trigger**: Cron schedule
+- **Trigger**: Cron schedule (via IInternalTrigger)
 - **Built-in Actions**:
-  - `consolidate-memory` — Consolidate agent memory files
-  - `cleanup-sessions` — Delete old sessions (retention-based)
-  - `rotate-logs` — Archive old log files
+   - `consolidate-memory` — Consolidate agent memory files
+   - `cleanup-sessions` — Delete old sessions (retention-based)
+   - `rotate-logs` — Archive old log files
 - **Configuration**: Per-action parameters (retention days, paths, agent lists)
 
 ### Central Registry

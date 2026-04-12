@@ -110,8 +110,8 @@ Think of the Descriptor as a job posting: it defines the role, the tools, the ac
 The Instance is the embodiment of the agent being alive - the runtime manifestation that can interact, think, and introspect. When a Descriptor is activated for a specific session, an Instance is born.
 
 - **Instance ID** - unique composite of agent + session, identifying this specific incarnation
-- **Agent ID** - which Descriptor this instance was created from
-- **Session ID** - which session this instance is bound to
+- **Agent ID** - which Descriptor this instance was created from (typed as `AgentId` value object)
+- **Session ID** - which session this instance is bound to (typed as `SessionId` value object)
 - **Status** - the current runtime state: Starting, Idle, Running, Stopping, Stopped, or Faulted
 - **Created At** - when this instance came alive
 - **Last Active At** - when it last processed something
