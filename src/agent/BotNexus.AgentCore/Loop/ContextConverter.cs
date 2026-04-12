@@ -34,6 +34,11 @@ internal static class ContextConverter
         return new Context(agentContext.SystemPrompt, providerMessages, tools);
     }
 
+    /// <summary>
+    /// Executes to provider tool.
+    /// </summary>
+    /// <param name="agentTool">The agent tool.</param>
+    /// <returns>The to provider tool result.</returns>
     public static Tool ToProviderTool(IAgentTool agentTool)
     {
         return new Tool(

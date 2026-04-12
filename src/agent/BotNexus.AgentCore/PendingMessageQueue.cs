@@ -18,6 +18,9 @@ internal sealed class PendingMessageQueue
 
     public PendingMessageQueue(QueueMode mode) => Mode = mode;
 
+    /// <summary>
+    /// Gets or sets the mode.
+    /// </summary>
     public QueueMode Mode { get; set; }
 
     public bool HasItems
@@ -31,6 +34,10 @@ internal sealed class PendingMessageQueue
         }
     }
 
+    /// <summary>
+    /// Executes enqueue.
+    /// </summary>
+    /// <param name="message">The message.</param>
     public void Enqueue(AgentMessage message)
     {
         lock (_lock)
@@ -39,6 +46,10 @@ internal sealed class PendingMessageQueue
         }
     }
 
+    /// <summary>
+    /// Executes drain.
+    /// </summary>
+    /// <returns>The drain result.</returns>
     public IReadOnlyList<AgentMessage> Drain()
     {
         lock (_lock)
@@ -61,6 +72,9 @@ internal sealed class PendingMessageQueue
         }
     }
 
+    /// <summary>
+    /// Executes clear.
+    /// </summary>
     public void Clear()
     {
         lock (_lock)

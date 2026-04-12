@@ -733,6 +733,9 @@ public sealed class Agent
     {
         private int _disposed;
 
+        /// <summary>
+        /// Executes dispose.
+        /// </summary>
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) == 1)
