@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
+using BotNexus.Domain;
 
 namespace BotNexus.Gateway.Configuration;
 
@@ -81,6 +82,8 @@ public sealed class GatewaySettingsConfig
     public Dictionary<string, ApiKeyConfig>? ApiKeys { get; set; }
     /// <summary>Extensions loading settings.</summary>
     public ExtensionsConfig? Extensions { get; set; }
+    /// <summary>World identity shown by gateway clients.</summary>
+    public WorldIdentity? World { get; set; }
 }
 
 /// <summary>CORS settings for gateway HTTP endpoints.</summary>

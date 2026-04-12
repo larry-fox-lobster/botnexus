@@ -182,6 +182,7 @@ using (var bootstrapLoggerFactory = new Serilog.Extensions.Logging.SerilogLogger
 var app = builder.Build();
 
 var platformConfig = app.Services.GetRequiredService<PlatformConfig>();
+var worldIdentity = WorldIdentityResolver.Resolve(platformConfig);
 var listenUrl = platformConfig.Gateway?.ListenUrl;
 if (!string.IsNullOrWhiteSpace(listenUrl))
 {
@@ -210,11 +211,16 @@ app.MapGet("/api/version", () =>
 });
 app.MapFallbackToFile("index.html");
 
-LogGatewayStartup(app, builder.Environment, startupPlatformConfig);
+LogGatewayStartup(app, builder.Environment, startupPlatformConfig, worldIdentity, listenUrl);
 
 app.Run();
 
-static void LogGatewayStartup(WebApplication app, IWebHostEnvironment environment, PlatformConfig startupPlatformConfig)
+static void LogGatewayStartup(
+    WebApplication app,
+    IWebHostEnvironment environment,
+    PlatformConfig startupPlatformConfig,
+    BotNexus.Domain.WorldIdentity worldIdentity,
+    string? configuredListenUrl)
 {
     var gatewayAssembly = typeof(Program).Assembly;
     var version = gatewayAssembly.GetName().Version?.ToString() ?? "dev";
@@ -268,6 +274,15 @@ static void LogGatewayStartup(WebApplication app, IWebHostEnvironment environmen
         })
         .OrderBy(endpoint => endpoint.route, StringComparer.OrdinalIgnoreCase)
         .ToArray();
+
+    var gatewayUrl = app.Urls.FirstOrDefault()
+        ?? configuredListenUrl
+        ?? app.Configuration["ASPNETCORE_URLS"]?.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault()
+        ?? "http://localhost:5000";
+    var worldEmoji = string.IsNullOrWhiteSpace(worldIdentity.Emoji) ? "🌍" : worldIdentity.Emoji;
+
+    app.Logger.LogWarning("{WorldEmoji} World: {WorldName} ({WorldId})", worldEmoji, worldIdentity.Name, worldIdentity.Id);
+    app.Logger.LogWarning("📡 Gateway starting on {GatewayUrl}", gatewayUrl);
 
     app.Logger.LogInformation(
         "Gateway startup complete {GatewayVersion} ({InformationalVersion}) on {DotNetVersion}. env={Environment} providers={LoadedProviderCount} agents={AgentCount} channels={ChannelCount}",

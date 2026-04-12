@@ -2,6 +2,12 @@
   "version": 1,
   "gateway": {
     "listenUrl": "http://localhost:5005",
+    "world": {
+      "id": "local-dev",
+      "name": "Local Development",
+      "description": "Local development gateway",
+      "emoji": "🏠"
+    },
     "defaultAgentId": "assistant",
     "agentsDirectory": "C:\\Users\\you\\.botnexus\\agents",
     "sessionsDirectory": "C:\\Users\\you\\.botnexus\\sessions",
