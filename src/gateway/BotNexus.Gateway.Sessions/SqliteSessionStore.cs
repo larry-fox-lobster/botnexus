@@ -255,7 +255,66 @@ public sealed class SqliteSessionStore : ISessionStore
         AgentId agentId,
         ExistenceQuery query,
         CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        return GetExistenceInternalAsync(agentId, query, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<GatewaySession>> GetExistenceInternalAsync(
+        AgentId agentId,
+        ExistenceQuery query,
+        CancellationToken cancellationToken)
+    {
+        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
+            await using var connection = CreateConnection();
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT id
+                FROM sessions
+                WHERE (
+                    agent_id = $agentId
+                    OR EXISTS (
+                        SELECT 1
+                        FROM json_each(COALESCE(participants_json, '[]')) AS participant
+                        WHERE lower(json_extract(participant.value, '$.id')) = $participantAgentId
+                    )
+                )
+                  AND ($from IS NULL OR created_at >= $from)
+                  AND ($to IS NULL OR created_at <= $to)
+                  AND ($typeFilter IS NULL OR session_type = $typeFilter)
+                ORDER BY created_at DESC
+                LIMIT CASE WHEN $limit IS NULL OR $limit <= 0 THEN -1 ELSE $limit END
+                """;
+            command.Parameters.AddWithValue("$agentId", agentId.Value);
+            command.Parameters.AddWithValue("$participantAgentId", agentId.Value.ToLowerInvariant());
+            command.Parameters.AddWithValue("$from", query.From.HasValue ? query.From.Value.ToString("O") : DBNull.Value);
+            command.Parameters.AddWithValue("$to", query.To.HasValue ? query.To.Value.ToString("O") : DBNull.Value);
+            command.Parameters.AddWithValue("$typeFilter", query.TypeFilter is not null ? query.TypeFilter.Value : DBNull.Value);
+            command.Parameters.AddWithValue("$limit", query.Limit.HasValue ? query.Limit.Value : DBNull.Value);
+
+            var sessions = new List<GatewaySession>();
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var sessionId = SessionId.From(reader.GetString(0));
+                var session = _cache.GetValueOrDefault(sessionId)
+                    ?? await LoadSessionAsync(connection, sessionId, cancellationToken).ConfigureAwait(false);
+                if (session is not null)
+                {
+                    _cache[sessionId] = session;
+                    sessions.Add(session);
+                }
+            }
+
+            return sessions;
+        }
+        finally { _lock.Release(); }
+    }
 
     private async Task EnsureCreatedAsync(CancellationToken cancellationToken)
     {
@@ -292,6 +351,8 @@ public sealed class SqliteSessionStore : ISessionStore
             );
 
             CREATE INDEX IF NOT EXISTS idx_session_history_session_id ON session_history(session_id);
+            CREATE INDEX IF NOT EXISTS idx_sessions_agent_id ON sessions(agent_id);
+            CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 

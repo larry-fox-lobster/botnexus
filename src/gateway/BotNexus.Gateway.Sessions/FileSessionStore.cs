@@ -214,7 +214,53 @@ public sealed class FileSessionStore : ISessionStore
         AgentId agentId,
         ExistenceQuery query,
         CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        return GetExistenceInternalAsync(agentId, query, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<GatewaySession>> GetExistenceInternalAsync(
+        AgentId agentId,
+        ExistenceQuery query,
+        CancellationToken cancellationToken)
+    {
+        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var sessions = new List<GatewaySession>();
+            foreach (var metaFile in _fileSystem.Directory.GetFiles(_storePath, "*.meta.json"))
+            {
+                var sessionId = SessionId.From(Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(metaFile)));
+                var session = _cache.GetValueOrDefault(sessionId) ?? await LoadFromFileAsync(sessionId, cancellationToken).ConfigureAwait(false);
+                if (session is null)
+                    continue;
+
+                if (session.AgentId != agentId && !IsParticipant(session, agentId))
+                    continue;
+
+                if (query.From.HasValue && session.CreatedAt < query.From.Value)
+                    continue;
+
+                if (query.To.HasValue && session.CreatedAt > query.To.Value)
+                    continue;
+
+                if (query.TypeFilter is not null && session.SessionType != query.TypeFilter)
+                    continue;
+
+                sessions.Add(session);
+            }
+
+            IEnumerable<GatewaySession> result = sessions
+                .OrderByDescending(session => session.CreatedAt);
+
+            if (query.Limit is > 0)
+                result = result.Take(query.Limit.Value);
+
+            return result.ToList();
+        }
+        finally { _lock.Release(); }
+    }
 
     private async Task<GatewaySession?> LoadFromFileAsync(SessionId sessionId, CancellationToken cancellationToken)
     {
@@ -300,6 +346,10 @@ public sealed class FileSessionStore : ISessionStore
     private string GetMetaPath(SessionId sessionId) => Path.Combine(_storePath, $"{SanitizeFileName(sessionId)}.meta.json");
 
     private static string SanitizeFileName(string name) => Uri.EscapeDataString(name);
+
+    private static bool IsParticipant(GatewaySession session, AgentId agentId)
+        => session.Participants.Any(participant =>
+            string.Equals(participant.Id, agentId.Value, StringComparison.OrdinalIgnoreCase));
 
     private static SessionType InferSessionType(SessionId sessionId, ChannelKey? channelType)
     {
