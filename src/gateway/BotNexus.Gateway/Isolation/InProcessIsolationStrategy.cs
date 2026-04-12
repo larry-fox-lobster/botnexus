@@ -170,6 +170,15 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
                 tools.Add(new SubAgentManageTool(subAgentManager, context.SessionId));
         }
 
+        var conversationService = _serviceProvider.GetService<IAgentConversationService>();
+        if (conversationService is not null && sessionStore is not null)
+        {
+            var includeConverse = descriptor.ToolIds.Count == 0
+                || descriptor.ToolIds.Contains("agent_converse", StringComparer.OrdinalIgnoreCase);
+            if (includeConverse)
+                tools.Add(new AgentConverseTool(conversationService, sessionStore, descriptor.AgentId, context.SessionId));
+        }
+
         // TODO: SkillTool is hardcoded here because it needs agent-specific discovery paths.
         // Move to extension loader discovery once extensions can receive per-agent context.
         var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
