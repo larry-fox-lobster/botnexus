@@ -1,120 +1,168 @@
-# Research: Session Resumption Not Working After Gateway Restart
+# Research: Session Resumption and Rehydration
+
+## Post-DDD Review (2026-07-14)
+
+> **Deep review performed against post-DDD (Wave 2) and WebUI rewrite codebase.**
+> Many gaps identified in the original research are now closed. The critical remaining
+> gap is the Phase 1 context bridge wiring — `AgentExecutionContext.History` exists as
+> a property but is never populated by the supervisor or consumed by the isolation strategy.
+
 ## Problem Statement
-When the BotNexus gateway is restarted, the agent (Nova) starts a fresh session instead of resuming the previous one. The conversation history and compaction summary are lost, requiring the user to re-explain context.
-## Observed Behavior
-1. Jon and Nova were in an active session (ID: `edd6b197b2a2...`, 48 messages)
-2. Last conversation topic: researching compaction in OpenClaw and industry
-3. Gateway was restarted (code changes deployed by the squad)
-4. Nova woke up in a **new session** with no memory of prior conversation
-5. When asked "what do you know from this session", Nova had zero in-context history
-6. Session history API showed the old session existed with all messages intact
-## Expected Behavior
-After gateway restart:
-1. Gateway should identify the most recent active session for the channel/agent
-2. Load the session's compaction summary (or recent messages) into the new context
-3. Agent should "remember" what was being discussed and continue naturally
-4. User should not need to re-explain context
-## Technical Analysis
-### What the Session Store Has
-- SQLite database at `C:\Users\jobullen\.botnexus\sessions.db`
-- Session `edd6b197b2a2...` with 48 messages, status 0 (active)
-- Session was last updated `2026-04-10T15:30:37Z`
-- Compaction config exists: threshold 60%, max summary 16K chars, preserves 3 turns
-### What Likely Went Wrong
-Possible causes (needs squad investigation):
-1. **New session created instead of resumed**: SignalR reconnection may create a new session rather than looking up the existing one for the agent+channel pair
-2. **Session matching logic**: May not be matching on the right key (agent ID + channel type + user?) after restart
-3. **No compaction summary persisted**: If the session never hit compaction threshold, there may be no summary to inject on resume
-4. **History injection missing**: Even without compaction, the gateway could inject recent messages into context on resume
-### Config Reference
-```json
-{
-  "gateway": {
-    "compaction": {
-      "tokenThresholdRatio": 0.6,
-      "maxSummaryChars": 16000,
-      "contextWindowTokens": 128000,
-      "summarizationModel": "gpt-4.1",
-      "preservedTurns": 3
-    }
-  }
-}
-```
-## Industry Reference
-### Claude Code
-- Uses checkpoints and session files for resumption
-- `/resume` command to continue a previous session
-- Compaction summary is persisted and re-injected
-### OpenClaw (from source analysis)
-- Session JSONL files persist full history
-- Compaction summary written as a session entry type
-- Post-compaction injects AGENTS.md "Session Startup" and "Red Lines" sections
-- `readPostCompactionContext()` function handles context refresh after compaction
-## Questions for the Squad
-1. When SignalR reconnects after gateway restart, does it look up the previous session?
-2. What is the session matching strategy? (agent ID + channel ID? session cookie?)
-3. Is there a session resume endpoint or does the client always create new?
-4. Where is the compaction summary stored? (in the session messages table? separate field?)
-5. Is there a "session resume" code path that loads history/summary into context?
 
-## Regression — 2026-04-10
+When the BotNexus gateway restarts, agents lose all conversation context. Sessions persist in SQLite but the history is never injected back into the agent's LLM context. This has been observed multiple times (2026-04-10, 2026-04-12) and a previous fix regressed.
 
-Session resumption was reportedly implemented by the squad and confirmed working on 2026-04-10. However, on the next gateway restart (same day / next morning), Nova started a fresh session with no prior context again. This suggests one of:
+## Current State
 
-- **A regression**: Something broke the fix between the confirmation and the next restart.
-- **An incomplete fix**: The fix may only cover SignalR client reconnects (client reconnects to a still-running gateway process) but NOT a full gateway process cold start (process exits and is relaunched).
-- **An uncovered scenario**: Cold start (process restart) may exercise a completely different code path than reconnect (SignalR connection drop/resume within a running process).
+### What Works
 
-### Investigation Questions
+- Sessions persist in SQLite across gateway restarts
+- Compaction summaries are stored as `SessionEntry` with `IsCompactionSummary=true`
+- Session load logic already slices from last compaction forward - `session.History` contains `[compaction_summary?, ...recent_messages]`
+- `JoinSession()` returns `isResumed = true` + `messageCount` for existing sessions
+- Session history API returns all messages for a session
 
-1. **What exactly was fixed?** Was it the SignalR reconnect handler, the session startup path, or both? These are different code paths.
-2. **Cold start vs reconnect**: Does the fix only work when the SignalR client reconnects to a running gateway? A full `botnexus gateway restart` (process exit + relaunch) is a cold start — the gateway has no in-memory state and must look up the session from the store. Was this path tested?
-3. **Cron/heartbeat session interference**: Could a cron or heartbeat session be interfering with the matching logic? If cron sessions share the same `sessions` table with `status = active`, a naive "pick most recent active session for this agent" query might resume the wrong session — e.g., picking up a heartbeat session that ran 5 minutes ago instead of the main conversation session from an hour ago.
-4. **Session type discrimination**: Is there a `session_type` or `source` column that distinguishes main interactive sessions from cron/heartbeat sessions? If not, the matching logic has no way to exclude ephemeral sessions.
+### What's Broken (Updated 2026-07-14)
 
-### Hypothesis
+~~Three~~ **One** gap remains that breaks the experience:
 
-The most likely explanation is that the fix covered **SignalR reconnect** (client reconnects to a running gateway) but **not gateway cold start** (process restart). These are architecturally different:
+1. **No session-to-agent context bridge** — `AgentExecutionContext` now has a `History` property, but `DefaultAgentSupervisor.CreateEntryAsync()` creates context as `new AgentExecutionContext { SessionId = sessionId }` (History defaults to empty). `InProcessIsolationStrategy.CreateAsync()` only uses `context.SessionId`, never `context.History`. Session `History` is never injected into the agent.
+2. ~~**No startup rehydration**~~ — **PARTIALLY ADDRESSED**: `SessionWarmupService` (new `IHostedService`) pre-loads session metadata on startup and caches `SessionSummary` objects. It doesn't pre-create agent handles, but the functional gap is in point 1.
+3. ~~**No cron session discrimination**~~ — **DONE**: `SessionType` smart enum exists (`BotNexus.Domain.Primitives.SessionType`) with values: UserAgent, AgentSelf, AgentSubAgent, AgentAgent, Soul, Cron. `session_type` column in SQLite schema. `SessionWarmupService.GetVisibleSessionsAsync()` filters by `SessionType.UserAgent`.
+
+### Cold Start vs Reconnect - Why the Fix Regressed
+
+The squad's 2026-04-10 fix likely covered SignalR reconnect (client reconnects to a still-running gateway) but NOT gateway cold start (process exit + relaunch):
 
 | Scenario           | Gateway process | In-memory state | Session lookup required? |
 |--------------------|-----------------|-----------------|--------------------------|
 | SignalR reconnect  | Still running   | Preserved       | No (already in memory)   |
 | Gateway cold start | New process     | Empty           | Yes (must query store)   |
 
-If the fix relies on in-memory session state surviving across reconnects, it would explain why it worked initially (reconnect) but failed on the next restart (cold start).
+This explains why the fix worked initially (reconnect scenario) but failed on the next restart (cold start scenario).
 
-## Key Design Principle — Channel-Scoped Sessions
+## Source Code Analysis
 
-Sessions are scoped to `agent_id + channel_type`, **NOT** to individual client connections.
+### Key Source Files (Updated 2026-07-14)
 
-A **channel** (e.g., SignalR, Telegram, Discord) is a logical communication pipe. Multiple clients can connect to the same channel simultaneously. The session belongs to the channel, not to any individual client.
+| File                                | Role                                                               | Status |
+|-------------------------------------|--------------------------------------------------------------------|--------|
+| `GatewayHost.cs`                    | Startup + message processing. No session preload                   | ✅ Same location |
+| `InProcessIsolationStrategy.cs`     | Agent handle creation. Has `context.History` available but ignores it | ✅ Moved to `Isolation/` |
+| `SqliteSessionStore.cs`             | Persistent store. Lazy cache, compaction-aware loading. Now extends `SessionStoreBase` | ✅ Updated |
+| `GatewayHub.cs` → `JoinSession()`  | Client connection. `[Obsolete]` — replaced by `SubscribeAll` + `SendMessage` | ⚠️ Deprecated |
+| `DefaultAgentSupervisor.cs`         | Handle cache. Creates `AgentExecutionContext` without History       | ✅ Moved to `Agents/` |
+| `LlmSessionCompactor.cs`           | Compaction. Summary stored as SessionEntry.IsCompactionSummary     | ✅ Same location |
+| `SessionWarmupService.cs` (NEW)     | Startup warmup + visibility filtering for UserAgent sessions       | 🆕 New |
+| `SessionStoreBase.cs` (NEW)         | Base class with `InferSessionType()` logic                         | 🆕 New |
+| `SessionType.cs` (NEW)              | Domain smart enum: UserAgent, Cron, Soul, AgentSelf, etc.          | 🆕 New |
+| `AgentExecutionContext` (UPDATED)   | Now has `History` property — ready for wiring                      | 🆕 Updated |
 
-### Examples
+### Project Structure (Updated 2026-07-14)
 
-- **Telegram**: A user has Telegram open on their phone, desktop app, and laptop web client. All three should see and continue the **same conversation** with the agent. There is one session for the `nova + telegram` pair, not three.
-- **WebUI / SignalR**: A user has the BotNexus WebUI open on their desktop browser and their laptop browser. Both should show the same conversation and stay in sync. Messages sent from one should appear on the other.
-- **Discord**: Multiple users in a Discord channel all see the same conversation. The session is the channel, not any individual user's view of it.
+| Project                              | Role                                                                       |
+|--------------------------------------|----------------------------------------------------------------------------|
+| `BotNexus.Domain`                    | Domain primitives: SessionType, SessionId, AgentId, ChannelKey, Session    |
+| `BotNexus.Gateway.Contracts`         | Interfaces: ISessionStore, IIsolationStrategy, ISessionWarmupService       |
+| `BotNexus.Gateway.Abstractions`      | Type forwards to Domain models (GatewaySession, SessionEntry, AgentExecutionContext) |
+| `BotNexus.Gateway.Sessions`          | Store implementations: Sqlite, File, InMemory + SessionStoreBase           |
+| `BotNexus.Gateway`                   | Core: GatewayHost, Compactor, Supervisor, Isolation, SessionWarmupService  |
+| `BotNexus.Gateway.Api`               | ASP.NET host: GatewayHub, SessionsController                              |
 
-### The Chat-Room Model
+### Session Load Behavior (SQLite)
 
-Think of a session as a **chat room**:
+On load, the store slices from last compaction forward:
 
-- The session **IS** the room. It exists independently of who's connected.
-- Clients **come and go**. A client connecting is like entering the room; disconnecting is like leaving. The room (session) persists.
-- Everyone in the room sees the same thing. Messages are shared state.
-- A **late-joining client** must catch up — load conversation history so it appears identical to what other clients already see.
-
-### Implication for Session Matching
-
-Session matching must **NEVER** use `client_id` or `connection_id` as part of the match key. The only key is:
-
+```csharp
+var lastCompactionIndex = entries.FindLastIndex(e => e.IsCompactionSummary);
+if (lastCompactionIndex >= 0)
+    entries = entries.GetRange(lastCompactionIndex, entries.Count - lastCompactionIndex);
 ```
-agent_id + channel_type
+
+This means `session.History` already contains the right data. The problem is delivery, not storage.
+
+### Agent Handle Creation (Updated 2026-07-14)
+
+`InProcessIsolationStrategy.CreateAsync()` builds:
+- System prompt from workspace files (AGENTS.md, SOUL.md, USER.md, TOOLS.md)
+- Tool registry
+- Fresh `Agent` with empty conversation state
+
+`AgentExecutionContext` now has a `History` property (`IReadOnlyList<SessionEntry>`, defaults to `[]`). However:
+- **`DefaultAgentSupervisor.CreateEntryAsync()`** creates context as `new AgentExecutionContext { SessionId = sessionId }` — History is never populated.
+- **`InProcessIsolationStrategy.CreateAsync()`** only reads `context.SessionId` — `context.History` is never consumed.
+
+The interface is ready. The wiring is the only remaining work for Phase 1.
+
+### Session Matching (Updated 2026-07-14)
+
+- ~~Client provides session ID to `JoinSession()`. No server-side "find my last session" logic exists.~~ **DONE**: `JoinSession` is `[Obsolete]`. New `SendMessage(agentId, channelType, content)` auto-resolves sessions via `ResolveOrCreateSessionAsync`.
+- `ResolveOrCreateSessionAsync` queries `SessionWarmupService.GetAvailableSessionsAsync(agentId)`, filters by matching channel, picks most recent.
+- `SessionWarmupService` filters by `SessionType.UserAgent` and `Status ∈ {Active, Suspended, Sealed}` and `UpdatedAt >= retention cutoff`.
+- `ISessionStore` has `ListByChannelAsync(AgentId, ChannelKey)` — returns sessions for agent+channel, ordered by created time descending.
+- No explicit `FindActiveSessionAsync` method exists, but `ResolveOrCreateSessionAsync` + warmup covers the same functionality.
+
+### Schema (Updated 2026-07-14)
+
+Current schema **already has** `session_type` column (in `CREATE TABLE` and migration path). Also has `participants_json`.
+
+```sql
+-- sessions table includes:
+--   session_type TEXT           ✅ DONE
+--   participants_json TEXT      ✅ DONE (not in original spec)
+
+-- session_history table includes:
+--   is_compaction_summary INTEGER NOT NULL DEFAULT 0   ✅ DONE (compaction stored as history entry, not separate column)
 ```
 
-If the matching logic includes any client-specific identifier, it will:
-1. Create separate sessions for each device/browser/client — breaking continuity
-2. Fail to resume on cold start (new process = new connection IDs)
-3. Make multi-device usage impossible
+~~Needed additions~~ Only remaining (low-priority):
+```sql
+ALTER TABLE sessions ADD COLUMN resume_count INTEGER DEFAULT 0;  -- telemetry only
+```
 
-This is a fundamental architectural constraint, not an optimization.
+Note: `compaction_summary` and `last_compaction_at` columns are NOT needed — compaction data is stored as `SessionEntry` records with `IsCompactionSummary=true` in the `session_history` table.
+
+## Industry Research
+
+### Claude Code
+- Uses checkpoints and session files for resumption
+- `/resume` command to continue a previous session
+- Compaction summary persisted and re-injected
+
+### OpenClaw (predecessor system)
+- Session JSONL files persist full history
+- Compaction summary written as a session entry type
+- `readPostCompactionContext()` function handles context refresh post-compaction
+- Post-compaction injects AGENTS.md "Session Startup" and "Red Lines" sections
+
+### General Patterns
+- Most persistent chat systems treat sessions as chat rooms (channel-scoped, not client-scoped)
+- Session discovery APIs (find my active session) are standard in multi-device messaging
+- Eager warming on startup is common in production systems to avoid cold-start latency
+
+## Key Findings
+
+1. **The data is ready** - SQLite has everything needed. The gap is purely in the context bridge (getting history into the agent's LLM conversation).
+2. **Cold start vs reconnect are different code paths** - the regression likely means only reconnect was fixed.
+3. **Session matching needs server-side logic** - clients shouldn't need to know their session ID; the gateway should resolve it from `agent_id + channel_key`.
+4. **Cron session interference is real** - without type discrimination, heartbeat sessions can mask the real conversation session.
+5. **The fix is phased** - context bridge is Phase 1 (the bug), eager rehydration is Phase 4 (the improvement). Both use the same underlying mechanism.
+
+## Gaps Identified (Updated 2026-07-14)
+
+| Gap | Description                                    | Phase | Status         | Evidence                                                    |
+|-----|------------------------------------------------|-------|----------------|-------------------------------------------------------------|
+| G1  | No prior history parameter on agent creation   | 1     | **HALF-FIXED** | `AgentExecutionContext.History` exists but never wired      |
+| G2  | No session-type filtering in session lookup    | 2, 5  | **DONE**       | `SessionWarmupService.GetVisibleSessionsAsync()` filters UserAgent |
+| G3  | No `FindActiveSessionAsync` on ISessionStore   | 2     | **COVERED**    | `ResolveOrCreateSessionAsync` + warmup + `ListByChannelAsync` |
+| G4  | No session discovery REST endpoint             | 3     | **OBSOLETE**   | `SubscribeAll` + `SendMessage` model replaces this          |
+| G5  | No startup rehydration service                 | 4     | **PARTIALLY COVERED** | `SessionWarmupService` loads metadata, not handles   |
+| G6  | No `session_type` column in schema             | 5     | **DONE**       | Column in CREATE TABLE + migration                          |
+| G7  | WebUI always creates new session on connect    | 3     | **DONE**       | `ResolveOrCreateSessionAsync` finds existing by agent+channel |
+
+## Questions for the Squad
+
+1. What exactly was fixed on 2026-04-10? Was it the SignalR reconnect handler, the session startup path, or both?
+2. Does the current `JoinSession` code path query the session store on cold start, or does it rely on in-memory state?
+3. Is there already a mechanism to distinguish cron sessions from interactive ones? (A column, a naming convention, anything?)
+4. What's the preferred approach for the context bridge - new parameter on `CreateAsync`, or a separate `InjectHistory` method on the handle?
+5. Are there any concerns with the bounded-parallelism approach for eager rehydration (3 concurrent, 60s timeout)?
