@@ -47,6 +47,22 @@ public sealed class ChannelKeyTests
     }
 
     [Fact]
+    public void ChannelKey_From_WebChatAlias_ShouldResolveToSignalr()
+    {
+        var alias = ChannelKey.From("web chat");
+        var canonical = ChannelKey.From("signalr");
+        alias.Should().Be(canonical);
+    }
+
+    [Fact]
+    public void ChannelKey_From_HyphenatedWebChatAlias_ShouldResolveToSignalr()
+    {
+        var alias = ChannelKey.From("Web-Chat");
+        var canonical = ChannelKey.From("signalr");
+        alias.Should().Be(canonical);
+    }
+
+    [Fact]
     public void ChannelKey_ImplicitConversion_WhenConvertedToString_ShouldReturnValue()
     {
         var channelKey = ChannelKey.From("SignalR");

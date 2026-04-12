@@ -83,6 +83,26 @@ public sealed class ChannelHistoryControllerTests
         result.Result.Should().BeOfType<BadRequestObjectResult>();
     }
 
+    [Fact]
+    public async Task GetHistory_WithWebChatAlias_FindsSignalrSessionHistory()
+    {
+        var store = new InMemorySessionStore();
+        await store.SaveAsync(CreateSession(
+            "s-signalr",
+            "agent-a",
+            "signalr",
+            DateTimeOffset.UtcNow,
+            "hello"));
+
+        var controller = new ChannelHistoryController(store);
+
+        var result = await controller.GetHistory("web chat", "agent-a", cancellationToken: CancellationToken.None);
+
+        var payload = (result.Result as OkObjectResult)?.Value as ChannelHistoryResponse;
+        payload.Should().NotBeNull();
+        payload!.Messages.Select(message => message.Content).Should().Equal("hello");
+    }
+
     private static GatewaySession CreateSession(
         string sessionId,
         string agentId,

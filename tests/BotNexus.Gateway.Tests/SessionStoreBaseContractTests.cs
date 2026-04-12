@@ -107,6 +107,26 @@ public sealed class SessionStoreBaseContractTests
 
     [Theory]
     [MemberData(nameof(StoreHarnesses))]
+    public async Task ListByChannelAsync_WebChatAlias_FindsSignalrSessionsAcrossStores(
+        string _,
+        Func<IStoreHarness> createHarness)
+    {
+        using var harness = createHarness();
+        await harness.Store.SaveAsync(new GatewaySession
+        {
+            SessionId = SessionId.From("signalr-session"),
+            AgentId = AgentId.From("agent-a"),
+            ChannelType = ChannelKey.From("signalr"),
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+
+        var sessions = await harness.Store.ListByChannelAsync(AgentId.From("agent-a"), ChannelKey.From("web chat"));
+
+        sessions.Select(s => s.SessionId.Value).Should().ContainSingle().Which.Should().Be("signalr-session");
+    }
+
+    [Theory]
+    [MemberData(nameof(StoreHarnesses))]
     public void Stores_InheritSessionStoreBaseBehavior(
         string _,
         Func<IStoreHarness> createHarness)
