@@ -54,4 +54,18 @@ public sealed class WorldDescriptorTests
         roundTrip.AvailableStrategies.Should().ContainSingle(strategy => strategy == ExecutionStrategy.InProcess);
         roundTrip.CrossWorldPermissions.Should().ContainSingle(permission => permission.TargetWorldId == "prod" && !permission.AllowOutbound);
     }
+
+    [Fact]
+    public void CrossWorldPermission_Defaults_AllowBidirectionalAccessWhenNotConfigured()
+    {
+        var permission = new CrossWorldPermission
+        {
+            TargetWorldId = "prod"
+        };
+
+        permission.TargetWorldId.Should().Be("prod");
+        permission.AllowedAgents.Should().BeNull();
+        permission.AllowInbound.Should().BeTrue();
+        permission.AllowOutbound.Should().BeTrue();
+    }
 }
