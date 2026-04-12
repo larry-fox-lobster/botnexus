@@ -3,13 +3,24 @@ id: bug-session-switching-ui
 title: "Session Switching Broken During Active Agent Work"
 type: bug
 priority: high
-status: draft
+status: likely_obsolete
 created: 2026-04-10
-updated: 2026-04-10
+updated: 2026-04-12
 author: nova
 tags: [webui, session, ux, multi-agent, critical-ux]
 blocks: [feature-subagent-ui-visibility]
+likely_fixed_by: feature-multi-session-connection (subscribe-all model)
+verification_needed: true
 ---
+
+## Status Note (2026-04-12)
+
+**Likely fixed by the subscribe-all connection model.** The root cause (race conditions during JoinSession/LeaveSession) should be eliminated by the new architecture where:
+- Client subscribes to ALL sessions once on connect
+- Session switching is a pure client-side DOM operation
+- No server round-trips during switch
+
+**Action**: Verify with E2E tests. If the Playwright tests in this spec still demonstrate the bug, reopen. Otherwise archive.
 
 # Design Spec: Session Switching Broken During Active Agent Work
 

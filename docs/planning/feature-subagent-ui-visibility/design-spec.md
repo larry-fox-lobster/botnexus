@@ -5,11 +5,19 @@ type: feature
 priority: medium
 status: draft
 created: 2026-04-10
-updated: 2026-04-10
+updated: 2026-04-12
 author: nova
 depends_on: [bug-session-switching-ui]
 tags: [webui, subagent, session, ux]
+ddd_types: [Session, SessionId, SessionType, AgentId]
 ---
+
+## Post-DDD Architecture Note (2026-04-12)
+
+This spec now uses domain types from BotNexus.Domain:
+- `SessionType.AgentSubAgent` - sub-agent sessions are identified by this enum value
+- `Session` domain model with `ParentSessionId` property
+- Subscribe-all connection model means sub-agent sessions are automatically subscribed if visible
 
 # Design Spec: Sub-Agent Session Visibility in WebUI
 
@@ -45,29 +53,32 @@ Surface sub-agent sessions in the BotNexus WebUI so users can see running/comple
 ## Proposed Implementation
 
 ### Session Panel Updates
-- Query sessions table for sub-agent sessions (identified by ::subagent:: in session ID or a dedicated session_type field)
-- Group sub-agent sessions under their parent session in a tree/accordion view
-- Show status badge: running, completed, failed
-- Show sub-agent name and start time
-
-### Session Canvas
-- When a sub-agent session is selected, render its messages in the main canvas (same as any session)
-- Subscribe to real-time updates via SignalR for the sub-agent session ID
-- Mark the view as read-only or add a note: This is a sub-agent session spawned by [parent agent]
+- Query sessions via `ISessionStore` for sessions where `SessionType == SessionType.AgentSubAgent`
+- Group sub-agent sessions under their parent session using `Session.ParentSessionId`
+- Show status via `SessionStatus` (Active, Sealed)
+- Show sub-agent name from `Session` metadata
 
 ### Data Model
-If not already present, add to sessions table:
 
-  ALTER TABLE sessions ADD COLUMN parent_session_id TEXT;
-  ALTER TABLE sessions ADD COLUMN session_type TEXT DEFAULT main; -- main, subagent, cron
-  ALTER TABLE sessions ADD COLUMN subagent_name TEXT;
+**Already in DDD refactoring:**
+```csharp
+public record Session(
+    SessionId SessionId,
+    AgentId AgentId,
+    SessionType SessionType,      // SessionType.AgentSubAgent for sub-agents
+    SessionStatus Status,
+    SessionId? ParentSessionId,   // Links to parent session
+    // ... other properties
+);
+```
 
-Note: The session_type column is also referenced in bug-session-resumption - session matching must filter by session_type to avoid resuming cron or sub-agent sessions instead of the main conversation. This is a shared schema concern.
+No schema changes needed - this is part of the domain model.
 
 ### SignalR Integration
-- The WebUI client should be able to subscribe to any session message stream
-- When opening a sub-agent session, subscribe to its SignalR group/topic
-- Messages should stream in real-time (same infrastructure as main sessions)
+- With the subscribe-all model, the client is already subscribed to all visible sessions
+- Sub-agent sessions can be filtered in/out of visibility via `SessionType` rules
+- Messages stream in real-time to the client's per-session stores
+- No additional subscription logic needed beyond visibility filtering
 
 ### Multi-Client Considerations
 Per the channel-scoped session model (see bug-session-resumption spec), if the WebUI is open on multiple devices, sub-agent sessions should appear on all of them. The fan-out mechanism for the parent session should extend to sub-agent session visibility updates.
