@@ -75,7 +75,52 @@ public sealed record FileAccessPolicy
 3. **Deny overrides allow** — if a path matches both an allow and deny rule, access is denied.
 4. **Default policy** — when `FileAccessPolicy` is null/empty, the agent can read and write only within its workspace (current behavior unchanged).
 5. **Directory containment** — `AllowedReadPaths: ["Q:\\repos\\botnexus"]` grants read access to all files under that directory tree.
-6. **No wildcards in v1** — exact directory paths only. Wildcards (`Q:\repos\*`) deferred to a future iteration to keep the validator simple and auditable.
+6. **Glob pattern support** — paths containing `*` or `?` wildcards are treated as glob patterns and matched using `FileSystemName.MatchesSimpleExpression`. Non-glob paths use the existing directory-prefix matching. Both allow and deny paths support globs.
+
+### Glob Pattern Support
+
+Glob patterns enable flexible path matching in `AllowedReadPaths`, `AllowedWritePaths`, and `DeniedPaths`.
+
+#### Pattern Syntax
+
+| Pattern | Meaning | Example Match |
+|---------|---------|---------------|
+| `Q:\repos\*` | All files/dirs under repos | `Q:\repos\botnexus\file.cs` |
+| `Q:\repos\botnexus\src\**` | All files under src recursively | `Q:\repos\botnexus\src\gateway\Program.cs` |
+| `C:\Users\*\.botnexus\**` | Any user's botnexus directory | `C:\Users\jon\.botnexus\config.json` |
+| `*.env` | Any `.env` file anywhere | `Q:\repos\botnexus\.env` |
+| `**\secrets\**` | Any secrets directory at any depth | `Q:\repos\project\secrets\key.txt` |
+
+#### Matching Rules
+
+1. `*` matches any characters within a single path segment.
+2. `**` matches any characters across multiple path segments (recursive).
+3. Glob matching uses `FileSystemName.MatchesSimpleExpression` (.NET built-in, `System.IO.Enumeration`) — no extra NuGet packages required.
+4. Glob patterns are identified by containing `*` or `?` characters.
+5. Non-glob paths use the existing directory-prefix matching.
+6. Both allow and deny paths support globs.
+7. Glob patterns that are not rooted are stored as-is (not resolved relative to workspace), enabling patterns like `*.env` to match files at any location.
+8. Path comparisons in glob matching normalize to forward slashes internally to avoid backslash escape conflicts with `MatchesSimpleExpression`.
+
+#### Example Configuration
+
+```json
+{
+  "fileAccess": {
+    "allowedReadPaths": [
+      "Q:\\repos\\botnexus\\src\\**",
+      "Q:\\repos\\**\\*.cs"
+    ],
+    "allowedWritePaths": [
+      "~\\.botnexus\\agents\\nova\\workspace"
+    ],
+    "deniedPaths": [
+      "**\\*.env",
+      "**\\secrets\\**"
+    ]
+  }
+}
+```
 
 ### Access Check Flow
 
@@ -353,12 +398,12 @@ The shell tool (`bash`) cannot enforce path-level access control — any shell c
 2. **Symlink traversal** — resolved paths are checked after symlink resolution (reuses existing `ResolveFinalTargetPath`).
 3. **Path normalization** — all comparisons use `Path.GetFullPath()` to prevent `..` traversal bypasses.
 4. **Shell remains unvalidated** — documented limitation. Agents with shell access can bypass file permissions.
-5. **No wildcard paths in v1** — reduces attack surface from misconfigured glob patterns.
+5. **Glob pattern auditing** — glob patterns (`*`, `?`) in allow lists should be reviewed carefully to avoid over-permissive access. Patterns like `*` in `AllowedWritePaths` could grant write access to unintended locations.
 
 ---
 
 ## 10. Open Questions
 
-1. ~~Wildcard support (`Q:\repos\*`)?~~ **Deferred to v2** — exact directory paths are sufficient and safer.
+1. ~~Wildcard support (`Q:\repos\*`)?~~ **Resolved** — glob patterns are now supported using `FileSystemName.MatchesSimpleExpression`.
 2. Should `FileAccessPolicy` support network path access? **Deferred** — not needed for current use cases.
 3. Should we add `FileWatcherTool` to Wave 2? **Yes** — it watches files and should respect read permissions.
