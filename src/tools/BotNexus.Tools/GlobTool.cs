@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
+using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Tools.Utils;
 using BotNexus.Providers.Core.Models;
 using Microsoft.Extensions.FileSystemGlobbing;
@@ -26,6 +27,7 @@ public sealed class GlobTool : IAgentTool
 {
     private const int MaxResults = 1000;
     private readonly string _workingDirectory;
+    private readonly IPathValidator? _validator;
     private readonly IFileSystem _fileSystem;
 
     /// <summary>
@@ -34,10 +36,22 @@ public sealed class GlobTool : IAgentTool
     /// <param name="workingDirectory">Repository root used as the default glob base.</param>
     /// <param name="fileSystem">File system abstraction for testability.</param>
     public GlobTool(string workingDirectory, IFileSystem? fileSystem = null)
+        : this(workingDirectory, validator: null, fileSystem)
+    {
+    }
+
+    /// <summary>
+    /// Initializes the glob tool.
+    /// </summary>
+    /// <param name="workingDirectory">Repository root used as the default glob base.</param>
+    /// <param name="validator">Path validator for access checks.</param>
+    /// <param name="fileSystem">File system abstraction for testability.</param>
+    public GlobTool(string workingDirectory, IPathValidator? validator, IFileSystem? fileSystem = null)
     {
         _workingDirectory = string.IsNullOrWhiteSpace(workingDirectory)
             ? throw new ArgumentException("Working directory cannot be empty.", nameof(workingDirectory))
             : Path.GetFullPath(workingDirectory);
+        _validator = validator;
         _fileSystem = fileSystem ?? new FileSystem();
     }
 
@@ -105,9 +119,17 @@ public sealed class GlobTool : IAgentTool
 
         var pattern = arguments["pattern"]?.ToString()
                       ?? throw new ArgumentException("Missing required argument: pattern.");
-        var baseDirectory = arguments.TryGetValue("path", out var pathObj) && pathObj is not null
-            ? PathUtils.ResolvePath(pathObj.ToString()!, _workingDirectory)
-            : _workingDirectory;
+        var rawPath = arguments.TryGetValue("path", out var pathObj) && pathObj is not null
+            ? pathObj.ToString()!
+            : ".";
+        var baseDirectory = _validator?.ValidateAndResolve(rawPath, FileAccessMode.Read);
+        if (_validator is not null && baseDirectory is null)
+        {
+            return Task.FromResult(new AgentToolResult(
+                [new AgentToolContent(AgentToolContentType.Text, $"Access denied: path '{rawPath}' is not permitted for read")]));
+        }
+
+        baseDirectory ??= PathUtils.ResolvePath(rawPath, _workingDirectory, _fileSystem);
 
         if (!_fileSystem.Directory.Exists(baseDirectory))
         {
@@ -122,6 +144,7 @@ public sealed class GlobTool : IAgentTool
         var allMatches = matcher.GetResultsInFullPath(baseDirectory)
             .Where(path => _fileSystem.File.Exists(path))
             .Select(path => Path.GetFullPath(path))
+            .Where(path => _validator?.CanRead(path) ?? true)
             .ToList();
         var ignoredPaths = PathUtils.GetGitIgnoredPaths(allMatches, _workingDirectory);
         var matches = allMatches

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
+using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Tools.Utils;
 using BotNexus.Providers.Core.Models;
 using System.IO.Abstractions;
@@ -13,13 +14,20 @@ public sealed class ReadTool : IAgentTool
     private const int MaxOutputLines = 2000;
     private const int MaxOutputBytes = 50 * 1024;
     private readonly string _workingDirectory;
+    private readonly IPathValidator? _validator;
     private readonly IFileSystem _fileSystem;
 
     public ReadTool(string workingDirectory, IFileSystem? fileSystem = null)
+        : this(workingDirectory, validator: null, fileSystem)
+    {
+    }
+
+    public ReadTool(string workingDirectory, IPathValidator? validator, IFileSystem? fileSystem = null)
     {
         _workingDirectory = string.IsNullOrWhiteSpace(workingDirectory)
             ? throw new ArgumentException("Working directory cannot be empty.", nameof(workingDirectory))
             : Path.GetFullPath(workingDirectory);
+        _validator = validator;
         _fileSystem = fileSystem ?? new FileSystem();
     }
 
@@ -94,7 +102,14 @@ public sealed class ReadTool : IAgentTool
 
         var relativePath = arguments["path"]?.ToString()
                            ?? throw new ArgumentException("Missing required argument: path.");
-        var resolvedPath = PathUtils.ResolvePath(relativePath, _workingDirectory, _fileSystem);
+        var resolvedPath = _validator?.ValidateAndResolve(relativePath, FileAccessMode.Read);
+        if (_validator is not null && resolvedPath is null)
+        {
+            return new AgentToolResult(
+                [new AgentToolContent(AgentToolContentType.Text, $"Access denied: path '{relativePath}' is not permitted for read")]);
+        }
+
+        resolvedPath ??= PathUtils.ResolvePath(relativePath, _workingDirectory, _fileSystem);
 
         if (_fileSystem.File.Exists(resolvedPath))
         {

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
+using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Tools.Utils;
 using BotNexus.Providers.Core.Models;
 using DiffPlex.DiffBuilder;
@@ -13,14 +14,21 @@ namespace BotNexus.Tools;
 public sealed class EditTool : IAgentTool
 {
     private readonly string _workingDirectory;
+    private readonly IPathValidator? _validator;
     private readonly FileMutationQueue _fileMutationQueue;
     private readonly IFileSystem _fileSystem;
 
     public EditTool(string workingDirectory, IFileSystem? fileSystem = null)
+        : this(workingDirectory, validator: null, fileSystem)
+    {
+    }
+
+    public EditTool(string workingDirectory, IPathValidator? validator, IFileSystem? fileSystem = null)
     {
         _workingDirectory = string.IsNullOrWhiteSpace(workingDirectory)
             ? throw new ArgumentException("Working directory cannot be empty.", nameof(workingDirectory))
             : Path.GetFullPath(workingDirectory);
+        _validator = validator;
         _fileMutationQueue = FileMutationQueue.Shared;
         _fileSystem = fileSystem ?? new FileSystem();
     }
@@ -90,7 +98,14 @@ public sealed class EditTool : IAgentTool
                       ?? throw new ArgumentException("Missing required argument: path.");
         var edits = ReadEdits(arguments);
 
-        var fullPath = PathUtils.ResolvePath(rawPath, _workingDirectory, _fileSystem);
+        var fullPath = _validator?.ValidateAndResolve(rawPath, FileAccessMode.Write);
+        if (_validator is not null && fullPath is null)
+        {
+            return new AgentToolResult(
+                [new AgentToolContent(AgentToolContentType.Text, $"Access denied: path '{rawPath}' is not permitted for write")]);
+        }
+
+        fullPath ??= PathUtils.ResolvePath(rawPath, _workingDirectory, _fileSystem);
         if (!_fileSystem.File.Exists(fullPath))
         {
             throw new FileNotFoundException($"File '{rawPath}' does not exist.", fullPath);

@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
+using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Tools.Utils;
 using BotNexus.Providers.Core.Models;
 using Microsoft.Extensions.FileSystemGlobbing;
@@ -20,13 +21,20 @@ public sealed class GrepTool : IAgentTool
     private const int MaxLineLength = 500;
     private const int BinaryProbeBytes = 4096;
     private readonly string _workingDirectory;
+    private readonly IPathValidator? _validator;
     private readonly IFileSystem _fileSystem;
 
     public GrepTool(string workingDirectory, IFileSystem? fileSystem = null)
+        : this(workingDirectory, validator: null, fileSystem)
+    {
+    }
+
+    public GrepTool(string workingDirectory, IPathValidator? validator, IFileSystem? fileSystem = null)
     {
         _workingDirectory = string.IsNullOrWhiteSpace(workingDirectory)
             ? throw new ArgumentException("Working directory cannot be empty.", nameof(workingDirectory))
             : Path.GetFullPath(workingDirectory);
+        _validator = validator;
         _fileSystem = fileSystem ?? new FileSystem();
     }
 
@@ -168,9 +176,17 @@ public sealed class GrepTool : IAgentTool
             : DefaultLimit;
         var include = arguments.TryGetValue("glob", out var includeObj) ? includeObj?.ToString() : null;
 
-        var targetPath = arguments.TryGetValue("path", out var pathObj) && pathObj is not null
-            ? PathUtils.ResolvePath(pathObj.ToString()!, _workingDirectory, _fileSystem)
-            : _workingDirectory;
+        var rawPath = arguments.TryGetValue("path", out var pathObj) && pathObj is not null
+            ? pathObj.ToString()!
+            : ".";
+        var targetPath = _validator?.ValidateAndResolve(rawPath, FileAccessMode.Read);
+        if (_validator is not null && targetPath is null)
+        {
+            return new AgentToolResult(
+                [new AgentToolContent(AgentToolContentType.Text, $"Access denied: path '{rawPath}' is not permitted for read")]);
+        }
+
+        targetPath ??= PathUtils.ResolvePath(rawPath, _workingDirectory, _fileSystem);
 
         if (!_fileSystem.Directory.Exists(targetPath) && !_fileSystem.File.Exists(targetPath))
         {
@@ -184,6 +200,7 @@ public sealed class GrepTool : IAgentTool
 
         var candidateFiles = EnumerateCandidateFiles(targetPath, include)
             .Where(file => !IsInsideGitDirectory(file, _workingDirectory))
+            .Where(file => _validator?.CanRead(file) ?? true)
             .ToList();
         var ignoredFiles = PathUtils.GetGitIgnoredPaths(candidateFiles, _workingDirectory, _fileSystem);
 

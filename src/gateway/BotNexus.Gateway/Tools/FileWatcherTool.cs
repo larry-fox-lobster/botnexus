@@ -3,14 +3,16 @@ using System.Text.Json;
 using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
 using BotNexus.Gateway.Configuration;
+using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Providers.Core.Models;
 using Microsoft.Extensions.Options;
 
 namespace BotNexus.Gateway.Tools;
 
-public sealed class FileWatcherTool(IOptions<FileWatcherToolOptions> options) : IAgentTool
+public sealed class FileWatcherTool(IOptions<FileWatcherToolOptions> options, IPathValidator? pathValidator = null) : IAgentTool
 {
     private readonly FileWatcherToolOptions _options = options?.Value ?? new FileWatcherToolOptions();
+    private readonly IPathValidator? _pathValidator = pathValidator;
 
     public string Name => "watch_file";
     public string Label => "Watch File";
@@ -78,8 +80,13 @@ public sealed class FileWatcherTool(IOptions<FileWatcherToolOptions> options) : 
         var maxTimeout = Math.Max(1, _options.MaxTimeoutSeconds);
         var timeout = Math.Clamp(requestedTimeout, 1, maxTimeout);
 
-        // Resolve to absolute path and validate
-        var fullPath = Path.GetFullPath(rawPath);
+        var fullPath = _pathValidator?.ValidateAndResolve(rawPath, FileAccessMode.Read);
+        if (_pathValidator is not null && fullPath is null)
+        {
+            return TextResult($"Access denied: path '{rawPath}' is not permitted for read");
+        }
+
+        fullPath ??= Path.GetFullPath(rawPath);
         var directory = Path.GetDirectoryName(fullPath);
         var fileName = Path.GetFileName(fullPath);
 

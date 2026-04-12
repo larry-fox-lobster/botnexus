@@ -1,6 +1,7 @@
 using System.Text.Json;
 using BotNexus.AgentCore.Tools;
 using BotNexus.AgentCore.Types;
+using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Tools.Utils;
 using BotNexus.Providers.Core.Models;
 using System.IO.Abstractions;
@@ -13,13 +14,20 @@ public sealed class ListDirectoryTool : IAgentTool
     private const int DefaultLimit = MaxEntries;
     private const int MaxOutputBytes = 50 * 1024;
     private readonly string _workingDirectory;
+    private readonly IPathValidator? _validator;
     private readonly IFileSystem _fileSystem;
 
     public ListDirectoryTool(string workingDirectory, IFileSystem? fileSystem = null)
+        : this(workingDirectory, validator: null, fileSystem)
+    {
+    }
+
+    public ListDirectoryTool(string workingDirectory, IPathValidator? validator, IFileSystem? fileSystem = null)
     {
         _workingDirectory = string.IsNullOrWhiteSpace(workingDirectory)
             ? throw new ArgumentException("Working directory cannot be empty.", nameof(workingDirectory))
             : Path.GetFullPath(workingDirectory);
+        _validator = validator;
         _fileSystem = fileSystem ?? new FileSystem();
     }
 
@@ -74,7 +82,14 @@ public sealed class ListDirectoryTool : IAgentTool
             : DefaultLimit;
         var limit = Math.Min(requestedLimit, MaxEntries);
 
-        var resolvedPath = PathUtils.ResolvePath(rawPath, _workingDirectory, _fileSystem);
+        var resolvedPath = _validator?.ValidateAndResolve(rawPath, FileAccessMode.Read);
+        if (_validator is not null && resolvedPath is null)
+        {
+            return Task.FromResult(new AgentToolResult(
+                [new AgentToolContent(AgentToolContentType.Text, $"Access denied: path '{rawPath}' is not permitted for read")]));
+        }
+
+        resolvedPath ??= PathUtils.ResolvePath(rawPath, _workingDirectory, _fileSystem);
         if (!_fileSystem.Directory.Exists(resolvedPath))
         {
             return Task.FromResult(new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, $"Path '{rawPath}' does not exist or is not a directory.")]));
