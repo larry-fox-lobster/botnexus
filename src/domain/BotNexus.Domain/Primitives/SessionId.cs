@@ -25,6 +25,23 @@ public readonly record struct SessionId(string Value) : IComparable<SessionId>
     public static SessionId ForSubAgent(SessionId parentId, string uniqueId)
         => ForSubAgent(parentId.Value, uniqueId);
 
+    public static SessionId ForAgentConversation(AgentId initiatorId, AgentId targetId, string uniqueId)
+    {
+        if (string.IsNullOrWhiteSpace(uniqueId))
+            throw new ArgumentException("Conversation unique ID cannot be empty", nameof(uniqueId));
+
+        return new($"{initiatorId}::agent-agent::{targetId}::{uniqueId.Trim()}");
+    }
+
+    public static SessionId ForSoul(AgentId agentId, DateOnly date)
+    {
+        ArgumentNullException.ThrowIfNull(agentId);
+        return new($"{agentId.Value}::soul::{date:yyyy-MM-dd}");
+    }
+
+    public static SessionId ForSoul(AgentId agentId, DateTimeOffset timestampUtc)
+        => ForSoul(agentId, DateOnly.FromDateTime(timestampUtc.UtcDateTime));
+
     public static SessionId ForCrossAgent(string sourceId, string targetId)
     {
         var sourceSessionId = From(sourceId);
@@ -33,6 +50,8 @@ public readonly record struct SessionId(string Value) : IComparable<SessionId>
     }
 
     public bool IsSubAgent => Value.Contains("::subagent::", StringComparison.OrdinalIgnoreCase);
+    public bool IsAgentConversation => Value.Contains("::agent-agent::", StringComparison.OrdinalIgnoreCase);
+    public bool IsSoul => Value.Contains("::soul::", StringComparison.OrdinalIgnoreCase);
 
     public static implicit operator string(SessionId id) => id.Value;
     public static implicit operator SessionId(string value) => From(value);
