@@ -5,6 +5,7 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Configuration;
 using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
+using SessionType = BotNexus.Domain.Primitives.SessionType;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -157,7 +158,10 @@ public sealed class SessionWarmupService : ISessionWarmupService, IHostedService
         var sessions = await _sessionStore.ListAsync(AgentId.From(agentId), ct);
         var summaries = sessions
             .Where(session =>
-                (session.Status == GatewaySessionStatus.Active || session.Status == GatewaySessionStatus.Expired)
+                session.SessionType.Equals(SessionType.UserAgent)
+                && (session.Status == GatewaySessionStatus.Active
+                    || session.Status == GatewaySessionStatus.Suspended
+                    || session.Status == GatewaySessionStatus.Sealed)
                 && session.UpdatedAt >= updatedAfter)
             .OrderByDescending(static session => session.UpdatedAt)
             .Take(maxSessions)
