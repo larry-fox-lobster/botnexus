@@ -5,9 +5,11 @@ type: improvement
 priority: high
 status: proposed
 created: 2026-04-11
+updated: 2026-04-12
 author: nova
 depends-on: [bug-session-resumption]
 tags: [session, gateway, startup, performance, continuity]
+ddd_types: [Session, SessionId, AgentId, ChannelKey, SessionStatus, SessionType]
 ---
 
 # Design Spec: Eager Session Rehydration on Gateway Start
@@ -60,23 +62,23 @@ Phase 2 runs **after** channels are started so the gateway can accept connection
 
 ### Rehydration Candidate Query
 
-New method on `ISessionStore`:
+New method on `ISessionStore` (BotNexus.Gateway.Contracts):
 
 ```csharp
-Task<IReadOnlyList<GatewaySession>> FindRehydrationCandidatesAsync(
+Task<IReadOnlyList<Session>> FindRehydrationCandidatesAsync(
     TimeSpan maxAge, CancellationToken ct);
 ```
 
-SQL (for SQLite):
+Implementation logic (for SQLite):
 ```sql
 SELECT * FROM sessions
-WHERE status = 'Active'
-  AND session_type != 'cron'          -- exclude ephemeral sessions
-  AND updated_at > @cutoff            -- within TTL
-ORDER BY updated_at DESC;
+WHERE Status = @activeStatus              -- SessionStatus.Active (smart enum value)
+  AND SessionType = @userAgentType        -- SessionType.UserAgent (exclude Soul, Cron, AgentSelf, etc.)
+  AND UpdatedAt > @cutoff                 -- within TTL
+ORDER BY UpdatedAt DESC;
 ```
 
-This requires the `session_type` column from the session-resumption spec. Until that's added, a reasonable workaround is filtering by session ID pattern or metadata.
+This uses the `SessionType` smart enum from BotNexus.Domain.Primitives. Only `SessionType.UserAgent` sessions are user-facing and should be rehydrated.
 
 ### Session-to-Agent Context Bridge
 
@@ -95,18 +97,19 @@ The store's existing load logic already slices from last compaction forward, so 
 
 ### Agent Handle Pre-Creation
 
-During rehydration, the supervisor pre-creates handles:
+During rehydration, the supervisor pre-creates handles using the `Session` domain model:
 
 ```csharp
 // In SessionRehydrationService (new hosted service)
 foreach (var session in candidates)
 {
     var handle = await _supervisor.GetOrCreateAsync(
-        session.AgentId, session.SessionId, ct,
-        priorHistory: session.History);  // NEW parameter
+        session.AgentId,      // AgentId value object
+        session.SessionId,    // SessionId value object
+        ct,
+        priorHistory: session.History);  // NEW parameter - list of SessionEntry from Session.History
 
-    session.Metadata["rehydrated"] = true;
-    session.Metadata["rehydratedAt"] = DateTimeOffset.UtcNow;
+    session.MarkAsRehydrated();  // Domain method on Session
     await _sessions.SaveAsync(session, ct);
 }
 ```
@@ -153,12 +156,12 @@ ALTER TABLE sessions ADD COLUMN resume_count INTEGER DEFAULT 0;
 
 ```csharp
 // New method for rehydration candidates
-Task<IReadOnlyList<GatewaySession>> FindRehydrationCandidatesAsync(
+Task<IReadOnlyList<Session>> FindRehydrationCandidatesAsync(
     TimeSpan maxAge, CancellationToken ct);
 
 // New method for session discovery by channel
-Task<GatewaySession?> FindActiveSessionAsync(
-    string agentId, string channelType, CancellationToken ct);
+Task<Session?> FindActiveSessionAsync(
+    AgentId agentId, ChannelKey channelKey, CancellationToken ct);
 ```
 
 ### Agent Handle Creation
@@ -194,9 +197,11 @@ Registration order matters — this should run **after** `AgentConfigurationHost
 ### Session Discovery API
 
 ```
-GET /api/sessions/active?agentId={agentId}&channelType={channelType}
-→ { sessionId, agentId, channelType, messageCount, updatedAt, isRehydrated }
+GET /api/sessions/active?agentId={agentId}&channelKey={channelKey}
+→ { sessionId, agentId, channelKey, messageCount, updatedAt, isRehydrated }
 ```
+
+Uses `AgentId` and `ChannelKey` value objects for query parameters. Returns `SessionId` value object.
 
 The WebUI (and other clients) should call this on connect to find an existing session rather than blindly creating a new one.
 

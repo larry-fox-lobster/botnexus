@@ -4,9 +4,11 @@
 |------------------|-------------------------------------------------|
 | **Author**       | Leela (Lead/Architect)                          |
 | **Requested by** | Jon Bullen                                      |
-| **Status**       | DRAFT — awaiting review                         |
+| **Status**       | DRAFT — awaiting review (updated for DDD)       |
 | **Created**      | 2025-07-24                                      |
+| **Updated**      | 2026-04-12                                      |
 | **Scope**        | Gateway API + WebUI chat history loading        |
+| **DDD Types**    | Session, SessionId, AgentId, ChannelKey, SessionStatus |
 
 ---
 
@@ -76,8 +78,8 @@ This is a **new** endpoint on a new `ChannelHistoryController`. It replaces the 
 
 **Path Parameters:**
 
-- `channelKey`: `ChannelKey` value object (normalized, case-insensitive). The channel type for this scrollback thread (e.g., "telegram-group-123", "slack-channel-acme").
-- `agentId`: `AgentId` value object. The agent whose sessions to scroll through.
+- `channelKey`: `ChannelKey` value object from BotNexus.Domain.Primitives (normalized, case-insensitive). The channel for this scrollback thread (e.g., "telegram-group-123", "slack-channel-acme").
+- `agentId`: `AgentId` value object from BotNexus.Domain.Primitives. The agent whose sessions to scroll through.
 
 ### Query Parameters
 
@@ -131,7 +133,7 @@ Example: `sess_abc123:42` means "start before message index 42 in session `sess_
 
 ### Cross-Session Logic (Server-Side)
 
-1. Resolve all `Session` records for `(agentId, channelKey)` ordered by `CreatedAt DESC` (newest first)
+1. Resolve all `Session` records (BotNexus.Domain.Sessions.Session) for `(AgentId, ChannelKey)` ordered by `CreatedAt DESC` (newest first)
 2. Parse cursor to find starting session + message index
 3. Read messages backwards from that point
 4. If the current session is exhausted and `limit` not yet met, move to the previous session and continue filling
@@ -140,12 +142,12 @@ Example: `sess_abc123:42` means "start before message index 42 in session `sess_
 
 **Session Status Filtering:**
 
-- Include `Session` records with `Status == SessionStatus.Active` or `SessionStatus.Sealed`
+- Include `Session` records with `Status == SessionStatus.Active` or `SessionStatus.Sealed` (SessionStatus smart enum from BotNexus.Domain.Primitives)
 - Skip `Status == SessionStatus.Suspended` (resumable, but not history) and `Status == SessionStatus.Expired` (retention-pruned)
 
 ### ISessionStore Changes
 
-Add one method to `ISessionStore`:
+Add one method to `ISessionStore` (BotNexus.Gateway.Contracts):
 
 ```csharp
 /// <summary>
@@ -159,7 +161,7 @@ Task<IReadOnlyList<Session>> ListByChannelAsync(
     CancellationToken cancellationToken = default);
 ```
 
-The existing `GetHistorySnapshot(offset, limit)` on `Session` is sufficient for reading message pages within a session.
+The existing `GetHistorySnapshot(offset, limit)` on `Session` (BotNexus.Domain.Sessions.Session) is sufficient for reading message pages within a session.
 
 ---
 

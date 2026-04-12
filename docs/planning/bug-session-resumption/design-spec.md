@@ -5,10 +5,11 @@ type: bug
 priority: critical
 status: reopened
 created: 2026-04-10
-updated: 2026-04-11
+updated: 2026-04-12
 author: nova
 previous_fix: "Implemented by squad 2026-04-10. Confirmed working briefly but regressed on next gateway restart."
 tags: [session, gateway, continuity]
+ddd_types: [SessionId, AgentId, ChannelKey, SessionStatus, SessionType]
 ---
 # Design Spec: Session Resumption After Gateway Restart
 **Type**: Bug Fix
@@ -17,6 +18,12 @@ tags: [session, gateway, continuity]
 **Author**: Nova (via Jon)
 ## Overview
 Fix session resumption so that when the BotNexus gateway restarts, agents resume their previous session with context intact rather than starting fresh.
+
+**Post-DDD Architecture**: This spec uses the domain types from BotNexus.Domain:
+- `Session` (pure domain record in BotNexus.Domain.Sessions)
+- `SessionId`, `AgentId`, `ChannelKey` (value objects in BotNexus.Domain.Primitives)
+- `SessionStatus` smart enum (Active, Suspended, Sealed)
+- `SessionType` smart enum (UserAgent, AgentSelf, AgentSubAgent, AgentAgent, Soul, Cron)
 ## Requirements
 ### Must Have
 1. After gateway restart, agent resumes the most recent active session for the channel
@@ -39,15 +46,14 @@ When a channel connects (e.g., SignalR client connects):
 
 ```
 1. Look up most recent session WHERE:
-   - agent_id = <connecting agent>
-   - channel_type = <connecting channel type>
-   - status = active (0)
-   - session_type != 'cron'          -- exclude cron/heartbeat sessions
-   - source = 'channel'              -- only match interactive channel sessions
-   - updated_at > (now - session_ttl)
+   - AgentId = <connecting agent>         -- AgentId value object
+   - ChannelKey = <connecting channel>    -- ChannelKey value object (normalized, case-insensitive)
+   - Status = SessionStatus.Active        -- SessionStatus smart enum
+   - SessionType = SessionType.UserAgent  -- Only user-facing sessions (not Soul, Cron, AgentSelf, etc.)
+   - UpdatedAt > (now - session_ttl)
    NOTE: Do NOT include client_id, connection_id, or any client-specific
          identifier in the WHERE clause. Sessions are channel-scoped.
-2. If found: RESUME that session
+2. If found: RESUME that session (load Session domain model with History)
 3. If not found: CREATE new session
 ```
 
@@ -114,12 +120,13 @@ ALTER TABLE sessions ADD COLUMN resume_count INTEGER DEFAULT 0;
 -- Note: resume_count is telemetry only - no behavioral logic is attached.
 -- Used for observability and debugging session stability.
 ```
-## API Changes
+### API Changes
 ### Session Lookup Endpoint (internal)
 ```
-GET /api/sessions/resume?agentId=nova&channelType=signalr
+GET /api/sessions/resume?agentId={agentId}&channelKey={channelKey}
 ```
-Returns the session to resume (if any) with its compaction summary and recent messages.
+Returns the `Session` domain model to resume (if any) with its compaction summary and recent messages.
+Uses `AgentId` and `ChannelKey` value objects for query parameters.
 ## Edge Cases
 1. **Multiple active sessions**: Pick the most recently updated one
 2. **Session too old**: Configurable TTL (default: 24h). Beyond that, start fresh
