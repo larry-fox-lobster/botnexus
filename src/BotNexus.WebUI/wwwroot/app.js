@@ -59,12 +59,16 @@
         static createStreamState() {
             return {
                 isStreaming: false,
+                showStreamingIndicator: false,
                 activeMessageId: null,
                 activeToolCalls: {},
                 activeToolCount: 0,
                 thinkingBuffer: '',
                 toolCallDepth: 0,
                 toolStartTimes: {},
+                processingVisible: false,
+                processingStage: '',
+                processingIcon: '⏳',
             };
         }
         resetStreamState() {
@@ -120,10 +124,14 @@
                 if (store.timelineMeta) elChatMeta.textContent = store.timelineMeta;
                 updateSessionIdDisplay();
                 updateSidebarBadge(sessionId, 0);
+                syncLoadingUiForActiveSession();
+                updateSendButtonState();
                 return true;
             }
 
             updateSessionIdDisplay();
+            syncLoadingUiForActiveSession();
+            updateSendButtonState();
             return false;
         }
 
@@ -1695,7 +1703,10 @@
     // =========================================================================
 
     async function sendMessage() {
-        if (!getCurrentAgentId()) return;
+        const activeStore = storeManager.activeStore;
+        const activeAgentId = activeStore?.agentId || storeManager.activeAgentId;
+        const activeSessionId = storeManager.activeViewId;
+        if (!activeAgentId) return;
         const text = elChatInput.value.trim();
         if (!text) return;
 
@@ -1718,22 +1729,26 @@
         updateSendButtonState();
 
         if (isCurrentSessionStreaming() && connection?.state === signalR.HubConnectionState.Connected) {
+            if (!activeSessionId) {
+                appendSystemMessage('Unable to send control message while no active session is selected.', 'warning');
+                return;
+            }
             if (sendModeFollowUp) {
                 pendingQueuedMessages.push(text);
                 incrementQueue();
                 showFollowUpIndicator();
-                trackActivity('message', getCurrentAgentId(), `Follow-up: ${text.substring(0, 60)}`);
+                trackActivity('message', activeAgentId, `Follow-up: ${text.substring(0, 60)}`);
                 try {
-                    await hubInvoke('FollowUp', getCurrentAgentId(), getCurrentSessionId(), text);
+                    await hubInvoke('FollowUp', activeAgentId, activeSessionId, text);
                 } catch (err) {
                     appendSystemMessage(`Failed to queue: ${err.message}`, 'error');
                 }
             } else {
                 appendSystemMessage(`🧭 Steering: ${text}`);
                 showSteerIndicator();
-                trackActivity('message', getCurrentAgentId(), `Steer: ${text.substring(0, 60)}`);
+                trackActivity('message', activeAgentId, `Steer: ${text.substring(0, 60)}`);
                 try {
-                    await hubInvoke('Steer', getCurrentAgentId(), getCurrentSessionId(), text);
+                    await hubInvoke('Steer', activeAgentId, activeSessionId, text);
                 } catch (err) {
                     appendSystemMessage(`Failed to steer: ${err.message}`, 'error');
                 }
@@ -1742,21 +1757,21 @@
         }
 
         appendChatMessage('user', text);
-        trackActivity('message', getCurrentAgentId(), text.substring(0, 60));
+        trackActivity('message', activeAgentId, text.substring(0, 60));
         setSendingState(true);
-        if (getCurrentSessionId()) {
-            getStreamState(getCurrentSessionId()).isStreaming = true;
+        if (activeSessionId) {
+            getStreamState(activeSessionId).isStreaming = true;
         }
         incrementQueue();
         startResponseTimeout();
 
         try {
-            const channelType = toHubChannelType(currentChannelType || 'Web Chat');
-            const result = await hubInvoke('SendMessage', getCurrentAgentId(), channelType, text);
+            const channelType = toHubChannelType(activeStore?.channelType || currentChannelType || 'Web Chat');
+            const result = await hubInvoke('SendMessage', activeAgentId, channelType, text);
             if (result?.sessionId) {
                 const sessionChannelType = result.channelType || channelType;
                 storeManager.getOrCreateStore(result.sessionId, {
-                    agentId: result.agentId || getCurrentAgentId(),
+                    agentId: result.agentId || activeAgentId,
                     channelType: sessionChannelType
                 });
                 storeManager.switchView(result.sessionId);
@@ -1764,7 +1779,7 @@
             }
         } catch (err) {
             appendSystemMessage(`Error: ${err.message}`, 'error');
-            getStreamState(getCurrentSessionId()).isStreaming = false;
+            if (activeSessionId) getStreamState(activeSessionId).isStreaming = false;
             setSendingState(false);
         }
     }
@@ -3810,6 +3825,5 @@
         init();
     }
 })();
-
 
 
