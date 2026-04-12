@@ -512,21 +512,21 @@ function stripControlTags(text) {
                .replace(/\[\[\s*reply_to:\s*\w+\s*\]\]/gi, '');
 }
 
-export function appendChatMessage(role, content) {
-    appendChatMessageTo(role, content, dom.chatMessages);
+export function appendChatMessage(role, content, timestamp) {
+    appendChatMessageTo(role, content, dom.chatMessages, timestamp);
 }
 
-function appendChatMessageTo(role, content, container) {
+function appendChatMessageTo(role, content, container, timestamp) {
     content = stripControlTags(content);
     if (!content || !content.trim()) return;
     const div = document.createElement('div');
     div.className = `message ${role}`;
-    const now = formatTime(new Date().toISOString());
+    const timeStr = formatTime(timestamp || new Date().toISOString());
     const contentHtml = role === 'assistant' ? renderMarkdown(content) : escapeHtml(content);
     div.innerHTML = `
         <div class="msg-header">
             <span class="msg-role">${escapeHtml(role.toUpperCase())}</span>
-            <span class="msg-time">${now}</span>
+            <span class="msg-time">${timeStr}</span>
             <button class="btn-copy-msg" title="Copy message" aria-label="Copy message">📋</button>
         </div>
         <div class="msg-content">${contentHtml}</div>
@@ -588,7 +588,7 @@ function renderHistoryEntry(entry) { renderHistoryEntryTo(entry, dom.chatMessage
 function renderHistoryEntryTo(entry, container) {
     if (!entry) return;
     if ((entry.role === 'user' || entry.role === 'assistant') && entry.content && entry.content.trim()) {
-        appendChatMessageTo(entry.role, entry.content, container);
+        appendChatMessageTo(entry.role, entry.content, container, entry.timestamp);
     }
     if (entry.role === 'assistant' && entry.toolCalls && entry.toolCalls.length > 0) {
         for (const tc of entry.toolCalls) renderToolCallHistoryTo(tc, container);
