@@ -186,6 +186,87 @@ public sealed class SignalRHubTests
     }
 
     [Fact]
+    public async Task GatewayHub_SendMessage_WithAgentAndChannelType_RoutesToExistingSession()
+    {
+        var warmup = new Mock<ISessionWarmupService>();
+        warmup.Setup(value => value.GetAvailableSessionsAsync("agent-a", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new SessionSummary("signalr-session", "agent-a", ChannelKey.From("signalr"), SessionStatus.Active, 1, DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddMinutes(-4)),
+                new SessionSummary("telegram-session", "agent-a", ChannelKey.From("telegram"), SessionStatus.Active, 2, DateTimeOffset.UtcNow.AddMinutes(-3), DateTimeOffset.UtcNow.AddMinutes(-2))
+            ]);
+
+        var sessions = new Mock<ISessionStore>();
+        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("telegram-session"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GatewaySession
+            {
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("telegram-session"),
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+                ChannelType = ChannelKey.From("telegram"),
+                SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent
+            });
+
+        var dispatcher = new Mock<IChannelDispatcher>();
+        dispatcher.Setup(value => value.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var hub = CreateHub(dispatcher: dispatcher.Object, sessions: sessions.Object, warmup: warmup.Object, connectionId: "conn-1");
+
+        var result = await hub.SendMessage("agent-a", "telegram", "hello-telegram");
+
+        GetPropertyValue<string>(result, "sessionId").Should().Be("telegram-session");
+        dispatcher.Verify(value => value.DispatchAsync(
+                It.Is<InboundMessage>(m =>
+                    m.SessionId == "telegram-session" &&
+                    m.TargetAgentId == "agent-a" &&
+                    m.Content == "hello-telegram"),
+                CancellationToken.None),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GatewayHub_SendMessage_WithNoSessionForChannel_AutoCreatesSession()
+    {
+        var warmup = new Mock<ISessionWarmupService>();
+        warmup.Setup(value => value.GetAvailableSessionsAsync("agent-a", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new SessionSummary("signalr-session", "agent-a", ChannelKey.From("signalr"), SessionStatus.Active, 1, DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddMinutes(-4))
+            ]);
+
+        GatewaySession? capturedSession = null;
+        var sessions = new Mock<ISessionStore>();
+        sessions.Setup(value => value.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.SessionId>(), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((BotNexus.Domain.Primitives.SessionId sid, BotNexus.Domain.Primitives.AgentId aid, CancellationToken _) => new GatewaySession
+            {
+                SessionId = sid,
+                AgentId = aid
+            });
+        sessions.Setup(value => value.SaveAsync(It.IsAny<GatewaySession>(), It.IsAny<CancellationToken>()))
+            .Callback<GatewaySession, CancellationToken>((session, _) => capturedSession = session)
+            .Returns(Task.CompletedTask);
+
+        var dispatcher = new Mock<IChannelDispatcher>();
+        dispatcher.Setup(value => value.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var hub = CreateHub(dispatcher: dispatcher.Object, sessions: sessions.Object, warmup: warmup.Object, connectionId: "conn-1");
+
+        var result = await hub.SendMessage("agent-a", "telegram", "needs-new-session");
+
+        var createdSessionId = GetPropertyValue<string>(result, "sessionId");
+        createdSessionId.Should().NotBeNullOrWhiteSpace();
+        GetPropertyValue<string>(result, "channelType").Should().Be("telegram");
+        capturedSession.Should().NotBeNull();
+        capturedSession!.ChannelType.Should().Be(ChannelKey.From("telegram"));
+        dispatcher.Verify(value => value.DispatchAsync(
+                It.Is<InboundMessage>(m =>
+                    m.SessionId == createdSessionId &&
+                    m.TargetAgentId == "agent-a" &&
+                    m.Content == "needs-new-session"),
+                CancellationToken.None),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task GatewayHub_SendMessage_WhitespaceIds_DispatchesNormalizedIds()
     {
         var warmup = new Mock<ISessionWarmupService>();
