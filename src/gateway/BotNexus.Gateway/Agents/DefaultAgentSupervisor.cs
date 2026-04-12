@@ -191,7 +191,20 @@ public sealed class DefaultAgentSupervisor : IAgentSupervisor, IAgentHandleInspe
                 $"Available strategies: {availableStrategies}.");
         }
 
-        var context = new AgentExecutionContext { SessionId = sessionId };
+        IReadOnlyList<SessionEntry> priorHistory = [];
+        var existingSession = await _sessionStore.GetAsync(sessionId, cancellationToken);
+        if (existingSession?.History.Count > 0)
+        {
+            priorHistory = existingSession.History;
+            _logger.LogInformation("Resuming session '{SessionId}' with {Count} history entries",
+                sessionId, priorHistory.Count);
+        }
+
+        var context = new AgentExecutionContext
+        {
+            SessionId = sessionId,
+            History = priorHistory
+        };
         var handle = await strategy.CreateAsync(descriptor, context, cancellationToken);
 
         var instance = new AgentInstance
