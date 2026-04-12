@@ -71,12 +71,22 @@ public sealed class DefaultAgentCommunicator : IAgentCommunicator
         activity?.SetTag("botnexus.correlation.id", System.Diagnostics.Activity.Current?.TraceId.ToString());
 
         var childSessionId = SessionId.ForSubAgent(parentSessionId, childAgentId);
-        _logger.LogInformation(
-            "Sub-agent call from '{ParentAgentId}' session '{ParentSessionId}' to '{ChildAgentId}' session '{ChildSessionId}'",
-            parentAgentId,
-            parentSessionId,
-            childAgentId,
-            childSessionId);
+        using (_logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["ParentAgentId"] = parentAgentId.Value,
+            ["ParentSessionId"] = parentSessionId.Value,
+            ["ChildAgentId"] = childAgentId.Value,
+            ["ChildSessionId"] = childSessionId.Value,
+            ["TraceId"] = System.Diagnostics.Activity.Current?.TraceId.ToString()
+        }))
+        {
+            _logger.LogInformation(
+                "Sub-agent call from '{ParentAgentId}' session '{ParentSessionId}' to '{ChildAgentId}' session '{ChildSessionId}'",
+                parentAgentId,
+                parentSessionId,
+                childAgentId,
+                childSessionId);
+        }
 
         var childHandle = await _supervisor.GetOrCreateAsync(childAgentId, childSessionId, cancellationToken);
         return await PromptWithTimeoutAsync(childHandle, message, parentAgentId, childAgentId, cancellationToken);
@@ -119,11 +129,20 @@ public sealed class DefaultAgentCommunicator : IAgentCommunicator
             throw new KeyNotFoundException($"Agent '{targetAgentId}' is not registered.");
 
         var crossSessionId = SessionId.From($"{SessionId.ForCrossAgent(sourceAgentId, targetAgentId)}::{Guid.NewGuid():N}");
-        _logger.LogInformation(
-            "Cross-agent call from '{SourceAgentId}' to '{TargetAgentId}' session '{CrossSessionId}'",
-            sourceAgentId,
-            targetAgentId,
-            crossSessionId);
+        using (_logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["SourceAgentId"] = sourceAgentId.Value,
+            ["TargetAgentId"] = targetAgentId.Value,
+            ["CrossSessionId"] = crossSessionId.Value,
+            ["TraceId"] = System.Diagnostics.Activity.Current?.TraceId.ToString()
+        }))
+        {
+            _logger.LogInformation(
+                "Cross-agent call from '{SourceAgentId}' to '{TargetAgentId}' session '{CrossSessionId}'",
+                sourceAgentId,
+                targetAgentId,
+                crossSessionId);
+        }
 
         var handle = await _supervisor.GetOrCreateAsync(targetAgentId, crossSessionId, cancellationToken);
         return await PromptWithTimeoutAsync(handle, message, sourceAgentId, targetAgentId, cancellationToken);

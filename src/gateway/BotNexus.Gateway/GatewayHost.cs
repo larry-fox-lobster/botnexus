@@ -197,6 +197,9 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
         activity?.SetTag("botnexus.channel.type", message.ChannelType);
         activity?.SetTag("botnexus.session.id", message.SessionId);
         activity?.SetTag("botnexus.correlation.id", System.Diagnostics.Activity.Current?.TraceId.ToString());
+        GatewayTelemetry.MessagesProcessed.Add(1,
+            new KeyValuePair<string, object?>("botnexus.channel.type", message.ChannelType),
+            new KeyValuePair<string, object?>("botnexus.session.id", message.SessionId));
 
         await _activity.PublishAsync(new GatewayActivity
         {
@@ -220,13 +223,36 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
             agentActivity?.SetTag("botnexus.agent.id", agentId);
             agentActivity?.SetTag("botnexus.session.id", sessionId);
             agentActivity?.SetTag("botnexus.correlation.id", System.Diagnostics.Activity.Current?.TraceId.ToString());
+            agentActivity?.SetTag("botnexus.channel.type", message.ChannelType);
+
+            using var executionActivity = GatewayDiagnostics.Source.StartActivity("gateway.agent.execution", ActivityKind.Internal);
+            executionActivity?.SetTag("botnexus.agent.id", agentId);
+            executionActivity?.SetTag("botnexus.session.id", sessionId);
+            executionActivity?.SetTag("botnexus.channel.type", message.ChannelType);
+            executionActivity?.SetTag("botnexus.trace.id", System.Diagnostics.Activity.Current?.TraceId.ToString());
+            var executionTimer = Stopwatch.StartNew();
+
+            using var logScope = _logger.BeginScope(new Dictionary<string, object?>
+            {
+                ["AgentId"] = agentId,
+                ["SessionId"] = sessionId,
+                ["Channel"] = message.ChannelType,
+                ["TraceId"] = System.Diagnostics.Activity.Current?.TraceId.ToString()
+            });
 
             using var getOrCreateActivity = GatewayDiagnostics.Source.StartActivity("session.get_or_create", ActivityKind.Internal);
             getOrCreateActivity?.SetTag("botnexus.session.id", sessionId);
             getOrCreateActivity?.SetTag("botnexus.agent.id", agentId);
             var existingSessionTask = _sessions.GetAsync(SessionId.From(sessionId), cancellationToken);
             var existingSession = existingSessionTask is null ? null : await existingSessionTask;
+            var createdSession = existingSession is null;
             var session = existingSession ?? await _sessions.GetOrCreateAsync(SessionId.From(sessionId), AgentId.From(agentId), cancellationToken);
+            if (createdSession)
+            {
+                GatewayTelemetry.ActiveSessions.Add(1,
+                    new KeyValuePair<string, object?>("botnexus.agent.id", agentId),
+                    new KeyValuePair<string, object?>("botnexus.channel.type", message.ChannelType));
+            }
             session.ChannelType ??= message.ChannelType;
             session.CallerId ??= message.SenderId;
             session.SessionType = ResolveSessionType(session, message);
@@ -357,13 +383,38 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
                     AgentId = agentId,
                     SessionId = sessionId
                 }, cancellationToken);
+
+                executionTimer.Stop();
+                executionActivity?.SetStatus(ActivityStatusCode.Ok);
+                GatewayTelemetry.AgentExecutionDurationMs.Record(executionTimer.Elapsed.TotalMilliseconds,
+                    new KeyValuePair<string, object?>("botnexus.agent.id", agentId),
+                    new KeyValuePair<string, object?>("botnexus.channel.type", message.ChannelType),
+                    new KeyValuePair<string, object?>("outcome", "success"));
+                GatewayTelemetry.ProviderLatencyMs.Record(executionTimer.Elapsed.TotalMilliseconds,
+                    new KeyValuePair<string, object?>("botnexus.agent.id", agentId),
+                    new KeyValuePair<string, object?>("botnexus.channel.type", message.ChannelType));
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                executionTimer.Stop();
+                executionActivity?.SetStatus(ActivityStatusCode.Error, "cancelled");
+                GatewayTelemetry.AgentExecutionDurationMs.Record(executionTimer.Elapsed.TotalMilliseconds,
+                    new KeyValuePair<string, object?>("botnexus.agent.id", agentId),
+                    new KeyValuePair<string, object?>("botnexus.channel.type", message.ChannelType),
+                    new KeyValuePair<string, object?>("outcome", "cancelled"));
                 _logger.LogInformation("Processing cancelled for agent '{AgentId}' session '{SessionId}' (client disconnected)", agentId, sessionId);
             }
             catch (Exception ex)
             {
+                executionTimer.Stop();
+                executionActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                GatewayTelemetry.AgentExecutionDurationMs.Record(executionTimer.Elapsed.TotalMilliseconds,
+                    new KeyValuePair<string, object?>("botnexus.agent.id", agentId),
+                    new KeyValuePair<string, object?>("botnexus.channel.type", message.ChannelType),
+                    new KeyValuePair<string, object?>("outcome", "error"));
+                GatewayTelemetry.ProviderLatencyMs.Record(executionTimer.Elapsed.TotalMilliseconds,
+                    new KeyValuePair<string, object?>("botnexus.agent.id", agentId),
+                    new KeyValuePair<string, object?>("botnexus.channel.type", message.ChannelType));
                 _logger.LogError(ex, "Error processing message for agent '{AgentId}' session '{SessionId}'", agentId, sessionId);
 
                 try

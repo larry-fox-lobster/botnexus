@@ -1,6 +1,7 @@
 using BotNexus.Gateway.Api;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
 using DiagnosticsActivity = System.Diagnostics.Activity;
 
@@ -13,7 +14,7 @@ public sealed class CorrelationIdMiddlewareTests
     {
         var expectedTraceId = ActivityTraceId.CreateFromString("0123456789abcdef0123456789abcdef".AsSpan());
         var expectedSpanId = ActivitySpanId.CreateFromString("0123456789abcdef".AsSpan());
-        var middleware = new CorrelationIdMiddleware(_ => Task.CompletedTask);
+        var middleware = new CorrelationIdMiddleware(_ => Task.CompletedTask, NullLogger<CorrelationIdMiddleware>.Instance);
         var context = new DefaultHttpContext();
         using var activity = new DiagnosticsActivity("gateway-request");
         activity.SetIdFormat(ActivityIdFormat.W3C);
@@ -28,7 +29,7 @@ public sealed class CorrelationIdMiddlewareTests
     [Fact]
     public async Task CorrelationIdMiddleware_WhenNoActivity_GeneratesCorrelationId()
     {
-        var middleware = new CorrelationIdMiddleware(_ => Task.CompletedTask);
+        var middleware = new CorrelationIdMiddleware(_ => Task.CompletedTask, NullLogger<CorrelationIdMiddleware>.Instance);
         var context = new DefaultHttpContext();
         DiagnosticsActivity.Current = null;
 
@@ -40,7 +41,7 @@ public sealed class CorrelationIdMiddlewareTests
     [Fact]
     public async Task CorrelationIdMiddleware_WhenClientSendsCorrelationId_PreservesIt()
     {
-        var middleware = new CorrelationIdMiddleware(_ => Task.CompletedTask);
+        var middleware = new CorrelationIdMiddleware(_ => Task.CompletedTask, NullLogger<CorrelationIdMiddleware>.Instance);
         var context = new DefaultHttpContext();
         context.Request.Headers["X-Correlation-Id"] = "client-correlation-id";
 
