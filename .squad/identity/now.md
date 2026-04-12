@@ -1,13 +1,13 @@
 ---
-updated_at: 2026-04-12T00:13:00Z
-focus_area: Infinite Scrollback Wave 1–2 Delivered
-active_issues: [Wave 3 UI blocked on Fry]
-status: scrollback_wave2_complete
+updated_at: 2026-04-12T05:00:00Z
+focus_area: DDD Refactoring Waves 1-4 Delivered
+active_issues: []
+status: ddd_refactoring_delivered
 ---
 
 # What We're Focused On
 
-**Infinite scrollback Wave 1 & 2 delivered (2026-04-12 00:13Z).** API for cross-session history + IntersectionObserver client pattern. 4-agent team: Leela design review + wave plan, Farnsworth (ListByChannelAsync + ChannelHistoryController), Bender (IntersectionObserver + fetchOlderMessages, removed broken loadEarlierMessages/loadOlderSessions), Hermes (19 tests: 10 API + 3 store + 6 pagination). Commits: 21fb7bb, fcc3785, 5ab9951.
+**DDD Refactoring Waves 1-4 delivered (2026-04-12 05:00Z).** Full domain-driven design alignment: BotNexus.Domain project with value objects + smart enums, SessionStatus Sealed rename, SessionType discrimination, Participants model, ChannelKey + MessageRole + AgentId + SessionId typed across entire stack, sub-agent archetype identity, cron decoupled to IInternalTrigger, existence queries, SessionStoreBase extraction. 6-agent team across 4 waves. 2,043 tests passing, 0 errors, 0 warnings. Deferred phases documented in `docs/planning/ddd-refactoring/deferred-phases.md`.
 
 **Previous:** Multi-session connection model fully delivered (2026-04-11 19:30Z). Fundamental architectural pivot: sessions now pre-warmed at gateway startup, WebUI holds all sessions simultaneously (separate connection per channel/session), switching is pure UI with zero server calls. Eliminated entire class of race conditions. 6 commits, 9 tests, 83/83 E2E passing.
 
