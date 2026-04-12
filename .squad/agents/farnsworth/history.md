@@ -62,3 +62,9 @@
 
 ---
 
+
+## Learnings
+
+- 2026-04-12: Added ExistenceQuery-backed dual lookup (AgentId owner OR participant ID match) across in-memory, file, and sqlite session stores with shared filtering for time range, type, and limit.
+- 2026-04-12: Extracted SessionStoreBase to centralize ListAsync, ListByChannelAsync, and GetExistenceAsync filtering logic while keeping store-specific persistence/locking behavior in derived stores.
+- 2026-04-12: Added SessionStoreBase.ListAsync(AgentId?, SessionStatus?, CancellationToken) overload to enforce consistent status filtering for contract tests without changing ISessionStore surface.
