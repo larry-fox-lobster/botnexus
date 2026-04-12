@@ -3,24 +3,33 @@ id: bug-session-switching-ui
 title: "Session Switching Broken During Active Agent Work"
 type: bug
 priority: high
-status: likely_obsolete
+status: delivered
 created: 2026-04-10
-updated: 2026-04-12
+updated: 2026-04-13
 author: nova
 tags: [webui, session, ux, multi-agent, critical-ux]
 blocks: [feature-subagent-ui-visibility]
 likely_fixed_by: feature-multi-session-connection (subscribe-all model)
 verification_needed: true
+partial_fix: 28a0329 (receive-side event isolation)
 ---
 
-## Status Note (2026-04-12)
+## Status Note (2026-04-13)
 
-**Likely fixed by the subscribe-all connection model.** The root cause (race conditions during JoinSession/LeaveSession) should be eliminated by the new architecture where:
-- Client subscribes to ALL sessions once on connect
-- Session switching is a pure client-side DOM operation
-- No server round-trips during switch
+**Partially fixed.** Commit `28a0329` addresses the **receive-side cross-session bleed** (Pattern A):
+- **Server**: `SendAsync` and `SendStreamDeltaAsync` now wrap `ContentDelta` payloads as `{ sessionId, contentDelta }` instead of raw strings
+- **Client**: `routeEvent()` no longer falls back to `activeViewId` when `sessionId` is missing — events without a `sessionId` are dropped with a console warning
 
-**Action**: Verify with E2E tests. If the Playwright tests in this spec still demonstrate the bug, reopen. Otherwise archive.
+### Still open: Send-side misrouting
+The **confirmed root cause** (2026-04-10) is the client-side race in `openAgentTimeline()` where `currentSessionId` is stale/null during async switch operations. A user typing and pressing Enter during the switch window still routes their message to the wrong session. This is **not addressed** by `28a0329`.
+
+### Remaining work
+1. **Send-side fix** — `sendMessage()` must not send to a stale/null `currentSessionId` during switch. Options: disable chat input during switch, queue sends, or set `currentSessionId` synchronously before async operations
+2. **Per-session loading state** (Pattern C) — loading indicators are still global
+3. **Tests** — no tests were added with `28a0329`. The expanded testing plan (SignalR integration + Playwright E2E) is still required
+4. **Acceptance criteria** — all items below remain unchecked
+
+**Action**: Address send-side race condition and add tests per the expanded testing plan.
 
 # Design Spec: Session Switching Broken During Active Agent Work
 
