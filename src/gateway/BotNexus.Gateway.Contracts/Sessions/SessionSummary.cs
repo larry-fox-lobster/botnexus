@@ -3,6 +3,9 @@ using ChannelKey = BotNexus.Domain.Primitives.ChannelKey;
 
 namespace BotNexus.Gateway.Abstractions.Sessions;
 
+/// <summary>
+/// Represents session summary.
+/// </summary>
 public sealed record SessionSummary(
     string SessionId,
     string AgentId,

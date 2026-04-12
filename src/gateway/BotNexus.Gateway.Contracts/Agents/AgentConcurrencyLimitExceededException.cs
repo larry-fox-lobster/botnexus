@@ -14,7 +14,13 @@ public sealed class AgentConcurrencyLimitExceededException : Exception
         MaxConcurrentSessions = maxConcurrentSessions;
     }
 
+    /// <summary>
+    /// Gets the agent id.
+    /// </summary>
     public AgentId AgentId { get; }
 
+    /// <summary>
+    /// Gets the max concurrent sessions.
+    /// </summary>
     public int MaxConcurrentSessions { get; }
 }
