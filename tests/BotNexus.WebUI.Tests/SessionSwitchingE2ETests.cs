@@ -90,6 +90,37 @@ public sealed class SessionSwitchingE2ETests
     }
 
     [PlaywrightFact(Timeout = 90000)]
+    public async Task SendDuringSwitch_DisablesInputAndPreventsDispatch()
+    {
+        await using var host = await _fixture.CreatePageAsync();
+
+        await host.OpenAgentTimelineAsync(AgentA);
+        await host.SendMessageAsync("switch-guard-seed-a");
+        await host.WaitForStreamingCompleteAsync();
+
+        var sendCountBefore = host.Supervisor.Dispatches.Count(d => d.Kind == DispatchKind.Send);
+        const string delayedRoutePattern = "**/api/channels/*/agents/agent-b/history*";
+        await host.Page.RouteAsync(delayedRoutePattern, async route =>
+        {
+            await Task.Delay(1200);
+            await route.ContinueAsync();
+        });
+
+        await host.Page.Locator($"#sessions-list .list-item[data-agent-id='{AgentB}'][data-channel-type='web chat']").First.ClickAsync();
+        await Assertions.Expect(host.Page.Locator("#chat-messages .loading")).ToContainTextAsync("Loading timeline...", new() { Timeout = 15000 });
+        await Assertions.Expect(host.Page.Locator("#chat-input")).ToBeDisabledAsync(new() { Timeout = 5000 });
+        await Assertions.Expect(host.Page.Locator("#btn-send")).ToBeDisabledAsync(new() { Timeout = 5000 });
+
+        await host.Page.Keyboard.PressAsync("Enter");
+        await Task.Delay(200);
+
+        host.Supervisor.Dispatches.Count(d => d.Kind == DispatchKind.Send).Should().Be(sendCountBefore);
+
+        await host.Page.UnrouteAsync(delayedRoutePattern);
+        await Assertions.Expect(host.Page.Locator("#chat-input")).ToBeEditableAsync(new() { Timeout = 15000 });
+    }
+
+    [PlaywrightFact(Timeout = 90000)]
     public async Task BackgroundSession_ReceivesEvents_WhileViewingOther()
     {
         await using var host = await _fixture.CreatePageAsync();
