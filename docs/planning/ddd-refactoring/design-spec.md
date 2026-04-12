@@ -1,10 +1,10 @@
 ---
-status: in-progress
+status: waves-1-4-complete
 ---
 
 # BotNexus Domain-Driven Design Refactoring Plan
 
-**Status**: In Progress
+**Status**: Waves 1–4 Complete (Waves 5–6 Deferred)
 
 This plan maps the [domain model](botnexus-domain-model.md) to the current codebase and defines the work needed to align them. The goal is cleaner contracts, better separation of concerns, simpler testing, and a codebase that speaks the same language as the architecture.
 
