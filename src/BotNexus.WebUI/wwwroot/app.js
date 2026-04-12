@@ -241,6 +241,7 @@
     const elAgentsList = $('#agents-list');
     const elConnectionStatus = $('#connection-status');
     const elStatusText = elConnectionStatus.querySelector('.status-text');
+    const elWorldIdentity = $('#world-identity');
     const elConnectionBanner = $('#connection-banner');
     const elWelcome = $('#welcome-screen');
     const elChatView = $('#chat-view');
@@ -1824,6 +1825,15 @@
             console.error(`API error (${path}):`, e);
             return null;
         }
+    }
+
+    async function loadWorldIdentity() {
+        const world = await fetchJson('/world');
+        if (!world || !elWorldIdentity) return;
+
+        const emoji = world.emoji && world.emoji.trim() ? world.emoji.trim() : '🌍';
+        const name = world.name && world.name.trim() ? world.name.trim() : 'BotNexus Gateway';
+        elWorldIdentity.textContent = `${emoji} ${name}`;
     }
 
     // =========================================================================
@@ -3784,6 +3794,7 @@
         initMarkdown();
         initSectionToggles();
         initEventListeners();
+        loadWorldIdentity();
         loadSessions();
         loadChannels();
         loadExtensions();

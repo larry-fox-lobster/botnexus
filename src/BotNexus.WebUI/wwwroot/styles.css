@@ -59,6 +59,7 @@ body {
 }
 .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); }
 .sidebar-header h1 { font-size: 1.2rem; font-weight: 600; margin-bottom: 8px; }
+.world-identity { font-size: 0.8rem; margin-bottom: 8px; }
 
 .sidebar-section { border-bottom: 1px solid var(--border); }
 .section-header {
