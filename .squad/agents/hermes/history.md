@@ -214,3 +214,4 @@
 
 ## Learnings
 - 2026-04-12: Domain primitive tests in this repo follow xUnit + FluentAssertions conventions with net10.0 test projects, explicit BotNexus.Domain project reference, and xunit.runner.json copied to output for consistent parallelism settings.
+- 2026-04-12: Wave 2 gateway tests should assert migration contracts via type-level checks (ChannelKey/MessageRole/SessionType/Participants) so refactors stay additive even while implementation is in-flight.
