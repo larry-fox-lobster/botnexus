@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Diagnostics;
+using AgentId = BotNexus.Domain.Primitives.AgentId;
+using SessionId = BotNexus.Domain.Primitives.SessionId;
 using ChannelKey = BotNexus.Domain.Primitives.ChannelKey;
 using MessageRole = BotNexus.Domain.Primitives.MessageRole;
 using SessionType = BotNexus.Domain.Primitives.SessionType;
@@ -19,7 +21,7 @@ public sealed class SqliteSessionStore : ISessionStore
     private static readonly ActivitySource ActivitySource = new("BotNexus.Gateway");
     private readonly string _connectionString;
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private readonly Dictionary<string, GatewaySession> _cache = [];
+    private readonly Dictionary<SessionId, GatewaySession> _cache = [];
     private bool _initialized;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -33,7 +35,7 @@ public sealed class SqliteSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task<GatewaySession?> GetAsync(string sessionId, CancellationToken cancellationToken = default)
+    public async Task<GatewaySession?> GetAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.get", ActivityKind.Internal);
         activity?.SetTag("botnexus.session.id", sessionId);
@@ -55,7 +57,7 @@ public sealed class SqliteSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task<GatewaySession> GetOrCreateAsync(string sessionId, string agentId, CancellationToken cancellationToken = default)
+    public async Task<GatewaySession> GetOrCreateAsync(SessionId sessionId, AgentId agentId, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.get_or_create", ActivityKind.Internal);
         activity?.SetTag("botnexus.session.id", sessionId);
@@ -108,7 +110,7 @@ public sealed class SqliteSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task DeleteAsync(string sessionId, CancellationToken cancellationToken = default)
+    public async Task DeleteAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.delete", ActivityKind.Internal);
         activity?.SetTag("botnexus.session.id", sessionId);
@@ -124,19 +126,19 @@ public sealed class SqliteSessionStore : ISessionStore
 
             await using var deleteHistory = connection.CreateCommand();
             deleteHistory.CommandText = "DELETE FROM session_history WHERE session_id = $sessionId";
-            deleteHistory.Parameters.AddWithValue("$sessionId", sessionId);
+            deleteHistory.Parameters.AddWithValue("$sessionId", sessionId.Value);
             await deleteHistory.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 
             await using var deleteSession = connection.CreateCommand();
             deleteSession.CommandText = "DELETE FROM sessions WHERE id = $sessionId";
-            deleteSession.Parameters.AddWithValue("$sessionId", sessionId);
+            deleteSession.Parameters.AddWithValue("$sessionId", sessionId.Value);
             await deleteSession.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
         finally { _lock.Release(); }
     }
 
     /// <inheritdoc />
-    public async Task ArchiveAsync(string sessionId, CancellationToken cancellationToken = default)
+    public async Task ArchiveAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -160,7 +162,7 @@ public sealed class SqliteSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<GatewaySession>> ListAsync(string? agentId = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<GatewaySession>> ListAsync(AgentId? agentId = null, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.list", ActivityKind.Internal);
         activity?.SetTag("botnexus.agent.id", agentId);
@@ -179,13 +181,13 @@ public sealed class SqliteSessionStore : ISessionStore
                 WHERE $agentId IS NULL OR agent_id = $agentId
                 ORDER BY updated_at DESC
                 """;
-            command.Parameters.AddWithValue("$agentId", (object?)agentId ?? DBNull.Value);
+            command.Parameters.AddWithValue("$agentId", agentId.HasValue ? agentId.Value.Value : DBNull.Value);
 
             var sessions = new List<GatewaySession>();
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                var sessionId = reader.GetString(0);
+                var sessionId = SessionId.From(reader.GetString(0));
                 var session = _cache.GetValueOrDefault(sessionId)
                     ?? await LoadSessionAsync(sessionId, cancellationToken).ConfigureAwait(false);
                 if (session is not null)
@@ -202,7 +204,7 @@ public sealed class SqliteSessionStore : ISessionStore
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<GatewaySession>> ListByChannelAsync(
-        string agentId,
+        AgentId agentId,
         ChannelKey channelType,
         CancellationToken cancellationToken = default)
     {
@@ -226,14 +228,14 @@ public sealed class SqliteSessionStore : ISessionStore
                   AND lower(channel_type) = $channelType
                 ORDER BY created_at DESC
                 """;
-            command.Parameters.AddWithValue("$agentId", agentId);
+            command.Parameters.AddWithValue("$agentId", agentId.Value);
             command.Parameters.AddWithValue("$channelType", channelType.Value);
 
             var sessions = new List<GatewaySession>();
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                var sessionId = reader.GetString(0);
+                var sessionId = SessionId.From(reader.GetString(0));
                 var session = _cache.GetValueOrDefault(sessionId)
                     ?? await LoadSessionAsync(connection, sessionId, cancellationToken).ConfigureAwait(false);
                 if (session is not null)
@@ -334,14 +336,14 @@ public sealed class SqliteSessionStore : ISessionStore
         await renameStatus.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<GatewaySession?> LoadSessionAsync(string sessionId, CancellationToken cancellationToken)
+    private async Task<GatewaySession?> LoadSessionAsync(SessionId sessionId, CancellationToken cancellationToken)
     {
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         return await LoadSessionAsync(connection, sessionId, cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task<GatewaySession?> LoadSessionAsync(SqliteConnection connection, string sessionId, CancellationToken cancellationToken)
+    private static async Task<GatewaySession?> LoadSessionAsync(SqliteConnection connection, SessionId sessionId, CancellationToken cancellationToken)
     {
         await using var sessionCommand = connection.CreateCommand();
         sessionCommand.CommandText = """
@@ -349,7 +351,7 @@ public sealed class SqliteSessionStore : ISessionStore
             FROM sessions
             WHERE id = $sessionId
             """;
-        sessionCommand.Parameters.AddWithValue("$sessionId", sessionId);
+        sessionCommand.Parameters.AddWithValue("$sessionId", sessionId.Value);
 
         await using var reader = await sessionCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -364,10 +366,14 @@ public sealed class SqliteSessionStore : ISessionStore
             channelType = ChannelKey.From(reader.GetString(2));
         var sessionType = ParseSessionType(reader.IsDBNull(4) ? null : reader.GetString(4), sessionId, channelType);
         var participants = DeserializeParticipants(reader.IsDBNull(5) ? null : reader.GetString(5));
+        var agentIdValue = reader.IsDBNull(1) ? null : reader.GetString(1);
+        if (string.IsNullOrWhiteSpace(agentIdValue))
+            return null;
+
         var session = new GatewaySession
         {
-            SessionId = reader.GetString(0),
-            AgentId = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+            SessionId = SessionId.From(reader.GetString(0)),
+            AgentId = AgentId.From(agentIdValue),
             ChannelType = channelType,
             CallerId = reader.IsDBNull(3) ? null : reader.GetString(3),
             SessionType = sessionType,
@@ -387,7 +393,7 @@ public sealed class SqliteSessionStore : ISessionStore
             WHERE session_id = $sessionId
             ORDER BY id ASC
             """;
-        historyCommand.Parameters.AddWithValue("$sessionId", sessionId);
+        historyCommand.Parameters.AddWithValue("$sessionId", sessionId.Value);
 
         await using var historyReader = await historyCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var entries = new List<SessionEntry>();
@@ -432,8 +438,8 @@ public sealed class SqliteSessionStore : ISessionStore
                 created_at = excluded.created_at,
                 updated_at = excluded.updated_at
             """;
-        command.Parameters.AddWithValue("$id", session.SessionId);
-        command.Parameters.AddWithValue("$agentId", session.AgentId);
+        command.Parameters.AddWithValue("$id", session.SessionId.Value);
+        command.Parameters.AddWithValue("$agentId", session.AgentId.Value);
         command.Parameters.AddWithValue("$channelType", session.ChannelType.HasValue ? session.ChannelType.Value.Value : DBNull.Value);
         command.Parameters.AddWithValue("$callerId", (object?)session.CallerId ?? DBNull.Value);
         command.Parameters.AddWithValue("$sessionType", session.SessionType.Value);
@@ -453,7 +459,7 @@ public sealed class SqliteSessionStore : ISessionStore
         await using var deleteCommand = connection.CreateCommand();
         deleteCommand.Transaction = transaction;
         deleteCommand.CommandText = "DELETE FROM session_history WHERE session_id = $sessionId";
-        deleteCommand.Parameters.AddWithValue("$sessionId", session.SessionId);
+        deleteCommand.Parameters.AddWithValue("$sessionId", session.SessionId.Value);
         await deleteCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 
         foreach (var entry in session.GetHistorySnapshot())
@@ -464,7 +470,7 @@ public sealed class SqliteSessionStore : ISessionStore
                 INSERT INTO session_history (session_id, role, content, timestamp, tool_name, tool_call_id, is_compaction_summary)
                 VALUES ($sessionId, $role, $content, $timestamp, $toolName, $toolCallId, $isCompactionSummary)
                 """;
-            insertCommand.Parameters.AddWithValue("$sessionId", session.SessionId);
+            insertCommand.Parameters.AddWithValue("$sessionId", session.SessionId.Value);
             insertCommand.Parameters.AddWithValue("$role", entry.Role.Value);
             insertCommand.Parameters.AddWithValue("$content", entry.Content);
             insertCommand.Parameters.AddWithValue("$timestamp", entry.Timestamp.ToString("O"));
@@ -492,7 +498,7 @@ public sealed class SqliteSessionStore : ISessionStore
             _ => SessionStatus.Active
         };
 
-    private static SessionType ParseSessionType(string? raw, string sessionId, ChannelKey? channelType)
+    private static SessionType ParseSessionType(string? raw, SessionId sessionId, ChannelKey? channelType)
     {
         if (!string.IsNullOrWhiteSpace(raw))
             return SessionType.FromString(raw);
@@ -516,9 +522,9 @@ public sealed class SqliteSessionStore : ISessionStore
         return JsonSerializer.Deserialize<Dictionary<string, object?>>(metadataJson, JsonOptions) ?? [];
     }
 
-    private static SessionType InferSessionType(string sessionId, ChannelKey? channelType)
+    private static SessionType InferSessionType(SessionId sessionId, ChannelKey? channelType)
     {
-        if (sessionId.Contains("::subagent::", StringComparison.OrdinalIgnoreCase))
+        if (sessionId.IsSubAgent)
             return SessionType.AgentSubAgent;
 
         if (channelType.HasValue && string.Equals(channelType.Value, "cron", StringComparison.OrdinalIgnoreCase))

@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Diagnostics;
 using System.IO.Abstractions;
+using AgentId = BotNexus.Domain.Primitives.AgentId;
+using SessionId = BotNexus.Domain.Primitives.SessionId;
 using ChannelKey = BotNexus.Domain.Primitives.ChannelKey;
 using SessionType = BotNexus.Domain.Primitives.SessionType;
 using SessionParticipant = BotNexus.Domain.Primitives.SessionParticipant;
@@ -34,7 +36,7 @@ public sealed class FileSessionStore : ISessionStore
     private readonly string _storePath;
     private readonly IFileSystem _fileSystem;
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private readonly Dictionary<string, GatewaySession> _cache = [];
+    private readonly Dictionary<SessionId, GatewaySession> _cache = [];
     private readonly ILogger<FileSessionStore> _logger;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -51,7 +53,7 @@ public sealed class FileSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task<GatewaySession?> GetAsync(string sessionId, CancellationToken cancellationToken = default)
+    public async Task<GatewaySession?> GetAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.get", ActivityKind.Internal);
         activity?.SetTag("botnexus.session.id", sessionId);
@@ -68,7 +70,7 @@ public sealed class FileSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task<GatewaySession> GetOrCreateAsync(string sessionId, string agentId, CancellationToken cancellationToken = default)
+    public async Task<GatewaySession> GetOrCreateAsync(SessionId sessionId, AgentId agentId, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.get_or_create", ActivityKind.Internal);
         activity?.SetTag("botnexus.session.id", sessionId);
@@ -116,7 +118,7 @@ public sealed class FileSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task DeleteAsync(string sessionId, CancellationToken cancellationToken = default)
+    public async Task DeleteAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.delete", ActivityKind.Internal);
         activity?.SetTag("botnexus.session.id", sessionId);
@@ -134,7 +136,7 @@ public sealed class FileSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task ArchiveAsync(string sessionId, CancellationToken cancellationToken = default)
+    public async Task ArchiveAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -153,7 +155,7 @@ public sealed class FileSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<GatewaySession>> ListAsync(string? agentId = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<GatewaySession>> ListAsync(AgentId? agentId = null, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.list", ActivityKind.Internal);
         activity?.SetTag("botnexus.agent.id", agentId);
@@ -165,7 +167,7 @@ public sealed class FileSessionStore : ISessionStore
             var sessions = new List<GatewaySession>();
             foreach (var metaFile in _fileSystem.Directory.GetFiles(_storePath, "*.meta.json"))
             {
-                var sessionId = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(metaFile));
+                var sessionId = SessionId.From(Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(metaFile)));
                 var session = _cache.GetValueOrDefault(sessionId) ?? await LoadFromFileAsync(sessionId, cancellationToken).ConfigureAwait(false);
                 if (session is not null && (agentId is null || session.AgentId == agentId))
                     sessions.Add(session);
@@ -177,7 +179,7 @@ public sealed class FileSessionStore : ISessionStore
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<GatewaySession>> ListByChannelAsync(
-        string agentId,
+        AgentId agentId,
         ChannelKey channelType,
         CancellationToken cancellationToken = default)
     {
@@ -191,7 +193,7 @@ public sealed class FileSessionStore : ISessionStore
             var sessions = new List<GatewaySession>();
             foreach (var metaFile in _fileSystem.Directory.GetFiles(_storePath, "*.meta.json"))
             {
-                var sessionId = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(metaFile));
+                var sessionId = SessionId.From(Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(metaFile)));
                 var session = _cache.GetValueOrDefault(sessionId) ?? await LoadFromFileAsync(sessionId, cancellationToken).ConfigureAwait(false);
                 if (session is null || session.ChannelType is null)
                     continue;
@@ -207,7 +209,7 @@ public sealed class FileSessionStore : ISessionStore
         finally { _lock.Release(); }
     }
 
-    private async Task<GatewaySession?> LoadFromFileAsync(string sessionId, CancellationToken cancellationToken)
+    private async Task<GatewaySession?> LoadFromFileAsync(SessionId sessionId, CancellationToken cancellationToken)
     {
         var metaPath = GetMetaPath(sessionId);
         if (!_fileSystem.File.Exists(metaPath)) return null;
@@ -287,14 +289,14 @@ public sealed class FileSessionStore : ISessionStore
         await _fileSystem.File.WriteAllTextAsync(metaPath, metaJson, cancellationToken).ConfigureAwait(false);
     }
 
-    private string GetHistoryPath(string sessionId) => Path.Combine(_storePath, $"{SanitizeFileName(sessionId)}.jsonl");
-    private string GetMetaPath(string sessionId) => Path.Combine(_storePath, $"{SanitizeFileName(sessionId)}.meta.json");
+    private string GetHistoryPath(SessionId sessionId) => Path.Combine(_storePath, $"{SanitizeFileName(sessionId)}.jsonl");
+    private string GetMetaPath(SessionId sessionId) => Path.Combine(_storePath, $"{SanitizeFileName(sessionId)}.meta.json");
 
     private static string SanitizeFileName(string name) => Uri.EscapeDataString(name);
 
-    private static SessionType InferSessionType(string sessionId, ChannelKey? channelType)
+    private static SessionType InferSessionType(SessionId sessionId, ChannelKey? channelType)
     {
-        if (sessionId.Contains("::subagent::", StringComparison.OrdinalIgnoreCase))
+        if (sessionId.IsSubAgent)
             return SessionType.AgentSubAgent;
 
         if (channelType.HasValue && string.Equals(channelType.Value, "cron", StringComparison.OrdinalIgnoreCase))
@@ -304,7 +306,7 @@ public sealed class FileSessionStore : ISessionStore
     }
 
     private sealed record SessionMeta(
-        string AgentId,
+        AgentId AgentId,
         ChannelKey? ChannelType,
         string? CallerId,
         SessionType? SessionType,

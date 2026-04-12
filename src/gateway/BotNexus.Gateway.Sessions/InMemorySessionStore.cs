@@ -12,11 +12,11 @@ namespace BotNexus.Gateway.Sessions;
 public sealed class InMemorySessionStore : ISessionStore
 {
     private static readonly ActivitySource ActivitySource = new("BotNexus.Gateway");
-    private readonly Dictionary<string, GatewaySession> _sessions = [];
+    private readonly Dictionary<SessionId, GatewaySession> _sessions = [];
     private readonly Lock _sync = new();
 
     /// <inheritdoc />
-    public Task<GatewaySession?> GetAsync(string sessionId, CancellationToken cancellationToken = default)
+    public Task<GatewaySession?> GetAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.get", ActivityKind.Internal);
         activity?.SetTag("botnexus.session.id", sessionId);
@@ -24,7 +24,7 @@ public sealed class InMemorySessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public Task<GatewaySession> GetOrCreateAsync(string sessionId, string agentId, CancellationToken cancellationToken = default)
+    public Task<GatewaySession> GetOrCreateAsync(SessionId sessionId, AgentId agentId, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.get_or_create", ActivityKind.Internal);
         activity?.SetTag("botnexus.session.id", sessionId);
@@ -56,7 +56,7 @@ public sealed class InMemorySessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public Task DeleteAsync(string sessionId, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.delete", ActivityKind.Internal);
         activity?.SetTag("botnexus.session.id", sessionId);
@@ -65,7 +65,7 @@ public sealed class InMemorySessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public Task ArchiveAsync(string sessionId, CancellationToken cancellationToken = default)
+    public Task ArchiveAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         lock (_sync)
         {
@@ -75,7 +75,7 @@ public sealed class InMemorySessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<GatewaySession>> ListAsync(string? agentId = null, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<GatewaySession>> ListAsync(AgentId? agentId = null, CancellationToken cancellationToken = default)
     {
         lock (_sync)
         {
@@ -88,7 +88,7 @@ public sealed class InMemorySessionStore : ISessionStore
 
     /// <inheritdoc />
     public Task<IReadOnlyList<GatewaySession>> ListByChannelAsync(
-        string agentId,
+        AgentId agentId,
         ChannelKey channelType,
         CancellationToken cancellationToken = default)
     {
@@ -103,9 +103,9 @@ public sealed class InMemorySessionStore : ISessionStore
         }
     }
 
-    private static SessionType InferSessionType(string sessionId, ChannelKey? channelType)
+    private static SessionType InferSessionType(SessionId sessionId, ChannelKey? channelType)
     {
-        if (sessionId.Contains("::subagent::", StringComparison.OrdinalIgnoreCase))
+        if (sessionId.IsSubAgent)
             return SessionType.AgentSubAgent;
 
         if (channelType.HasValue && string.Equals(channelType.Value, "cron", StringComparison.OrdinalIgnoreCase))
