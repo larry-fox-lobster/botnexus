@@ -169,6 +169,7 @@ public static class PlatformConfigLoader
         ValidatePath(config.Gateway?.SessionsDirectory, "gateway.sessionsDirectory", errors);
         ValidateSessionStore(config.Gateway?.SessionStore, errors);
         ValidateCors(config.Gateway?.Cors, errors);
+        ValidateCrossWorld(config.Gateway?.CrossWorld, errors);
 
         var logLevel = config.Gateway?.LogLevel;
         if (!string.IsNullOrWhiteSpace(logLevel) &&
@@ -295,6 +296,7 @@ public static class PlatformConfigLoader
         migrated |= TryMigrateObject(root, "cors", gateway.Cors, value => gateway.Cors = value);
         migrated |= TryMigrateObject(root, "rateLimit", gateway.RateLimit, value => gateway.RateLimit = value);
         migrated |= TryMigrateObject(root, "extensions", gateway.Extensions, value => gateway.Extensions = value);
+        migrated |= TryMigrateObject(root, "crossWorld", gateway.CrossWorld, value => gateway.CrossWorld = value);
 
         if (migrated || config.Gateway is not null)
             config.Gateway = gateway;
@@ -357,6 +359,72 @@ public static class PlatformConfigLoader
 
             if (string.IsNullOrWhiteSpace(channelConfig.Type))
                 errors.Add($"channels.{channelKey}.type is required (example: 'signalr' or 'slack').");
+        }
+    }
+
+    private static void ValidateCrossWorld(CrossWorldFederationConfig? crossWorld, List<string> errors)
+    {
+        if (crossWorld is null)
+            return;
+
+        if (crossWorld.Peers is not null)
+        {
+            foreach (var (peerKey, peerConfig) in crossWorld.Peers)
+            {
+                if (string.IsNullOrWhiteSpace(peerKey))
+                {
+                    errors.Add("gateway.crossWorld.peers contains an empty peer key.");
+                    continue;
+                }
+
+                if (!peerConfig.Enabled)
+                    continue;
+
+                var worldId = string.IsNullOrWhiteSpace(peerConfig.WorldId) ? peerKey : peerConfig.WorldId;
+                if (string.IsNullOrWhiteSpace(worldId))
+                    errors.Add($"gateway.crossWorld.peers.{peerKey}.worldId is required.");
+
+                if (string.IsNullOrWhiteSpace(peerConfig.Endpoint) ||
+                    !Uri.TryCreate(peerConfig.Endpoint, UriKind.Absolute, out var endpointUri) ||
+                    (endpointUri.Scheme != Uri.UriSchemeHttp && endpointUri.Scheme != Uri.UriSchemeHttps))
+                {
+                    errors.Add($"gateway.crossWorld.peers.{peerKey}.endpoint must be a valid http or https absolute URL.");
+                }
+            }
+        }
+
+        if (crossWorld.Agents is not null)
+        {
+            foreach (var (agentKey, agentConfig) in crossWorld.Agents)
+            {
+                if (string.IsNullOrWhiteSpace(agentKey))
+                    errors.Add("gateway.crossWorld.agents contains an empty key.");
+                if (string.IsNullOrWhiteSpace(agentConfig.WorldId))
+                    errors.Add($"gateway.crossWorld.agents.{agentKey}.worldId is required.");
+                if (string.IsNullOrWhiteSpace(agentConfig.AgentId))
+                    errors.Add($"gateway.crossWorld.agents.{agentKey}.agentId is required.");
+            }
+        }
+
+        if (crossWorld.Inbound is null || !crossWorld.Inbound.Enabled)
+            return;
+
+        if (crossWorld.Inbound.AllowedWorlds is null || crossWorld.Inbound.AllowedWorlds.Count == 0)
+        {
+            errors.Add("gateway.crossWorld.inbound.allowedWorlds must contain at least one world when inbound is enabled.");
+            return;
+        }
+
+        if (crossWorld.Inbound.ApiKeys is null)
+        {
+            errors.Add("gateway.crossWorld.inbound.apiKeys is required when inbound is enabled.");
+            return;
+        }
+
+        foreach (var worldId in crossWorld.Inbound.AllowedWorlds.Where(world => !string.IsNullOrWhiteSpace(world)))
+        {
+            if (!crossWorld.Inbound.ApiKeys.TryGetValue(worldId, out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+                errors.Add($"gateway.crossWorld.inbound.apiKeys.{worldId} is required for allowed inbound world '{worldId}'.");
         }
     }
 

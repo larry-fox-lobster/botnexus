@@ -16,6 +16,7 @@ using BotNexus.Gateway.Isolation;
 using BotNexus.Gateway.Routing;
 using BotNexus.Gateway.Sessions;
 using BotNexus.Gateway.Security;
+using BotNexus.Gateway.Federation;
 using BotNexus.Channels.Core;
 using BotNexus.Extensions.Skills;
 using BotNexus.Memory;
@@ -100,6 +101,14 @@ public static class GatewayServiceCollectionExtensions
         services.AddSingleton<IAgentSupervisor, DefaultAgentSupervisor>();
         services.AddSingleton<IAgentCommunicator, DefaultAgentCommunicator>();
         services.AddSingleton<IAgentConversationService, AgentConversationService>();
+        services.AddSingleton<CrossWorldInboundAuthService>();
+        services.TryAddSingleton<CrossWorldChannelOptions>();
+        services.AddSingleton<CrossWorldChannelAdapter>(serviceProvider =>
+            new CrossWorldChannelAdapter(
+                serviceProvider.GetRequiredService<ILogger<CrossWorldChannelAdapter>>(),
+                serviceProvider.GetService<HttpClient>() ?? new HttpClient(),
+                serviceProvider.GetService<CrossWorldChannelOptions>()));
+        services.AddSingleton<IChannelAdapter>(serviceProvider => serviceProvider.GetRequiredService<CrossWorldChannelAdapter>());
         services.AddSingleton<ISubAgentManager, DefaultSubAgentManager>();
         services.TryAddSingleton<SessionLifecycleEvents>();
         services.TryAddSingleton<ISessionLifecycleEvents>(serviceProvider =>

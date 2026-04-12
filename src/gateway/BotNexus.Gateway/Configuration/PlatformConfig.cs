@@ -86,6 +86,8 @@ public sealed class GatewaySettingsConfig
     public WorldIdentity? World { get; set; }
     /// <summary>Optional explicit cross-world communication permissions.</summary>
     public List<CrossWorldPermissionConfig>? CrossWorldPermissions { get; set; }
+    /// <summary>Cross-world federation settings for gateway-to-gateway communication.</summary>
+    public CrossWorldFederationConfig? CrossWorld { get; set; }
 }
 
 /// <summary>Configuration for granting communication with another world.</summary>
@@ -102,6 +104,61 @@ public sealed class CrossWorldPermissionConfig
 
     /// <summary>Whether outbound communication to the target world is allowed.</summary>
     public bool AllowOutbound { get; set; } = true;
+}
+
+/// <summary>Cross-world federation runtime configuration.</summary>
+public sealed class CrossWorldFederationConfig
+{
+    /// <summary>Known peer gateways keyed by world ID or alias.</summary>
+    public Dictionary<string, CrossWorldPeerConfig>? Peers { get; set; }
+
+    /// <summary>Inbound cross-world relay policy.</summary>
+    public CrossWorldInboundConfig? Inbound { get; set; }
+
+    /// <summary>Optional explicit cross-world agent discovery map.</summary>
+    public Dictionary<string, CrossWorldAgentConfig>? Agents { get; set; }
+}
+
+/// <summary>Outbound peer gateway settings.</summary>
+public sealed class CrossWorldPeerConfig
+{
+    /// <summary>Canonical world ID for this peer (defaults to dictionary key).</summary>
+    public string? WorldId { get; set; }
+
+    /// <summary>Peer gateway endpoint URL.</summary>
+    public string? Endpoint { get; set; }
+
+    /// <summary>Shared API key used for gateway-to-gateway relay authentication.</summary>
+    public string? ApiKey { get; set; }
+
+    /// <summary>Whether this peer is enabled for outbound calls.</summary>
+    public bool Enabled { get; set; } = true;
+}
+
+/// <summary>Inbound cross-world relay authentication and allow-list policy.</summary>
+public sealed class CrossWorldInboundConfig
+{
+    /// <summary>Whether inbound relay endpoint is enabled.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>Allowed source world IDs. Empty means no source worlds are allowed.</summary>
+    public List<string>? AllowedWorlds { get; set; }
+
+    /// <summary>Shared API keys keyed by source world ID.</summary>
+    public Dictionary<string, string>? ApiKeys { get; set; }
+}
+
+/// <summary>Explicit cross-world agent discovery record.</summary>
+public sealed class CrossWorldAgentConfig
+{
+    /// <summary>Target world hosting the agent.</summary>
+    public string? WorldId { get; set; }
+
+    /// <summary>Remote agent ID within the target world.</summary>
+    public string? AgentId { get; set; }
+
+    /// <summary>Optional operator-facing description.</summary>
+    public string? Description { get; set; }
 }
 
 /// <summary>CORS settings for gateway HTTP endpoints.</summary>
