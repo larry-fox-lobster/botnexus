@@ -156,13 +156,7 @@ public sealed class SessionWarmupService : ISessionWarmupService, IHostedService
         var maxSessions = Math.Max(0, options.MaxSessionsPerAgent);
 
         var sessions = await _sessionStore.ListAsync(AgentId.From(agentId), ct);
-        var summaries = sessions
-            .Where(session =>
-                session.SessionType.Equals(SessionType.UserAgent)
-                && (session.Status == GatewaySessionStatus.Active
-                    || session.Status == GatewaySessionStatus.Suspended
-                    || session.Status == GatewaySessionStatus.Sealed)
-                && session.UpdatedAt >= updatedAfter)
+        var summaries = GetVisibleSessionsAsync(sessions, updatedAfter)
             .OrderByDescending(static session => session.UpdatedAt)
             .Take(maxSessions)
             .Select(static session => new SessionSummary(
@@ -177,5 +171,47 @@ public sealed class SessionWarmupService : ISessionWarmupService, IHostedService
 
         _logger.LogDebug("Session warmup cache refreshed for agent {AgentId}: {Count} sessions", agentId, summaries.Count);
         return summaries;
+    }
+
+    private static IEnumerable<GatewaySession> GetVisibleSessionsAsync(IEnumerable<GatewaySession> sessions, DateTimeOffset updatedAfter)
+    {
+        var visibleCandidates = sessions
+            .Where(session =>
+                session.SessionType.Equals(SessionType.UserAgent)
+                && (session.Status == GatewaySessionStatus.Active
+                    || session.Status == GatewaySessionStatus.Suspended
+                    || session.Status == GatewaySessionStatus.Sealed)
+                && session.UpdatedAt >= updatedAfter)
+            .ToArray();
+
+        var visible = visibleCandidates
+            .Where(static session => !session.ChannelType.HasValue)
+            .ToList();
+
+        foreach (var channelSessions in visibleCandidates
+                     .Where(static session => session.ChannelType.HasValue)
+                     .GroupBy(static session => session.ChannelType!.Value))
+        {
+            var mostRecentActiveOrSuspended = channelSessions
+                .Where(session => session.Status == GatewaySessionStatus.Active || session.Status == GatewaySessionStatus.Suspended)
+                .OrderByDescending(static session => session.UpdatedAt)
+                .FirstOrDefault();
+
+            if (mostRecentActiveOrSuspended is not null)
+            {
+                visible.Add(mostRecentActiveOrSuspended);
+                continue;
+            }
+
+            var mostRecentSealed = channelSessions
+                .Where(session => session.Status == GatewaySessionStatus.Sealed)
+                .OrderByDescending(static session => session.UpdatedAt)
+                .FirstOrDefault();
+
+            if (mostRecentSealed is not null)
+                visible.Add(mostRecentSealed);
+        }
+
+        return visible;
     }
 }
