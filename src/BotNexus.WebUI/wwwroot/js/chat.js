@@ -650,6 +650,7 @@ function renderHistoryBatch(messages, sessionBoundaries, container) {
         }
     } finally {
         setBatchRenderingState(false);
+        applyToggleState(container);
     }
 }
 
@@ -1364,14 +1365,20 @@ export async function handleModelChange() {
 
 export function toggleToolVisibility() {
     showTools = dom.toggleTools.checked;
-    dom.chatMessages.querySelectorAll('.message.tool-call').forEach(el => {
-        el.classList.toggle('hidden', !showTools);
-    });
+    applyToggleState();
 }
 
 export function toggleThinkingVisibility() {
     showThinking = dom.toggleThinking.checked;
-    dom.chatMessages.querySelectorAll('.thinking-block').forEach(el => {
+    applyToggleState();
+}
+
+function applyToggleState(container = dom.chatMessages) {
+    container.querySelectorAll('.tool-call').forEach(el => {
+        el.classList.toggle('hidden', !showTools);
+    });
+    container.querySelectorAll('.thinking-block').forEach(el => {
+        el.classList.toggle('hidden', !showThinking);
         el.classList.toggle('collapsed', !showThinking);
         const toggle = el.querySelector('.thinking-toggle');
         if (toggle) {
