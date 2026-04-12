@@ -8,6 +8,7 @@ using SessionType = BotNexus.Domain.Primitives.SessionType;
 using SessionParticipant = BotNexus.Domain.Primitives.SessionParticipant;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
+using BotNexus.Sessions.Common;
 using Microsoft.Extensions.Logging;
 
 namespace BotNexus.Gateway.Sessions;
@@ -173,10 +174,11 @@ public sealed class FileSessionStore : SessionStoreBase
     private async Task<GatewaySession?> LoadFromFileAsync(SessionId sessionId, CancellationToken cancellationToken)
     {
         var metaPath = GetMetaPath(sessionId);
-        if (!_fileSystem.File.Exists(metaPath)) return null;
-
-        var metaJson = await _fileSystem.File.ReadAllTextAsync(metaPath, cancellationToken).ConfigureAwait(false);
-        var meta = JsonSerializer.Deserialize<SessionMeta>(metaJson, JsonOptions);
+        var meta = await SessionMetadataSidecar.ReadAsync<SessionMeta>(
+            _fileSystem,
+            metaPath,
+            JsonOptions,
+            cancellationToken).ConfigureAwait(false);
         if (meta is null) return null;
 
         var session = new GatewaySession
@@ -195,30 +197,16 @@ public sealed class FileSessionStore : SessionStoreBase
         session.SetStreamReplayState(meta.NextSequenceId, meta.StreamEvents);
 
         var historyPath = GetHistoryPath(sessionId);
-        if (_fileSystem.File.Exists(historyPath))
+        var entries = await SessionJsonl.ReadAllAsync<SessionEntry>(
+            _fileSystem,
+            historyPath,
+            JsonOptions,
+            _logger,
+            "session history",
+            cancellationToken).ConfigureAwait(false);
+        if (entries.Count > 0)
         {
-            var lines = await _fileSystem.File.ReadAllLinesAsync(historyPath, cancellationToken).ConfigureAwait(false);
-            var entries = new List<SessionEntry>();
-            foreach (var line in lines.Where(l => !string.IsNullOrWhiteSpace(l)))
-            {
-                try
-                {
-                    var entry = JsonSerializer.Deserialize<SessionEntry>(line, JsonOptions);
-                    if (entry is not null) entries.Add(entry);
-                }
-                catch (JsonException ex)
-                {
-                    _logger.LogWarning(ex, "Skipping malformed session history entry for session {SessionId}", sessionId);
-                }
-            }
-
-            var lastCompactionIndex = entries.FindLastIndex(entry => entry.IsCompactionSummary);
-            if (lastCompactionIndex >= 0)
-                entries = entries.GetRange(lastCompactionIndex, entries.Count - lastCompactionIndex);
-
-            if (entries.Count > 0)
-                session.AddEntries(entries);
-
+            session.AddEntries(SessionCompaction.KeepFromLastCompaction(entries));
             session.UpdatedAt = meta.UpdatedAt;
         }
 
@@ -227,12 +215,14 @@ public sealed class FileSessionStore : SessionStoreBase
 
     private async Task WriteToFileAsync(GatewaySession session, CancellationToken cancellationToken)
     {
-        // Write history as JSONL
         var historyPath = GetHistoryPath(session.SessionId);
-        var lines = session.GetHistorySnapshot().Select(e => JsonSerializer.Serialize(e, JsonOptions));
-        await _fileSystem.File.WriteAllLinesAsync(historyPath, lines, cancellationToken).ConfigureAwait(false);
+        await SessionJsonl.WriteAllAsync(
+            _fileSystem,
+            historyPath,
+            session.GetHistorySnapshot(),
+            JsonOptions,
+            cancellationToken).ConfigureAwait(false);
 
-        // Write metadata sidecar
         var metaPath = GetMetaPath(session.SessionId);
         var meta = new SessionMeta(
             session.AgentId,
@@ -246,14 +236,16 @@ public sealed class FileSessionStore : SessionStoreBase
             session.ExpiresAt,
             session.NextSequenceId,
             [.. session.GetStreamEventSnapshot()]);
-        var metaJson = JsonSerializer.Serialize(meta, JsonOptions);
-        await _fileSystem.File.WriteAllTextAsync(metaPath, metaJson, cancellationToken).ConfigureAwait(false);
+        await SessionMetadataSidecar.WriteAsync(
+            _fileSystem,
+            metaPath,
+            meta,
+            JsonOptions,
+            cancellationToken).ConfigureAwait(false);
     }
 
-    private string GetHistoryPath(SessionId sessionId) => Path.Combine(_storePath, $"{SanitizeFileName(sessionId)}.jsonl");
-    private string GetMetaPath(SessionId sessionId) => Path.Combine(_storePath, $"{SanitizeFileName(sessionId)}.meta.json");
-
-    private static string SanitizeFileName(string name) => Uri.EscapeDataString(name);
+    private string GetHistoryPath(SessionId sessionId) => Path.Combine(_storePath, SessionFileNames.HistoryFileName(sessionId));
+    private string GetMetaPath(SessionId sessionId) => Path.Combine(_storePath, SessionFileNames.MetadataFileName(sessionId));
 
     private sealed record SessionMeta(
         AgentId AgentId,
