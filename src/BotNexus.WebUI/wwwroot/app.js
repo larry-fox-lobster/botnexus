@@ -1934,7 +1934,9 @@
         // Group sessions by agentId
         const sessionsByAgent = {};
         if (sessions) {
-            for (const s of sessions) {
+            for (let s of sessions) {
+                // Unwrap nested session property if present (GatewaySession serializes as { session: { ... } })
+                if (s.session && !s.agentId) s = { ...s.session, ...s };
                 const agentId = s.agentId || s.agentName || 'unknown';
                 if (!sessionsByAgent[agentId]) sessionsByAgent[agentId] = [];
                 sessionsByAgent[agentId].push(s);

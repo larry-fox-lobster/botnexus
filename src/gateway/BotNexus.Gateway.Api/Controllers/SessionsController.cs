@@ -43,12 +43,25 @@ public sealed class SessionsController : ControllerBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The list result.</returns>
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<GatewaySession>>> List([FromQuery] string? agentId, CancellationToken cancellationToken)
+    public async Task<ActionResult> List([FromQuery] string? agentId, CancellationToken cancellationToken)
     {
         AgentId? parsedAgentId = null;
         if (!string.IsNullOrWhiteSpace(agentId))
             parsedAgentId = AgentId.From(agentId);
-        return Ok(await _sessions.ListAsync(parsedAgentId, cancellationToken));
+        var sessions = await _sessions.ListAsync(parsedAgentId, cancellationToken);
+        var result = sessions.Select(s => new
+        {
+            sessionId = s.SessionId.Value,
+            agentId = s.AgentId.Value,
+            channelType = s.ChannelType?.Value,
+            status = s.Status.ToString(),
+            sessionType = s.SessionType.Value,
+            isInteractive = s.IsInteractive,
+            messageCount = s.MessageCount,
+            createdAt = s.CreatedAt,
+            updatedAt = s.UpdatedAt
+        });
+        return Ok(result);
     }
 
     /// <summary>Gets a specific session by ID.</summary>

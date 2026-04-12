@@ -22,9 +22,13 @@ public sealed class SessionsControllerTests
         await store.GetOrCreateAsync("s1", "agent-a");
         var controller = new SessionsController(store);
 
-        var result = await controller.List(null, CancellationToken.None);
+        var actionResult = await controller.List(null, CancellationToken.None);
 
-        ((result.Result as OkObjectResult)?.Value as IReadOnlyList<GatewaySession>).Should().HaveCount(1);
+        var okResult = actionResult as OkObjectResult;
+        okResult.Should().NotBeNull();
+        var sessions = okResult!.Value as IEnumerable<object>;
+        sessions.Should().NotBeNull();
+        sessions!.Count().Should().Be(1);
     }
 
     [Fact]
@@ -32,9 +36,9 @@ public sealed class SessionsControllerTests
     {
         var controller = new SessionsController(new InMemorySessionStore());
 
-        var result = await controller.Get("missing", CancellationToken.None);
+        var actionResult = await controller.Get("missing", CancellationToken.None);
 
-        result.Result.Should().BeOfType<NotFoundResult>();
+        actionResult.Result.Should().BeOfType<NotFoundResult>();
     }
 
     [Fact]
