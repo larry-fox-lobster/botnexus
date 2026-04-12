@@ -274,6 +274,23 @@ internal sealed class ResettableInMemorySessionStore : ISessionStore
         }
     }
 
+    public Task<IReadOnlyList<GatewaySession>> ListByChannelAsync(
+        string agentId,
+        string channelType,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedChannelType = NormalizeChannelKey(channelType);
+        lock (_sync)
+        {
+            var sessions = _sessions.Values
+                .Where(s => s.AgentId == agentId)
+                .Where(s => s.ChannelType is not null && NormalizeChannelKey(s.ChannelType) == normalizedChannelType)
+                .OrderByDescending(s => s.CreatedAt)
+                .ToList();
+            return Task.FromResult<IReadOnlyList<GatewaySession>>(sessions);
+        }
+    }
+
     public void Reset()
     {
         lock (_sync)
@@ -321,6 +338,14 @@ internal sealed class ResettableInMemorySessionStore : ISessionStore
                 };
             }
         }
+    }
+
+    private static string NormalizeChannelKey(string? raw)
+    {
+        var normalized = (raw ?? string.Empty).Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(normalized) || normalized is "signalr" or "web-chat")
+            return "web chat";
+        return normalized;
     }
 }
 

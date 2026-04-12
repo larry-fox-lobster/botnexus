@@ -167,6 +167,39 @@ public sealed class FileSessionStore : ISessionStore
         finally { _lock.Release(); }
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<GatewaySession>> ListByChannelAsync(
+        string agentId,
+        string channelType,
+        CancellationToken cancellationToken = default)
+    {
+        using var activity = ActivitySource.StartActivity("session.list_by_channel", ActivityKind.Internal);
+        activity?.SetTag("botnexus.agent.id", agentId);
+        activity?.SetTag("botnexus.channel.type", channelType);
+
+        var normalizedChannelType = NormalizeChannelKey(channelType);
+        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var sessions = new List<GatewaySession>();
+            foreach (var metaFile in _fileSystem.Directory.GetFiles(_storePath, "*.meta.json"))
+            {
+                var sessionId = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(metaFile));
+                var session = _cache.GetValueOrDefault(sessionId) ?? await LoadFromFileAsync(sessionId, cancellationToken).ConfigureAwait(false);
+                if (session is null || session.ChannelType is null)
+                    continue;
+
+                if (session.AgentId == agentId && NormalizeChannelKey(session.ChannelType) == normalizedChannelType)
+                    sessions.Add(session);
+            }
+
+            return sessions
+                .OrderByDescending(session => session.CreatedAt)
+                .ToList();
+        }
+        finally { _lock.Release(); }
+    }
+
     private async Task<GatewaySession?> LoadFromFileAsync(string sessionId, CancellationToken cancellationToken)
     {
         var metaPath = GetMetaPath(sessionId);
@@ -247,6 +280,14 @@ public sealed class FileSessionStore : ISessionStore
     private string GetMetaPath(string sessionId) => Path.Combine(_storePath, $"{SanitizeFileName(sessionId)}.meta.json");
 
     private static string SanitizeFileName(string name) => Uri.EscapeDataString(name);
+
+    private static string NormalizeChannelKey(string? raw)
+    {
+        var normalized = (raw ?? string.Empty).Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(normalized) || normalized is "signalr" or "web-chat")
+            return "web chat";
+        return normalized;
+    }
 
     private sealed record SessionMeta(
         string AgentId,

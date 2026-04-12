@@ -191,6 +191,62 @@ public sealed class SqliteSessionStore : ISessionStore
         finally { _lock.Release(); }
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<GatewaySession>> ListByChannelAsync(
+        string agentId,
+        string channelType,
+        CancellationToken cancellationToken = default)
+    {
+        using var activity = ActivitySource.StartActivity("session.list_by_channel", ActivityKind.Internal);
+        activity?.SetTag("botnexus.agent.id", agentId);
+        activity?.SetTag("botnexus.channel.type", channelType);
+
+        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
+            await using var connection = CreateConnection();
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT id
+                FROM sessions
+                WHERE agent_id = $agentId
+                  AND channel_type IS NOT NULL
+                  AND (
+                      CASE
+                          WHEN trim(lower(channel_type)) = ''
+                               OR lower(channel_type) = 'signalr'
+                               OR lower(channel_type) = 'web-chat'
+                          THEN 'web chat'
+                          ELSE lower(channel_type)
+                      END
+                  ) = $channelType
+                ORDER BY created_at DESC
+                """;
+            command.Parameters.AddWithValue("$agentId", agentId);
+            command.Parameters.AddWithValue("$channelType", NormalizeChannelKey(channelType));
+
+            var sessions = new List<GatewaySession>();
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var sessionId = reader.GetString(0);
+                var session = _cache.GetValueOrDefault(sessionId)
+                    ?? await LoadSessionAsync(connection, sessionId, cancellationToken).ConfigureAwait(false);
+                if (session is not null)
+                {
+                    _cache[sessionId] = session;
+                    sessions.Add(session);
+                }
+            }
+
+            return sessions;
+        }
+        finally { _lock.Release(); }
+    }
+
     private async Task EnsureCreatedAsync(CancellationToken cancellationToken)
     {
         if (_initialized)
@@ -402,5 +458,13 @@ public sealed class SqliteSessionStore : ISessionStore
             return [];
 
         return JsonSerializer.Deserialize<Dictionary<string, object?>>(metadataJson, JsonOptions) ?? [];
+    }
+
+    private static string NormalizeChannelKey(string? raw)
+    {
+        var normalized = (raw ?? string.Empty).Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(normalized) || normalized is "signalr" or "web-chat")
+            return "web chat";
+        return normalized;
     }
 }

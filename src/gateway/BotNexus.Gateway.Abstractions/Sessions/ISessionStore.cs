@@ -54,4 +54,13 @@ public interface ISessionStore
     /// <param name="agentId">If set, only returns sessions for this agent.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<IReadOnlyList<GatewaySession>> ListAsync(string? agentId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists sessions for a specific agent filtered by channel type,
+    /// ordered by created time descending (newest first).
+    /// </summary>
+    Task<IReadOnlyList<GatewaySession>> ListByChannelAsync(
+        string agentId,
+        string channelType,
+        CancellationToken cancellationToken = default);
 }

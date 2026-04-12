@@ -179,6 +179,42 @@ public sealed class SqliteSessionStoreTests
     }
 
     [Fact]
+    public async Task ListByChannelAsync_FiltersByAgentAndNormalizedChannel_OrderedByCreatedAtDesc()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        await store.SaveAsync(new GatewaySession
+        {
+            SessionId = "s-old",
+            AgentId = "agent-a",
+            ChannelType = "signalr",
+            CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-5)
+        });
+        await store.SaveAsync(new GatewaySession
+        {
+            SessionId = "s-new",
+            AgentId = "agent-a",
+            ChannelType = "web chat",
+            CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+        });
+        await store.SaveAsync(new GatewaySession
+        {
+            SessionId = "s-other-channel",
+            AgentId = "agent-a",
+            ChannelType = "telegram"
+        });
+        await store.SaveAsync(new GatewaySession
+        {
+            SessionId = "s-null-channel",
+            AgentId = "agent-a"
+        });
+
+        var sessions = await store.ListByChannelAsync("agent-a", "web-chat");
+
+        sessions.Select(s => s.SessionId).Should().Equal("s-new", "s-old");
+    }
+
+    [Fact]
     public async Task ConcurrentAccess_SavesAndLoadsWithoutCorruption()
     {
         using var fixture = new StoreFixture();

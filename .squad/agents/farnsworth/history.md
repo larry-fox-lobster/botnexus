@@ -194,3 +194,10 @@ Validation: `dotnet build src\gateway\BotNexus.Cli\BotNexus.Cli.csproj --nologo 
 - Added GatewayHub.SubscribeAll() and Subscribe(sessionId), and Connected capabilities.multiSession=true.
 - Updated SignalRHubTests hub factory for new warmup dependency.
 - Validation: dotnet build Q:\repos\botnexus --verbosity quiet (passed).
+
+## 2026-04-12T00:20:29Z — Wave 1 Infinite Scrollback API
+- Added ISessionStore.ListByChannelAsync and implemented it in InMemorySessionStore, FileSessionStore, SqliteSessionStore, plus test ResettableInMemorySessionStore.
+- Added ChannelHistoryController with GET /api/channels/{channelType}/agents/{agentId}/history implementing cross-session cursor pagination, oldest-first payload ordering, hasMore/nextCursor, and session boundary markers.
+- Added/updated tests for channel filtering + ordering and controller cursor behavior.
+- Validation: dotnet test (targeted Gateway tests) and dotnet build Q:\repos\botnexus --verbosity quiet passed.
+
