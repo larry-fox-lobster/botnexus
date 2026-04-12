@@ -20,6 +20,7 @@
   <Folder Name="/src/gateway/">
     <Project Path="src/gateway/BotNexus.Cli/BotNexus.Cli.csproj" />
     <Project Path="src/gateway/BotNexus.Gateway.Abstractions/BotNexus.Gateway.Abstractions.csproj" />
+    <Project Path="src/gateway/BotNexus.Gateway.Contracts/BotNexus.Gateway.Contracts.csproj" />
     <Project Path="src/gateway/BotNexus.Gateway/BotNexus.Gateway.csproj" />
     <Project Path="src/gateway/BotNexus.Gateway.Api/BotNexus.Gateway.Api.csproj" />
     <Project Path="src/gateway/BotNexus.Gateway.Sessions/BotNexus.Gateway.Sessions.csproj" />
