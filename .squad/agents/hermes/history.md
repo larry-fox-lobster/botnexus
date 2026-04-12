@@ -197,3 +197,9 @@
 - Validation:
   - dotnet build tests\BotNexus.Gateway.Tests --verbosity quiet ✅
   - dotnet test tests\BotNexus.Gateway.Tests --filter "FullyQualifiedName~FileWatcher" --verbosity minimal ✅ (10/10)
+## 2026-04-11T17:20:06-07:00 - Channel history + ListByChannel test coverage (Hermes)
+- Added 	ests/BotNexus.Gateway.Tests/Api/ChannelHistoryTests.cs with 10 endpoint contract/integration tests for cursor pagination, cross-session continuity, boundaries, empty-session skipping, ordering, limit behavior, and invalid cursor handling.
+- Added 	ests/BotNexus.Gateway.Tests/Sessions/ListByChannelTests.cs with 3 store-method tests for agent/channel filtering, created-at descending order, and null-channel exclusion.
+- Validation:
+  - dotnet build tests\BotNexus.Gateway.Tests --verbosity quiet ✅
+  - dotnet test tests\BotNexus.Gateway.Tests --filter "FullyQualifiedName~ChannelHistory|FullyQualifiedName~ListByChannel" --verbosity minimal ✅ (19/19)
