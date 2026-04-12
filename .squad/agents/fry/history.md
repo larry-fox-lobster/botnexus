@@ -303,3 +303,19 @@ The `showStreamingIndicator()` function appended an "Agent is thinking..." div t
 3. **Version-conditional finally:** Only the latest switch clears `sessionSwitchInProgress`. Stale calls' finally blocks are no-ops.
 
 **Pattern Established:** Async functions with global flag side effects must use version counters when re-entrant calls are possible. Reset all outgoing-session global state (flight flags, queue counts) at the START of a switch, not at the end — because end-of-stream events for the old session may never arrive.
+
+## cli-latest — Floating 'New messages' button when scrolled up
+
+**Commit:** 4ea3bfb — `feat(webui): add floating 'New messages' button when scrolled up`
+
+### Deliverables
+
+1. **HTML:** Added `<button id="btn-new-messages">` inside chat-view, after the existing scroll-to-bottom button.
+2. **CSS:** Styled as a centered floating pill — `rgba(88,166,255,0.9)` background, `border-radius: 20px`, `box-shadow`, hover scale effect. Mobile-responsive rule added.
+3. **JS — State tracking:** Added `newMessageCount` variable and `elNewMessages` DOM reference. Three helpers: `incrementNewMessageCount()`, `resetNewMessageCount()`, and extended `updateScrollButton()` to reset on natural scroll-to-bottom.
+4. **JS — Increment on message finalize:** `finalizeMessage()` calls `incrementNewMessageCount()` before `scrollToBottom()`. When user is scrolled up, button shows "↓ N new messages".
+5. **JS — Button click:** Calls `scrollToBottom(true)` + `resetNewMessageCount()` to dismiss.
+6. **JS — Session switch reset:** `openAgentTimeline()` calls `resetNewMessageCount()` during cleanup.
+
+**Files changed:** `index.html`, `styles.css`, `app.js` (3 files, +54 lines)
+**Validation:** `node --check app.js` passed.

@@ -332,3 +332,69 @@ Jon wants agents to be able to call `delay(seconds)` mid-session — e.g., "wait
 **Open Questions:** 3 (WebSocket progress events, per-agent max override, steering delivery semantics — all have recommended answers)
 
 **Deliverable:** `docs/planning/feature-agent-delay-tool/design-spec.md`
+
+---
+
+## File Watcher Tool — Spec + Implementation (2026-07-19)
+
+Jon requested `watch_file` — an `IAgentTool` that watches a file and completes when modified (with timeout). Reactive counterpart to `delay`.
+
+**Design Decisions:**
+- D1: `FileSystemWatcher` + `TaskCompletionSource` — OS-native events, no polling
+- D2: Debounce (500ms) — coalesces rapid saves from editors/formatters
+- D3: Linked cancellation — combines steering/abort token with timeout CTS
+- D4: Graceful results (not exceptions) on timeout/cancel — same pattern as DelayTool
+- D5: Event types: modified, created, deleted, any
+- D6: Path validation — must resolve under workspace (no system directories)
+
+**Tool Shape:**
+- Name: `watch_file`, params: `path` (required string), `timeout` (optional int, default 300), `event` (optional string, default "modified")
+- Returns: text result with event type, path, and elapsed seconds
+- On timeout/cancel: informational text result
+
+**Files Created:**
+- `docs/planning/feature-file-watcher-tool/design-spec.md`
+- `src/gateway/BotNexus.Gateway/Configuration/FileWatcherToolOptions.cs`
+- `src/gateway/BotNexus.Gateway/Tools/FileWatcherTool.cs`
+
+**Files Modified:**
+- `GatewayOptions.cs` — added `FileWatcherTool` property
+- `GatewayServiceCollectionExtensions.cs` — registered options + config binding
+- `InProcessIsolationStrategy.cs` — registered tool for all agents
+
+**Validation:** Build green (0 errors), all changes follow DelayTool pattern.
+---
+
+### Design Spec — Infinite Scrollback History (2025-07-24)
+
+**Requested by:** Jon Bullen
+**Commit:** `0476bee`
+**Status:** DRAFT — awaiting review
+
+Jon reported that clicking "Load earlier messages" wipes current messages from the DOM. Wrote design spec for proper infinite scrollback:
+
+- **Root cause:** `loadEarlierMessages` does `innerHTML = ''` (app.js:2203) then re-renders — destroys scroll position and event listeners
+- **New API:** `GET /api/channels/{channelType}/agents/{agentId}/history` with cursor-based cross-session pagination
+- **Cursor format:** `{sessionId}:{messageIndex}` — opaque to client, spans sessions automatically
+- **Client:** IntersectionObserver on sentinel element, prepend-without-jump pattern, single in-flight guard
+- **Session boundaries:** API returns `sessionBoundaries` array; client renders dividers at indicated positions
+- **Work breakdown:** Farnsworth (API), Bender (observer/fetch), Fry (dividers/UX), Hermes (tests)
+
+**File created:** `docs/planning/feature-infinite-scrollback/design-spec.md`
+
+---
+### Glob Pattern Support for File Access Permissions (2026-04-11)
+**Requested by:** Jon Bullen
+**Commits:** `5dc7fb6` (spec), `b8da733` (implementation)
+**Status:** COMPLETE — build green, 18/18 PathValidator tests passing
+
+Updated the per-agent file permission model to support glob patterns in AllowedReadPaths, AllowedWritePaths, and DeniedPaths:
+
+- **Spec update:** Added Glob Pattern Support section to `docs/planning/feature-tool-permission-model/design-spec.md` — pattern syntax table, matching rules, example config. Updated resolution rules (Rule 6), security considerations, and open questions to reflect glob support.
+- **Implementation:** `DefaultPathValidator.cs` — added `PathMatchesPattern`, `IsGlobPattern`, `ResolveGlobPath` methods. Glob patterns (containing `*` or `?`) use `FileSystemName.MatchesSimpleExpression` from `System.IO.Enumeration` (no extra NuGet). Non-glob paths retain existing directory-prefix matching. Forward-slash normalization avoids backslash escape conflicts.
+- **Tests:** 5 new tests — `GlobStar_MatchesAllUnderDirectory`, `GlobDoubleStar_MatchesRecursive`, `GlobInDeny_BlocksPattern`, `GlobAndLiteral_BothWork`, `GlobNoMatch_ReturnsFalse`.
+
+**Files changed:**
+- `docs/planning/feature-tool-permission-model/design-spec.md`
+- `src/gateway/BotNexus.Gateway/Security/DefaultPathValidator.cs`
+- `tests/BotNexus.Gateway.Tests/Security/PathValidatorTests.cs`

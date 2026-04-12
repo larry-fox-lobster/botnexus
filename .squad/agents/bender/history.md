@@ -258,3 +258,36 @@
 - Implemented DelayTool (delay) with required seconds, optional eason, argument validation, clamped wait bounds, Task.Delay execution, progress update callback, and graceful cancellation result text.
 - Registered delay config binding in gateway DI and added DelayTool to in-process agent tool assembly so it is available to all agents by default.
 - Validation: dotnet build Q:\repos\botnexus --verbosity quiet ✅
+
+### 2026-04-11 — Wave 2: Client-Side Infinite Scrollback (IntersectionObserver)
+
+**Status:** ✅ Complete
+**Commit:** 5ab9951
+**File:** `src/BotNexus.WebUI/wwwroot/app.js` — 129 insertions, 155 deletions
+
+**Removed:**
+- `loadEarlierMessages()` — broken nuke-and-rebuild function (wiped innerHTML, lost scroll position)
+- `loadOlderSessions()` — N+1 sequential session fetch function
+- "Load older sessions" button + click handler in `openAgentTimeline`
+- "Load earlier messages" button + click handler in `renderSessionMessages`
+
+**Added:**
+- `createSessionDividerEl(sessionId, timestamp)` — reusable divider element factory
+- `renderHistoryBatch(messages, sessionBoundaries, container)` — renders messages with boundary dividers at correct positions
+- `setupScrollbackObserver(channelType, agentId, initialCursor, initialHasMore)` — IntersectionObserver on sentinel element with 200px rootMargin preload
+- `showTopSpinner(sentinel)` / `hideTopSpinner(sentinel)` — loading indicator management
+- `showEndOfHistory(sentinel)` — "Beginning of conversation history" end state
+- `_scrollbackCleanups` Map — per-view observer lifecycle management
+
+**Changed:**
+- `openAgentTimeline()` cold path — replaced multi-session fetch + per-session render with single `GET /api/channels/{channelType}/agents/{agentId}/history?limit=50` call, followed by `renderHistoryBatch` + `setupScrollbackObserver`
+- `renderSessionDivider()` — refactored to use `createSessionDividerEl` helper
+
+**Key design:**
+- Cursor-based cross-session pagination (server handles session boundaries)
+- Scroll-jump prevention via `scrollHeight` delta on prepend
+- Single in-flight guard (`isFetching` flag) prevents concurrent fetches
+- Channel-switch safety: fetch callback discards response if active view changed
+- Observer cleanup per `(agentId, channelType)` key to prevent leaks
+
+**Validation:** `node --check` ✅, `dotnet build --verbosity quiet` ✅

@@ -32,6 +32,7 @@ Read it, then execute the full delivery cycle below.
 
 ### Phase 0 — Preparation
 - Read the design spec provided by the user
+- **Update the spec status to `in-progress`** — set the YAML frontmatter field `status: in-progress` and the body line `**Status**: In Progress`. This signals work has begun.
 - Read `.squad/ceremonies.md` to know which ceremonies are configured
 - Read `.squad/team.md`, `.squad/routing.md`, `.squad/casting/registry.json`
 - Identify which team members are relevant based on the spec's scope
@@ -60,6 +61,7 @@ Run every ceremony where `when: after` and the condition matches:
 ### Phase 4 — Final Assembly
 - Spawn Scribe for final session log, decision merge, history updates, and `now.md` refresh.
 - Run full solution build + all tests one final time.
+- **Update the spec status to `delivered`** — set the YAML frontmatter field `status: delivered` and the body line `**Status**: Delivered`. The user will review and promote to `done` separately.
 - Present delivery summary to the user: commits, test counts, agents involved, decisions made.
 
 ## Ceremony Execution Rules
@@ -81,3 +83,14 @@ Run every ceremony where `when: after` and the condition matches:
 ❌ Spawning only 1-2 agents when the wave calls for more — use full parallel fan-out
 ❌ Skipping Scribe between waves — every batch gets logged
 ❌ Skipping the final build+test verification — always confirm green before reporting done
+❌ Setting status to `done` — only the user sets that after their own review
+❌ Forgetting to update spec status — `in-progress` at Phase 0, `delivered` at Phase 4
+
+## Spec Status Lifecycle
+
+| Status | Set by | When |
+|---|---|---|
+| `draft` | Author / planning agent | Spec is written but not yet picked up |
+| `in-progress` | This prompt (Phase 0) | Squad begins delivery |
+| `delivered` | This prompt (Phase 4) | All waves complete, build green, docs updated |
+| `done` | User (manual review) | User confirms delivery meets expectations |
