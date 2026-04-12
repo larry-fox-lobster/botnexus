@@ -1,3 +1,5 @@
+using BotNexus.Gateway.Abstractions.Security;
+
 namespace BotNexus.Gateway.Abstractions.Models;
 
 /// <summary>
@@ -88,6 +90,9 @@ public sealed record AgentDescriptor
 
     /// <summary>Session access level for this agent's session tool. Defaults to "own".</summary>
     public string SessionAccessLevel { get; init; } = "own";
+
+    /// <summary>File system access policy for this agent. Null means workspace-only access.</summary>
+    public FileAccessPolicy? FileAccess { get; init; }
 
     /// <summary>Agent IDs this agent can view sessions for (when SessionAccessLevel is "allowlist").</summary>
     public IReadOnlyList<string> SessionAllowedAgents { get; init; } = [];

@@ -5,6 +5,7 @@ using BotNexus.AgentCore.Types;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Activity;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Isolation;
@@ -224,7 +225,7 @@ public sealed class SubAgentIntegrationTests
 
     private sealed class EmptyToolFactory : IAgentToolFactory
     {
-        public IReadOnlyList<IAgentTool> CreateTools(string workingDirectory) => [];
+        public IReadOnlyList<IAgentTool> CreateTools(string workingDirectory, IPathValidator? pathValidator = null) => [];
     }
 
     private sealed class TestWorkspaceManager : IAgentWorkspaceManager

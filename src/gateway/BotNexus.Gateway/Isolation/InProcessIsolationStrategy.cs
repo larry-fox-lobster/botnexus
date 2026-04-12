@@ -13,9 +13,11 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Hooks;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
+using BotNexus.Gateway.Security;
 using BotNexus.Gateway.Tools;
 using BotNexus.Providers.Core;
 using BotNexus.Providers.Core.Models;
@@ -93,7 +95,8 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         var enrichedSystemPrompt = await _contextBuilder.BuildSystemPromptAsync(descriptor, cancellationToken);
 
         var workspacePath = _workspaceManager.GetWorkspacePath(descriptor.AgentId);
-        var workspaceTools = _toolFactory.CreateTools(workspacePath);
+        var pathValidator = new DefaultPathValidator(descriptor.FileAccess, workspacePath);
+        var workspaceTools = _toolFactory.CreateTools(workspacePath, pathValidator);
         var workspaceToolNames = new HashSet<string>(workspaceTools.Select(tool => tool.Name), StringComparer.OrdinalIgnoreCase);
 
         IReadOnlyList<IAgentTool> selectedWorkspaceTools = descriptor.ToolIds.Count > 0
@@ -142,7 +145,7 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         tools.Add(new DelayTool(delayToolOptions));
 
         var fileWatcherToolOptions = _serviceProvider.GetService<IOptions<FileWatcherToolOptions>>() ?? Options.Create(new FileWatcherToolOptions());
-        tools.Add(new FileWatcherTool(fileWatcherToolOptions));
+        tools.Add(new FileWatcherTool(fileWatcherToolOptions, pathValidator));
 
         var subAgentOptions = _serviceProvider.GetService<IOptions<GatewayOptions>>()?.Value.SubAgents;
         var subAgentManager = _serviceProvider.GetService<ISubAgentManager>();
