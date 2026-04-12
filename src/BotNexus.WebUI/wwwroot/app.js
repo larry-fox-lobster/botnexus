@@ -1931,17 +1931,16 @@
             return;
         }
 
-        // Group sessions by agentId
+        // Group sessions by agentId (API returns flat array with agentId at top level)
         const sessionsByAgent = {};
         if (sessions) {
-            for (let s of sessions) {
-                // Unwrap nested session property if present (GatewaySession serializes as { session: { ... } })
-                if (s.session && !s.agentId) s = { ...s.session, ...s };
+            for (const s of sessions) {
                 const agentId = s.agentId || s.agentName || 'unknown';
                 if (!sessionsByAgent[agentId]) sessionsByAgent[agentId] = [];
                 sessionsByAgent[agentId].push(s);
             }
         }
+        console.log(`[loadSessions] ${agents.length} agents, ${(sessions || []).length} sessions, grouped into ${Object.keys(sessionsByAgent).length} agents`);
 
         // Build a fingerprint to detect actual changes
         const newFingerprint = JSON.stringify({
@@ -2072,7 +2071,8 @@
     async function openSession(sessionId, agentId) {
         // Opening a single session — load as timeline for this agent+channel
         const session = await fetchJson(`/sessions/${encodeURIComponent(sessionId)}`);
-        const channelType = session?.channelType || 'Web Chat';
+        // Normalize to display channel key for consistency with sidebar click paths
+        const channelType = normalizeChannelKey(session?.channelType || 'web chat');
         await openAgentTimeline(agentId, channelType, sessionId);
     }
 
@@ -2110,6 +2110,7 @@
             if (existingStore && existingStore.sessionId) {
                 const warm = storeManager.switchView(existingStore.sessionId);
                 const hasWarmContent = !!elChatMessages.querySelector('.history-sentinel');
+                console.log(`[openAgentTimeline] warm check: store=${existingStore.sessionId}, warm=${warm}, hasContent=${hasWarmContent}`);
                 if (warm && hasWarmContent) {
                     scrollToBottom();
                     elChatInput.focus();
@@ -2118,17 +2119,22 @@
                     fetchSubAgents();
                     return;
                 }
+            } else {
+                console.log(`[openAgentTimeline] no existing store for ${agentId}/${channelType}, cold start`);
             }
 
             // Cold start — fetch from channel history endpoint
             elChatMessages.innerHTML = '<div class="loading">Loading timeline...</div>';
 
+            // channelType may be display ("web chat") or hub ("signalr") — always convert to hub type for API calls
             const historyChannelType = toHubChannelType(channelType);
+            console.log(`[openAgentTimeline] cold fetch: agent=${agentId}, hubChannel=${historyChannelType}, displayChannel=${channelType}`);
             const data = await fetchJson(
-                `/api/channels/${encodeURIComponent(historyChannelType)}/agents/${encodeURIComponent(agentId)}/history?limit=50`
+                `/channels/${encodeURIComponent(historyChannelType)}/agents/${encodeURIComponent(agentId)}/history?limit=50`
             );
 
             if (!data || !data.messages || data.messages.length === 0) {
+                console.log(`[openAgentTimeline] no messages returned for ${agentId}/${historyChannelType}`);
                 elChatMessages.innerHTML = '';
                 elChatMeta.textContent = `Agent: ${agentId} · No messages yet`;
                 storeManager.setActiveView(null, agentId, channelType);
@@ -2138,6 +2144,8 @@
                 elChatInput.focus();
                 return;
             }
+
+            console.log(`[openAgentTimeline] loaded ${data.messages.length} messages, hasMore=${data.hasMore}, cursor=${data.nextCursor}`);
 
             // Use the newest message's session as the active session
             const latestSessionId = data.messages[data.messages.length - 1].sessionId;
@@ -2245,7 +2253,7 @@
 
             const historyChannelType = toHubChannelType(channelType);
             const data = await fetchJson(
-                `/api/channels/${encodeURIComponent(historyChannelType)}/agents/${encodeURIComponent(agentId)}/history?cursor=${encodeURIComponent(nextCursor)}&limit=50`
+                `/channels/${encodeURIComponent(historyChannelType)}/agents/${encodeURIComponent(agentId)}/history?cursor=${encodeURIComponent(nextCursor)}&limit=50`
             );
 
             // Discard if user switched away during fetch
