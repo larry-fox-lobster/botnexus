@@ -32,10 +32,10 @@ public sealed class SessionWarmupServiceTests
     {
         var now = DateTimeOffset.UtcNow;
         var activeRecent = CreateSession("active-recent", "agent-a", SessionStatus.Active, now.AddHours(-2));
-        var expiredRecent = CreateSession("expired-recent", "agent-a", SessionStatus.Expired, now.AddHours(-1));
+        var sealedRecent = CreateSession("sealed-recent", "agent-a", SessionStatus.Sealed, now.AddHours(-1));
         var activeOld = CreateSession("active-old", "agent-a", SessionStatus.Active, now.AddDays(-2));
 
-        var store = CreateSessionStore(activeRecent, expiredRecent, activeOld);
+        var store = CreateSessionStore(activeRecent, sealedRecent, activeOld);
         var service = CreateService(store.Object, CreateRegistry("agent-a"), new SessionWarmupOptions
         {
             Enabled = true,
@@ -46,8 +46,60 @@ public sealed class SessionWarmupServiceTests
         var sessions = await service.GetAvailableSessionsAsync(CancellationToken.None);
         var ids = sessions.Select(summary => summary.SessionId).ToList();
 
-        ids.Should().Contain(["active-recent", "expired-recent"]);
+        ids.Should().Contain(["active-recent", "sealed-recent"]);
         ids.Should().NotContain("active-old");
+    }
+
+    [Fact]
+    public async Task WarmupService_OnlyReturnsUserAgentSessions()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var userAgent = CreateSession("user-agent", "agent-a", SessionStatus.Active, now, BotNexus.Domain.Primitives.SessionType.UserAgent);
+        var soul = CreateSession("soul", "agent-a", SessionStatus.Active, now.AddMinutes(-1), BotNexus.Domain.Primitives.SessionType.Soul);
+        var cron = CreateSession("cron", "agent-a", SessionStatus.Active, now.AddMinutes(-2), BotNexus.Domain.Primitives.SessionType.Cron);
+        var subAgent = CreateSession("sub-agent", "agent-a", SessionStatus.Active, now.AddMinutes(-3), BotNexus.Domain.Primitives.SessionType.AgentSubAgent);
+        var agentSelf = CreateSession("agent-self", "agent-a", SessionStatus.Active, now.AddMinutes(-4), BotNexus.Domain.Primitives.SessionType.AgentSelf);
+        var agentAgent = CreateSession("agent-agent", "agent-a", SessionStatus.Active, now.AddMinutes(-5), BotNexus.Domain.Primitives.SessionType.AgentAgent);
+
+        var store = CreateSessionStore(userAgent, soul, cron, subAgent, agentSelf, agentAgent);
+        var service = CreateService(store.Object, CreateRegistry("agent-a"), new SessionWarmupOptions());
+
+        await service.StartAsync(CancellationToken.None);
+        var sessions = await service.GetAvailableSessionsAsync("agent-a", CancellationToken.None);
+
+        sessions.Select(summary => summary.SessionId).Should().ContainSingle().Which.Should().Be("user-agent");
+    }
+
+    [Fact]
+    public async Task WarmupService_HidesSealedChannelSessionWhenNewerActiveSiblingExists()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var oldSealed = CreateSession("sealed-old", "agent-a", SessionStatus.Sealed, now.AddMinutes(-10), channelType: BotNexus.Domain.Primitives.ChannelKey.From("telegram"));
+        var newActive = CreateSession("active-new", "agent-a", SessionStatus.Active, now.AddMinutes(-1), channelType: BotNexus.Domain.Primitives.ChannelKey.From("telegram"));
+
+        var store = CreateSessionStore(oldSealed, newActive);
+        var service = CreateService(store.Object, CreateRegistry("agent-a"), new SessionWarmupOptions());
+
+        await service.StartAsync(CancellationToken.None);
+        var sessions = await service.GetAvailableSessionsAsync("agent-a", CancellationToken.None);
+
+        sessions.Select(summary => summary.SessionId).Should().ContainSingle().Which.Should().Be("active-new");
+    }
+
+    [Fact]
+    public async Task WarmupService_ShowsMostRecentSealedWhenNoActiveSessionForChannel()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var sealedOld = CreateSession("sealed-old", "agent-a", SessionStatus.Sealed, now.AddMinutes(-15), channelType: BotNexus.Domain.Primitives.ChannelKey.From("telegram"));
+        var sealedNewest = CreateSession("sealed-newest", "agent-a", SessionStatus.Sealed, now.AddMinutes(-5), channelType: BotNexus.Domain.Primitives.ChannelKey.From("telegram"));
+
+        var store = CreateSessionStore(sealedOld, sealedNewest);
+        var service = CreateService(store.Object, CreateRegistry("agent-a"), new SessionWarmupOptions());
+
+        await service.StartAsync(CancellationToken.None);
+        var sessions = await service.GetAvailableSessionsAsync("agent-a", CancellationToken.None);
+
+        sessions.Select(summary => summary.SessionId).Should().ContainSingle().Which.Should().Be("sealed-newest");
     }
 
     [Fact]
@@ -55,9 +107,9 @@ public sealed class SessionWarmupServiceTests
     {
         var now = DateTimeOffset.UtcNow;
         var sessions = Enumerable.Range(1, 6)
-            .Select(index => CreateSession($"agent-a-{index}", "agent-a", SessionStatus.Active, now.AddMinutes(-index)))
+            .Select(index => CreateSession($"agent-a-{index}", "agent-a", SessionStatus.Active, now.AddMinutes(-index), channelType: BotNexus.Domain.Primitives.ChannelKey.From($"chan-a-{index}")))
             .Concat(Enumerable.Range(1, 6)
-                .Select(index => CreateSession($"agent-b-{index}", "agent-b", SessionStatus.Active, now.AddMinutes(-index))))
+                .Select(index => CreateSession($"agent-b-{index}", "agent-b", SessionStatus.Active, now.AddMinutes(-index), channelType: BotNexus.Domain.Primitives.ChannelKey.From($"chan-b-{index}"))))
             .ToArray();
 
         var store = CreateSessionStore(sessions);
@@ -155,13 +207,20 @@ public sealed class SessionWarmupServiceTests
         return registry.Object;
     }
 
-    private static GatewaySession CreateSession(string sessionId, string agentId, BotNexus.Gateway.Abstractions.Models.SessionStatus status, DateTimeOffset updatedAt)
+    private static GatewaySession CreateSession(
+        string sessionId,
+        string agentId,
+        BotNexus.Gateway.Abstractions.Models.SessionStatus status,
+        DateTimeOffset updatedAt,
+        BotNexus.Domain.Primitives.SessionType? sessionType = null,
+        BotNexus.Domain.Primitives.ChannelKey? channelType = null)
         => new()
         {
             SessionId = sessionId,
             AgentId = agentId,
             Status = status,
             UpdatedAt = updatedAt,
-            ExpiresAt = status == BotNexus.Gateway.Abstractions.Models.SessionStatus.Expired ? updatedAt : null
+            SessionType = sessionType ?? BotNexus.Domain.Primitives.SessionType.UserAgent,
+            ChannelType = channelType
         };
 }

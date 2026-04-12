@@ -77,33 +77,37 @@ public sealed class GatewayHub : Hub
 
     public async Task<object> Subscribe(string sessionId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+        var typedSessionId = ParseSessionId(sessionId);
 
         await Groups.AddToGroupAsync(
             Context.ConnectionId,
-            GetSessionGroup(sessionId),
+            GetSessionGroup(typedSessionId),
             Context.ConnectionAborted);
 
         return new
         {
-            sessionId,
+            sessionId = typedSessionId.Value,
             status = "subscribed"
         };
     }
 
     public async Task<object> JoinSession(string agentId, string? sessionId)
     {
-        sessionId ??= Guid.NewGuid().ToString("N");
-        _logger.LogInformation("Hub JoinSession: agent={AgentId} session={SessionId} connection={ConnectionId} group={Group}",
-            agentId, sessionId, Context.ConnectionId, GetSessionGroup(sessionId));
-        await Groups.AddToGroupAsync(Context.ConnectionId, GetSessionGroup(sessionId));
+        var typedAgentId = ParseAgentId(agentId);
+        var typedSessionId = string.IsNullOrWhiteSpace(sessionId)
+            ? SessionId.Create()
+            : ParseSessionId(sessionId);
 
-        var session = await _sessions.GetOrCreateAsync(SessionId.From(sessionId), AgentId.From(agentId), Context.ConnectionAborted);
+        _logger.LogInformation("Hub JoinSession: agent={AgentId} session={SessionId} connection={ConnectionId} group={Group}",
+            typedAgentId, typedSessionId, Context.ConnectionId, GetSessionGroup(typedSessionId));
+        await Groups.AddToGroupAsync(Context.ConnectionId, GetSessionGroup(typedSessionId), Context.ConnectionAborted);
+
+        var session = await _sessions.GetOrCreateAsync(typedSessionId, typedAgentId, Context.ConnectionAborted);
 
         var needsSave = false;
         if (session.Status == SessionStatus.Expired)
         {
-            _logger.LogInformation("Reactivating expired session {SessionId} on join", sessionId);
+            _logger.LogInformation("Reactivating expired session {SessionId} on join", typedSessionId);
             session.Status = SessionStatus.Active;
             session.ExpiresAt = null;
             needsSave = true;
@@ -133,8 +137,8 @@ public sealed class GatewayHub : Hub
 
         return new
         {
-            sessionId,
-            agentId,
+            sessionId = session.SessionId.Value,
+            agentId = session.AgentId.Value,
             connectionId = Context.ConnectionId,
             messageCount = session.History.Count,
             isResumed = session.History.Count > 0,
@@ -146,20 +150,26 @@ public sealed class GatewayHub : Hub
     }
 
     public Task LeaveSession(string sessionId)
-        => Groups.RemoveFromGroupAsync(Context.ConnectionId, GetSessionGroup(sessionId));
+        => Groups.RemoveFromGroupAsync(
+            Context.ConnectionId,
+            GetSessionGroup(ParseSessionId(sessionId)),
+            Context.ConnectionAborted);
 
     public Task SendMessage(string agentId, string sessionId, string content)
     {
+        var typedAgentId = ParseAgentId(agentId);
+        var typedSessionId = ParseSessionId(sessionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(content);
         _logger.LogInformation("Hub SendMessage: agent={AgentId} session={SessionId} connection={ConnectionId} content={Content}",
-            agentId, sessionId, Context.ConnectionId, content?.Length > 50 ? content[..50] + "..." : content);
+            typedAgentId, typedSessionId, Context.ConnectionId, content.Length > 50 ? content[..50] + "..." : content);
         return _dispatcher.DispatchAsync(
             new InboundMessage
             {
                 ChannelType = ChannelKey.From("signalr"),
                 SenderId = Context.ConnectionId,
-                ConversationId = sessionId,
-                SessionId = sessionId,
-                TargetAgentId = agentId,
+                ConversationId = typedSessionId.Value,
+                SessionId = typedSessionId.Value,
+                TargetAgentId = typedAgentId.Value,
                 Content = content,
                 Metadata = new Dictionary<string, object?> { ["messageType"] = "message" }
             },
@@ -167,14 +177,18 @@ public sealed class GatewayHub : Hub
     }
 
     public Task Steer(string agentId, string sessionId, string content)
-        => _dispatcher.DispatchAsync(
+    {
+        var typedAgentId = ParseAgentId(agentId);
+        var typedSessionId = ParseSessionId(sessionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(content);
+        return _dispatcher.DispatchAsync(
             new InboundMessage
             {
                 ChannelType = ChannelKey.From("signalr"),
                 SenderId = Context.ConnectionId,
-                ConversationId = sessionId,
-                SessionId = sessionId,
-                TargetAgentId = agentId,
+                ConversationId = typedSessionId.Value,
+                SessionId = typedSessionId.Value,
+                TargetAgentId = typedAgentId.Value,
                 Content = content,
                 Metadata = new Dictionary<string, object?>
                 {
@@ -183,32 +197,39 @@ public sealed class GatewayHub : Hub
                 }
             },
             CancellationToken.None);
+    }
 
     public Task FollowUp(string agentId, string sessionId, string content)
         => SendMessage(agentId, sessionId, content);
 
     public async Task Abort(string agentId, string sessionId)
     {
-        var instance = _supervisor.GetInstance(AgentId.From(agentId), SessionId.From(sessionId));
+        var typedAgentId = ParseAgentId(agentId);
+        var typedSessionId = ParseSessionId(sessionId);
+        var instance = _supervisor.GetInstance(typedAgentId, typedSessionId);
         if (instance is null)
             return;
 
-        var handle = await _supervisor.GetOrCreateAsync(AgentId.From(agentId), SessionId.From(sessionId), CancellationToken.None);
+        var handle = await _supervisor.GetOrCreateAsync(typedAgentId, typedSessionId, CancellationToken.None);
         await handle.AbortAsync(CancellationToken.None);
     }
 
     public async Task ResetSession(string agentId, string sessionId)
     {
-        await _supervisor.StopAsync(AgentId.From(agentId), SessionId.From(sessionId), CancellationToken.None);
-        await _sessions.ArchiveAsync(SessionId.From(sessionId), CancellationToken.None);
-        await Clients.Caller.SendAsync("SessionReset", new { agentId, sessionId });
+        var typedAgentId = ParseAgentId(agentId);
+        var typedSessionId = ParseSessionId(sessionId);
+        await _supervisor.StopAsync(typedAgentId, typedSessionId, CancellationToken.None);
+        await _sessions.ArchiveAsync(typedSessionId, CancellationToken.None);
+        await Clients.Caller.SendAsync("SessionReset", new { agentId = typedAgentId.Value, sessionId = typedSessionId.Value });
     }
 
     public async Task<object> CompactSession(string agentId, string sessionId)
     {
-        var session = await _sessions.GetAsync(SessionId.From(sessionId), CancellationToken.None);
+        _ = ParseAgentId(agentId);
+        var typedSessionId = ParseSessionId(sessionId);
+        var session = await _sessions.GetAsync(typedSessionId, CancellationToken.None);
         if (session is null)
-            throw new HubException($"Session '{sessionId}' not found.");
+            throw new HubException($"Session '{typedSessionId.Value}' not found.");
 
         var requestServices = Context.GetHttpContext()?.RequestServices;
         var compactor = requestServices?.GetService<ISessionCompactor>() ?? _compactor;
@@ -230,7 +251,7 @@ public sealed class GatewayHub : Hub
         => Task.FromResult(_registry.GetAll());
 
     public AgentInstance? GetAgentStatus(string agentId, string sessionId)
-        => _supervisor.GetInstance(AgentId.From(agentId), SessionId.From(sessionId));
+        => _supervisor.GetInstance(ParseAgentId(agentId), ParseSessionId(sessionId));
 
     public override async Task OnConnectedAsync()
     {
@@ -259,5 +280,22 @@ public sealed class GatewayHub : Hub
         await base.OnConnectedAsync();
     }
 
+    private static AgentId ParseAgentId(string agentId)
+    {
+        if (string.IsNullOrWhiteSpace(agentId))
+            throw new HubException("Agent ID is required.");
+
+        return AgentId.From(agentId);
+    }
+
+    private static SessionId ParseSessionId(string sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId))
+            throw new HubException("Session ID is required.");
+
+        return SessionId.From(sessionId);
+    }
+
+    private static string GetSessionGroup(SessionId sessionId) => $"session:{sessionId.Value}";
     private static string GetSessionGroup(string sessionId) => $"session:{sessionId}";
 }
