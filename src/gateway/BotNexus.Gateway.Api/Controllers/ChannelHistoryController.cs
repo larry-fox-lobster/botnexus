@@ -116,7 +116,9 @@ public sealed class ChannelHistoryController : ControllerBase
                     entry.Role,
                     entry.Content,
                     entry.Timestamp,
-                    EmptyMetadata));
+                    EmptyMetadata,
+                    entry.ToolName,
+                    entry.ToolCallId));
                 messageIndex++;
             }
         }
@@ -202,7 +204,9 @@ public sealed record ChannelHistoryMessage(
     MessageRole Role,
     string Content,
     DateTimeOffset Timestamp,
-    IReadOnlyDictionary<string, object?> Metadata);
+    IReadOnlyDictionary<string, object?> Metadata,
+    string? ToolName = null,
+    string? ToolCallId = null);
 
 /// <summary>
 /// Session boundary marker in a history page.
