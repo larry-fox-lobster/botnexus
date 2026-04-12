@@ -6,7 +6,7 @@ import {
     dom, $, initMarkdown, scrollToBottom, updateScrollButton, resetNewMessageCount,
     autoResize, setStatus, showConnectionBanner, hideConnectionBanner,
     showConfirm, closeConfirm, getConfirmCallback, showView, copyMessageContent,
-    toggleSidebar, closeSidebar, initSectionToggles
+    toggleSidebar, closeSidebar, initSectionToggles, setSidebarCollapsedState
 } from './ui.js';
 import {
     storeManager, getCurrentSessionId, getCurrentAgentId, isCurrentSessionStreaming
@@ -28,7 +28,10 @@ import {
     openToolModal, closeToolModal, handleModelChange,
     appendSystemMessage, initSubAgentPanel, openAgentTimeline
 } from './chat.js';
-import { getShowTools, getShowThinking, getLastContext } from './storage.js';
+import {
+    getShowTools, getShowThinking, getLastContext,
+    getSidebarCollapsed, setSidebarCollapsed
+} from './storage.js';
 
 // ── Gateway health check ────────────────────────────────────────────
 
@@ -195,8 +198,17 @@ function initEventListeners() {
 
     dom.btnSendMode.addEventListener('click', toggleSendMode);
 
-    dom.sidebarToggle.addEventListener('click', toggleSidebar);
-    dom.sidebarOverlay.addEventListener('click', closeSidebar);
+    dom.sidebarToggle.addEventListener('click', () => {
+        const isCollapsed = toggleSidebar();
+        setSidebarCollapsed(isCollapsed);
+    });
+    dom.sidebarOverlay.addEventListener('click', () => {
+        closeSidebar();
+        setSidebarCollapsed(true);
+    });
+    window.addEventListener('resize', () => {
+        setSidebarCollapsedState(dom.app.classList.contains('sidebar-collapsed'));
+    });
     window.addEventListener('popstate', () => { void handleHistoryNavigation(); });
 
     // Global keyboard shortcuts
@@ -275,12 +287,8 @@ function init() {
     initHub(registerEventHandlers);
     initSubAgentPanel();
     initVersionCheck();
+    setSidebarCollapsedState(getSidebarCollapsed());
     void restoreInitialView();
-
-    if (window.innerWidth <= 768) {
-        dom.sidebar.classList.add('collapsed');
-        dom.sidebarOverlay.classList.add('hidden');
-    }
 }
 
 if (document.readyState === 'loading') {
