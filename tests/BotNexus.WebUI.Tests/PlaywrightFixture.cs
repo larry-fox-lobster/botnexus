@@ -91,6 +91,9 @@ public sealed class PlaywrightFixture : IAsyncLifetime
     internal void SeedHistoricalSessions(string agentId, int additionalSessionCount)
         => _sessionStore?.SeedAdditionalSessions(agentId, additionalSessionCount);
 
+    internal void SeedScrollbackHistory(string agentId, int sessionCount, int entriesPerSession)
+        => _sessionStore?.SeedSessionsWithHistory(agentId, sessionCount, entriesPerSession);
+
     private async Task RestartInfrastructureAsync()
     {
         await DisposeInfrastructureAsync();
@@ -336,6 +339,44 @@ internal sealed class ResettableInMemorySessionStore : ISessionStore
                     CreatedAt = baseTime.AddMinutes(i),
                     UpdatedAt = baseTime.AddMinutes(i)
                 };
+            }
+        }
+    }
+
+    public void SeedSessionsWithHistory(string agentId, int sessionCount, int entriesPerSession)
+    {
+        if (sessionCount <= 0 || entriesPerSession <= 0)
+            return;
+
+        lock (_sync)
+        {
+            var baseTime = DateTimeOffset.UtcNow.AddHours(-sessionCount - 1);
+            for (var sessionOrdinal = 0; sessionOrdinal < sessionCount; sessionOrdinal++)
+            {
+                var createdAt = baseTime.AddHours(sessionOrdinal);
+                var sessionId = $"{agentId}-scrollback-{sessionOrdinal}-{Guid.NewGuid():N}";
+                var session = new GatewaySession
+                {
+                    SessionId = sessionId,
+                    AgentId = agentId,
+                    ChannelType = "web chat",
+                    CallerId = "playwright-tests",
+                    CreatedAt = createdAt,
+                    UpdatedAt = createdAt
+                };
+
+                for (var entryIndex = 0; entryIndex < entriesPerSession; entryIndex++)
+                {
+                    session.History.Add(new SessionEntry
+                    {
+                        Role = entryIndex % 2 == 0 ? "user" : "assistant",
+                        Content = $"{agentId}-s{sessionOrdinal}-m{entryIndex}",
+                        Timestamp = createdAt.AddSeconds(entryIndex)
+                    });
+                }
+
+                session.UpdatedAt = createdAt.AddSeconds(entriesPerSession + 1);
+                _sessions[sessionId] = session;
             }
         }
     }

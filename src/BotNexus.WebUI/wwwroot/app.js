@@ -2024,7 +2024,8 @@
         const existingStore = storeManager.findStoreForAgent(agentId, channelType);
         if (existingStore && existingStore.sessionId) {
             const warm = storeManager.switchView(existingStore.sessionId);
-            if (warm) {
+            const hasWarmContent = !!elChatMessages.querySelector('.history-sentinel');
+            if (warm && hasWarmContent) {
                 scrollToBottom();
                 elChatInput.focus();
                 updateSendButtonState();

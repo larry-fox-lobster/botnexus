@@ -203,3 +203,11 @@
 - Validation:
   - dotnet build tests\BotNexus.Gateway.Tests --verbosity quiet ✅
   - dotnet test tests\BotNexus.Gateway.Tests --filter "FullyQualifiedName~ChannelHistory|FullyQualifiedName~ListByChannel" --verbosity minimal ✅ (19/19)
+## 2026-04-12 - Scrollback Playwright E2E coverage (Hermes)
+- Added 	ests/BotNexus.WebUI.Tests/ScrollbackE2ETests.cs with 6 new tests for infinite scrollback UX: newest-at-bottom load, scroll-up pagination, session divider rendering, end-of-history marker, prepend no-jump behavior, and channel-switch reset behavior.
+- Extended PlaywrightFixture test store seeding with SeedScrollbackHistory / SeedSessionsWithHistory to create deterministic multi-session message history for E2E scenarios.
+- Updated WebUI scrollback marker class to include .end-of-history and adjusted timeline warm-cache guard in pp.js.
+- Validation:
+  - dotnet build tests\BotNexus.WebUI.Tests --verbosity quiet ✅
+  - $env:BOTNEXUS_RUN_PLAYWRIGHT_E2E = "1"; dotnet test tests\BotNexus.WebUI.Tests --filter "FullyQualifiedName~Scrollback" --verbosity minimal ❌ (6 total, 0 passed, 6 failed)
+- Failure detail: all new Scrollback tests currently fail; UI did not render expected scrollback sentinel/divider/end markers during test flow (timeouts and missing selectors).
