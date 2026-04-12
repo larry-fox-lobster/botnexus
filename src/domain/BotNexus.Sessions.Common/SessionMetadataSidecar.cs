@@ -3,6 +3,9 @@ using System.Text.Json;
 
 namespace BotNexus.Sessions.Common;
 
+/// <summary>
+/// Represents session metadata sidecar.
+/// </summary>
 public static class SessionMetadataSidecar
 {
     public static async Task WriteAsync<TMetadata>(

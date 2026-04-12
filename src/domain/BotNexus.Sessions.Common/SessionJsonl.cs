@@ -5,6 +5,9 @@ using Microsoft.Extensions.Logging;
 
 namespace BotNexus.Sessions.Common;
 
+/// <summary>
+/// Represents session jsonl.
+/// </summary>
 public static class SessionJsonl
 {
     public static async Task WriteAllAsync<TEntry>(

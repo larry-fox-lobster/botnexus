@@ -2,8 +2,16 @@ using BotNexus.Gateway.Abstractions.Models;
 
 namespace BotNexus.Sessions.Common;
 
+/// <summary>
+/// Represents session compaction.
+/// </summary>
 public static class SessionCompaction
 {
+    /// <summary>
+    /// Executes keep from last compaction.
+    /// </summary>
+    /// <param name="entries">The entries.</param>
+    /// <returns>The keep from last compaction result.</returns>
     public static IReadOnlyList<SessionEntry> KeepFromLastCompaction(IEnumerable<SessionEntry> entries)
     {
         var materialized = entries.ToList();
