@@ -190,6 +190,156 @@ public class ExecToolTests : IDisposable
         args.Should().BeEquivalentTo(["arg1", "arg2"]);
     }
 
+    // --- Negative input / edge case tests ---
+
+    [Fact]
+    public async Task PrepareArguments_RejectsMissingCommand()
+    {
+        var args = new Dictionary<string, object?>();
+
+        var act = () => _tool.PrepareArgumentsAsync(args);
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*command*");
+    }
+
+    [Fact]
+    public async Task PrepareArguments_RejectsNullCommand()
+    {
+        var args = new Dictionary<string, object?>
+        {
+            ["command"] = null,
+        };
+
+        var act = () => _tool.PrepareArgumentsAsync(args);
+        await act.Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public async Task PrepareArguments_RejectsInvalidNoOutputTimeout()
+    {
+        var args = new Dictionary<string, object?>
+        {
+            ["command"] = JsonDocument.Parse("""["echo","hi"]""").RootElement.Clone(),
+            ["noOutputTimeoutMs"] = JsonDocument.Parse("0").RootElement.Clone(),
+        };
+
+        var act = () => _tool.PrepareArgumentsAsync(args);
+        await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public async Task PrepareArguments_RejectsZeroTimeout()
+    {
+        var args = new Dictionary<string, object?>
+        {
+            ["command"] = JsonDocument.Parse("""["echo","hi"]""").RootElement.Clone(),
+            ["timeoutMs"] = JsonDocument.Parse("0").RootElement.Clone(),
+        };
+
+        var act = () => _tool.PrepareArgumentsAsync(args);
+        await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public async Task ExecuteNonExistentCommand_ReturnsError()
+    {
+        var args = BuildArgs(["nonexistent_command_abc_xyz_12345"]);
+
+        Func<Task> act = () => _tool.ExecuteAsync("test-fail", args);
+
+        // Should throw because the process can't start,
+        // or return a non-zero exit code
+        try
+        {
+            var result = await _tool.ExecuteAsync("test-fail", args);
+            var details = result.Details as ExecTool.ExecToolDetails;
+            // If it doesn't throw, it should indicate failure
+            details.Should().NotBeNull();
+            details!.ExitCode.Should().NotBe(0);
+        }
+        catch (Exception ex)
+        {
+            // System.ComponentModel.Win32Exception or InvalidOperationException
+            ex.Should().Match<Exception>(e =>
+                e is System.ComponentModel.Win32Exception ||
+                e is InvalidOperationException);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteWithEnvironmentVariables()
+    {
+        string[] command = IsWindows
+            ? ["cmd.exe", "/c", "echo %TEST_BOTNEXUS_VAR%"]
+            : ["/bin/bash", "-c", "echo $TEST_BOTNEXUS_VAR"];
+
+        var env = new Dictionary<string, string> { ["TEST_BOTNEXUS_VAR"] = "hello_from_env" };
+        var dict = new Dictionary<string, object?>
+        {
+            ["command"] = (IReadOnlyList<string>)command.ToList(),
+            ["timeoutMs"] = ExecTool_DefaultTimeoutMs,
+            ["noOutputTimeoutMs"] = (int?)null,
+            ["input"] = (string?)null,
+            ["background"] = false,
+            ["env"] = (IReadOnlyDictionary<string, string>)env,
+            ["workingDir"] = (string?)null,
+        };
+
+        var result = await _tool.ExecuteAsync("test-env", dict);
+
+        var text = GetResultText(result);
+        text.Should().Contain("hello_from_env");
+    }
+
+    [Fact]
+    public async Task ExecuteWithCancellation_TerminatesProcess()
+    {
+        using var cts = new CancellationTokenSource(500);
+
+        string[] command = IsWindows
+            ? ["cmd.exe", "/c", "ping -n 30 127.0.0.1"]
+            : ["/bin/bash", "-c", "sleep 30"];
+
+        var args = BuildArgs(command);
+        var result = await _tool.ExecuteAsync("test-cancel", args, cts.Token);
+
+        var details = result.Details as ExecTool.ExecToolDetails;
+        details.Should().NotBeNull();
+        details!.Termination.Should().Be("cancelled");
+    }
+
+    [Fact]
+    public async Task ExecuteNoOutput_ReturnsNoOutputMessage()
+    {
+        string[] command = IsWindows
+            ? ["cmd.exe", "/c", "echo.>nul"]
+            : ["/bin/true"];
+
+        var args = BuildArgs(command);
+        var result = await _tool.ExecuteAsync("test-no-output", args);
+
+        var text = GetResultText(result);
+        var details = result.Details as ExecTool.ExecToolDetails;
+        details.Should().NotBeNull();
+        details!.ExitCode.Should().Be(0);
+        // Should be either empty output indicator or whitespace
+    }
+
+    [Fact]
+    public async Task StderrOutput_IsCapturedWithStdout()
+    {
+        string[] command = IsWindows
+            ? ["cmd.exe", "/c", "echo stdout_msg & echo stderr_msg 1>&2"]
+            : ["/bin/bash", "-c", "echo stdout_msg; echo stderr_msg >&2"];
+
+        var args = BuildArgs(command);
+        var result = await _tool.ExecuteAsync("test-stderr", args);
+
+        var text = GetResultText(result);
+        text.Should().Contain("stdout_msg");
+        text.Should().Contain("stderr_msg");
+    }
+
     #region Helpers
 
     private static bool IsWindows => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);

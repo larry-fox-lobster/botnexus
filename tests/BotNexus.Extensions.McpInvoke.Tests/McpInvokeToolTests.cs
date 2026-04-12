@@ -243,4 +243,135 @@ public class McpInvokeToolTests
 
         await tool.DisposeAsync();
     }
+
+    // --- Negative input / edge case tests ---
+
+    [Fact]
+    public async Task Call_WithEmptyServerName_ReturnsError()
+    {
+        var config = new McpInvokeConfig();
+        var tool = new McpInvokeTool(config);
+
+        var args = new Dictionary<string, object?>
+        {
+            ["action"] = "call",
+            ["server"] = "",
+            ["tool"] = "search"
+        };
+        var result = await tool.ExecuteAsync("test-empty-server", args);
+
+        result.Content.Should().HaveCount(1);
+        result.Content[0].Value.Should().Contain("server");
+
+        await tool.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Call_WithWhitespaceOnlyServerName_ReturnsError()
+    {
+        var config = new McpInvokeConfig();
+        var tool = new McpInvokeTool(config);
+
+        var args = new Dictionary<string, object?>
+        {
+            ["action"] = "call",
+            ["server"] = "   ",
+            ["tool"] = "search"
+        };
+        var result = await tool.ExecuteAsync("test-ws-server", args);
+
+        result.Content.Should().HaveCount(1);
+        // Should indicate server is missing or not found
+        result.Content[0].Value.Should().NotBeNullOrEmpty();
+
+        await tool.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Call_WithNullAction_ReturnsError()
+    {
+        var config = new McpInvokeConfig();
+        var tool = new McpInvokeTool(config);
+
+        var args = new Dictionary<string, object?> { ["action"] = null };
+        var result = await tool.ExecuteAsync("test-null-action", args);
+
+        result.Content.Should().HaveCount(1);
+        result.Content[0].Value.Should().NotBeNullOrEmpty();
+
+        await tool.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Call_WithEmptyAction_ReturnsError()
+    {
+        var config = new McpInvokeConfig();
+        var tool = new McpInvokeTool(config);
+
+        var args = new Dictionary<string, object?> { ["action"] = "" };
+        var result = await tool.ExecuteAsync("test-empty-action", args);
+
+        result.Content.Should().HaveCount(1);
+        result.Content[0].Value.Should().Contain("Unknown action");
+
+        await tool.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ListTools_WithUnconfiguredServer_ReturnsError()
+    {
+        var config = new McpInvokeConfig { Servers = new() };
+        var tool = new McpInvokeTool(config);
+
+        var args = new Dictionary<string, object?>
+        {
+            ["action"] = "list_tools",
+            ["server"] = "nonexistent"
+        };
+        var result = await tool.ExecuteAsync("test-list-unconfigured", args);
+
+        result.Content.Should().HaveCount(1);
+        result.Content[0].Value.Should().Contain("not configured");
+
+        await tool.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task DisposeAsync_CanBeCalledMultipleTimes()
+    {
+        var config = new McpInvokeConfig();
+        var tool = new McpInvokeTool(config);
+
+        await tool.DisposeAsync();
+        await tool.DisposeAsync(); // should not throw
+    }
+
+    [Fact]
+    public async Task Call_WithEmptyArguments_ReturnsError()
+    {
+        var config = new McpInvokeConfig();
+        var tool = new McpInvokeTool(config);
+
+        var args = new Dictionary<string, object?>();
+        var result = await tool.ExecuteAsync("test-no-args", args);
+
+        result.Content.Should().HaveCount(1);
+        result.Content[0].Value.Should().NotBeNullOrEmpty();
+
+        await tool.DisposeAsync();
+    }
+
+    [Fact]
+    public void McpInvokeConfig_DefaultEnabled_IsTrue()
+    {
+        var config = new McpInvokeConfig();
+        config.Enabled.Should().BeTrue();
+    }
+
+    [Fact]
+    public void McpInvokeConfig_DefaultServers_IsNotNull()
+    {
+        var config = new McpInvokeConfig();
+        config.Servers.Should().NotBeNull();
+    }
 }

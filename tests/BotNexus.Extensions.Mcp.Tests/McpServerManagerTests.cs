@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+using BotNexus.Extensions.Mcp.Transport;
 using FluentAssertions;
 
 namespace BotNexus.Extensions.Mcp.Tests;
@@ -98,7 +100,7 @@ public class McpServerManagerTests
     }
 
     [Fact]
-    public async Task GetClients_ThrowsObjectDisposed_AfterDispose()
+    public async Task GetClients_ThrowsAfterDispose()
     {
         var manager = new McpServerManager();
         await manager.DisposeAsync();
@@ -108,13 +110,119 @@ public class McpServerManagerTests
     }
 
     [Fact]
-    public async Task StartServersAsync_ThrowsObjectDisposed_AfterDispose()
+    public async Task StartServersAsync_ThrowsAfterDispose()
     {
         var manager = new McpServerManager();
         await manager.DisposeAsync();
 
-        var config = new McpExtensionConfig();
+        var config = new McpExtensionConfig { Servers = new Dictionary<string, McpServerConfig>() };
         var act = () => manager.StartServersAsync(config);
         await act.Should().ThrowAsync<ObjectDisposedException>();
+    }
+
+    // --- Transport creation tests ---
+
+    [Fact]
+    public void CreateTransport_WithUrl_ReturnsHttpSseTransport()
+    {
+        var config = new McpServerConfig { Url = "http://localhost:8080/mcp" };
+        var transport = McpServerManager.CreateTransport(config);
+        transport.Should().NotBeNull();
+        transport.Should().BeOfType<HttpSseMcpTransport>();
+    }
+
+    [Fact]
+    public void CreateTransport_WithCommand_ReturnsStdioTransport()
+    {
+        var config = new McpServerConfig { Command = "node", Args = ["server.js"] };
+        var transport = McpServerManager.CreateTransport(config);
+        transport.Should().NotBeNull();
+        transport.Should().BeOfType<StdioMcpTransport>();
+    }
+
+    [Fact]
+    public void CreateTransport_WithNoCommandOrUrl_ReturnsNull()
+    {
+        var config = new McpServerConfig();
+        var transport = McpServerManager.CreateTransport(config);
+        transport.Should().BeNull();
+    }
+
+    [Fact]
+    public void CreateTransport_WithEmptyUrl_ReturnsNull()
+    {
+        var config = new McpServerConfig { Url = "" };
+        var transport = McpServerManager.CreateTransport(config);
+        transport.Should().BeNull();
+    }
+
+    [Fact]
+    public void CreateTransport_WithWhitespaceUrl_ReturnsNull()
+    {
+        var config = new McpServerConfig { Url = "   " };
+        var transport = McpServerManager.CreateTransport(config);
+        transport.Should().BeNull();
+    }
+
+    [Fact]
+    public void CreateTransport_PrefersUrlOverCommand()
+    {
+        // When both URL and command are set, URL takes precedence
+        var config = new McpServerConfig
+        {
+            Url = "http://localhost:8080/mcp",
+            Command = "node",
+            Args = ["server.js"]
+        };
+        var transport = McpServerManager.CreateTransport(config);
+        transport.Should().BeOfType<HttpSseMcpTransport>();
+    }
+
+    [Fact]
+    public async Task StartServersAsync_WithInvalidCommand_SkipsAndContinues()
+    {
+        var manager = new McpServerManager();
+        var config = new McpExtensionConfig
+        {
+            Servers = new Dictionary<string, McpServerConfig>
+            {
+                ["bad"] = new McpServerConfig
+                {
+                    Command = "nonexistent_program_that_does_not_exist_abc_xyz",
+                    InitTimeoutMs = 2000
+                },
+            },
+        };
+
+        // Should not throw — bad servers are skipped with warnings
+        var tools = await manager.StartServersAsync(config);
+        tools.Should().BeEmpty();
+        manager.GetClients().Should().BeEmpty();
+
+        await manager.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task StartServersAsync_WithShortTimeout_SkipsSlowServer()
+    {
+        var manager = new McpServerManager();
+        var config = new McpExtensionConfig
+        {
+            Servers = new Dictionary<string, McpServerConfig>
+            {
+                ["slow"] = new McpServerConfig
+                {
+                    // Use a command that exists but will never complete MCP init
+                    Command = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "cmd.exe" : "/bin/cat",
+                    Args = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ["/c", "ping -n 30 127.0.0.1"] : [],
+                    InitTimeoutMs = 500
+                },
+            },
+        };
+
+        var tools = await manager.StartServersAsync(config);
+        tools.Should().BeEmpty("server should time out during init");
+
+        await manager.DisposeAsync();
     }
 }
