@@ -3,8 +3,8 @@ using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
-using Microsoft.Extensions.Logging;
 using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
+using Microsoft.Extensions.Logging;
 
 namespace BotNexus.Gateway.Agents;
 
