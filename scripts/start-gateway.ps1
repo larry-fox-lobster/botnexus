@@ -39,7 +39,7 @@ function Test-PortAvailable {
 }
 
 function Build-Gateway {
-    Write-Host "🔧 Building solution (Release)..."
+    Write-Host "[build] Building solution (Release)..."
     dotnet build $solution -c Release --nologo --tl:off
     if ($LASTEXITCODE -ne 0) {
         throw "Gateway API build failed."
@@ -51,13 +51,13 @@ function Build-Gateway {
 }
 
 function Deploy-Extensions {
-    Write-Host "📦 Deploying extensions..."
+    Write-Host "[deploy] Deploying extensions..."
     $deployScript = Join-Path $PSScriptRoot "deploy-extensions.ps1"
     if (Test-Path $deployScript) {
         & $deployScript -Configuration Release
     }
     else {
-        Write-Host "⚠️  deploy-extensions.ps1 not found — skipping extension deployment." -ForegroundColor Yellow
+        Write-Host "WARNING: deploy-extensions.ps1 not found - skipping extension deployment." -ForegroundColor Yellow
     }
 }
 
@@ -65,7 +65,7 @@ function Wait-ForRestartOrAbort {
     param([int]$Seconds = 5)
 
     Write-Host ""
-    Write-Host "🔄 Gateway will restart in $Seconds seconds. Press 'q' to quit instead." -ForegroundColor Yellow
+    Write-Host "[restart] Gateway will restart in $Seconds seconds. Press 'q' to quit instead." -ForegroundColor Yellow
 
     for ($i = $Seconds; $i -gt 0; $i--) {
         Write-Host "`r   Restarting in $i... " -NoNewline
@@ -114,13 +114,16 @@ public static class CtrlCHandler {
     public static void OnCancel(object sender, ConsoleCancelEventArgs e) {
         e.Cancel = true;   // keep PowerShell alive
         Pressed = true;    // signal the run loop
-        // The child shares the console — it already received Ctrl+C
+        // The child shares the console and already received Ctrl+C
         // and will begin graceful shutdown on its own.
     }
 }
 "@
 
-$cancelHandler = [System.ConsoleCancelEventHandler]([CtrlCHandler]::OnCancel)
+$cancelHandler = [System.ConsoleCancelEventHandler]{
+    param($sender, $e)
+    [CtrlCHandler]::OnCancel($sender, $e)
+}
 [Console]::add_CancelKeyPress($cancelHandler)
 
 function Stop-GatewayGracefully {
@@ -129,7 +132,7 @@ function Stop-GatewayGracefully {
     if (-not $p -or $p.HasExited) { return }
     # Wait for the process to finish its graceful shutdown
     if (-not $p.WaitForExit($TimeoutSeconds * 1000)) {
-        Write-Host "⚠️  Gateway did not exit within $TimeoutSeconds seconds — force-killing." -ForegroundColor Red
+        Write-Host "WARNING: Gateway did not exit within $TimeoutSeconds seconds - force-killing." -ForegroundColor Red
         try { $p.Kill($true) } catch { }
     }
 }
@@ -152,7 +155,7 @@ function Start-Gateway {
 try {
     while ($true) {
         Write-Host ""
-        Write-Host "🚀 Starting Gateway API"
+        Write-Host "[start] Starting Gateway API"
         Write-Host "   URL:         $gatewayUrl"
         Write-Host "   Environment: $($env:ASPNETCORE_ENVIRONMENT)"
         Write-Host ""
@@ -165,7 +168,7 @@ try {
         }
 
         Write-Host ""
-        Write-Host "⏹️  Gateway process exited (code $exitCode)." -ForegroundColor Cyan
+        Write-Host "[stop] Gateway process exited (code $exitCode)." -ForegroundColor Cyan
 
         if (-not (Wait-ForRestartOrAbort -Seconds 5)) {
             break
@@ -176,7 +179,7 @@ try {
             Build-Gateway
         }
         catch {
-            Write-Host "❌ Build failed: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "ERROR: Build failed: $($_.Exception.Message)" -ForegroundColor Red
             if (-not (Wait-ForRestartOrAbort -Seconds 5)) {
                 break
             }
