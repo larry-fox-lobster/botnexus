@@ -6,6 +6,7 @@ const PREFIX = 'botnexus:';
 
 const KEYS = {
     collapsedAgents: `${PREFIX}collapsed-agents`,
+    sidebarCollapsed: `${PREFIX}sidebar-collapsed`,
     showTools: `${PREFIX}show-tools`,
     showThinking: `${PREFIX}show-thinking`,
     lastAgent: `${PREFIX}last-agent`,
@@ -59,6 +60,9 @@ export function setCollapsedAgents(agentSet) {
     setJson(KEYS.collapsedAgents, [...agentSet]);
 }
 
+export function getSidebarCollapsed() { return getBool(KEYS.sidebarCollapsed, false); }
+export function setSidebarCollapsed(v) { setBool(KEYS.sidebarCollapsed, v); }
+
 export function toggleAgentCollapsed(displayName, isCollapsed) {
     const set = getCollapsedAgents();
     if (isCollapsed) set.add(displayName);
@@ -75,6 +79,8 @@ export function getShowThinking() { return getBool(KEYS.showThinking, true); }
 export function setShowThinking(v) { setBool(KEYS.showThinking, v); }
 
 // ── Last Active Context (resume on reload) ─────────────────────────
+// Multi-tab note: this is only read at startup as a fallback when no hash
+// route is present. Runtime tab state remains in memory per-tab.
 
 export function getLastContext() {
     return {
