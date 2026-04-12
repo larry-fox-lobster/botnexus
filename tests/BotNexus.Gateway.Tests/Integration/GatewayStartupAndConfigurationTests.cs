@@ -164,6 +164,54 @@ public sealed class GatewayStartupAndConfigurationTests
     }
 
     [Fact]
+    public async Task GatewayApi_WorldEndpoint_ReturnsConfiguredWorldIdentity()
+    {
+        using var fixture = new GatewayStartupFixture();
+        fixture.WriteDefaultConfig("""
+            {
+              "gateway": {
+                "world": {
+                  "id": "local-dev",
+                  "name": "Local Development",
+                  "description": "Local development gateway",
+                  "emoji": "🏠"
+                }
+              }
+            }
+            """);
+
+        await fixture.WithEnvironmentAsync(async () =>
+        {
+            await using var factory = CreateTestFactory();
+            using var client = factory.CreateClient();
+
+            var world = await client.GetFromJsonAsync<JsonElement>("/api/world");
+
+            world.GetProperty("id").GetString().Should().Be("local-dev");
+            world.GetProperty("name").GetString().Should().Be("Local Development");
+            world.GetProperty("description").GetString().Should().Be("Local development gateway");
+            world.GetProperty("emoji").GetString().Should().Be("🏠");
+        });
+    }
+
+    [Fact]
+    public async Task GatewayApi_WorldEndpoint_WhenNotConfigured_ReturnsDefaults()
+    {
+        using var fixture = new GatewayStartupFixture();
+
+        await fixture.WithEnvironmentAsync(async () =>
+        {
+            await using var factory = CreateTestFactory();
+            using var client = factory.CreateClient();
+
+            var world = await client.GetFromJsonAsync<JsonElement>("/api/world");
+
+            world.GetProperty("id").GetString().Should().Be(Environment.MachineName);
+            world.GetProperty("name").GetString().Should().Be("BotNexus Gateway");
+        });
+    }
+
+    [Fact]
     public async Task GatewayConfiguration_UsesDefaultConfigPathWhenNoOverridesAreSet()
     {
         using var fixture = new GatewayStartupFixture();
