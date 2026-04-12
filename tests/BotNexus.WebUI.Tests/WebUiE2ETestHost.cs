@@ -121,6 +121,12 @@ internal sealed class WebUiE2ETestHost : IAsyncDisposable
         return _consoleMessages.Count(message => message.Contains(marker, StringComparison.Ordinal));
     }
 
+    public IReadOnlyList<string> GetHubInvocationMessages(string method)
+    {
+        var marker = $"[BotNexus:hub] → {method}";
+        return _consoleMessages.Where(message => message.Contains(marker, StringComparison.Ordinal)).ToArray();
+    }
+
     public async Task WaitForConsoleMessageAsync(string fragment, int timeoutMs = 15000)
     {
         var start = DateTimeOffset.UtcNow;

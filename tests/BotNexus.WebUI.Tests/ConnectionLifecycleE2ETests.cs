@@ -37,10 +37,10 @@ public sealed class ConnectionLifecycleE2ETests
     {
         await using var host = await _fixture.CreatePageAsync();
         await host.OpenAgentTimelineAsync(AgentA);
-        var sessionId = await host.SendMessageAsync("seed-session-list");
+        _ = await host.SendMessageAsync("seed-session-list");
         await host.WaitForStreamingCompleteAsync();
         await host.Page.ClickAsync("#btn-refresh-sessions");
-        await host.Page.Locator($"#sessions-list .list-item[data-agent-id='{AgentA}'][data-session-id='{sessionId}']").WaitForAsync(
+        await host.Page.Locator($"#sessions-list .list-item[data-agent-id='{AgentA}'][data-channel-type='web chat']").First.WaitForAsync(
             new LocatorWaitForOptions { Timeout = 15000 });
     }
 

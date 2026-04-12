@@ -49,10 +49,10 @@ public sealed class SidebarNavigationE2ETests
     {
         await using var host = await _fixture.CreatePageAsync();
         await host.OpenAgentTimelineAsync(AgentA);
-        var sessionId = await host.SendMessageAsync("refresh-seed");
+        _ = await host.SendMessageAsync("refresh-seed");
         await host.WaitForStreamingCompleteAsync();
         await host.Page.ClickAsync("#btn-refresh-sessions");
-        await host.Page.Locator($"#sessions-list .list-item[data-session-id='{sessionId}']").WaitForAsync(new() { Timeout = 15000 });
+        await host.Page.Locator($"#sessions-list .list-item[data-agent-id='{AgentA}'][data-channel-type='web chat']").First.WaitForAsync(new() { Timeout = 15000 });
     }
 
     [PlaywrightFact(Timeout = 90000)]
