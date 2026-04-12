@@ -3,8 +3,10 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
+using AgentId = BotNexus.Domain.Primitives.AgentId;
 using ChannelKey = BotNexus.Domain.Primitives.ChannelKey;
 using ParticipantType = BotNexus.Domain.Primitives.ParticipantType;
+using SessionId = BotNexus.Domain.Primitives.SessionId;
 using SessionParticipant = BotNexus.Domain.Primitives.SessionParticipant;
 using SessionType = BotNexus.Domain.Primitives.SessionType;
 using Microsoft.AspNetCore.SignalR;
@@ -96,7 +98,7 @@ public sealed class GatewayHub : Hub
             agentId, sessionId, Context.ConnectionId, GetSessionGroup(sessionId));
         await Groups.AddToGroupAsync(Context.ConnectionId, GetSessionGroup(sessionId));
 
-        var session = await _sessions.GetOrCreateAsync(sessionId, agentId, Context.ConnectionAborted);
+        var session = await _sessions.GetOrCreateAsync(SessionId.From(sessionId), AgentId.From(agentId), Context.ConnectionAborted);
 
         var needsSave = false;
         if (session.Status == SessionStatus.Expired)
@@ -187,24 +189,24 @@ public sealed class GatewayHub : Hub
 
     public async Task Abort(string agentId, string sessionId)
     {
-        var instance = _supervisor.GetInstance(agentId, sessionId);
+        var instance = _supervisor.GetInstance(AgentId.From(agentId), SessionId.From(sessionId));
         if (instance is null)
             return;
 
-        var handle = await _supervisor.GetOrCreateAsync(agentId, sessionId, CancellationToken.None);
+        var handle = await _supervisor.GetOrCreateAsync(AgentId.From(agentId), SessionId.From(sessionId), CancellationToken.None);
         await handle.AbortAsync(CancellationToken.None);
     }
 
     public async Task ResetSession(string agentId, string sessionId)
     {
-        await _supervisor.StopAsync(agentId, sessionId, CancellationToken.None);
-        await _sessions.ArchiveAsync(sessionId, CancellationToken.None);
+        await _supervisor.StopAsync(AgentId.From(agentId), SessionId.From(sessionId), CancellationToken.None);
+        await _sessions.ArchiveAsync(SessionId.From(sessionId), CancellationToken.None);
         await Clients.Caller.SendAsync("SessionReset", new { agentId, sessionId });
     }
 
     public async Task<object> CompactSession(string agentId, string sessionId)
     {
-        var session = await _sessions.GetAsync(sessionId, CancellationToken.None);
+        var session = await _sessions.GetAsync(SessionId.From(sessionId), CancellationToken.None);
         if (session is null)
             throw new HubException($"Session '{sessionId}' not found.");
 
@@ -228,7 +230,7 @@ public sealed class GatewayHub : Hub
         => Task.FromResult(_registry.GetAll());
 
     public AgentInstance? GetAgentStatus(string agentId, string sessionId)
-        => _supervisor.GetInstance(agentId, sessionId);
+        => _supervisor.GetInstance(AgentId.From(agentId), SessionId.From(sessionId));
 
     public override async Task OnConnectedAsync()
     {

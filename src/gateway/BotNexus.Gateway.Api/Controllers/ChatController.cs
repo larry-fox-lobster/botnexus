@@ -48,7 +48,9 @@ public sealed class ChatController : ControllerBase
                 : request.SessionId;
 
             // Use CancellationToken.None for agent work — client disconnect should not kill the agent
-            var handle = await _supervisor.GetOrCreateAsync(request.AgentId, sessionId, CancellationToken.None);
+            var typedAgentId = AgentId.From(request.AgentId);
+            var typedSessionId = SessionId.From(sessionId);
+            var handle = await _supervisor.GetOrCreateAsync(typedAgentId, typedSessionId, CancellationToken.None);
 
             // If agent is already running, queue as follow-up instead of failing
             AgentResponse response;
@@ -62,7 +64,7 @@ public sealed class ChatController : ControllerBase
                 return Accepted(new ChatResponse(sessionId, "Message queued as follow-up — agent is currently processing a previous request.", null));
             }
 
-            var session = await _sessions.GetOrCreateAsync(sessionId, request.AgentId, CancellationToken.None);
+            var session = await _sessions.GetOrCreateAsync(typedSessionId, typedAgentId, CancellationToken.None);
             session.SessionType = SessionType.UserAgent;
             session.AddEntry(new SessionEntry { Role = MessageRole.User, Content = request.Message });
             session.AddEntry(new SessionEntry { Role = MessageRole.Assistant, Content = response.Content });
@@ -86,13 +88,13 @@ public sealed class ChatController : ControllerBase
     [HttpPost("steer")]
     public async Task<IActionResult> Steer([FromBody] AgentControlRequest request, CancellationToken cancellationToken)
     {
-        var instance = _supervisor.GetInstance(request.AgentId, request.SessionId);
+        var instance = _supervisor.GetInstance(AgentId.From(request.AgentId), SessionId.From(request.SessionId));
         if (instance is null)
             return NotFound(new { message = "Agent session not found." });
 
         try
         {
-            var handle = await _supervisor.GetOrCreateAsync(request.AgentId, request.SessionId, cancellationToken);
+            var handle = await _supervisor.GetOrCreateAsync(AgentId.From(request.AgentId), SessionId.From(request.SessionId), cancellationToken);
             await handle.SteerAsync(request.Message, cancellationToken);
             return Accepted();
         }
@@ -108,13 +110,13 @@ public sealed class ChatController : ControllerBase
     [HttpPost("follow-up")]
     public async Task<IActionResult> FollowUp([FromBody] AgentControlRequest request, CancellationToken cancellationToken)
     {
-        var instance = _supervisor.GetInstance(request.AgentId, request.SessionId);
+        var instance = _supervisor.GetInstance(AgentId.From(request.AgentId), SessionId.From(request.SessionId));
         if (instance is null)
             return NotFound(new { message = "Agent session not found." });
 
         try
         {
-            var handle = await _supervisor.GetOrCreateAsync(request.AgentId, request.SessionId, cancellationToken);
+            var handle = await _supervisor.GetOrCreateAsync(AgentId.From(request.AgentId), SessionId.From(request.SessionId), cancellationToken);
             await handle.FollowUpAsync(request.Message, cancellationToken);
             return Accepted();
         }

@@ -1,5 +1,6 @@
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Domain.Primitives;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BotNexus.Gateway.Api.Controllers;
@@ -29,7 +30,7 @@ public sealed class ModelsController : ControllerBase
     {
         if (!string.IsNullOrWhiteSpace(agentId))
         {
-            var agent = _agentRegistry.Get(agentId);
+            var agent = _agentRegistry.Get(AgentId.From(agentId));
             if (agent is null)
                 return NotFound(new { error = $"Agent '{agentId}' not found." });
 

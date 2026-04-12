@@ -38,7 +38,7 @@ public sealed class ChannelHistoryController : ControllerBase
             return BadRequest(new { error = "limit must be greater than zero." });
 
         var boundedLimit = Math.Min(limit, 200);
-        var sessions = (await _sessions.ListByChannelAsync(agentId, ChannelKey.From(channelType), cancellationToken))
+        var sessions = (await _sessions.ListByChannelAsync(AgentId.From(agentId), ChannelKey.From(channelType), cancellationToken))
             .Where(session => session.History.Count > 0)
             .ToList();
 

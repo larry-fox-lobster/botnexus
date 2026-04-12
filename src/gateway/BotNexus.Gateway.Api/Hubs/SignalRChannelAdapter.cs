@@ -54,7 +54,7 @@ public sealed class SignalRChannelAdapter(ILogger<SignalRChannelAdapter> logger,
         };
 
         logger.LogInformation("SignalR → group session:{SessionId} method {Method}", conversationId, method);
-        var enrichedEvent = streamEvent with { SessionId = conversationId };
+        var enrichedEvent = streamEvent with { SessionId = SessionId.From(conversationId) };
         return _hubContext.Clients.Group(GetSessionGroup(conversationId))
             .SendAsync(method, enrichedEvent, cancellationToken);
     }

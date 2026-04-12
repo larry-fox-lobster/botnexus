@@ -1,5 +1,6 @@
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Domain.Primitives;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -37,7 +38,7 @@ public sealed class AgentsController : ControllerBase
     [HttpGet("{agentId}")]
     public ActionResult<AgentDescriptor> Get(string agentId)
     {
-        var descriptor = _registry.Get(agentId);
+        var descriptor = _registry.Get(AgentId.From(agentId));
         return descriptor is not null ? Ok(descriptor) : NotFound();
     }
 
@@ -84,10 +85,10 @@ public sealed class AgentsController : ControllerBase
         }
 
         var updatedDescriptor = string.IsNullOrWhiteSpace(descriptor.AgentId)
-            ? descriptor with { AgentId = agentId }
+            ? descriptor with { AgentId = AgentId.From(agentId) }
             : descriptor;
 
-        var wasUpdated = _registry.Update(agentId, updatedDescriptor);
+        var wasUpdated = _registry.Update(AgentId.From(agentId), updatedDescriptor);
         if (!wasUpdated)
             return NotFound();
 
@@ -99,7 +100,7 @@ public sealed class AgentsController : ControllerBase
     [HttpDelete("{agentId}")]
     public async Task<ActionResult> Unregister(string agentId, CancellationToken cancellationToken)
     {
-        _registry.Unregister(agentId);
+        _registry.Unregister(AgentId.From(agentId));
         await _configurationWriter.DeleteAsync(agentId, cancellationToken);
         return NoContent();
     }
@@ -108,7 +109,7 @@ public sealed class AgentsController : ControllerBase
     [HttpGet("{agentId}/sessions/{sessionId}/status")]
     public ActionResult<AgentInstance> GetInstanceStatus(string agentId, string sessionId)
     {
-        var instance = _supervisor.GetInstance(agentId, sessionId);
+        var instance = _supervisor.GetInstance(AgentId.From(agentId), SessionId.From(sessionId));
         return instance is not null ? Ok(instance) : NotFound();
     }
 
@@ -120,7 +121,7 @@ public sealed class AgentsController : ControllerBase
     [HttpGet("{agentId}/health")]
     public async Task<ActionResult<AgentHealthResponse>> GetHealth(string agentId, CancellationToken cancellationToken)
     {
-        if (_registry.Get(agentId) is null)
+        if (_registry.Get(AgentId.From(agentId)) is null)
             return NotFound();
 
         var instances = (_supervisor.GetAllInstances() ?? [])
@@ -128,10 +129,10 @@ public sealed class AgentsController : ControllerBase
             .ToList();
 
         if (instances.Count == 0)
-            return Ok(new AgentHealthResponse("unknown", agentId, 0));
+            return Ok(new AgentHealthResponse("unknown", AgentId.From(agentId), 0));
 
         if (_supervisor is not IAgentHandleInspector inspector)
-            return Ok(new AgentHealthResponse("unknown", agentId, instances.Count));
+            return Ok(new AgentHealthResponse("unknown", AgentId.From(agentId), instances.Count));
 
         var evaluatedCount = 0;
         foreach (var instance in instances)
@@ -142,18 +143,18 @@ public sealed class AgentsController : ControllerBase
 
             evaluatedCount++;
             if (!await healthCheckable.PingAsync(cancellationToken))
-                return Ok(new AgentHealthResponse("unhealthy", agentId, instances.Count));
+                return Ok(new AgentHealthResponse("unhealthy", AgentId.From(agentId), instances.Count));
         }
 
         var status = evaluatedCount > 0 ? "healthy" : "unknown";
-        return Ok(new AgentHealthResponse(status, agentId, instances.Count));
+        return Ok(new AgentHealthResponse(status, AgentId.From(agentId), instances.Count));
     }
 
     /// <summary>Stops a specific agent instance.</summary>
     [HttpPost("{agentId}/sessions/{sessionId}/stop")]
     public async Task<ActionResult> StopInstance(string agentId, string sessionId, CancellationToken cancellationToken)
     {
-        await _supervisor.StopAsync(agentId, sessionId, cancellationToken);
+        await _supervisor.StopAsync(AgentId.From(agentId), SessionId.From(sessionId), cancellationToken);
         return NoContent();
     }
 }

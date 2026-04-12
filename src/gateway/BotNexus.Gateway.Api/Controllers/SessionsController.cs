@@ -2,6 +2,8 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Abstractions.Sessions;
+using AgentId = BotNexus.Domain.Primitives.AgentId;
+using SessionId = BotNexus.Domain.Primitives.SessionId;
 using BotNexus.Gateway.Api;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -33,13 +35,18 @@ public sealed class SessionsController : ControllerBase
     /// <summary>Lists sessions, optionally filtered by agent ID.</summary>
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<GatewaySession>>> List([FromQuery] string? agentId, CancellationToken cancellationToken)
-        => Ok(await _sessions.ListAsync(agentId, cancellationToken));
+    {
+        AgentId? parsedAgentId = null;
+        if (!string.IsNullOrWhiteSpace(agentId))
+            parsedAgentId = AgentId.From(agentId);
+        return Ok(await _sessions.ListAsync(parsedAgentId, cancellationToken));
+    }
 
     /// <summary>Gets a specific session by ID.</summary>
     [HttpGet("{sessionId}")]
     public async Task<ActionResult<GatewaySession>> Get(string sessionId, CancellationToken cancellationToken)
     {
-        var session = await _sessions.GetAsync(sessionId, cancellationToken);
+        var session = await _sessions.GetAsync(SessionId.From(sessionId), cancellationToken);
         return session is not null ? Ok(session) : NotFound();
     }
 
@@ -49,11 +56,11 @@ public sealed class SessionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IReadOnlyList<SubAgentInfo>>> ListSubAgents(string sessionId, CancellationToken cancellationToken)
     {
-        var session = await _sessions.GetAsync(sessionId, cancellationToken);
+        var session = await _sessions.GetAsync(SessionId.From(sessionId), cancellationToken);
         if (session is null)
             return NotFound();
 
-        var subAgents = await _subAgentManager.ListAsync(sessionId, cancellationToken);
+        var subAgents = await _subAgentManager.ListAsync(SessionId.From(sessionId), cancellationToken);
         return Ok(subAgents);
     }
 
@@ -64,7 +71,7 @@ public sealed class SessionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> KillSubAgent(string sessionId, string subAgentId, CancellationToken cancellationToken)
     {
-        var session = await _sessions.GetAsync(sessionId, cancellationToken);
+        var session = await _sessions.GetAsync(SessionId.From(sessionId), cancellationToken);
         if (session is null)
             return NotFound();
 
@@ -75,7 +82,7 @@ public sealed class SessionsController : ControllerBase
         if (!string.Equals(subAgent.ParentSessionId, sessionId, StringComparison.OrdinalIgnoreCase))
             return StatusCode(StatusCodes.Status403Forbidden, new { error = "Sub-agent does not belong to the requested session." });
 
-        var killed = await _subAgentManager.KillAsync(subAgentId, sessionId, cancellationToken);
+        var killed = await _subAgentManager.KillAsync(subAgentId, SessionId.From(sessionId), cancellationToken);
         if (!killed)
             return NotFound();
 
@@ -100,7 +107,7 @@ public sealed class SessionsController : ControllerBase
 
         var boundedLimit = Math.Min(limit, 200);
 
-        var session = await _sessions.GetAsync(sessionId, cancellationToken);
+        var session = await _sessions.GetAsync(SessionId.From(sessionId), cancellationToken);
         if (session is null)
             return NotFound();
 
@@ -120,7 +127,7 @@ public sealed class SessionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<Dictionary<string, object?>>> GetMetadata(string sessionId, CancellationToken cancellationToken)
     {
-        var session = await _sessions.GetAsync(sessionId, cancellationToken);
+        var session = await _sessions.GetAsync(SessionId.From(sessionId), cancellationToken);
         if (session is null)
             return NotFound();
 
@@ -150,7 +157,7 @@ public sealed class SessionsController : ControllerBase
         if (metadataPatch.ValueKind != JsonValueKind.Object)
             return BadRequest(new { error = "Metadata patch body must be a JSON object." });
 
-        var session = await _sessions.GetAsync(sessionId, cancellationToken);
+        var session = await _sessions.GetAsync(SessionId.From(sessionId), cancellationToken);
         if (session is null)
             return NotFound();
 
@@ -193,7 +200,7 @@ public sealed class SessionsController : ControllerBase
     [HttpDelete("{sessionId}")]
     public async Task<ActionResult> Delete(string sessionId, CancellationToken cancellationToken)
     {
-        await _sessions.DeleteAsync(sessionId, cancellationToken);
+        await _sessions.DeleteAsync(SessionId.From(sessionId), cancellationToken);
         return NoContent();
     }
 
@@ -201,7 +208,7 @@ public sealed class SessionsController : ControllerBase
     [HttpPatch("{sessionId}/suspend")]
     public async Task<ActionResult<GatewaySession>> Suspend(string sessionId, CancellationToken cancellationToken)
     {
-        var session = await _sessions.GetAsync(sessionId, cancellationToken);
+        var session = await _sessions.GetAsync(SessionId.From(sessionId), cancellationToken);
         if (session is null)
             return NotFound();
 
@@ -218,7 +225,7 @@ public sealed class SessionsController : ControllerBase
     [HttpPatch("{sessionId}/resume")]
     public async Task<ActionResult<GatewaySession>> Resume(string sessionId, CancellationToken cancellationToken)
     {
-        var session = await _sessions.GetAsync(sessionId, cancellationToken);
+        var session = await _sessions.GetAsync(SessionId.From(sessionId), cancellationToken);
         if (session is null)
             return NotFound();
 
@@ -256,13 +263,13 @@ public sealed class SessionsController : ControllerBase
         public Task<SubAgentInfo> SpawnAsync(SubAgentSpawnRequest request, CancellationToken ct = default)
             => throw new NotSupportedException("Sub-agent spawning is not supported by this controller instance.");
 
-        public Task<IReadOnlyList<SubAgentInfo>> ListAsync(string parentSessionId, CancellationToken ct = default)
+        public Task<IReadOnlyList<SubAgentInfo>> ListAsync(SessionId parentSessionId, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<SubAgentInfo>>([]);
 
         public Task<SubAgentInfo?> GetAsync(string subAgentId, CancellationToken ct = default)
             => Task.FromResult<SubAgentInfo?>(null);
 
-        public Task<bool> KillAsync(string subAgentId, string requestingSessionId, CancellationToken ct = default)
+        public Task<bool> KillAsync(string subAgentId, SessionId requestingSessionId, CancellationToken ct = default)
             => Task.FromResult(false);
 
         public Task OnCompletedAsync(string subAgentId, string resultSummary, CancellationToken ct = default)
