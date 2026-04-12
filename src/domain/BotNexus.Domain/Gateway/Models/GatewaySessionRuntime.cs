@@ -14,6 +14,9 @@ public sealed class GatewaySessionRuntime
         Session = session ?? throw new ArgumentNullException(nameof(session));
     }
 
+    /// <summary>
+    /// Gets the session.
+    /// </summary>
     public Session Session { get; }
 
     public long NextSequenceId
@@ -26,6 +29,10 @@ public sealed class GatewaySessionRuntime
 
     public SessionReplayBuffer ReplayBuffer => _replayBuffer;
 
+    /// <summary>
+    /// Executes add entry.
+    /// </summary>
+    /// <param name="entry">The entry.</param>
     public void AddEntry(SessionEntry entry)
     {
         lock (_lock)
@@ -35,6 +42,10 @@ public sealed class GatewaySessionRuntime
         }
     }
 
+    /// <summary>
+    /// Executes add entries.
+    /// </summary>
+    /// <param name="entries">The entries.</param>
     public void AddEntries(IEnumerable<SessionEntry> entries)
     {
         lock (_lock)
@@ -44,6 +55,10 @@ public sealed class GatewaySessionRuntime
         }
     }
 
+    /// <summary>
+    /// Executes replace history.
+    /// </summary>
+    /// <param name="compactedEntries">The compacted entries.</param>
     public void ReplaceHistory(IReadOnlyList<SessionEntry> compactedEntries)
     {
         lock (_lock)
@@ -54,6 +69,10 @@ public sealed class GatewaySessionRuntime
         }
     }
 
+    /// <summary>
+    /// Executes get history snapshot.
+    /// </summary>
+    /// <returns>The get history snapshot result.</returns>
     public IReadOnlyList<SessionEntry> GetHistorySnapshot()
     {
         lock (_lock)
@@ -62,6 +81,12 @@ public sealed class GatewaySessionRuntime
         }
     }
 
+    /// <summary>
+    /// Executes get history snapshot.
+    /// </summary>
+    /// <param name="offset">The offset.</param>
+    /// <param name="limit">The limit.</param>
+    /// <returns>The get history snapshot result.</returns>
     public IReadOnlyList<SessionEntry> GetHistorySnapshot(int offset, int limit)
     {
         lock (_lock)
@@ -78,6 +103,10 @@ public sealed class GatewaySessionRuntime
         }
     }
 
+    /// <summary>
+    /// Executes allocate sequence id.
+    /// </summary>
+    /// <returns>The allocate sequence id result.</returns>
     public long AllocateSequenceId()
     {
         var sequenceId = _replayBuffer.AllocateSequenceId();
@@ -85,18 +114,39 @@ public sealed class GatewaySessionRuntime
         return sequenceId;
     }
 
+    /// <summary>
+    /// Executes add stream event.
+    /// </summary>
+    /// <param name="sequenceId">The sequence id.</param>
+    /// <param name="payloadJson">The payload json.</param>
+    /// <param name="replayWindowSize">The replay window size.</param>
     public void AddStreamEvent(long sequenceId, string payloadJson, int replayWindowSize)
     {
         _replayBuffer.AddStreamEvent(sequenceId, payloadJson, replayWindowSize);
         Session.UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    /// <summary>
+    /// Executes get stream events after.
+    /// </summary>
+    /// <param name="lastSequenceId">The last sequence id.</param>
+    /// <param name="maxReplayCount">The max replay count.</param>
+    /// <returns>The get stream events after result.</returns>
     public IReadOnlyList<GatewaySessionStreamEvent> GetStreamEventsAfter(long lastSequenceId, int maxReplayCount)
         => _replayBuffer.GetStreamEventsAfter(lastSequenceId, maxReplayCount);
 
+    /// <summary>
+    /// Executes get stream event snapshot.
+    /// </summary>
+    /// <returns>The get stream event snapshot result.</returns>
     public IReadOnlyList<GatewaySessionStreamEvent> GetStreamEventSnapshot()
         => _replayBuffer.GetStreamEventSnapshot();
 
+    /// <summary>
+    /// Executes set stream replay state.
+    /// </summary>
+    /// <param name="nextSequenceId">The next sequence id.</param>
+    /// <param name="streamEvents">The stream events.</param>
     public void SetStreamReplayState(long nextSequenceId, IEnumerable<GatewaySessionStreamEvent>? streamEvents)
         => _replayBuffer.SetState(nextSequenceId, streamEvents);
 }

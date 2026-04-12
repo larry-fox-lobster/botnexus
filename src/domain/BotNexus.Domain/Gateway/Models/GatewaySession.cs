@@ -198,8 +198,17 @@ public sealed class GatewaySession
     public void SetStreamReplayState(long nextSequenceId, IEnumerable<GatewaySessionStreamEvent>? streamEvents)
         => Runtime.SetStreamReplayState(nextSequenceId, streamEvents);
 
+    /// <summary>
+    /// Executes to session.
+    /// </summary>
+    /// <returns>The to session result.</returns>
     public Session ToSession() => Session;
 
+    /// <summary>
+    /// Executes from session.
+    /// </summary>
+    /// <param name="session">The session.</param>
+    /// <returns>The from session result.</returns>
     public static GatewaySession FromSession(Session session) => new(session);
 }
 
