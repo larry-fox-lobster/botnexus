@@ -32,15 +32,17 @@ public sealed class SignalRChannelAdapter(ILogger<SignalRChannelAdapter> logger,
         => Task.CompletedTask;
 
     public override Task SendAsync(OutboundMessage message, CancellationToken cancellationToken = default)
-        => _hubContext.Clients.Group(GetSessionGroup(message.SessionId ?? message.ConversationId))
+        => _hubContext.Clients.Group(GetSessionGroup(NormalizeSessionId(message.SessionId ?? message.ConversationId)))
             .SendAsync("ContentDelta", message.Content, cancellationToken);
 
     public override Task SendStreamDeltaAsync(string conversationId, string delta, CancellationToken cancellationToken = default)
-        => _hubContext.Clients.Group(GetSessionGroup(conversationId))
+        => _hubContext.Clients.Group(GetSessionGroup(NormalizeSessionId(conversationId)))
             .SendAsync("ContentDelta", delta, cancellationToken);
 
     public Task SendStreamEventAsync(string conversationId, AgentStreamEvent streamEvent, CancellationToken cancellationToken = default)
     {
+        var normalizedSessionId = NormalizeSessionId(conversationId);
+        var typedSessionId = SessionId.From(normalizedSessionId);
         var method = streamEvent.Type switch
         {
             AgentStreamEventType.MessageStart => "MessageStart",
@@ -53,11 +55,19 @@ public sealed class SignalRChannelAdapter(ILogger<SignalRChannelAdapter> logger,
             _ => "Unknown"
         };
 
-        logger.LogInformation("SignalR → group session:{SessionId} method {Method}", conversationId, method);
-        var enrichedEvent = streamEvent with { SessionId = SessionId.From(conversationId) };
-        return _hubContext.Clients.Group(GetSessionGroup(conversationId))
+        logger.LogInformation("SignalR → group session:{SessionId} method {Method}", normalizedSessionId, method);
+        var enrichedEvent = streamEvent with { SessionId = typedSessionId };
+        return _hubContext.Clients.Group(GetSessionGroup(normalizedSessionId))
             .SendAsync(method, enrichedEvent, cancellationToken);
     }
 
     private static string GetSessionGroup(string sessionId) => $"session:{sessionId}";
+
+    private static string NormalizeSessionId(string sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId))
+            throw new ArgumentException("Session ID cannot be empty.", nameof(sessionId));
+
+        return SessionId.From(sessionId).Value;
+    }
 }
