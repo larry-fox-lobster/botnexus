@@ -1,4 +1,5 @@
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Sessions;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
@@ -326,6 +327,43 @@ public sealed class SqliteSessionStoreTests
             columns.Add(columnReader.GetString(1));
 
         columns.Should().Contain("is_compaction_summary");
+    }
+
+    [Fact]
+    public async Task GetExistenceAsync_ReturnsOwnedAndParticipantSessions_WithFiltersApplied()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var now = DateTimeOffset.UtcNow;
+        await store.SaveAsync(new GatewaySession
+        {
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("owned"),
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
+            CreatedAt = now.AddDays(-2)
+        });
+        await store.SaveAsync(new GatewaySession
+        {
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("participant"),
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-b"),
+            SessionType = BotNexus.Domain.Primitives.SessionType.Cron,
+            Participants =
+            [
+                new BotNexus.Domain.Primitives.SessionParticipant { Type = BotNexus.Domain.Primitives.ParticipantType.Agent, Id = "agent-a" }
+            ],
+            CreatedAt = now.AddDays(-1)
+        });
+
+        var sessions = await store.GetExistenceAsync(
+            BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+            new ExistenceQuery
+            {
+                TypeFilter = BotNexus.Domain.Primitives.SessionType.Cron,
+                From = now.AddDays(-1.5),
+                Limit = 10
+            });
+
+        sessions.Select(session => session.SessionId.Value).Should().Equal("participant");
     }
 
     private static async Task CreateAndSaveAsync(SqliteSessionStore store, string sessionId, string agentId)

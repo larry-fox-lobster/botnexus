@@ -299,7 +299,24 @@ internal sealed class ResettableInMemorySessionStore : ISessionStore
         AgentId agentId,
         ExistenceQuery query,
         CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        lock (_sync)
+        {
+            IEnumerable<GatewaySession> sessions = _sessions.Values
+                .Where(session => session.AgentId == agentId || session.Participants.Any(p => string.Equals(p.Id, agentId.Value, StringComparison.OrdinalIgnoreCase)))
+                .Where(session => !query.From.HasValue || session.CreatedAt >= query.From.Value)
+                .Where(session => !query.To.HasValue || session.CreatedAt <= query.To.Value)
+                .Where(session => query.TypeFilter is null || session.SessionType == query.TypeFilter)
+                .OrderByDescending(session => session.CreatedAt);
+
+            if (query.Limit is > 0)
+                sessions = sessions.Take(query.Limit.Value);
+
+            return Task.FromResult<IReadOnlyList<GatewaySession>>(sessions.ToList());
+        }
+    }
 
     public void Reset()
     {

@@ -1,4 +1,5 @@
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Sessions;
 using FluentAssertions;
@@ -143,6 +144,42 @@ public sealed class InMemorySessionStoreTests
 
         session.SessionType.Should().Be(SessionType.AgentSubAgent);
         session.SessionId.Value.Should().Contain("::subagent::");
+    }
+
+    [Fact]
+    public async Task GetExistenceAsync_ReturnsOwnedAndParticipantSessions_WithFiltersApplied()
+    {
+        var store = new InMemorySessionStore();
+        var now = DateTimeOffset.UtcNow;
+        await store.SaveAsync(new GatewaySession
+        {
+            SessionId = SessionId.From("owned"),
+            AgentId = AgentId.From("agent-a"),
+            SessionType = SessionType.UserAgent,
+            CreatedAt = now.AddDays(-2)
+        });
+        await store.SaveAsync(new GatewaySession
+        {
+            SessionId = SessionId.From("participant"),
+            AgentId = AgentId.From("agent-b"),
+            SessionType = SessionType.Cron,
+            Participants =
+            [
+                new SessionParticipant { Type = ParticipantType.Agent, Id = "agent-a" }
+            ],
+            CreatedAt = now.AddDays(-1)
+        });
+
+        var sessions = await store.GetExistenceAsync(
+            AgentId.From("agent-a"),
+            new ExistenceQuery
+            {
+                TypeFilter = SessionType.Cron,
+                From = now.AddDays(-1.5),
+                Limit = 10
+            });
+
+        sessions.Select(session => session.SessionId.Value).Should().Equal("participant");
     }
 }
 
