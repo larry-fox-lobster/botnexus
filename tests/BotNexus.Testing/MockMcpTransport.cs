@@ -3,7 +3,7 @@ using System.Text.Json;
 using BotNexus.Extensions.Mcp.Protocol;
 using BotNexus.Extensions.Mcp.Transport;
 
-namespace BotNexus.Extensions.Mcp.Tests;
+namespace BotNexus.Testing.Mcp;
 
 /// <summary>
 /// In-memory transport for testing McpClient without spawning a real process.

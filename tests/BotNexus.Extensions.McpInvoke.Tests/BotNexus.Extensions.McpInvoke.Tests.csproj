@@ -19,11 +19,16 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="BotNexus.Testing.Mcp" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\extensions\mcp-invoke\BotNexus.Extensions.McpInvoke\BotNexus.Extensions.McpInvoke.csproj" />
     <ProjectReference Include="..\..\extensions\mcp\BotNexus.Extensions.Mcp\BotNexus.Extensions.Mcp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\BotNexus.Testing\MockMcpTransport.cs" Link="Shared\MockMcpTransport.cs" />
   </ItemGroup>
 
   <ItemGroup>
