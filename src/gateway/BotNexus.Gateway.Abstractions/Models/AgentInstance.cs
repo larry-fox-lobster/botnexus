@@ -1,3 +1,5 @@
+using BotNexus.Domain.Primitives;
+
 namespace BotNexus.Gateway.Abstractions.Models;
 
 /// <summary>
@@ -10,10 +12,10 @@ public sealed class AgentInstance
     public required string InstanceId { get; init; }
 
     /// <summary>The registered agent this instance was created from.</summary>
-    public required string AgentId { get; init; }
+    public required AgentId AgentId { get; init; }
 
     /// <summary>The session this instance is bound to.</summary>
-    public required string SessionId { get; init; }
+    public required SessionId SessionId { get; init; }
 
     /// <summary>Current execution status.</summary>
     public AgentInstanceStatus Status { get; set; } = AgentInstanceStatus.Starting;

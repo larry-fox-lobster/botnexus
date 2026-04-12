@@ -1,3 +1,4 @@
+using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Security;
 
 namespace BotNexus.Gateway.Abstractions.Models;
@@ -9,7 +10,7 @@ namespace BotNexus.Gateway.Abstractions.Models;
 public sealed record AgentDescriptor
 {
     /// <summary>Unique agent identifier (e.g., "coding-agent", "chat-assistant").</summary>
-    public required string AgentId { get; init; }
+    public required AgentId AgentId { get; init; }
 
     /// <summary>Human-readable display name.</summary>
     public required string DisplayName { get; init; }

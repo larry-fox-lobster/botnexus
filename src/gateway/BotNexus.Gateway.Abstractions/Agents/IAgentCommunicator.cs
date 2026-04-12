@@ -1,4 +1,5 @@
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Domain.Primitives;
 
 namespace BotNexus.Gateway.Abstractions.Agents;
 
@@ -32,9 +33,9 @@ public interface IAgentCommunicator
     /// <returns>The sub-agent's response.</returns>
     /// <exception cref="KeyNotFoundException">The child agent ID is not registered.</exception>
     Task<AgentResponse> CallSubAgentAsync(
-        string parentAgentId,
-        string parentSessionId,
-        string childAgentId,
+        AgentId parentAgentId,
+        SessionId parentSessionId,
+        AgentId childAgentId,
         string message,
         CancellationToken cancellationToken = default);
 
@@ -52,9 +53,9 @@ public interface IAgentCommunicator
     /// <exception cref="NotSupportedException">Remote endpoint calls are not supported yet.</exception>
     /// <exception cref="KeyNotFoundException">The target agent ID is not registered.</exception>
     Task<AgentResponse> CallCrossAgentAsync(
-        string sourceAgentId,
+        AgentId sourceAgentId,
         string targetEndpoint,
-        string targetAgentId,
+        AgentId targetAgentId,
         string message,
         CancellationToken cancellationToken = default);
 }

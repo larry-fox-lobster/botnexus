@@ -1,3 +1,5 @@
+using BotNexus.Domain.Primitives;
+
 namespace BotNexus.Gateway.Abstractions.Agents;
 
 /// <summary>
@@ -8,5 +10,5 @@ public interface IAgentHandleInspector
     /// <summary>
     /// Gets an active agent handle for the given agent/session pair, or <c>null</c> when unavailable.
     /// </summary>
-    IAgentHandle? GetHandle(string agentId, string sessionId);
+    IAgentHandle? GetHandle(AgentId agentId, SessionId sessionId);
 }

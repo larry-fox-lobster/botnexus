@@ -1,4 +1,5 @@
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Domain.Primitives;
 
 namespace BotNexus.Gateway.Abstractions.Agents;
 
@@ -26,7 +27,7 @@ public interface IAgentSupervisor
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A handle to the running agent instance.</returns>
     /// <exception cref="KeyNotFoundException">The agent ID is not registered.</exception>
-    Task<IAgentHandle> GetOrCreateAsync(string agentId, string sessionId, CancellationToken cancellationToken = default);
+    Task<IAgentHandle> GetOrCreateAsync(AgentId agentId, SessionId sessionId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Stops a specific agent instance and releases its resources.
@@ -34,12 +35,12 @@ public interface IAgentSupervisor
     /// <param name="agentId">The agent ID.</param>
     /// <param name="sessionId">The session ID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task StopAsync(string agentId, string sessionId, CancellationToken cancellationToken = default);
+    Task StopAsync(AgentId agentId, SessionId sessionId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets the current instance metadata, or <c>null</c> if no instance exists.
     /// </summary>
-    AgentInstance? GetInstance(string agentId, string sessionId);
+    AgentInstance? GetInstance(AgentId agentId, SessionId sessionId);
 
     /// <summary>
     /// Gets all active agent instances.

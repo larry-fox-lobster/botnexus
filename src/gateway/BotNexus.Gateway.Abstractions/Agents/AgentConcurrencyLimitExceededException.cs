@@ -1,3 +1,5 @@
+using BotNexus.Domain.Primitives;
+
 namespace BotNexus.Gateway.Abstractions.Agents;
 
 /// <summary>
@@ -5,14 +7,14 @@ namespace BotNexus.Gateway.Abstractions.Agents;
 /// </summary>
 public sealed class AgentConcurrencyLimitExceededException : Exception
 {
-    public AgentConcurrencyLimitExceededException(string agentId, int maxConcurrentSessions)
+    public AgentConcurrencyLimitExceededException(AgentId agentId, int maxConcurrentSessions)
         : base($"Agent '{agentId}' has reached MaxConcurrentSessions ({maxConcurrentSessions}).")
     {
         AgentId = agentId;
         MaxConcurrentSessions = maxConcurrentSessions;
     }
 
-    public string AgentId { get; }
+    public AgentId AgentId { get; }
 
     public int MaxConcurrentSessions { get; }
 }

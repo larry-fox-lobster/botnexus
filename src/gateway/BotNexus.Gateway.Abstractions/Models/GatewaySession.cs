@@ -13,10 +13,10 @@ public sealed class GatewaySession
     private readonly SessionReplayBuffer _replayBuffer = new();
 
     /// <summary>Unique session identifier.</summary>
-    public required string SessionId { get; init; }
+    public required SessionId SessionId { get; init; }
 
     /// <summary>The agent this session is bound to.</summary>
-    public required string AgentId { get; set; }
+    public required AgentId AgentId { get; set; }
 
     /// <summary>The channel this session originated from (e.g., "signalr", "telegram").</summary>
     public ChannelKey? ChannelType { get; set; }

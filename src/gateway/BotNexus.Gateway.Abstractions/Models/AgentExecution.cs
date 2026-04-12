@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using BotNexus.Domain.Primitives;
 
 namespace BotNexus.Gateway.Abstractions.Models;
 
@@ -9,7 +10,7 @@ namespace BotNexus.Gateway.Abstractions.Models;
 public sealed record AgentExecutionContext
 {
     /// <summary>The session this execution is bound to.</summary>
-    public required string SessionId { get; init; }
+    public required SessionId SessionId { get; init; }
 
     /// <summary>Conversation history to restore, if resuming a session.</summary>
     public IReadOnlyList<SessionEntry> History { get; init; } = [];
@@ -87,7 +88,7 @@ public sealed record AgentStreamEvent
     public string? MessageId { get; init; }
 
     /// <summary>Session identifier for client-side routing verification.</summary>
-    public string? SessionId { get; init; }
+    public SessionId? SessionId { get; init; }
 
     /// <summary>When this event was emitted.</summary>
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;

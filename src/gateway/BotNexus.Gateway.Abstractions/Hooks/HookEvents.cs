@@ -1,9 +1,11 @@
+using BotNexus.Domain.Primitives;
+
 namespace BotNexus.Gateway.Abstractions.Hooks;
 
 // ── Before prompt build ──────────────────────────────────────────────
 
 public sealed record BeforePromptBuildEvent(
-    string AgentId,
+    AgentId AgentId,
     string CurrentPrompt,
     IReadOnlyList<object> Messages);
 
@@ -16,7 +18,7 @@ public sealed record BeforePromptBuildResult
 // ── Before tool call ─────────────────────────────────────────────────
 
 public sealed record BeforeToolCallEvent(
-    string AgentId,
+    AgentId AgentId,
     string ToolName,
     string ToolCallId,
     IReadOnlyDictionary<string, object?> Arguments);
@@ -31,7 +33,7 @@ public sealed record BeforeToolCallResult
 // ── After tool call ──────────────────────────────────────────────────
 
 public sealed record AfterToolCallEvent(
-    string AgentId,
+    AgentId AgentId,
     string ToolName,
     string ToolCallId,
     string? Result,

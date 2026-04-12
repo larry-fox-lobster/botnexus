@@ -1,4 +1,5 @@
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Domain.Primitives;
 
 namespace BotNexus.Gateway.Abstractions.Agents;
 
@@ -20,10 +21,10 @@ namespace BotNexus.Gateway.Abstractions.Agents;
 public interface IAgentHandle : IAsyncDisposable
 {
     /// <summary>The agent ID this handle is for.</summary>
-    string AgentId { get; }
+    AgentId AgentId { get; }
 
     /// <summary>The session ID this handle is bound to.</summary>
-    string SessionId { get; }
+    SessionId SessionId { get; }
 
     /// <summary>Whether the agent is currently processing a request.</summary>
     bool IsRunning { get; }

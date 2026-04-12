@@ -1,3 +1,5 @@
+using BotNexus.Domain.Primitives;
+
 namespace BotNexus.Gateway.Abstractions.Models;
 
 /// <summary>
@@ -6,4 +8,4 @@ namespace BotNexus.Gateway.Abstractions.Models;
 /// <param name="Status">Health status: healthy, unhealthy, or unknown.</param>
 /// <param name="AgentId">The agent identifier.</param>
 /// <param name="InstanceCount">Number of active instances for the agent.</param>
-public sealed record AgentHealthResponse(string Status, string AgentId, int InstanceCount);
+public sealed record AgentHealthResponse(string Status, AgentId AgentId, int InstanceCount);

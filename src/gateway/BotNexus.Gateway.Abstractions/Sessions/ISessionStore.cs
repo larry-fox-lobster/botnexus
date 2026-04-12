@@ -24,7 +24,7 @@ public interface ISessionStore
     /// <summary>
     /// Gets a session by ID, or <c>null</c> if it doesn't exist.
     /// </summary>
-    Task<GatewaySession?> GetAsync(string sessionId, CancellationToken cancellationToken = default);
+    Task<GatewaySession?> GetAsync(SessionId sessionId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets an existing session or creates a new one bound to the specified agent.
@@ -32,7 +32,7 @@ public interface ISessionStore
     /// <param name="sessionId">The session ID.</param>
     /// <param name="agentId">The agent to bind to if creating a new session.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task<GatewaySession> GetOrCreateAsync(string sessionId, string agentId, CancellationToken cancellationToken = default);
+    Task<GatewaySession> GetOrCreateAsync(SessionId sessionId, AgentId agentId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Persists the session state. Creates or updates as needed.
@@ -42,26 +42,26 @@ public interface ISessionStore
     /// <summary>
     /// Deletes a session and its history.
     /// </summary>
-    Task DeleteAsync(string sessionId, CancellationToken cancellationToken = default);
+    Task DeleteAsync(SessionId sessionId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Archives the session, preserving its data but removing it from active use.
     /// </summary>
-    Task ArchiveAsync(string sessionId, CancellationToken cancellationToken = default);
+    Task ArchiveAsync(SessionId sessionId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Lists sessions, optionally filtered by agent ID.
     /// </summary>
     /// <param name="agentId">If set, only returns sessions for this agent.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task<IReadOnlyList<GatewaySession>> ListAsync(string? agentId = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<GatewaySession>> ListAsync(AgentId? agentId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Lists sessions for a specific agent filtered by channel type,
     /// ordered by created time descending (newest first).
     /// </summary>
     Task<IReadOnlyList<GatewaySession>> ListByChannelAsync(
-        string agentId,
+        AgentId agentId,
         ChannelKey channelType,
         CancellationToken cancellationToken = default);
 }

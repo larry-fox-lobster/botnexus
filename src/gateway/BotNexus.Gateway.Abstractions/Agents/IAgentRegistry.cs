@@ -1,4 +1,5 @@
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Domain.Primitives;
 
 namespace BotNexus.Gateway.Abstractions.Agents;
 
@@ -25,7 +26,7 @@ public interface IAgentRegistry
     /// Running instances of this agent are <b>not</b> automatically stopped.
     /// </summary>
     /// <param name="agentId">The agent ID to unregister.</param>
-    void Unregister(string agentId);
+    void Unregister(AgentId agentId);
 
     /// <summary>
     /// Updates an existing agent descriptor while preserving registration identity.
@@ -34,13 +35,13 @@ public interface IAgentRegistry
     /// <param name="descriptor">The updated descriptor payload.</param>
     /// <returns><c>true</c> when updated; otherwise <c>false</c> if the agent does not exist.</returns>
     /// <exception cref="ArgumentException">Thrown when <paramref name="descriptor"/> uses a different agent ID.</exception>
-    bool Update(string agentId, AgentDescriptor descriptor)
+    bool Update(AgentId agentId, AgentDescriptor descriptor)
         => throw new NotSupportedException("This registry does not support descriptor updates.");
 
     /// <summary>
     /// Gets an agent descriptor by ID, or <c>null</c> if not registered.
     /// </summary>
-    AgentDescriptor? Get(string agentId);
+    AgentDescriptor? Get(AgentId agentId);
 
     /// <summary>
     /// Gets all registered agent descriptors.
@@ -50,5 +51,5 @@ public interface IAgentRegistry
     /// <summary>
     /// Checks whether an agent with the given ID is registered.
     /// </summary>
-    bool Contains(string agentId);
+    bool Contains(AgentId agentId);
 }
