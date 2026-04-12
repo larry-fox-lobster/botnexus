@@ -39,6 +39,7 @@
     let activityWs = null;
     let activityReconnectTimer = null;
     let userScrolledUp = false;
+    let newMessageCount = 0;
     let commandPaletteIndex = -1;
     /** @type {Map<string, Object>} */
     let activeSubAgents = new Map();
@@ -275,6 +276,7 @@
     const elActivityFilterAgent = $('#activity-filter-agent');
     const elActivityFilterType = $('#activity-filter-type');
     const elScrollBottom = $('#btn-scroll-bottom');
+    const elNewMessages = $('#btn-new-messages');
     const elSidebarToggle = $('#btn-sidebar-toggle');
     const elSidebarOverlay = $('#sidebar-overlay');
     const elSidebar = $('#sidebar');
@@ -355,6 +357,22 @@
         const atBottom = elChatMessages.scrollHeight - elChatMessages.scrollTop - elChatMessages.clientHeight < threshold;
         userScrolledUp = !atBottom;
         elScrollBottom.classList.toggle('hidden', atBottom);
+        if (atBottom) resetNewMessageCount();
+    }
+
+    function incrementNewMessageCount() {
+        if (!userScrolledUp) return;
+        newMessageCount++;
+        if (elNewMessages) {
+            const label = newMessageCount === 1 ? '↓ 1 new message' : `↓ ${newMessageCount} new messages`;
+            elNewMessages.textContent = label;
+            elNewMessages.classList.remove('hidden');
+        }
+    }
+
+    function resetNewMessageCount() {
+        newMessageCount = 0;
+        if (elNewMessages) elNewMessages.classList.add('hidden');
     }
 
     function autoResize(el) {
@@ -1307,6 +1325,7 @@
         updateSendButtonState();
         updateSessionIdDisplay();
         loadSessions();
+        incrementNewMessageCount();
         scrollToBottom();
     }
 
@@ -1982,6 +2001,7 @@
         clearResponseTimeout();
         stopToolElapsedTimer();
         hideProcessingStatus();
+        resetNewMessageCount();
         elBtnAbort.classList.add('hidden');
         removeStreamingIndicator();
 
@@ -2194,7 +2214,7 @@
     function showEndOfHistory(sentinel) {
         sentinel.innerHTML = '';
         const endEl = document.createElement('div');
-        endEl.className = 'history-end';
+        endEl.className = 'history-end end-of-history';
         endEl.style.cssText = 'text-align:center;padding:12px;color:var(--text-secondary);font-size:0.85rem;';
         endEl.innerHTML = '<span class="session-divider-line"></span> Beginning of conversation history <span class="session-divider-line"></span>';
         sentinel.appendChild(endEl);
@@ -3628,6 +3648,9 @@
         // Scroll-to-bottom button
         elScrollBottom.addEventListener('click', () => scrollToBottom(true));
         elChatMessages.addEventListener('scroll', updateScrollButton);
+
+        // New messages button
+        elNewMessages.addEventListener('click', () => { scrollToBottom(true); resetNewMessageCount(); });
 
         // Reconnect button
         elBtnReconnect.addEventListener('click', manualReconnect);
