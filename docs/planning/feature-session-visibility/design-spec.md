@@ -3,12 +3,13 @@ id: feature-session-visibility
 title: "Session Visibility Rules for Multi-Session UI"
 type: feature
 priority: high
-status: draft
+status: implemented
 created: 2026-04-11
-updated: 2026-04-11
+updated: 2026-04-12
 author: jon
 tags: [signalr, sessions, ui, gateway, multi-session, ddd]
 depends_on: [feature-multi-session-connection, ddd-refactoring]
+implemented_by: ddd-refactoring (SessionType filtering)
 ---
 
 # Design Spec: Session Visibility Rules for Multi-Session UI

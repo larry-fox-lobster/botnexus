@@ -4,8 +4,9 @@
 |--------------|--------------------------------------------|
 | **Author**   | Leela (Lead/Architect)                     |
 | **Requested by** | Jon Bullen                            |
-| **Status**   | DRAFT — awaiting review                    |
+| **Status**   | IMPLEMENTED — subscribe-all model is live  |
 | **Created**  | 2026-04-11                                 |
+| **Updated**  | 2026-04-12                                 |
 | **Scope**    | Gateway + WebUI SignalR connection model    |
 
 ---
