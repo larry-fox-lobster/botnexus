@@ -69,12 +69,17 @@ A subtle spinner or "Loading older messages..." text appears at the top of the c
 ### Endpoint
 
 ```
-GET /api/channels/{channelType}/agents/{agentId}/history
+GET /api/channels/{channelKey}/agents/{agentId}/history
 ```
 
-This is a **new** endpoint on a new `ChannelHistoryController`. It replaces the per-session `GET /sessions/{sessionId}/history` for scrollback purposes (that endpoint remains for direct session access).
+This is a **new** endpoint on a new `ChannelHistoryController`. It replaces the per-session `GET /api/sessions/{sessionId}/history` for scrollback purposes (that endpoint remains for direct session access).
 
-### Parameters
+**Path Parameters:**
+
+- `channelKey`: `ChannelKey` value object (normalized, case-insensitive). The channel type for this scrollback thread (e.g., "telegram-group-123", "slack-channel-acme").
+- `agentId`: `AgentId` value object. The agent whose sessions to scroll through.
+
+### Query Parameters
 
 | Parameter   | Type   | Required | Default | Description                                          |
 |-------------|--------|----------|---------|------------------------------------------------------|
@@ -91,7 +96,7 @@ Opaque to the client. Internal structure:
 {sessionId}:{messageIndex}
 ```
 
-Example: `sess_abc123:42` means "start before message index 42 in session sess_abc123." When `messageIndex` reaches 0, the API automatically locates the previous session for the same `channelType + agentId` pair and continues from its last message.
+Example: `sess_abc123:42` means "start before message index 42 in session `sess_abc123`." When `messageIndex` reaches 0, the API automatically locates the previous session for the same `agentId + channelKey` pair (using `ChannelKey` value object equality, which is normalized and case-insensitive) and continues from its last message.
 
 ### Response
 
@@ -126,12 +131,17 @@ Example: `sess_abc123:42` means "start before message index 42 in session sess_a
 
 ### Cross-Session Logic (Server-Side)
 
-1. Resolve all sessions for `(channelType, agentId)` ordered by `createdAt DESC`
+1. Resolve all `Session` records for `(agentId, channelKey)` ordered by `CreatedAt DESC` (newest first)
 2. Parse cursor to find starting session + message index
 3. Read messages backwards from that point
 4. If the current session is exhausted and `limit` not yet met, move to the previous session and continue filling
 5. Record any session transitions as `sessionBoundaries`
 6. Sessions with 0 messages are skipped automatically
+
+**Session Status Filtering:**
+
+- Include `Session` records with `Status == SessionStatus.Active` or `SessionStatus.Sealed`
+- Skip `Status == SessionStatus.Suspended` (resumable, but not history) and `Status == SessionStatus.Expired` (retention-pruned)
 
 ### ISessionStore Changes
 
@@ -139,16 +149,17 @@ Add one method to `ISessionStore`:
 
 ```csharp
 /// <summary>
-/// Lists sessions for a specific agent filtered by channel type,
+/// Lists sessions for a specific agent filtered by channel key,
 /// ordered by CreatedAt descending (newest first).
+/// Uses ChannelKey value object equality (normalized, case-insensitive).
 /// </summary>
-Task<IReadOnlyList<GatewaySession>> ListByChannelAsync(
-    string agentId,
-    string channelType,
+Task<IReadOnlyList<Session>> ListByChannelAsync(
+    AgentId agentId,
+    ChannelKey channelKey,
     CancellationToken cancellationToken = default);
 ```
 
-The existing `GetHistorySnapshot(offset, limit)` on `GatewaySession` is sufficient for reading message pages within a session.
+The existing `GetHistorySnapshot(offset, limit)` on `Session` is sufficient for reading message pages within a session.
 
 ---
 
@@ -180,7 +191,7 @@ async function fetchOlderMessages() {
     showTopSpinner();
 
     const data = await fetchJson(
-        `/api/channels/${channelType}/agents/${agentId}/history?cursor=${nextCursor}&limit=50`
+        `/api/channels/${channelKey}/agents/${agentId}/history?cursor=${nextCursor}&limit=50`
     );
 
     const scrollHeightBefore = chatContainer.scrollHeight;
@@ -221,9 +232,9 @@ Fetched pages are cached in the existing `SessionStore` (from the multi-session 
 |----------|----------|
 | **New messages while scrolled up** | Don't auto-scroll. Show a floating "↓ New messages" button anchored to bottom of chat. Clicking it scrolls to bottom and dismisses. |
 | **Session with 0 messages** | API skips it and loads from the previous session. The client never sees it. |
-| **Deleted/archived sessions** | API treats them as end-of-history. `hasMore: false`. |
+| **Deleted/archived sessions** | API treats them as end-of-history. `hasMore: false`. Sessions with `Status == Expired` are excluded from history walks. |
 | **Rapid scrolling** | Single in-flight guard prevents duplicate fetches. Observer re-fires after each prepend completes. |
-| **Channel switch mid-fetch** | The fetch callback checks if the active view still matches `(channelType, agentId)`. If not, the response is discarded. |
+| **Channel switch mid-fetch** | The fetch callback checks if the active view still matches `(channelKey, agentId)`. If not, the response is discarded. |
 | **Reconnect after disconnect** | On SignalR reconnect, the client does NOT re-fetch history. Existing DOM is preserved. Only live events resume. |
 | **Very large sessions (10k+ messages)** | The cursor-based model handles this naturally — no offset drift, no N+1 queries. |
 
