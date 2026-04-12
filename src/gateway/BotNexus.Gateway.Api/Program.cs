@@ -1,6 +1,8 @@
 using BotNexus.Gateway.Api.Extensions;
 using BotNexus.Gateway.Api.Hubs;
 using BotNexus.Gateway.Api;
+using BotNexus.Gateway.Abstractions.Agents;
+using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Extensions;
 using BotNexus.Providers.Anthropic;
@@ -10,6 +12,7 @@ using BotNexus.Providers.OpenAI;
 using BotNexus.Providers.OpenAICompat;
 using BotNexus.Cron;
 using BotNexus.Cron.Extensions;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.OpenApi.Models;
 using OpenTelemetry.Trace;
 using Serilog;
@@ -207,7 +210,84 @@ app.MapGet("/api/version", () =>
 });
 app.MapFallbackToFile("index.html");
 
+LogGatewayStartup(app, builder.Environment, startupPlatformConfig);
+
 app.Run();
+
+static void LogGatewayStartup(WebApplication app, IWebHostEnvironment environment, PlatformConfig startupPlatformConfig)
+{
+    var gatewayAssembly = typeof(Program).Assembly;
+    var version = gatewayAssembly.GetName().Version?.ToString() ?? "dev";
+    var informationalVersion = gatewayAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? version;
+
+    var agents = app.Services.GetRequiredService<IAgentRegistry>()
+        .GetAll()
+        .Select(agent => new
+        {
+            agentId = agent.AgentId.Value,
+            agent.DisplayName,
+            provider = agent.ApiProvider,
+            model = agent.ModelId,
+            isolation = agent.IsolationStrategy
+        })
+        .ToArray();
+
+    var channels = app.Services.GetRequiredService<IChannelManager>()
+        .Adapters
+        .Select(channel => new
+        {
+            channelType = channel.ChannelType,
+            channel.DisplayName,
+            channel.SupportsStreaming
+        })
+        .ToArray();
+
+    var loadedProviders = app.Services.GetRequiredService<ApiProviderRegistry>()
+        .GetAll()
+        .Select(provider => provider.Api)
+        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    var configuredProviders = startupPlatformConfig.Providers?
+        .Where(provider => provider.Value.Enabled)
+        .Select(provider => provider.Key)
+        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+        .ToArray() ?? [];
+
+    var endpoints = app.Services.GetServices<EndpointDataSource>()
+        .SelectMany(source => source.Endpoints.OfType<RouteEndpoint>())
+        .Select(endpoint =>
+        {
+            var methods = endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods?.ToArray() ?? ["*"];
+            return new
+            {
+                route = endpoint.RoutePattern.RawText ?? endpoint.DisplayName ?? "<unknown>",
+                methods,
+                endpoint.DisplayName
+            };
+        })
+        .OrderBy(endpoint => endpoint.route, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    app.Logger.LogInformation(
+        "Gateway startup complete {GatewayVersion} ({InformationalVersion}) on {DotNetVersion}. env={Environment} providers={LoadedProviderCount} agents={AgentCount} channels={ChannelCount}",
+        version,
+        informationalVersion,
+        Environment.Version,
+        environment.EnvironmentName,
+        loadedProviders.Length,
+        agents.Length,
+        channels.Length);
+
+    app.Logger.LogInformation(
+        "Gateway components loaded: configuredProviders={ConfiguredProviders} loadedProviders={LoadedProviders} agents={Agents} channels={Channels}",
+        configuredProviders,
+        loadedProviders,
+        agents,
+        channels);
+
+    app.Logger.LogInformation("Gateway endpoints registered: {Endpoints}", endpoints);
+}
 
 /// <summary>
 /// Entry point marker for integration testing.
