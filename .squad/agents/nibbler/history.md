@@ -248,3 +248,31 @@ Participated in design review ceremony for Phase 3 architecture. All ADs approve
 **Commit:** ix: consistency review — session switching alignment
 **Build:** 0 errors, 0 warnings
 **Tests:** 1,798/1,798 pass (16 test projects)
+
+---
+
+## 2026-04-12 — Post-DDD Refactoring Consistency Review (Waves 1-4)
+
+**Requested by:** Copilot (Jon Bullen)
+**Sprint:** DDD refactoring Waves 1-4
+
+**Results:**
+- **6 discrepancies found** across 4 files, **all fixed** in 6 commits
+
+**P0 Fixes (incorrect values):**
+1. ddd-patterns.md SubAgentArchetype: "Executor, Coordinator" -> Coder, Planner, Reviewer, Writer
+2. ddd-patterns.md TriggerType: "Channel, Cron, SystemTimer" -> Cron, Soul, Heartbeat
+3. overview.md TriggerType: same wrong values fixed
+
+**P1 Fixes (stale/misleading):**
+4. overview.md Sealed description: "Closed permanently" -> "terminal state; complete and preserved"
+5. design-spec.md status: "In Progress" -> "Waves 1-4 Complete"
+6. README.md: added missing BotNexus.Domain to project structure
+
+**Build:** 0 errors, 0 warnings
+
+## Learnings
+
+- Smart enum values are the #1 drift source in DDD docs. Design spec had correct values but patterns guide copied from earlier draft with placeholder names.
+- TriggerType is confusing because "Channel" sounds plausible but contradicts the whole IInternalTrigger design intent.
+- Even after a rename, descriptions can reuse old terms ("Closed permanently") — grep for the OLD term in ALL contexts.
