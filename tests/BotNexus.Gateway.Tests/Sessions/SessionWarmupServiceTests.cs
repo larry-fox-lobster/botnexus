@@ -71,6 +71,27 @@ public sealed class SessionWarmupServiceTests
     }
 
     [Fact]
+    public async Task WarmupService_HidesSoulCronAndSubAgentSessions()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var userAgent = CreateSession("user-agent", "agent-a", SessionStatus.Active, now, BotNexus.Domain.Primitives.SessionType.UserAgent);
+        var soul = CreateSession("soul", "agent-a", SessionStatus.Active, now.AddMinutes(-1), BotNexus.Domain.Primitives.SessionType.Soul);
+        var cron = CreateSession("cron", "agent-a", SessionStatus.Active, now.AddMinutes(-2), BotNexus.Domain.Primitives.SessionType.Cron);
+        var subAgent = CreateSession("sub-agent", "agent-a", SessionStatus.Active, now.AddMinutes(-3), BotNexus.Domain.Primitives.SessionType.AgentSubAgent);
+
+        var store = CreateSessionStore(userAgent, soul, cron, subAgent);
+        var service = CreateService(store.Object, CreateRegistry("agent-a"), new SessionWarmupOptions());
+
+        await service.StartAsync(CancellationToken.None);
+        var visibleIds = (await service.GetAvailableSessionsAsync("agent-a", CancellationToken.None))
+            .Select(summary => summary.SessionId)
+            .ToList();
+
+        visibleIds.Should().Contain("user-agent");
+        visibleIds.Should().NotContain(["soul", "cron", "sub-agent"]);
+    }
+
+    [Fact]
     public async Task WarmupService_HidesSealedChannelSessionWhenNewerActiveSiblingExists()
     {
         var now = DateTimeOffset.UtcNow;
