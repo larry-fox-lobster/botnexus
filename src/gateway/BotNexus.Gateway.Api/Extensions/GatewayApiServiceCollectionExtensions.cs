@@ -1,7 +1,9 @@
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Triggers;
 using BotNexus.Gateway.Api.Hubs;
+using BotNexus.Gateway.Api.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace BotNexus.Gateway.Api.Extensions;
 
@@ -16,6 +18,9 @@ public static class GatewayApiServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddBotNexusGatewayApi(this IServiceCollection services)
     {
+        services.AddSingleton<IRecentLogStore, InMemoryRecentLogStore>();
+        services.AddSingleton<ILoggerProvider>(serviceProvider =>
+            new RecentLogEntryLoggerProvider(serviceProvider.GetRequiredService<IRecentLogStore>()));
         services.AddSingleton<CronTrigger>();
         services.AddSingleton<IInternalTrigger>(provider => provider.GetRequiredService<CronTrigger>());
         services.AddSingleton<SignalRChannelAdapter>();

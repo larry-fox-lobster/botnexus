@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using BotNexus.Gateway.Api.Logging;
 
 namespace BotNexus.Gateway.Api.Controllers;
 
@@ -6,12 +7,18 @@ namespace BotNexus.Gateway.Api.Controllers;
 /// Receives client-side log entries for unified server-side debugging.
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/log")]
+[Route("api/logs")]
 public sealed class LogController : ControllerBase
 {
     private readonly ILogger<LogController> _logger;
+    private readonly IRecentLogStore _recentLogs;
 
-    public LogController(ILogger<LogController> logger) => _logger = logger;
+    public LogController(ILogger<LogController> logger, IRecentLogStore recentLogs)
+    {
+        _logger = logger;
+        _recentLogs = recentLogs;
+    }
 
     /// <summary>Receives a log entry from the WebUI client.</summary>
     [HttpPost]
@@ -29,6 +36,13 @@ public sealed class LogController : ControllerBase
             entry.Version ?? "?", entry.Message ?? "", entry.Data ?? "");
 
         return Ok();
+    }
+
+    /// <summary>Returns recent structured log entries for diagnostics.</summary>
+    [HttpGet("recent")]
+    public ActionResult<IReadOnlyList<RecentLogEntry>> GetRecent([FromQuery] int limit = 100)
+    {
+        return Ok(_recentLogs.GetRecent(limit));
     }
 }
 
