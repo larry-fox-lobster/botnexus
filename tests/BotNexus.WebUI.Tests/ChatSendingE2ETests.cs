@@ -82,6 +82,19 @@ public sealed class ChatSendingE2ETests
     }
 
     [PlaywrightFact(Timeout = 90000)]
+    public async Task SendMessage_UsesAgentAndChannelArguments()
+    {
+        var host = await OpenChatAsync();
+        await host.SendMessageAsync("signature-check");
+        await host.WaitForConsoleMessageAsync("→ SendMessage");
+
+        var invocations = host.GetHubInvocationMessages("SendMessage");
+        invocations.Should().Contain(message =>
+            message.Contains("agent-a", StringComparison.OrdinalIgnoreCase) &&
+            message.Contains("web chat", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [PlaywrightFact(Timeout = 90000)]
     public async Task SendButton_RemainsEnabledDuringSessionSwitch()
     {
         var host = await OpenChatAsync();
