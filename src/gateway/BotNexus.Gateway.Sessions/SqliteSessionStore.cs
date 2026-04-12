@@ -16,7 +16,7 @@ namespace BotNexus.Gateway.Sessions;
 /// <summary>
 /// SQLite-backed session store for single-node persistent gateway sessions.
 /// </summary>
-public sealed class SqliteSessionStore : ISessionStore
+public sealed class SqliteSessionStore : SessionStoreBase
 {
     private static readonly ActivitySource ActivitySource = new("BotNexus.Gateway");
     private readonly string _connectionString;
@@ -35,7 +35,7 @@ public sealed class SqliteSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task<GatewaySession?> GetAsync(SessionId sessionId, CancellationToken cancellationToken = default)
+    public override async Task<GatewaySession?> GetAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.get", ActivityKind.Internal);
         activity?.SetTag("botnexus.session.id", sessionId);
@@ -57,7 +57,7 @@ public sealed class SqliteSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task<GatewaySession> GetOrCreateAsync(SessionId sessionId, AgentId agentId, CancellationToken cancellationToken = default)
+    public override async Task<GatewaySession> GetOrCreateAsync(SessionId sessionId, AgentId agentId, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.get_or_create", ActivityKind.Internal);
         activity?.SetTag("botnexus.session.id", sessionId);
@@ -77,12 +77,7 @@ public sealed class SqliteSessionStore : ISessionStore
                 return loaded;
             }
 
-            var session = new GatewaySession
-            {
-                SessionId = sessionId,
-                AgentId = agentId,
-                SessionType = InferSessionType(sessionId, null)
-            };
+            var session = CreateSession(sessionId, agentId, null);
             _cache[sessionId] = session;
             return session;
         }
@@ -90,7 +85,7 @@ public sealed class SqliteSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task SaveAsync(GatewaySession session, CancellationToken cancellationToken = default)
+    public override async Task SaveAsync(GatewaySession session, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.save", ActivityKind.Internal);
         activity?.SetTag("botnexus.session.id", session.SessionId);
@@ -110,7 +105,7 @@ public sealed class SqliteSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task DeleteAsync(SessionId sessionId, CancellationToken cancellationToken = default)
+    public override async Task DeleteAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("session.delete", ActivityKind.Internal);
         activity?.SetTag("botnexus.session.id", sessionId);
@@ -138,7 +133,7 @@ public sealed class SqliteSessionStore : ISessionStore
     }
 
     /// <inheritdoc />
-    public async Task ArchiveAsync(SessionId sessionId, CancellationToken cancellationToken = default)
+    public override async Task ArchiveAsync(SessionId sessionId, CancellationToken cancellationToken = default)
     {
         await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -161,12 +156,8 @@ public sealed class SqliteSessionStore : ISessionStore
         finally { _lock.Release(); }
     }
 
-    /// <inheritdoc />
-    public async Task<IReadOnlyList<GatewaySession>> ListAsync(AgentId? agentId = null, CancellationToken cancellationToken = default)
+    protected override async Task<IReadOnlyList<GatewaySession>> EnumerateSessionsAsync(CancellationToken cancellationToken)
     {
-        using var activity = ActivitySource.StartActivity("session.list", ActivityKind.Internal);
-        activity?.SetTag("botnexus.agent.id", agentId);
-
         await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -178,124 +169,8 @@ public sealed class SqliteSessionStore : ISessionStore
             command.CommandText = """
                 SELECT id
                 FROM sessions
-                WHERE $agentId IS NULL OR agent_id = $agentId
                 ORDER BY updated_at DESC
                 """;
-            command.Parameters.AddWithValue("$agentId", agentId.HasValue ? agentId.Value.Value : DBNull.Value);
-
-            var sessions = new List<GatewaySession>();
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                var sessionId = SessionId.From(reader.GetString(0));
-                var session = _cache.GetValueOrDefault(sessionId)
-                    ?? await LoadSessionAsync(sessionId, cancellationToken).ConfigureAwait(false);
-                if (session is not null)
-                {
-                    _cache[sessionId] = session;
-                    sessions.Add(session);
-                }
-            }
-
-            return sessions;
-        }
-        finally { _lock.Release(); }
-    }
-
-    /// <inheritdoc />
-    public async Task<IReadOnlyList<GatewaySession>> ListByChannelAsync(
-        AgentId agentId,
-        ChannelKey channelType,
-        CancellationToken cancellationToken = default)
-    {
-        using var activity = ActivitySource.StartActivity("session.list_by_channel", ActivityKind.Internal);
-        activity?.SetTag("botnexus.agent.id", agentId);
-        activity?.SetTag("botnexus.channel.type", channelType);
-
-        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            await EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
-            await using var connection = CreateConnection();
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-            await using var command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT id
-                FROM sessions
-                WHERE agent_id = $agentId
-                  AND channel_type IS NOT NULL
-                  AND lower(channel_type) = $channelType
-                ORDER BY created_at DESC
-                """;
-            command.Parameters.AddWithValue("$agentId", agentId.Value);
-            command.Parameters.AddWithValue("$channelType", channelType.Value);
-
-            var sessions = new List<GatewaySession>();
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                var sessionId = SessionId.From(reader.GetString(0));
-                var session = _cache.GetValueOrDefault(sessionId)
-                    ?? await LoadSessionAsync(connection, sessionId, cancellationToken).ConfigureAwait(false);
-                if (session is not null)
-                {
-                    _cache[sessionId] = session;
-                    sessions.Add(session);
-                }
-            }
-
-            return sessions;
-        }
-        finally { _lock.Release(); }
-    }
-
-    /// <inheritdoc />
-    public Task<IReadOnlyList<GatewaySession>> GetExistenceAsync(
-        AgentId agentId,
-        ExistenceQuery query,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(query);
-        return GetExistenceInternalAsync(agentId, query, cancellationToken);
-    }
-
-    private async Task<IReadOnlyList<GatewaySession>> GetExistenceInternalAsync(
-        AgentId agentId,
-        ExistenceQuery query,
-        CancellationToken cancellationToken)
-    {
-        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            await EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
-            await using var connection = CreateConnection();
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-            await using var command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT id
-                FROM sessions
-                WHERE (
-                    agent_id = $agentId
-                    OR EXISTS (
-                        SELECT 1
-                        FROM json_each(COALESCE(participants_json, '[]')) AS participant
-                        WHERE lower(json_extract(participant.value, '$.id')) = $participantAgentId
-                    )
-                )
-                  AND ($from IS NULL OR created_at >= $from)
-                  AND ($to IS NULL OR created_at <= $to)
-                  AND ($typeFilter IS NULL OR session_type = $typeFilter)
-                ORDER BY created_at DESC
-                LIMIT CASE WHEN $limit IS NULL OR $limit <= 0 THEN -1 ELSE $limit END
-                """;
-            command.Parameters.AddWithValue("$agentId", agentId.Value);
-            command.Parameters.AddWithValue("$participantAgentId", agentId.Value.ToLowerInvariant());
-            command.Parameters.AddWithValue("$from", query.From.HasValue ? query.From.Value.ToString("O") : DBNull.Value);
-            command.Parameters.AddWithValue("$to", query.To.HasValue ? query.To.Value.ToString("O") : DBNull.Value);
-            command.Parameters.AddWithValue("$typeFilter", query.TypeFilter is not null ? query.TypeFilter.Value : DBNull.Value);
-            command.Parameters.AddWithValue("$limit", query.Limit.HasValue ? query.Limit.Value : DBNull.Value);
 
             var sessions = new List<GatewaySession>();
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -590,14 +465,4 @@ public sealed class SqliteSessionStore : ISessionStore
         return JsonSerializer.Deserialize<Dictionary<string, object?>>(metadataJson, JsonOptions) ?? [];
     }
 
-    private static SessionType InferSessionType(SessionId sessionId, ChannelKey? channelType)
-    {
-        if (sessionId.IsSubAgent)
-            return SessionType.AgentSubAgent;
-
-        if (channelType.HasValue && string.Equals(channelType.Value, "cron", StringComparison.OrdinalIgnoreCase))
-            return SessionType.Cron;
-
-        return SessionType.UserAgent;
-    }
 }
