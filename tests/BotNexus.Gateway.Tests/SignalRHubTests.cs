@@ -63,171 +63,115 @@ public sealed class SignalRHubTests
     }
 
     [Fact]
-    public async Task GatewayHub_JoinSession_CreatesSessionAndAddsToGroup()
+    public async Task GatewayHub_SendMessage_UsesVisibleSessionForAgentChannel()
     {
         var groups = new Mock<IGroupManager>();
         groups.Setup(value => value.AddToGroupAsync("conn-1", "session:s1", It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("s1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("s1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") });
+        var warmup = new Mock<ISessionWarmupService>();
+        warmup.Setup(value => value.GetAvailableSessionsAsync("agent-a", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new SessionSummary("s1", "agent-a", ChannelKey.From("signalr"), SessionStatus.Active, 3, DateTimeOffset.UtcNow.AddMinutes(-10), DateTimeOffset.UtcNow)
+            ]);
 
-        var hub = CreateHub(
-            groups: groups.Object,
-            sessions: sessions.Object,
-            connectionId: "conn-1");
-
-        var result = await hub.JoinSession("agent-a", "s1");
-
-        groups.Verify(value => value.AddToGroupAsync("conn-1", "session:s1", It.IsAny<CancellationToken>()), Times.Once);
-        sessions.Verify(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("s1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()), Times.Once);
-        HasPropertyValue([result], "sessionId", "s1").Should().BeTrue();
-        HasPropertyValue([result], "agentId", "agent-a").Should().BeTrue();
-        HasPropertyValue([result], "connectionId", "conn-1").Should().BeTrue();
-        GetPropertyValue<int>(result, "messageCount").Should().Be(0);
-        GetPropertyValue<bool>(result, "isResumed").Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task JoinSession_NewSession_ReturnsIsResumedFalse()
-    {
-        var groups = new Mock<IGroupManager>();
-        groups.Setup(value => value.AddToGroupAsync("conn-1", "session:new-session", It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("new-session"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GatewaySession
-            {
-                SessionId = BotNexus.Domain.Primitives.SessionId.From("new-session"),
-                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
-                History = []
-            });
-
-        var hub = CreateHub(groups: groups.Object, sessions: sessions.Object, connectionId: "conn-1");
-
-        var result = await hub.JoinSession("agent-a", "new-session");
-
-        GetPropertyValue<bool>(result, "isResumed").Should().BeFalse();
-        GetPropertyValue<int>(result, "messageCount").Should().Be(0);
-    }
-
-    [Fact]
-    public async Task JoinSession_ExistingSessionWithHistory_ReturnsIsResumedTrue()
-    {
-        var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("existing"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GatewaySession
-            {
-                SessionId = BotNexus.Domain.Primitives.SessionId.From("existing"),
-                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
-                History =
-                [
-                    new SessionEntry { Role = MessageRole.User, Content = "hello" },
-                    new SessionEntry { Role = MessageRole.Assistant, Content = "hi" }
-                ]
-            });
-
-        var hub = CreateHub(sessions: sessions.Object, connectionId: "conn-1");
-
-        var result = await hub.JoinSession("agent-a", "existing");
-
-        GetPropertyValue<bool>(result, "isResumed").Should().BeTrue();
-        GetPropertyValue<int>(result, "messageCount").Should().BeGreaterThan(0);
-    }
-
-    [Fact]
-    public async Task JoinSession_WhitespaceIds_NormalizesBeforeSessionLookup()
-    {
-        var groups = new Mock<IGroupManager>();
-        groups.Setup(value => value.AddToGroupAsync("conn-1", "session:s1", It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("s1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GatewaySession
-            {
-                SessionId = BotNexus.Domain.Primitives.SessionId.From("s1"),
-                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a")
-            });
-
-        var hub = CreateHub(groups: groups.Object, sessions: sessions.Object, connectionId: "conn-1");
-
-        var result = await hub.JoinSession("  agent-a  ", "  s1  ");
-
-        groups.Verify(value => value.AddToGroupAsync("conn-1", "session:s1", It.IsAny<CancellationToken>()), Times.Once);
-        sessions.Verify(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("s1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()), Times.Once);
-        HasPropertyValue([result], "sessionId", "s1").Should().BeTrue();
-        HasPropertyValue([result], "agentId", "agent-a").Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task JoinSession_ExpiredSession_ReactivatesAndReturnsResumed()
-    {
-        var expiredSession = new GatewaySession
+        var existing = new GatewaySession
         {
-            SessionId = BotNexus.Domain.Primitives.SessionId.From("expired"),
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("s1"),
             AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
-            Status = SessionStatus.Expired,
-            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1),
-            History =
-            [
-                new SessionEntry { Role = MessageRole.User, Content = "persisted" }
-            ]
+            ChannelType = ChannelKey.From("signalr"),
+            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent
         };
 
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("expired"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(expiredSession);
-        sessions.Setup(value => value.SaveAsync(expiredSession, It.IsAny<CancellationToken>()))
+        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("s1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var dispatcher = new Mock<IChannelDispatcher>();
+        dispatcher.Setup(value => value.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var hub = CreateHub(sessions: sessions.Object, connectionId: "conn-1");
+        var hub = CreateHub(groups: groups.Object, sessions: sessions.Object, warmup: warmup.Object, dispatcher: dispatcher.Object, connectionId: "conn-1");
 
-        var result = await hub.JoinSession("agent-a", "expired");
+        var result = await hub.SendMessage("agent-a", "web chat", "hello");
 
-        expiredSession.Status.Should().Be(SessionStatus.Active);
-        expiredSession.ExpiresAt.Should().BeNull();
-        sessions.Verify(value => value.SaveAsync(expiredSession, It.IsAny<CancellationToken>()), Times.Once);
-        GetPropertyValue<bool>(result, "isResumed").Should().BeTrue();
-        GetPropertyValue<string>(result, "status").Should().Be(SessionStatus.Active.ToString());
+        groups.Verify(value => value.AddToGroupAsync("conn-1", "session:s1", It.IsAny<CancellationToken>()), Times.Once);
+        sessions.Verify(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("s1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()), Times.Once);
+        dispatcher.Verify(value => value.DispatchAsync(
+            It.Is<InboundMessage>(m => m.SessionId == "s1" && m.TargetAgentId == "agent-a" && m.Content == "hello"),
+            CancellationToken.None), Times.Once);
+        HasPropertyValue([result], "sessionId", "s1").Should().BeTrue();
     }
 
     [Fact]
-    public async Task JoinSession_ReturnsStatusAndTimestamps()
+    public async Task GatewayHub_SendMessage_NoVisibleSession_CreatesAndPersistsSession()
     {
-        var createdAt = DateTimeOffset.UtcNow.AddMinutes(-5);
-        var updatedAt = DateTimeOffset.UtcNow;
+        var groups = new Mock<IGroupManager>();
+        groups.Setup(value => value.AddToGroupAsync("conn-1", It.Is<string>(g => g.StartsWith("session:")), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var warmup = new Mock<ISessionWarmupService>();
+        warmup.Setup(value => value.GetAvailableSessionsAsync("agent-a", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        GatewaySession? capturedSession = null;
         var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("s1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GatewaySession
+        sessions.Setup(value => value.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.SessionId>(), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((BotNexus.Domain.Primitives.SessionId sid, BotNexus.Domain.Primitives.AgentId aid, CancellationToken _) => new GatewaySession
             {
-                SessionId = BotNexus.Domain.Primitives.SessionId.From("s1"),
-                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
-                CreatedAt = createdAt,
-                UpdatedAt = updatedAt
+                SessionId = sid,
+                AgentId = aid
             });
+        sessions.Setup(value => value.SaveAsync(It.IsAny<GatewaySession>(), It.IsAny<CancellationToken>()))
+            .Callback<GatewaySession, CancellationToken>((s, _) => capturedSession = s)
+            .Returns(Task.CompletedTask);
 
-        var hub = CreateHub(sessions: sessions.Object, connectionId: "conn-1");
+        InboundMessage? dispatched = null;
+        var dispatcher = new Mock<IChannelDispatcher>();
+        dispatcher.Setup(value => value.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
+            .Callback<InboundMessage, CancellationToken>((m, _) => dispatched = m)
+            .Returns(Task.CompletedTask);
 
-        var result = await hub.JoinSession("agent-a", "s1");
+        var hub = CreateHub(groups: groups.Object, sessions: sessions.Object, warmup: warmup.Object, dispatcher: dispatcher.Object, connectionId: "conn-1");
 
-        GetPropertyValue<string>(result, "status").Should().Be(SessionStatus.Active.ToString());
-        GetPropertyValue<DateTimeOffset>(result, "createdAt").Should().Be(createdAt);
-        GetPropertyValue<DateTimeOffset>(result, "updatedAt").Should().Be(updatedAt);
+        var result = await hub.SendMessage("agent-a", "signalr", "hello");
+
+        capturedSession.Should().NotBeNull();
+        capturedSession!.ChannelType.Should().Be(ChannelKey.From("signalr"));
+        groups.Verify(value => value.AddToGroupAsync("conn-1", It.Is<string>(g => g.StartsWith("session:")), It.IsAny<CancellationToken>()), Times.Once);
+        sessions.Verify(value => value.SaveAsync(It.IsAny<GatewaySession>(), It.IsAny<CancellationToken>()), Times.Once);
+        dispatched.Should().NotBeNull();
+        dispatched!.TargetAgentId.Should().Be("agent-a");
+        dispatched.Content.Should().Be("hello");
+        GetPropertyValue<string>(result, "sessionId").Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
     public async Task GatewayHub_SendMessage_DispatchesThroughGateway()
     {
+        var warmup = new Mock<ISessionWarmupService>();
+        warmup.Setup(value => value.GetAvailableSessionsAsync("agent-a", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new SessionSummary("session-1", "agent-a", ChannelKey.From("signalr"), SessionStatus.Active, 0, DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow)
+            ]);
+
+        var sessions = new Mock<ISessionStore>();
+        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GatewaySession
+            {
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"),
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+                ChannelType = ChannelKey.From("signalr"),
+                SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent
+            });
+
         var dispatcher = new Mock<IChannelDispatcher>();
         dispatcher.Setup(value => value.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var hub = CreateHub(dispatcher: dispatcher.Object, connectionId: "conn-1");
+        var hub = CreateHub(dispatcher: dispatcher.Object, sessions: sessions.Object, warmup: warmup.Object, connectionId: "conn-1");
 
-        await hub.SendMessage("agent-a", "session-1", "hello");
+        await hub.SendMessage("agent-a", "signalr", "hello");
 
         dispatcher.Verify(value => value.DispatchAsync(
                 It.Is<InboundMessage>(m =>
@@ -244,13 +188,29 @@ public sealed class SignalRHubTests
     [Fact]
     public async Task GatewayHub_SendMessage_WhitespaceIds_DispatchesNormalizedIds()
     {
+        var warmup = new Mock<ISessionWarmupService>();
+        warmup.Setup(value => value.GetAvailableSessionsAsync("agent-a", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new SessionSummary("session-1", "agent-a", ChannelKey.From("signalr"), SessionStatus.Active, 0, DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow)
+            ]);
+
+        var sessions = new Mock<ISessionStore>();
+        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GatewaySession
+            {
+                SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"),
+                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+                ChannelType = ChannelKey.From("signalr"),
+                SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent
+            });
+
         var dispatcher = new Mock<IChannelDispatcher>();
         dispatcher.Setup(value => value.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var hub = CreateHub(dispatcher: dispatcher.Object, connectionId: "conn-1");
+        var hub = CreateHub(dispatcher: dispatcher.Object, sessions: sessions.Object, warmup: warmup.Object, connectionId: "conn-1");
 
-        await hub.SendMessage("  agent-a  ", "  session-1  ", "hello");
+        await hub.SendMessage("  agent-a  ", "  signalr  ", "hello");
 
         dispatcher.Verify(value => value.DispatchAsync(
                 It.Is<InboundMessage>(m =>

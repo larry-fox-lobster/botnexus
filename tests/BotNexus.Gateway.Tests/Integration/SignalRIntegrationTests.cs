@@ -106,7 +106,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Hub_Subscribe_JoinsSingleGroup()
+    public async Task Hub_SubscribeAll_JoinsVisibleGroups()
     {
         await using var factory = CreateTestFactory();
         using var cts = CreateTimeout();
@@ -118,17 +118,19 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await SeedSessionAsync(factory, new GatewaySession { SessionId = sessionOther, AgentId = TestAgentId, Status = GatewaySessionStatus.Active }, cts.Token);
 
         await using var connection = await CreateStartedConnection(factory, cts.Token);
-        var subscribed = await connection.InvokeAsync<JsonElement>("Subscribe", sessionTarget, cts.Token);
-        subscribed.GetProperty("sessionId").GetString().Should().Be(sessionTarget);
+        var subscribed = await connection.InvokeAsync<JsonElement>("SubscribeAll", cts.Token);
+        subscribed.GetProperty("sessions").EnumerateArray().Should()
+            .Contain(item => item.GetProperty("sessionId").GetString() == sessionTarget)
+            .And.Contain(item => item.GetProperty("sessionId").GetString() == sessionOther);
 
         var targetReceived = new TaskCompletionSource<AgentStreamEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var crossReceived = false;
+        var otherReceived = new TaskCompletionSource<AgentStreamEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var _ = connection.On<AgentStreamEvent>("ContentDelta", payload =>
         {
             if (payload.ContentDelta == "target-only")
                 targetReceived.TrySetResult(payload);
             if (payload.ContentDelta == "other-should-not-arrive")
-                crossReceived = true;
+                otherReceived.TrySetResult(payload);
         });
 
         var adapter = factory.Services.GetRequiredService<SignalRChannelAdapter>();
@@ -136,8 +138,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await adapter.SendStreamEventAsync(sessionOther, new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "other-should-not-arrive" }, cts.Token);
 
         (await targetReceived.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("target-only");
-        await Task.Delay(250, cts.Token);
-        crossReceived.Should().BeFalse();
+        (await otherReceived.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("other-should-not-arrive");
     }
 
     [Fact]
@@ -253,9 +254,9 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await RegisterAgentAsync(factory, cts.Token);
 
         await using var connection = await CreateStartedConnection(factory, cts.Token);
-        const string sessionId = "dispatch-session";
-        await connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionId, cts.Token);
-        await connection.InvokeAsync("SendMessage", TestAgentId, sessionId, "hello", cts.Token);
+        var result = await connection.InvokeAsync<JsonElement>("SendMessage", TestAgentId, "signalr", "hello", cts.Token);
+        var sessionId = result.GetProperty("sessionId").GetString();
+        sessionId.Should().NotBeNullOrWhiteSpace();
 
         dispatcher.Messages.Should().ContainSingle()
             .Which.Should().Match<InboundMessage>(m =>
@@ -295,14 +296,27 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         using var cts = CreateTimeout();
         await RegisterAgentAsync(factory, cts.Token);
 
-        await using var connection = await CreateStartedConnection(factory, cts.Token);
         const string sessionA = "switch-a";
         const string sessionB = "switch-b";
+        await SeedSessionAsync(factory, new GatewaySession
+        {
+            SessionId = sessionA,
+            AgentId = TestAgentId,
+            ChannelType = ChannelKey.From("signalr"),
+            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
+            Status = GatewaySessionStatus.Active
+        }, cts.Token);
+        await SeedSessionAsync(factory, new GatewaySession
+        {
+            SessionId = sessionB,
+            AgentId = TestAgentId,
+            ChannelType = ChannelKey.From("telegram"),
+            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
+            Status = GatewaySessionStatus.Active
+        }, cts.Token);
 
-        await connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionA, cts.Token);
-        await connection.InvokeAsync("LeaveSession", sessionA, cts.Token);
-        await connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionB, cts.Token);
-        await connection.InvokeAsync("SendMessage", TestAgentId, sessionB, "latest", cts.Token);
+        await using var connection = await CreateStartedConnection(factory, cts.Token);
+        await connection.InvokeAsync("SendMessage", TestAgentId, "telegram", "latest", cts.Token);
 
         dispatcher.Messages.Should().ContainSingle();
         dispatcher.Messages[0].SessionId.Should().Be(sessionB);
@@ -320,18 +334,31 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         using var cts = CreateTimeout();
         await RegisterAgentAsync(factory, cts.Token);
 
-        await using var connection = await CreateStartedConnection(factory, cts.Token);
         const string sessionA = "rapid-a";
         const string sessionB = "rapid-b";
+        await SeedSessionAsync(factory, new GatewaySession
+        {
+            SessionId = sessionA,
+            AgentId = TestAgentId,
+            ChannelType = ChannelKey.From("signalr"),
+            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
+            Status = GatewaySessionStatus.Active
+        }, cts.Token);
+        await SeedSessionAsync(factory, new GatewaySession
+        {
+            SessionId = sessionB,
+            AgentId = TestAgentId,
+            ChannelType = ChannelKey.From("telegram"),
+            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
+            Status = GatewaySessionStatus.Active
+        }, cts.Token);
 
-        var joinA = connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionA, cts.Token);
-        var joinB = connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionB, cts.Token);
-        var results = await Task.WhenAll(joinA, joinB);
-        results.Should().Contain(result => result.GetProperty("sessionId").GetString() == sessionB);
+        await using var connection = await CreateStartedConnection(factory, cts.Token);
+        await Task.WhenAll(
+            connection.InvokeAsync("SendMessage", TestAgentId, "signalr", "before-switch", cts.Token),
+            connection.InvokeAsync("SendMessage", TestAgentId, "telegram", "after-switch", cts.Token));
 
-        await connection.InvokeAsync("SendMessage", TestAgentId, sessionB, "after-switch", cts.Token);
-        dispatcher.Messages.Should().ContainSingle();
-        dispatcher.Messages[0].SessionId.Should().Be(sessionB);
+        dispatcher.Messages.Should().ContainSingle(m => m.SessionId == sessionB && m.Content == "after-switch");
     }
 
     [Fact]
@@ -346,16 +373,27 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         using var cts = CreateTimeout();
         await RegisterAgentAsync(factory, cts.Token);
 
-        await using var connection = await CreateStartedConnection(factory, cts.Token);
         const string sessionA = "active-join-a";
         const string sessionB = "active-join-b";
+        await SeedSessionAsync(factory, new GatewaySession
+        {
+            SessionId = sessionA,
+            AgentId = TestAgentId,
+            ChannelType = ChannelKey.From("signalr"),
+            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
+            Status = GatewaySessionStatus.Active
+        }, cts.Token);
+        await SeedSessionAsync(factory, new GatewaySession
+        {
+            SessionId = sessionB,
+            AgentId = TestAgentId,
+            ChannelType = ChannelKey.From("telegram"),
+            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
+            Status = GatewaySessionStatus.Active
+        }, cts.Token);
 
-        await connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionA, cts.Token);
-        await connection.InvokeAsync("LeaveSession", sessionA, cts.Token);
-
-        var joinB = connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionB, cts.Token);
-        await connection.InvokeAsync("SendMessage", TestAgentId, sessionB, "send-during-join", cts.Token);
-        await joinB;
+        await using var connection = await CreateStartedConnection(factory, cts.Token);
+        await connection.InvokeAsync("SendMessage", TestAgentId, "telegram", "send-during-join", cts.Token);
 
         dispatcher.Messages.Should().ContainSingle();
         dispatcher.Messages[0].SessionId.Should().Be(sessionB);
@@ -374,16 +412,27 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         using var cts = CreateTimeout();
         await RegisterAgentAsync(factory, cts.Token);
 
-        await using var connection = await CreateStartedConnection(factory, cts.Token);
         const string sessionA = "leave-join-a";
         const string sessionB = "leave-join-b";
+        await SeedSessionAsync(factory, new GatewaySession
+        {
+            SessionId = sessionA,
+            AgentId = TestAgentId,
+            ChannelType = ChannelKey.From("signalr"),
+            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
+            Status = GatewaySessionStatus.Active
+        }, cts.Token);
+        await SeedSessionAsync(factory, new GatewaySession
+        {
+            SessionId = sessionB,
+            AgentId = TestAgentId,
+            ChannelType = ChannelKey.From("telegram"),
+            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
+            Status = GatewaySessionStatus.Active
+        }, cts.Token);
 
-        await connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionA, cts.Token);
-        await connection.InvokeAsync("LeaveSession", sessionA, cts.Token);
-
-        var joinB = connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionB, cts.Token);
-        await connection.InvokeAsync("SendMessage", TestAgentId, sessionB, "immediate-after-join", cts.Token);
-        await joinB;
+        await using var connection = await CreateStartedConnection(factory, cts.Token);
+        await connection.InvokeAsync("SendMessage", TestAgentId, "telegram", "immediate-after-join", cts.Token);
 
         dispatcher.Messages.Should().ContainSingle();
         dispatcher.Messages[0].SessionId.Should().Be(sessionB);
@@ -405,14 +454,28 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await RegisterAgentAsync(factory, cts.Token, agentA);
         await RegisterAgentAsync(factory, cts.Token, agentB);
 
-        await using var connection = await CreateStartedConnection(factory, cts.Token);
         const string sessionA = "interleaved-session-1";
         const string sessionB = "interleaved-session-2";
+        await SeedSessionAsync(factory, new GatewaySession
+        {
+            SessionId = sessionA,
+            AgentId = agentA,
+            ChannelType = ChannelKey.From("signalr"),
+            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
+            Status = GatewaySessionStatus.Active
+        }, cts.Token);
+        await SeedSessionAsync(factory, new GatewaySession
+        {
+            SessionId = sessionB,
+            AgentId = agentB,
+            ChannelType = ChannelKey.From("signalr"),
+            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
+            Status = GatewaySessionStatus.Active
+        }, cts.Token);
 
-        await connection.InvokeAsync<JsonElement>("JoinSession", agentA, sessionA, cts.Token);
-        await connection.InvokeAsync<JsonElement>("JoinSession", agentB, sessionB, cts.Token);
-        await connection.InvokeAsync("SendMessage", agentA, sessionA, "message-for-a", cts.Token);
-        await connection.InvokeAsync("SendMessage", agentB, sessionB, "message-for-b", cts.Token);
+        await using var connection = await CreateStartedConnection(factory, cts.Token);
+        await connection.InvokeAsync("SendMessage", agentA, "signalr", "message-for-a", cts.Token);
+        await connection.InvokeAsync("SendMessage", agentB, "signalr", "message-for-b", cts.Token);
 
         dispatcher.Messages.Should().HaveCount(2);
         dispatcher.Messages.Should().ContainSingle(m =>
@@ -892,5 +955,4 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }
-
 
