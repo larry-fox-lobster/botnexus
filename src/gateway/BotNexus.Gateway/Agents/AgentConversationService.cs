@@ -4,6 +4,7 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using Microsoft.Extensions.Logging;
+using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
 
 namespace BotNexus.Gateway.Agents;
 
@@ -52,7 +53,7 @@ public sealed class AgentConversationService : IAgentConversationService
         session.SessionType = SessionType.AgentAgent;
         session.ChannelType = null;
         session.CallerId = null;
-        session.Status = SessionStatus.Active;
+        session.Status = GatewaySessionStatus.Active;
         session.Participants.Clear();
         session.Participants.Add(new SessionParticipant
         {
@@ -98,14 +99,14 @@ public sealed class AgentConversationService : IAgentConversationService
                 message = BuildFollowUpMessage(request.Objective, finalResponse);
             }
 
-            session.Status = SessionStatus.Sealed;
+            session.Status = GatewaySessionStatus.Sealed;
             session.Metadata["conversationStatus"] = "sealed";
             await _sessionStore.SaveAsync(session, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Agent conversation failed for session '{SessionId}'.", sessionId);
-            session.Status = SessionStatus.Sealed;
+            session.Status = GatewaySessionStatus.Sealed;
             session.Metadata["conversationStatus"] = "error";
             session.Metadata["error"] = ex.Message;
             await _sessionStore.SaveAsync(session, CancellationToken.None).ConfigureAwait(false);
