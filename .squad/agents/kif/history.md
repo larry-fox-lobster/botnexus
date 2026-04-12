@@ -205,8 +205,65 @@ Created docs/features/sub-agent-spawning.md — comprehensive feature documentat
 
 All interface names cross-referenced against Leela's design review (leela-subagent-design-review.md). Updated README.md Getting Started table with link to new feature doc. Created docs/features/ directory (first feature doc in this location). Commit: ad72475.
 
+## 2026-04-12 — DDD Patterns Developer Reference Guide (Wave 1)
+
+**Status:** ✅ COMPLETE  
+**Commit:** (post-commit pending — documentation only)
+
+Created `docs/development/ddd-patterns.md` — comprehensive developer reference documenting value object and smart enum patterns from Leela's DDD design review.
+
+**Content (20.5 KB markdown):**
+
+1. **Introduction** — Problem statement: primitive obsession (raw strings for domain concepts), lack of type safety (duplicated logic across 13 projects), domain language misalignment (string concat for identities). Solution: value objects (AgentId, SessionId, ChannelKey) + smart enums (MessageRole, SessionType).
+
+2. **Value Object Pattern** — `readonly record struct` with:
+   - When to use (domain concepts with validation, high-ROI targets like AgentId P0, ChannelKey P0)
+   - Code pattern with validation factory `From()`, implicit/explicit operators
+   - JsonConverter implementation (Read() calls From() for validation, Write() outputs string)
+   - Conversion semantics: implicit for migration phase (backward compat), explicit for new code (type safety)
+   - Dos/Don'ts (validate in factory, no business logic, no mutators, round-trip serialization)
+
+3. **Smart Enum Pattern** — `sealed class` with:
+   - When to use (discriminators, plugin-extensible types like MessageRole, SessionType)
+   - Code pattern with static instances, `ConcurrentDictionary<string, T>` registry, `FromString()` factory
+   - Registry-based extensibility: plugins call `FromString("custom-value")` at init time, registry stores + retrieves
+   - Thread safety: `ConcurrentDictionary.GetOrAdd()` guarantees single instance per value even under concurrent calls
+   - Extension registration flow for plugins (no core code modifications needed)
+
+4. **Migration Guide** — 5-step additive process:
+   - Step 1: Add new type alongside old (no breaking changes)
+   - Step 2: Use implicit conversion (existing tests compile without changes)
+   - Step 3: Update producers (API callers)
+   - Step 4: Update consumers (API implementations)
+   - Step 5: Remove old type (Wave 2-3 timeline)
+
+5. **Type Catalog** — Table tracking all 15+ value objects + 6 smart enums:
+   - **Phase 1 (Wave 1):** AgentId, SessionId, ChannelKey, ConversationId, SenderId, AgentSessionKey, ToolName (value objects); MessageRole, SessionStatus, SessionType, ExecutionStrategy (smart enums)
+   - **Phase 2 (Wave 2-3):** SessionParticipant, SubAgentArchetype, TriggerType
+   - **Future:** World (YAGNI), AgentCapabilities
+
+**Cross-references:**
+- design-spec.md (specification)
+- research.md (primitive obsession analysis)
+- leela-ddd-design-review.md (decisions D1-D8, wave plan, risk analysis)
+- docs/architecture/ (system design)
+
+**Key design decisions documented:**
+- D1 preserved: `readonly record struct` + JsonConverter ensures serialization safety
+- D2 preserved: implicit conversion allows ~2,000 tests to migrate incrementally
+- Both patterns verified against design review source material
+
+**Audience:**
+- Developers implementing Phase 1 (Farnsworth will use this as reference for BotNexus.Domain)
+- Reviewers (code pattern contracts are documented)
+- Plugins/extensions (extensibility model explained)
+
 ## Learnings
 
 - BotNexus docs use numbered sections (## 1. Overview) with matching TOC anchors (#1-overview). Anchors must include the section number prefix.
 - Feature docs should live under docs/features/ — this is a new convention established with sub-agent spawning.
 - Design review documents in .squad/decisions/inbox/ are the authoritative source for interface names and architectural decisions.
+- Developer reference guides for architectural patterns should live in docs/development/ — new convention for Wave 1 DDD patterns guide.
+- Value object and smart enum patterns are best explained via concrete code examples + decision rationale (why `readonly record struct` over regular record? → stack allocation + immutability).
+- Migration guides should be explicit about timing: implicit conversion during Phase 1, explicit conversion in Phase 2+. This manages team expectations about when old code patterns are retired.
+- Type catalogs with phase/wave breakdown help teams parallelize work (Wave 1 types are immediate dependencies, Wave 2-3 types are sequenced by dependencies).

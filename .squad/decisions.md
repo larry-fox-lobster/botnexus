@@ -13695,3 +13695,221 @@ Replace Copilot chat-completions search with MCP-native provider (CopilotMcpSear
 
 **Status:** Complete, build passes, ready for integration.
 
+
+### Farnsworth Decision — Domain Primitives + PlatformConfig Migration (2026-04-12)
+
+**Date:** 2026-04-12  
+**Owner:** Farnsworth (Platform Dev)  
+**Status:** Implemented
+
+## Decision
+
+1. Introduce a new zero-dependency `BotNexus.Domain` project containing foundational domain primitives:
+   - Value objects (`AgentId`, `SessionId`, `ChannelKey`, `ConversationId`, `SenderId`, `AgentSessionKey`, `ToolName`)
+   - Smart enums (`MessageRole`, `SessionStatus`, `SessionType`, `ExecutionStrategy`)
+   - Shared `SmartEnumJsonConverter<T>` + dedicated value-object converters
+2. Remove root-level gateway duplication from `PlatformConfig` and require canonical `Gateway.*` configuration.
+3. Preserve backward compatibility by adding a one-time migration path in `PlatformConfigLoader`:
+   - Read legacy root keys from raw JSON
+   - Map them into `GatewaySettingsConfig` when nested values are absent
+   - Validate schema against the migrated object model
+
+## Rationale
+
+- Domain primitive types establish type safety and contract clarity needed for DDD wave work.
+- Single canonical config shape (`gateway`) prevents drift and duplicate resolution logic.
+- One-time migration keeps existing user configs functional without retaining permanent duplication.
+
+## Validation
+
+- `dotnet build BotNexus.slnx --nologo --tl:off` ✅
+- `dotnet test tests\BotNexus.Gateway.Tests\BotNexus.Gateway.Tests.csproj --filter "<config/platform-related suites>"` ✅ (99 passed)
+- Full gateway suite had one known flaky file watcher cleanup failure on first run; isolated rerun passed.
+
+---
+
+### Bender Wave 1 Cleanup Decisions (2026-04-12)
+
+**Decision Date:** 2026-04-12  
+**Decided By:** Bender (Runtime Dev)  
+**Status:** Implemented
+
+## Context
+
+Wave 1 requested independent cleanup for provider streaming duplication (Phase 9.4) and tool utility duplication (Phase 9.6) while preserving behavior.
+
+## Decisions
+
+1. **Shared provider stream processor in Providers.Core**
+   - Created `OpenAIStreamProcessor` under `BotNexus.Providers.Core.Streaming`.
+   - Both `OpenAICompletionsProvider` and `OpenAICompatProvider` now delegate SSE stream parsing and chunk assembly to this shared processor.
+   - Provider-specific behavior remains at provider boundary via delegates (usage mapping, stop-reason mapping, provider error extraction/emission).
+
+2. **Tool-call ID normalization moved to scoped extension**
+   - Added `ToolCallIdExtensions.NormalizeToolCallId(int)` in `BotNexus.Providers.Core.Utilities`.
+   - Replaced duplicated regex-based sanitization/truncation logic at provider call sites.
+
+3. **Tool normalization dedup + PathUtils quick wins**
+   - Added `StringExtensions.NormalizeLineEndings()` in `BotNexus.Tools.Extensions` and replaced duplicate private methods in `EditTool` and `ReadTool`.
+   - Simplified `PathUtils` by removing unused `IsGitIgnored` and trimming `GetRelativePath` to only required parameters.
+
+## Validation
+
+- `dotnet build src\providers\BotNexus.Providers.Core\BotNexus.Providers.Core.csproj` ✅
+- `dotnet build src\providers\BotNexus.Providers.OpenAI\BotNexus.Providers.OpenAI.csproj` ✅
+- `dotnet build src\providers\BotNexus.Providers.OpenAICompat\BotNexus.Providers.OpenAICompat.csproj` ✅
+- `dotnet build src\providers\BotNexus.Providers.Anthropic\BotNexus.Providers.Anthropic.csproj` ✅
+- `dotnet build src\tools\BotNexus.Tools\BotNexus.Tools.csproj` ✅
+- `dotnet build BotNexus.slnx` ❌ (fails due pre-existing unrelated gateway/webui test/config drift in working tree)
+
+---
+
+### Decision: Per-Agent File Permission Model — Design Review (2026-04-11)
+
+**Date:** 2026-04-11
+**Author:** Leela (Lead/Architect)
+**Status:** Approved for implementation
+**Design Spec:** [design-spec.md](../../../docs/planning/feature-tool-permission-model/design-spec.md)
+
+## Context
+
+Jon reported that agents can't read project files outside their workspace directory. All file tools use `PathUtils.ResolvePath()` which enforces strict containment to `~/.botnexus/agents/{name}/workspace`. Meanwhile, the shell tool has zero path validation — `cat /etc/passwd` works. We need per-agent, config-driven file access control.
+
+## Key Design Decisions
+
+### 1. Deny Overrides Allow — Always
+
+Deny rules take absolute precedence. If a path matches both an allow rule and a deny rule, access is denied. No ambiguity.
+
+### 2. Read/Write Separation
+
+`FileAccessPolicy` has separate `AllowedReadPaths` and `AllowedWritePaths`. An agent can read a repository without being able to write to it. This is the most common real-world need (code review agents).
+
+### 3. No Wildcards in v1
+
+Only exact directory paths. Wildcards (`Q:\repos\*`) deferred to v2. Rationale: simpler to audit, harder to misconfigure, covers all current use cases.
+
+### 4. Shell Tool Is Unsandboxable
+
+Shell commands can access anything the OS user can. We set working directory, inject env vars (`BOTNEXUS_ALLOWED_READ`, `BOTNEXUS_ALLOWED_WRITE`), and document the limitation. True sandboxing requires container isolation (future work).
+
+### 5. Zero Breaking Changes
+
+`FileAccessPolicy` is nullable on `AgentDescriptor`. Null means workspace-only (current behavior). Existing tool constructors get an overload — no signature breaks.
+
+## Wave Plan
+
+### Wave 1: Abstractions + Config → Farnsworth
+
+- `FileAccessPolicy` record in `BotNexus.Gateway.Abstractions/Security/`
+- `FileAccessMode` enum in `BotNexus.Gateway.Abstractions/Security/`
+- `IPathValidator` interface in `BotNexus.Gateway.Abstractions/Security/`
+- `DefaultPathValidator` implementation in `BotNexus.Tools/Security/`
+- `FileAccessPolicy?` property on `AgentDescriptor`
+- Config deserialization for `fileAccess` JSON block
+
+**Branch:** `feature/permission-model-abstractions`
+
+### Wave 2: Tool Integration → Bender
+
+Depends on: Wave 1 merged
+
+- Add `IPathValidator` to all file tool constructors (read, write, edit, glob, grep, ls, watch_file)
+- Replace `PathUtils.ResolvePath()` calls with `IPathValidator.ValidateAndResolve()`
+- Update `DefaultAgentToolFactory.CreateTools()` to accept and pass `FileAccessPolicy`
+- Update `InProcessIsolationStrategy.CreateAsync()` to wire `descriptor.FileAccessPolicy`
+- Shell tool: inject allowed-path env vars into `ProcessStartInfo.Environment`
+
+**Branch:** `feature/permission-model-tools`
+
+### Wave 3: Tests → Hermes
+
+Depends on: Wave 2 merged
+
+- `DefaultPathValidator` unit tests: allow, deny, deny-overrides-allow, default workspace fallback, ~ expansion, relative path resolution, symlink traversal
+- Per-tool integration tests: each tool rejects denied paths, allows permitted paths
+- Config round-trip tests: `FileAccessPolicy` serializes/deserializes correctly
+- End-to-end isolation test: agent with policy can read allowed repo, cannot write to it
+
+**Branch:** `feature/permission-model-tests`
+
+## Risk Assessment
+
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| Shell bypasses all file permissions | Medium | Documented limitation; env vars for cooperative scripts; container isolation in v2 |
+| Misconfigured deny rules lock agent out | Low | Default policy (null) preserves current workspace-only behavior |
+| Symlink traversal bypasses checks | Low | Reuses existing `ResolveFinalTargetPath` — paths checked after resolution |
+| Breaking existing tool constructors | Low | Overloaded constructors — existing signatures preserved |
+
+## Acceptance Criteria
+
+1. Agent with `allowedReadPaths: ["Q:\\repos\\botnexus"]` can read files in that repo
+2. Same agent without `allowedWritePaths` for that repo cannot write to it
+3. Agent with `deniedPaths: [".env"]` cannot read `.env` even if parent directory is allowed
+4. Agent with no `fileAccess` config behaves identically to current behavior
+5. All existing tests pass without modification
+
+---
+
+### Design Review: DDD Refactoring (2026-04-12)
+
+**Decision Date:** 2026-04-12
+**Decided By:** Leela (Lead/Architect)
+**Status:** Approved with modifications
+**Spec:** `docs/planning/ddd-refactoring/design-spec.md`
+**Research:** `docs/planning/ddd-refactoring/research.md`
+
+## Architecture Assessment
+
+### Spec Quality
+
+The spec is research-backed and thorough. The domain-to-code mapping is accurate — I verified every claim against the codebase. The primitive obsession analysis is correct (NormalizeChannelKey triplication confirmed in 5 locations, Role magic strings in 13 occurrences across 6 files, IsolationStrategy string comparisons in 40+ files). The migration strategy (additive-first) is sound.
+
+### What the Spec Gets Right
+
+1. **BotNexus.Domain as the keystone** — Zero-dependency domain project is the correct first move. Everything should reference it downward.
+2. **Primitive obsession as P1** — ChannelKey and MessageRole are the highest-ROI value objects. The codebase evidence supports this.
+3. **CronChannelAdapter is misplaced** — Confirmed: it implements IChannelAdapter but disables every capability flag. It's a trigger, not a channel.
+4. **Sub-agent identity theft is real** — `childAgentId = request.ParentAgentId` (line 64 of DefaultSubAgentManager.cs) makes parent and child indistinguishable in logs and audit.
+5. **Additive migration strategy** — Adding new types alongside old ones before migrating consumers is the only safe approach with 13 projects referencing Gateway.Abstractions.
+
+### Key Decisions
+
+| ID | Decision | Rationale |
+|----|----------|-----------|
+| D1 | Value objects: `readonly record struct` with implicit string conversion + JsonConverter | Stack-allocated, serialization-safe, backward-compatible |
+| D2 | Tests migrate incrementally via implicit conversion | ~2,000 tests can't all change at once |
+| D3 | Defer Phase 4 (World) | YAGNI — no consumer exists |
+| D4 | Defer Phase 5 (Agent-to-Agent) | Feature work, not DDD alignment — needs own spec |
+| D5 | Defer Phase 2.3 (Soul Session) | Underspecified — needs detailed design |
+| D6 | Move Phases 9.4/9.5/9.6 to Wave 1 | Zero dependency on Domain project — parallelize |
+| D7 | Phase 7.2 requires dedicated sub-spec | GatewaySession decomposition is highest-risk item |
+| D8 | Phase 7.1 uses TypeForwardedTo attributes | 13 projects can't all switch at once |
+
+## Wave Plan
+
+### Wave 1: Domain Foundation + Independent Cleanup (In Progress)
+
+| Work Item | Agent | Status |
+|-----------|-------|--------|
+| 1.1a Create BotNexus.Domain project + Primitives | Farnsworth | ✅ Complete |
+| 1.1a Domain tests | Hermes | ✅ Complete (109 tests) |
+| 9.4 Provider streaming consolidation | Bender | ✅ Complete |
+| 9.5 PlatformConfig cleanup | Farnsworth | ✅ Complete |
+| 9.6 Tool utility elimination | Bender | ✅ Complete |
+| Docs: DDD patterns guide | Kif | ✅ Complete |
+
+### Waves 2-4: Session Model + Sealed Rename + Cron Decoupling + Existence
+
+Depends on Wave 1 (BotNexus.Domain project must exist). ~3-4 weeks.
+
+### Waves 5-6: Abstractions Split + GatewaySession Decomposition (Deferred)
+
+Depends on Waves 2-4. Highest-risk items. ~2-3 weeks. Ready to start after Wave 4 stabilizes.
+
+## Grade: B+
+
+The spec is well-researched, correctly identifies real problems, and proposes sound solutions. It loses points for scope ambition (mixing DDD alignment with speculative features), missing serialization strategy detail, and underestimating GatewaySession decomposition. With the modifications above (D1-D8), the spec is actionable and the wave plan provides a safe execution path.
+
+---
