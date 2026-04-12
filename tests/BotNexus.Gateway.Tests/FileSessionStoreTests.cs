@@ -1,6 +1,7 @@
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Sessions;
+using BotNexus.Sessions.Common;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
@@ -68,7 +69,7 @@ public sealed class FileSessionStoreTests
         var sessionId = "session/with special";
         var session = await store.GetOrCreateAsync(sessionId, "agent-a");
         await store.SaveAsync(session);
-        var encodedName = Uri.EscapeDataString(sessionId);
+        var encodedName = SessionFileNames.SanitizeSessionId(sessionId);
 
         await store.DeleteAsync(sessionId);
 
@@ -82,7 +83,7 @@ public sealed class FileSessionStoreTests
         using var fixture = new StoreFixture();
         var store = fixture.CreateStore();
         const string sessionId = "archive-me";
-        var encodedName = Uri.EscapeDataString(sessionId);
+        var encodedName = SessionFileNames.SanitizeSessionId(sessionId);
         var session = await store.GetOrCreateAsync(sessionId, "agent-a");
         session.History.Add(new SessionEntry { Role = MessageRole.User, Content = "persist-me" });
         await store.SaveAsync(session);
