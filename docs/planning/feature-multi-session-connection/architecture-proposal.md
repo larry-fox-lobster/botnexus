@@ -82,7 +82,7 @@ When the gateway starts (or when an agent is registered), it pre-loads sessions 
 │  1. Load all agents from IAgentRegistry              │
 │  2. For each agent:                                  │
 │     a. ISessionStore.ListAsync(agentId)              │
-│     b. Filter to Active + recent Expired sessions    │
+│     b. Filter to Active + recent Sealed sessions     │
 │     c. Pre-load into memory cache                    │
 │  3. Gateway is "warm" — ready for client connections │
 │                                                      │
@@ -95,13 +95,15 @@ When the gateway starts (or when an agent is registered), it pre-loads sessions 
 namespace BotNexus.Gateway.Abstractions.Sessions;
 
 /// <summary>
-/// Pre-loads sessions on gateway startup so clients can subscribe immediately.
+/// Pre-loads sessions on gateway startup so clients can subscribe immediately via SubscribeAll.
 /// </summary>
 public interface ISessionWarmupService : IHostedService
 {
     /// <summary>
-    /// Returns all sessions that are available for client subscription.
-    /// Includes Active sessions and recently Expired sessions within the retention window.
+    /// Returns all sessions available for client subscription, applying visibility rules.
+    /// - Only SessionType.UserAgent sessions (non-internal)
+    /// - Active + Sealed sessions (not Suspended, Expired)
+    /// - For sealed channel sessions: only if no newer active/suspended replacement exists
     /// </summary>
     Task<IReadOnlyList<SessionSummary>> GetAvailableSessionsAsync(
         CancellationToken cancellationToken = default);
@@ -110,22 +112,29 @@ public interface ISessionWarmupService : IHostedService
     /// Returns available sessions filtered by agent.
     /// </summary>
     Task<IReadOnlyList<SessionSummary>> GetAvailableSessionsAsync(
-        string agentId,
+        AgentId agentId,
         CancellationToken cancellationToken = default);
 }
 
 /// <summary>
 /// Lightweight summary for client subscription — no history payload.
+/// Uses domain value types: SessionId, AgentId, ChannelKey, SessionStatus, SessionType.
 /// </summary>
 public sealed record SessionSummary(
-    string SessionId,
-    string AgentId,
-    string? ChannelType,
+    SessionId SessionId,
+    AgentId AgentId,
+    ChannelKey? ChannelKey,
     SessionStatus Status,
+    SessionType SessionType,
     int MessageCount,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 ```
+
+**Notes on visibility:**
+- `SessionWarmupService` queries `ISessionStore.GetVisibleSessionsAsync()` (defined in [Session Visibility spec](../feature-session-visibility/design-spec.md)) to apply server-side filtering.
+- This ensures only `UserAgent` sessions and non-superseded sealed channel sessions are available for subscription.
+- The `ChannelKey` value object provides normalized, case-insensitive comparison.
 
 ### 2.2 Client-Side: Multi-Session Subscription
 
@@ -250,17 +259,18 @@ Compare to current model: **2 round-trips + version checks + safety timer → 0 
 | Scope | Description | Memory | Startup Time |
 |-------|-------------|--------|--------------|
 | **All sessions ever** | Load everything from the store | Unbounded | Slow |
-| **Active sessions only** | `Status == Active` | Bounded, small | Fast |
-| **Active + recent** | Active + Expired within 24h | Bounded, reasonable | Fast |
+| **Active sessions only** | `Status == SessionStatus.Active` | Bounded, small | Fast |
+| **Active + recent** | Active + Sealed within 24h | Bounded, reasonable | Fast |
 
-**Recommendation: Active + recently active (configurable window).** The warmup service loads sessions with `Status == Active` plus sessions that expired within a configurable retention window (default: 24 hours). This covers the common case (resume where you left off) without loading the entire archive.
+**Recommendation: Active + recently sealed (configurable window).** The warmup service loads sessions with `Status == SessionStatus.Active` plus sessions that were sealed within a configurable retention window (default: 24 hours). This covers the common case (resume where you left off, including channel continuations) without loading the entire archive. Uses `ISessionStore.GetVisibleSessionsAsync()` which applies session visibility rules, ensuring only `UserAgent` sessions appear and sealed channel sessions don't duplicate active ones.
 
 ```csharp
 public sealed class SessionWarmupOptions
 {
     /// <summary>
-    /// How far back to look for expired sessions to pre-warm.
+    /// How far back to look for sealed sessions to pre-warm.
     /// Default: 24 hours.
+    /// Sealed sessions with `UpdatedAt` within this window are pre-loaded.
     /// </summary>
     public TimeSpan RetentionWindow { get; set; } = TimeSpan.FromHours(24);
 
@@ -344,7 +354,8 @@ public sealed class GatewayHub : Hub
     // ... existing dependencies + new ones ...
     private readonly ISessionWarmupService _warmup;
 
-    // NEW: Client subscribes to all available sessions on connect
+    // NEW: Client subscribes to all available sessions on connect (simplified model)
+    // No explicit session join/leave from client — SubscribeAll is the only entry point.
     public async Task<SubscriptionResult> SubscribeAll()
     {
         var sessions = await _warmup.GetAvailableSessionsAsync(Context.ConnectionAborted);
@@ -363,13 +374,14 @@ public sealed class GatewayHub : Hub
 
         return new SubscriptionResult(
             sessions.Select(s => new SessionInfo(
-                s.SessionId, s.AgentId, s.ChannelType,
-                s.Status.ToString(), s.MessageCount,
+                s.SessionId.Value, s.AgentId.Value, (string?)s.ChannelKey,
+                s.Status.Value, s.SessionType.Value, s.MessageCount,
                 s.CreatedAt, s.UpdatedAt)).ToList());
     }
 
     // NEW: Subscribe to a specific new session (created after initial SubscribeAll)
-    public async Task<SessionInfo> Subscribe(string sessionId)
+    // Called when a new session is created (e.g., user sends first message to a new agent).
+    public async Task<SessionInfo> Subscribe(SessionId sessionId)
     {
         await Groups.AddToGroupAsync(
             Context.ConnectionId,
@@ -378,29 +390,32 @@ public sealed class GatewayHub : Hub
 
         var session = await _sessions.GetAsync(sessionId, Context.ConnectionAborted);
         if (session is null)
-            throw new HubException($"Session '{sessionId}' not found.");
+            throw new HubException($"Session '{sessionId.Value}' not found.");
 
         return new SessionInfo(
-            session.SessionId, session.AgentId, session.ChannelType,
-            session.Status.ToString(), session.MessageCount,
+            session.SessionId.Value, session.AgentId.Value, (string?)session.ChannelKey,
+            session.Status.Value, session.SessionType.Value, session.MessageCount,
             session.CreatedAt, session.UpdatedAt);
     }
 
     // EXISTING: JoinSession stays for backward compat (marked obsolete)
+    // Deprecated — use SubscribeAll + Subscribe instead.
     [Obsolete("Use SubscribeAll + Subscribe. Will be removed in v2.")]
     public async Task<object> JoinSession(string agentId, string? sessionId)
     { /* ... existing implementation unchanged ... */ }
 
     // EXISTING: LeaveSession stays for backward compat
+    // Deprecated — no longer needed with multi-session subscription.
     [Obsolete("Use SubscribeAll. Will be removed in v2.")]
-    public Task LeaveSession(string sessionId)
+    public Task LeaveSession(SessionId sessionId)
         => Groups.RemoveFromGroupAsync(Context.ConnectionId, GetSessionGroup(sessionId));
 
-    // MODIFIED: SendMessage unchanged — it already takes agentId + sessionId
-    public Task SendMessage(string agentId, string sessionId, string content)
+    // MODIFIED: SendMessage now requires explicit session specification (agentId + channelKey or sessionId)
+    // Client doesn't join sessions — it specifies the session to write to.
+    public Task SendMessage(AgentId agentId, string content, ChannelKey? channelKey = null, SessionId? sessionId = null)
     { /* ... unchanged ... */ }
 
-    // MODIFIED: OnConnectedAsync — include available session count
+    // MODIFIED: OnConnectedAsync — include available session count and capabilities
     public override async Task OnConnectedAsync()
     {
         // ... existing logic ...
@@ -412,8 +427,8 @@ public sealed class GatewayHub : Hub
             connectionId = Context.ConnectionId,
             agents = _registry.GetAll().Select(a => new { a.AgentId, a.DisplayName }),
             serverVersion = typeof(GatewayHub).Assembly.GetName().Version?.ToString() ?? "dev",
-            // NEW: signal multi-session support
-            capabilities = new { multiSession = true },
+            // NEW: signal multi-session support — clients MUST call SubscribeAll to get all sessions
+            capabilities = new { multiSession = true, subscriballRequired = true },
             availableSessionCount = sessions.Count
         });
 
@@ -421,14 +436,15 @@ public sealed class GatewayHub : Hub
     }
 }
 
-// New DTOs
+// New DTOs using DDD types
 public sealed record SubscriptionResult(IReadOnlyList<SessionInfo> Sessions);
 
 public sealed record SessionInfo(
     string SessionId,
     string AgentId,
-    string? ChannelType,
+    string? ChannelKey,
     string Status,
+    string SessionType,
     int MessageCount,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
