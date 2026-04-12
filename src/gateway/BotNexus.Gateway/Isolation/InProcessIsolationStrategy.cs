@@ -286,11 +286,23 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
             };
         }
 
+        List<AgentMessage>? initialMessages = null;
+        if (context.History.Count > 0)
+        {
+            initialMessages = context.History
+                .Select(ConvertSessionEntryToAgentMessage)
+                .ToList();
+
+            _logger.LogInformation("Injecting {Count} history messages into agent context for session '{SessionId}'",
+                initialMessages.Count, context.SessionId);
+        }
+
         var options = new AgentOptions(
             InitialState: new AgentInitialState(
                 SystemPrompt: enrichedSystemPrompt,
                 Model: model,
-                Tools: tools),
+                Tools: tools,
+                Messages: initialMessages),
             Model: model,
             LlmClient: _llmClient,
             ConvertToLlm: null,
@@ -377,6 +389,21 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         }
 
         return null;
+    }
+
+    private static AgentMessage ConvertSessionEntryToAgentMessage(SessionEntry entry)
+    {
+        return entry.Role.Value switch
+        {
+            "user" => new AgentCoreUserMessage(entry.Content),
+            "assistant" => new AssistantAgentMessage(entry.Content),
+            "system" => new SystemAgentMessage(entry.Content),
+            "tool" => new ToolResultAgentMessage(
+                entry.ToolCallId ?? string.Empty,
+                entry.ToolName ?? "tool",
+                new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, entry.Content)])),
+            _ => new AgentCoreUserMessage(entry.Content)
+        };
     }
 
     private static string ResolveCopilotMcpEndpoint(string? baseEndpoint)
