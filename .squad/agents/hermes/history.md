@@ -211,3 +211,6 @@
   - dotnet build tests\BotNexus.WebUI.Tests --verbosity quiet ✅
   - $env:BOTNEXUS_RUN_PLAYWRIGHT_E2E = "1"; dotnet test tests\BotNexus.WebUI.Tests --filter "FullyQualifiedName~Scrollback" --verbosity minimal ❌ (6 total, 0 passed, 6 failed)
 - Failure detail: all new Scrollback tests currently fail; UI did not render expected scrollback sentinel/divider/end markers during test flow (timeouts and missing selectors).
+
+## Learnings
+- 2026-04-12: Domain primitive tests in this repo follow xUnit + FluentAssertions conventions with net10.0 test projects, explicit BotNexus.Domain project reference, and xunit.runner.json copied to output for consistent parallelism settings.
