@@ -8,9 +8,12 @@ using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Routing;
 using BotNexus.Gateway.Abstractions.Sessions;
+using AgentId = BotNexus.Domain.Primitives.AgentId;
 using MessageRole = BotNexus.Domain.Primitives.MessageRole;
 using ParticipantType = BotNexus.Domain.Primitives.ParticipantType;
+using SessionId = BotNexus.Domain.Primitives.SessionId;
 using SessionParticipant = BotNexus.Domain.Primitives.SessionParticipant;
+using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
 using SessionType = BotNexus.Domain.Primitives.SessionType;
 using BotNexus.Gateway.Diagnostics;
 using BotNexus.Gateway.Sessions;
@@ -221,9 +224,9 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
             using var getOrCreateActivity = GatewayDiagnostics.Source.StartActivity("session.get_or_create", ActivityKind.Internal);
             getOrCreateActivity?.SetTag("botnexus.session.id", sessionId);
             getOrCreateActivity?.SetTag("botnexus.agent.id", agentId);
-            var existingSessionTask = _sessions.GetAsync(sessionId, cancellationToken);
+            var existingSessionTask = _sessions.GetAsync(SessionId.From(sessionId), cancellationToken);
             var existingSession = existingSessionTask is null ? null : await existingSessionTask;
-            var session = existingSession ?? await _sessions.GetOrCreateAsync(sessionId, agentId, cancellationToken);
+            var session = existingSession ?? await _sessions.GetOrCreateAsync(SessionId.From(sessionId), AgentId.From(agentId), cancellationToken);
             session.ChannelType ??= message.ChannelType;
             session.CallerId ??= message.SenderId;
             session.SessionType = ResolveSessionType(session, message);
@@ -232,7 +235,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
             {
                 session.Metadata[SystemPromptInitializedMetadataKey] = true;
                 // Force fresh handle creation so isolation strategy rebuilds system prompt from workspace files.
-                var stopTask = _supervisor.StopAsync(agentId, sessionId, cancellationToken);
+                var stopTask = _supervisor.StopAsync(AgentId.From(agentId), SessionId.From(sessionId), cancellationToken);
                 if (stopTask is not null)
                     await stopTask;
             }
@@ -284,7 +287,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
 
             try
             {
-                var handle = await _supervisor.GetOrCreateAsync(agentId, sessionId, cancellationToken);
+                var handle = await _supervisor.GetOrCreateAsync(AgentId.From(agentId), SessionId.From(sessionId), cancellationToken);
 
                 await _activity.PublishAsync(new GatewayActivity
                 {
@@ -396,10 +399,10 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
         InboundMessage message,
         string agentId,
         string sessionId,
-        SessionStatus status,
+        GatewaySessionStatus status,
         CancellationToken cancellationToken)
     {
-        var statusMessage = status == SessionStatus.Suspended
+        var statusMessage = status == GatewaySessionStatus.Suspended
             ? "Session is suspended. Resume the session before sending new messages."
             : $"Session is in '{status}' state and cannot accept messages.";
 
@@ -429,14 +432,14 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
         string sessionId,
         CancellationToken cancellationToken)
     {
-        var instance = _supervisor.GetInstance(agentId, sessionId);
+        var instance = _supervisor.GetInstance(AgentId.From(agentId), SessionId.From(sessionId));
         IAgentHandle? handle = null;
 
         if (instance is not null)
         {
             try
             {
-                handle = await _supervisor.GetOrCreateAsync(agentId, sessionId, cancellationToken);
+                handle = await _supervisor.GetOrCreateAsync(AgentId.From(agentId), SessionId.From(sessionId), cancellationToken);
             }
             catch { /* instance exists but handle creation failed */ }
         }
@@ -455,7 +458,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
         }
 
         // Record steering message in session history
-        var session = await _sessions.GetOrCreateAsync(sessionId, agentId, cancellationToken);
+        var session = await _sessions.GetOrCreateAsync(SessionId.From(sessionId), AgentId.From(agentId), cancellationToken);
         session.AddEntry(new SessionEntry { Role = MessageRole.User, Content = message.Content });
         await _sessions.SaveAsync(session, cancellationToken);
 
@@ -537,7 +540,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
         using var sessionActivity = GatewayDiagnostics.Source.StartActivity("session.get", ActivityKind.Internal);
         sessionActivity?.SetTag("botnexus.session.id", message.SessionId);
 
-        var session = await _sessions.GetAsync(message.SessionId, cancellationToken);
+        var session = await _sessions.GetAsync(SessionId.From(message.SessionId), cancellationToken);
         if (session?.Status is not SessionStatus.Sealed)
             return;
 
@@ -591,7 +594,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
 
     private static SessionType ResolveSessionType(GatewaySession session, InboundMessage message)
     {
-        if (session.SessionId.Contains("::subagent::", StringComparison.OrdinalIgnoreCase))
+        if (session.SessionId.IsSubAgent)
             return SessionType.AgentSubAgent;
 
         if (string.Equals(message.ChannelType, "cron", StringComparison.OrdinalIgnoreCase))

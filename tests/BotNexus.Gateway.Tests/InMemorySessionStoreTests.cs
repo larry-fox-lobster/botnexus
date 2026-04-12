@@ -1,4 +1,5 @@
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Sessions;
 using FluentAssertions;
 
@@ -11,7 +12,7 @@ public sealed class InMemorySessionStoreTests
     {
         var store = new InMemorySessionStore();
 
-        var session = await store.GetOrCreateAsync("s1", "agent-a");
+        var session = await store.GetOrCreateAsync(SessionId.From("s1"), AgentId.From("agent-a"));
 
         session.SessionId.Should().Be("s1");
     }
@@ -20,9 +21,9 @@ public sealed class InMemorySessionStoreTests
     public async Task GetOrCreateAsync_WithExistingSession_ReturnsExistingSession()
     {
         var store = new InMemorySessionStore();
-        var created = await store.GetOrCreateAsync("s1", "agent-a");
+        var created = await store.GetOrCreateAsync(SessionId.From("s1"), AgentId.From("agent-a"));
 
-        var loaded = await store.GetOrCreateAsync("s1", "agent-b");
+        var loaded = await store.GetOrCreateAsync(SessionId.From("s1"), AgentId.From("agent-b"));
 
         loaded.Should().BeSameAs(created);
     }
@@ -31,11 +32,11 @@ public sealed class InMemorySessionStoreTests
     public async Task SaveAsync_PersistsSessionChanges()
     {
         var store = new InMemorySessionStore();
-        var session = await store.GetOrCreateAsync("s1", "agent-a");
+        var session = await store.GetOrCreateAsync(SessionId.From("s1"), AgentId.From("agent-a"));
         session.CallerId = "caller-1";
 
         await store.SaveAsync(session);
-        var loaded = await store.GetAsync("s1");
+        var loaded = await store.GetAsync(SessionId.From("s1"));
 
         loaded!.CallerId.Should().Be("caller-1");
     }
@@ -44,30 +45,30 @@ public sealed class InMemorySessionStoreTests
     public async Task DeleteAsync_RemovesSession()
     {
         var store = new InMemorySessionStore();
-        await store.GetOrCreateAsync("s1", "agent-a");
+        await store.GetOrCreateAsync(SessionId.From("s1"), AgentId.From("agent-a"));
 
-        await store.DeleteAsync("s1");
+        await store.DeleteAsync(SessionId.From("s1"));
 
-        (await store.GetAsync("s1")).Should().BeNull();
+        (await store.GetAsync(SessionId.From("s1"))).Should().BeNull();
     }
 
     [Fact]
     public async Task ArchiveAsync_RemovesFromStore()
     {
         var store = new InMemorySessionStore();
-        await store.GetOrCreateAsync("s1", "agent-a");
+        await store.GetOrCreateAsync(SessionId.From("s1"), AgentId.From("agent-a"));
 
-        await store.ArchiveAsync("s1");
+        await store.ArchiveAsync(SessionId.From("s1"));
 
-        (await store.GetAsync("s1")).Should().BeNull();
+        (await store.GetAsync(SessionId.From("s1"))).Should().BeNull();
     }
 
     [Fact]
     public async Task ListAsync_WithoutFilter_ReturnsAllSessions()
     {
         var store = new InMemorySessionStore();
-        await store.GetOrCreateAsync("s1", "agent-a");
-        await store.GetOrCreateAsync("s2", "agent-b");
+        await store.GetOrCreateAsync(SessionId.From("s1"), AgentId.From("agent-a"));
+        await store.GetOrCreateAsync(SessionId.From("s2"), AgentId.From("agent-b"));
 
         var sessions = await store.ListAsync();
 
@@ -78,11 +79,11 @@ public sealed class InMemorySessionStoreTests
     public async Task ListAsync_WithAgentFilter_ReturnsMatchingSessionsOnly()
     {
         var store = new InMemorySessionStore();
-        await store.GetOrCreateAsync("s1", "agent-a");
-        await store.GetOrCreateAsync("s2", "agent-a");
-        await store.GetOrCreateAsync("s3", "agent-b");
+        await store.GetOrCreateAsync(SessionId.From("s1"), AgentId.From("agent-a"));
+        await store.GetOrCreateAsync(SessionId.From("s2"), AgentId.From("agent-a"));
+        await store.GetOrCreateAsync(SessionId.From("s3"), AgentId.From("agent-b"));
 
-        var sessions = await store.ListAsync("agent-a");
+        var sessions = await store.ListAsync(AgentId.From("agent-a"));
 
         sessions.Should().OnlyContain(s => s.AgentId == "agent-a");
     }
@@ -93,31 +94,31 @@ public sealed class InMemorySessionStoreTests
         var store = new InMemorySessionStore();
         await store.SaveAsync(new GatewaySession
         {
-            SessionId = "s-old",
-            AgentId = "agent-a",
+            SessionId = SessionId.From("s-old"),
+            AgentId = AgentId.From("agent-a"),
             ChannelType = ChannelKey.From("web chat"),
             CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-5)
         });
         await store.SaveAsync(new GatewaySession
         {
-            SessionId = "s-new",
-            AgentId = "agent-a",
+            SessionId = SessionId.From("s-new"),
+            AgentId = AgentId.From("agent-a"),
             ChannelType = ChannelKey.From("web chat"),
             CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1)
         });
         await store.SaveAsync(new GatewaySession
         {
-            SessionId = "s-other-agent",
-            AgentId = "agent-b",
+            SessionId = SessionId.From("s-other-agent"),
+            AgentId = AgentId.From("agent-b"),
             ChannelType = ChannelKey.From("web chat")
         });
         await store.SaveAsync(new GatewaySession
         {
-            SessionId = "s-null-channel",
-            AgentId = "agent-a"
+            SessionId = SessionId.From("s-null-channel"),
+            AgentId = AgentId.From("agent-a")
         });
 
-        var sessions = await store.ListByChannelAsync("agent-a", ChannelKey.From("web chat"));
+        var sessions = await store.ListByChannelAsync(AgentId.From("agent-a"), ChannelKey.From("web chat"));
 
         sessions.Select(s => s.SessionId).Should().Equal("s-new", "s-old");
     }
@@ -127,9 +128,21 @@ public sealed class InMemorySessionStoreTests
     {
         var store = new InMemorySessionStore();
 
-        var session = await store.GetAsync("unknown");
+        var session = await store.GetAsync(SessionId.From("unknown"));
 
         session.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetOrCreateAsync_SubAgentPatternSessionId_InfersSubAgentSessionType()
+    {
+        var store = new InMemorySessionStore();
+        var subSessionId = SessionId.ForSubAgent("parent-session", "child-1");
+
+        var session = await store.GetOrCreateAsync(subSessionId, AgentId.From("agent-a"));
+
+        session.SessionType.Should().Be(SessionType.AgentSubAgent);
+        session.SessionId.Value.Should().Contain("::subagent::");
     }
 }
 

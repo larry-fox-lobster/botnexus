@@ -88,6 +88,15 @@ public sealed class SubAgentModelsTests
     }
 
     [Fact]
+    public void SubAgentInfo_ExposesArchetypeField()
+    {
+        var property = typeof(SubAgentInfo).GetProperty(nameof(SubAgentInfo.Archetype));
+
+        property.Should().NotBeNull();
+        property!.PropertyType.Should().Be(typeof(SubAgentArchetype));
+    }
+
+    [Fact]
     public void SubAgentInfo_RecordWith_CanRepresentStatusTransition()
     {
         var running = new SubAgentInfo

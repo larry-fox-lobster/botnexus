@@ -11,25 +11,30 @@
 
 ---
 
-## 2026-04-06T07:50:00Z — Phase 11 Wave 1: Comprehensive Test Coverage
+## Archived Entries (2026-04-06 to 2026-04-11)
 
-**Status:** ✅ Complete  
-**Agents:** Farnsworth (Config/Schema), Bender (Extension Loading), Hermes (Testing), Kif (Docs)
-
-**Testing Work (Hermes):**
-- Created ConfigPathResolverTests (path traversal, edge cases)
-- Created SchemaValidationTests (validation behavior tests)
+**Phase 11 Testing Work:**
+- Config path tests: ConfigPathResolverTests (traversal, edge cases)
+- Schema validation tests: SchemaValidationTests
 - Extended PlatformConfigurationTests (loader edge cases, round-trip, concurrent reads)
-- 23 new tests added
-- Gateway test count: 312 (up from 289)
+- 23 new tests added; 891 total tests passing (868→891); build clean, 0 warnings
 - Commits: 42ff15a, e9040ca, 542d33a
 
-**Cross-Team Results:**
-- Farnsworth: Config schema generation, ConfigPathResolver extraction
-- Bender: Dynamic extension loading system with manifest discovery
-- Kif: 14 XML doc comments, comprehensive module READMEs
-- **Total:** 891 tests passing (868→891, +23), Build clean, 0 warnings
+**Phase 12 Sub-Agent Testing (W1+W2+W3+W4):**
+- Wave 1 model validation: serialization, enum coverage for SubAgentStatus
+- Wave 2 manager tests: spawn/list/kill operations, concurrency enforcement, recursion prevention, timeout behavior
+- Wave 3+4 integration tests: REST endpoint validation, event emission patterns
+- Commits: b614205 (W1 models), 041d65a (W3+4 integration)
 
+**E2E and Playwright Testing:**
+- DelayTool: 9 unit tests (1 currently failing on reason propagation)
+- FileWatcherTool: 10 unit tests (all passing)
+- ChannelHistory: 10 endpoint contract tests (all passing)
+- ListByChannel: 3 store method tests (all passing)
+- Scrollback E2E: 6 tests (currently failing - UI rendering issues)
+- Commits tracked in recent history; Playwright fixture extended for multi-session seeding
+
+---
 ## 2026-04-10T16:30Z — Sub-Agent Spawning Feature: Wave 1 + 2 + 3 + 4 Testing (Tester)
 
 **Status:** ✅ Complete  
@@ -224,3 +229,7 @@
 - SessionModelWave2Tests.cs written; expected to compile cleanly now that db21650 integrated
 - Action: Run full test matrix `dotnet test tests\BotNexus.Gateway.Tests\SessionModelWave2Tests.csproj` to confirm test quality gate met
 - Status: Ready to proceed to Wave 3 if tests pass
+
+
+- 2026-04-12: Wave 3 QA coverage added for CronTrigger (IInternalTrigger contract, TriggerType.Cron, cron session creation with SessionType.Cron), sub-agent archetype identity semantics (distinct child AgentId with archetype + parent traceability, default General archetype), and typed ID adoption checks (GatewaySession AgentId/SessionId types, AgentSessionKey replacing MakeKey, typed ISessionStore usage with string back-compat assertions).
+- 2026-04-12: Validation status during Wave 3 handoff: BotNexus.Cron.Tests passed; BotNexus.Gateway.Tests is currently blocked by ongoing AgentId/SessionId migration compile errors in BotNexus.Gateway.Api controllers/hubs and related callers.

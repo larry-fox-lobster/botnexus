@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
+using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Configuration;
+using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -109,7 +111,7 @@ public sealed class SessionWarmupService : ISessionWarmupService, IHostedService
         {
             var options = _options.Value;
             var agentIds = _agentRegistry.GetAll()
-                .Select(static descriptor => descriptor.AgentId)
+                .Select(static descriptor => descriptor.AgentId.Value)
                 .Where(static id => !string.IsNullOrWhiteSpace(id))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -152,10 +154,10 @@ public sealed class SessionWarmupService : ISessionWarmupService, IHostedService
         var updatedAfter = DateTimeOffset.UtcNow.AddHours(-retentionHours);
         var maxSessions = Math.Max(0, options.MaxSessionsPerAgent);
 
-        var sessions = await _sessionStore.ListAsync(agentId, ct);
+        var sessions = await _sessionStore.ListAsync(AgentId.From(agentId), ct);
         var summaries = sessions
             .Where(session =>
-                (session.Status == SessionStatus.Active || session.Status == SessionStatus.Expired)
+                (session.Status == GatewaySessionStatus.Active || session.Status == GatewaySessionStatus.Expired)
                 && session.UpdatedAt >= updatedAfter)
             .OrderByDescending(static session => session.UpdatedAt)
             .Take(maxSessions)
