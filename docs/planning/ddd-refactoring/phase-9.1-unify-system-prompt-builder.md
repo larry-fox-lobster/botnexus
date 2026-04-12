@@ -96,6 +96,91 @@ public sealed class PromptPipeline
 }
 ```
 
+### Extension-Contributed Sections
+
+Extensions need to inject content into the system prompt (skill descriptions, tool guidelines, MCP server context, etc.). The pipeline handles this through **section registration at startup** - extensions don't modify core sections, they add their own.
+
+**Registration**: Extensions implement `IPromptSection` and register it via DI. The pipeline discovers all registered sections automatically:
+
+```csharp
+// In an extension's service registration
+services.AddSingleton<IPromptSection, SkillsPromptSection>();
+services.AddSingleton<IPromptSection, McpToolsPromptSection>();
+```
+
+The pipeline collects all `IPromptSection` implementations from the DI container:
+
+```csharp
+public sealed class PromptPipeline
+{
+    private readonly IEnumerable<IPromptSection> _sections;
+
+    public PromptPipeline(IEnumerable<IPromptSection> sections)
+    {
+        _sections = sections;
+    }
+
+    public string Build(PromptContext context)
+    {
+        var lines = _sections
+            .Where(s => s.ShouldInclude(context))
+            .OrderBy(s => s.Order)
+            .SelectMany(s => s.Build(context))
+            .ToList();
+        return string.Join("\n", lines);
+    }
+}
+```
+
+**Ordering**: Each section declares its `Order` value. Core sections use well-known ranges:
+- 0-99: Preamble (identity, role description)
+- 100-199: Tooling and capabilities
+- 200-299: Behavioral rules (safety, execution bias, tool call style)
+- 300-399: Skills and domain knowledge (extension territory)
+- 400-499: Context injection (workspace files, docs)
+- 500-599: Channel-specific (messaging, reply tags, voice)
+- 600-699: Dynamic context (heartbeat, runtime)
+- 900+: Cache boundary and trailing sections
+
+Extensions typically register in the 300-399 range but can use any range to position themselves relative to core sections.
+
+**Data flow**: Extensions may need to pass data to their section builders. Two patterns:
+
+1. **PromptContext.Extensions bag** - for simple key-value data:
+```csharp
+// Extension populates context before pipeline runs
+context.Extensions["skills-prompt"] = skillsMarkdown;
+
+// Section reads it
+public IReadOnlyList<string> Build(PromptContext context)
+{
+    var skills = context.Extensions.GetValueOrDefault("skills-prompt") as string;
+    if (string.IsNullOrEmpty(skills)) return [];
+    return ["## Available Skills", skills, ""];
+}
+```
+
+2. **Typed context via DI** - for complex data, the section's constructor receives whatever services it needs:
+```csharp
+public class McpToolsPromptSection(IMcpServerRegistry registry) : IPromptSection
+{
+    public IReadOnlyList<string> Build(PromptContext context)
+    {
+        var servers = registry.GetActiveServers();
+        // Build MCP tool descriptions from live server state
+    }
+}
+```
+
+**Conditional inclusion**: `ShouldInclude(context)` lets extensions skip their section when not relevant (e.g., skills section only included when the agent has skills configured, MCP section only when MCP servers are active).
+
+This model means:
+- Core prompt sections ship in `BotNexus.Prompts`
+- Gateway-specific sections ship in `BotNexus.Gateway`
+- Extension-contributed sections ship in their own extension assembly
+- Nobody modifies anyone else's code to add prompt content
+- The pipeline composes everything at runtime based on what's registered
+
 ### PromptContext
 
 Shared bag of data that sections read from:
@@ -115,42 +200,48 @@ public sealed record PromptContext
 
 ### Gateway Composition
 
-Gateway adds its own sections on top of the shared ones:
+Gateway registers its sections via DI. The pipeline collects all registered `IPromptSection` implementations automatically - core, gateway-specific, and extension-contributed:
 
 ```csharp
-var pipeline = new PromptPipeline()
-    // Shared sections from BotNexus.Prompts
-    .Add(new ToolSection())
-    .Add(new SafetySection())
-    .Add(new ExecutionBiasSection())
-    .Add(new ContextFileSection())
-    .Add(new RuntimeSection())
-    // Gateway-specific sections
-    .Add(new SkillsSection())
-    .Add(new MessagingSection())
-    .Add(new ReplyTagsSection())
-    .Add(new VoiceSection())
-    .Add(new HeartbeatSection())
-    .Add(new SilentReplySection())
-    .Add(new CacheBoundarySection())
-    .Add(new GatewayCliSection());
+// In Gateway DI setup - core sections
+services.AddSingleton<IPromptSection, ToolSection>();          // from BotNexus.Prompts
+services.AddSingleton<IPromptSection, SafetySection>();        // from BotNexus.Prompts
+services.AddSingleton<IPromptSection, ExecutionBiasSection>(); // from BotNexus.Prompts
+services.AddSingleton<IPromptSection, ContextFileSection>();   // from BotNexus.Prompts
+services.AddSingleton<IPromptSection, RuntimeSection>();       // from BotNexus.Prompts
 
-return pipeline.Build(context);
+// Gateway-specific sections
+services.AddSingleton<IPromptSection, SkillsSection>();
+services.AddSingleton<IPromptSection, MessagingSection>();
+services.AddSingleton<IPromptSection, ReplyTagsSection>();
+services.AddSingleton<IPromptSection, HeartbeatSection>();
+services.AddSingleton<IPromptSection, SilentReplySection>();
+services.AddSingleton<IPromptSection, CacheBoundarySection>();
+services.AddSingleton<IPromptSection, GatewayCliSection>();
+
+// Extensions register their own sections during extension loading
+// e.g., BotNexus.Extensions.Skills adds SkillsPromptSection
+// e.g., BotNexus.Extensions.Mcp adds McpToolsPromptSection
+
+// Pipeline is injected via DI with all registered sections
+services.AddSingleton<PromptPipeline>();
 ```
+
+At runtime, `PromptPipeline` receives all sections via constructor injection, orders them, and builds the prompt. No manual wiring needed.
 
 ### CodingAgent Composition
 
-```csharp
-var pipeline = new PromptPipeline()
-    .Add(new ToolSection())
-    .Add(new SafetySection())
-    .Add(new ContextFileSection())
-    .Add(new RuntimeSection())
-    // CodingAgent-specific
-    .Add(new EnvironmentSection())      // git branch, package manager
-    .Add(new ToolGuidelinesSection());   // tool-specific contributions
+CodingAgent uses the same pattern but with fewer sections and no extension system:
 
-return pipeline.Build(context);
+```csharp
+// CodingAgent registers just the sections it needs
+services.AddSingleton<IPromptSection, ToolSection>();          // from BotNexus.Prompts
+services.AddSingleton<IPromptSection, SafetySection>();        // from BotNexus.Prompts
+services.AddSingleton<IPromptSection, ContextFileSection>();   // from BotNexus.Prompts
+services.AddSingleton<IPromptSection, RuntimeSection>();       // from BotNexus.Prompts
+services.AddSingleton<IPromptSection, EnvironmentSection>();   // CodingAgent-specific
+services.AddSingleton<IPromptSection, ToolGuidelinesSection>();// CodingAgent-specific
+services.AddSingleton<PromptPipeline>();
 ```
 
 ### What Moves Where

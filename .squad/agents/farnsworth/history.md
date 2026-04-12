@@ -11,31 +11,25 @@
 
 ---
 
-## 2026-04-06T01:45Z — Gateway Phase 6 Batch 1: Dev-Loop Reliability + Cross-Agent Coordination
+## Archived Entries (2026-04-06 to 2026-04-09)
 
-**Status:** ✅ Complete. Commit: 974d91c
+**Phase 11 Config & Schema Work:**
+- Extracted IConfigPathResolver/ConfigPathResolver from CLI reflection logic (supports bracket array indexing)
+- JSON schema generation via PlatformConfigSchema with key-casing normalization
+- CLI schema command for docs/botnexus-config.schema.json generation
+- Commit: e57eae1; 23 new tests; 891 total tests passing
 
-**Deliverables:**
-- Standardized `dev-loop.ps1` → `start-gateway.ps1 -SkipBuild` flow to eliminate duplicate Gateway builds and file-lock failures
-- TCP port pre-check in `start-gateway.ps1` for fail-fast behavior on port collisions
-- `-SkipBuild` and `-SkipTests` flags for faster iterative loops
-- Configuration validation for end-to-end gateway startup
-- Sample config file for local testing
+**Phase 11 CLI Decomposition:**
+- Refactored Program.cs into thin DI wiring with extracted command handlers
+- Cross-platform reliability: TCP port pre-checks, SkipBuild/SkipTests flags
 
-**Cross-Agent Notes:**
-- **Fry's WebUI** now separates activity feed to dedicated `ws://host/ws/activity` WebSocket endpoint
-  - **Action Required:** Ensure `/ws/activity` endpoint is available and serves activity events independently of main `/ws`
-  - Activity feed will silently fail/retry if endpoint unavailable; monitor logs
-- **Fry's new message type:** WebUI sends `{"type": "follow_up", "content": "..."}` for queued messages during streaming
-  - **Action Required:** Ensure Gateway/runtime handles `follow_up` message type alongside existing `steer` type
-- **Hermes' tests** now validate both endpoints (main WebSocket + activity WebSocket) end-to-end with LiveGatewayIntegrationTests
+**Phase 12 Sub-Agent Foundation (W1+W2+W3+W4):**
+- ISubAgentManager abstraction with spawn/list/kill lifecycle
+- DefaultSubAgentManager singleton with recursion prevention, concurrency limits
+- REST endpoints, WebSocket event emissions, tool registry security scoping
+- Commits: f57b157 (W1), 25c8876 (W2+3 DI), c75a033 (W4 REST)
 
-**Owner Review Required:** Squad should not implement follow-on provider changes without explicit approval.
-
-
-- 2026-04-06: Gateway config mutation logic moved from CLI inline reflection into IConfigPathResolver + ConfigPathResolver, adding bracket array index support (path[0]) and reusable path discovery for DI consumers.
-- 2026-04-06: Platform config load now runs JSON Schema validation via PlatformConfigSchema with key-casing normalization before existing manual validation, and CLI exposes otnexus config schema --output ... to regenerate docs/botnexus-config.schema.json.
-
+---
 ## 2026-04-10T16:30Z — Sub-Agent Spawning Feature: Waves 1 + 2 + 4 (Platform Dev)
 
 **Status:** ✅ Complete  
@@ -219,3 +213,4 @@ Validation: `dotnet build src\gateway\BotNexus.Cli\BotNexus.Cli.csproj --nologo 
 - Tests cover: Sealed enum rename, SessionType/IsInteractive/Participants property contracts, domain participant model round-trip, ChannelKey/MessageRole integration, backward-compatibility scenarios (legacy closed → Sealed)
 - Status: Tests should compile cleanly once db21650 integrated
 - Action: Monitor compile results; if failures emerge, coordinate with Hermes on contract mismatches
+
