@@ -119,6 +119,49 @@ public sealed class DefaultAgentSupervisorTests
             .WithMessage("*Available*");
     }
 
+    [Fact]
+    public async Task GetOrCreateAsync_WhenSessionHistoryExists_PassesHistoryToExecutionContext()
+    {
+        var registry = new DefaultAgentRegistry(NullLogger<DefaultAgentRegistry>.Instance);
+        registry.Register(new AgentDescriptor
+        {
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+            DisplayName = "Agent A",
+            ModelId = "test-model",
+            ApiProvider = "test-provider",
+            IsolationStrategy = "test"
+        });
+
+        var sessionStore = new Mock<ISessionStore>();
+        sessionStore
+            .Setup(s => s.GetAsync("session-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GatewaySession
+            {
+                SessionId = "session-1",
+                AgentId = "agent-a",
+                History =
+                [
+                    new SessionEntry { Role = BotNexus.Domain.Primitives.MessageRole.User, Content = "hello" },
+                    new SessionEntry { Role = BotNexus.Domain.Primitives.MessageRole.Assistant, Content = "hi there" }
+                ]
+            });
+
+        AgentExecutionContext? capturedContext = null;
+        var strategy = new Mock<IIsolationStrategy>();
+        strategy.SetupGet(s => s.Name).Returns("test");
+        strategy.Setup(s => s.CreateAsync(It.IsAny<AgentDescriptor>(), It.IsAny<AgentExecutionContext>(), It.IsAny<CancellationToken>()))
+            .Callback<AgentDescriptor, AgentExecutionContext, CancellationToken>((_, context, _) => capturedContext = context)
+            .ReturnsAsync(CreateHandleMock("agent-a", "session-1").Object);
+        var supervisor = new DefaultAgentSupervisor(registry, [strategy.Object], sessionStore.Object, NullLogger<DefaultAgentSupervisor>.Instance);
+
+        await supervisor.GetOrCreateAsync("agent-a", "session-1");
+
+        capturedContext.Should().NotBeNull();
+        capturedContext!.History.Should().HaveCount(2);
+        capturedContext.History[0].Content.Should().Be("hello");
+        capturedContext.History[1].Content.Should().Be("hi there");
+    }
+
     private static Mock<IAgentHandle> CreateHandleMock(string agentId, string sessionId)
     {
         var handle = new Mock<IAgentHandle>();

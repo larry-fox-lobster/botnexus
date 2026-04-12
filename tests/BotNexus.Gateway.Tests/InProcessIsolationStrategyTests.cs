@@ -1,4 +1,6 @@
 using BotNexus.AgentCore.Tools;
+using BotNexus.AgentCore.Types;
+using BotNexus.AgentCore;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
@@ -17,6 +19,8 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Abstractions;
+using System.Reflection;
+using AgentCoreUserMessage = BotNexus.AgentCore.Types.UserMessage;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -77,6 +81,41 @@ public sealed class InProcessIsolationStrategyTests
         strategy.Name.Should().Be("in-process");
     }
 
+    [Fact]
+    public async Task CreateAsync_WithHistoryInContext_SeedsAgentInitialMessages()
+    {
+        var strategy = CreateStrategyWithRegisteredModel();
+        var context = new AgentExecutionContext
+        {
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("session-history"),
+            History =
+            [
+                new SessionEntry { Role = BotNexus.Domain.Primitives.MessageRole.User, Content = "hi" },
+                new SessionEntry { Role = BotNexus.Domain.Primitives.MessageRole.Assistant, Content = "hello" },
+                new SessionEntry { Role = BotNexus.Domain.Primitives.MessageRole.System, Content = "rules" },
+                new SessionEntry
+                {
+                    Role = BotNexus.Domain.Primitives.MessageRole.Tool,
+                    Content = "tool output",
+                    ToolName = "read",
+                    ToolCallId = "call-1"
+                }
+            ]
+        };
+
+        var handle = await strategy.CreateAsync(CreateDescriptor(), context);
+        var messages = GetMessages(handle);
+
+        messages.Should().HaveCount(4);
+        messages[0].Should().BeEquivalentTo(new AgentCoreUserMessage("hi"));
+        messages[1].Should().BeEquivalentTo(new AssistantAgentMessage("hello"));
+        messages[2].Should().BeEquivalentTo(new SystemAgentMessage("rules"));
+        messages[3].Should().BeEquivalentTo(new ToolResultAgentMessage(
+            "call-1",
+            "read",
+            new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, "tool output")])));
+    }
+
     private static InProcessIsolationStrategy CreateStrategyWithRegisteredModel()
     {
         var modelRegistry = new ModelRegistry();
@@ -114,6 +153,15 @@ public sealed class InProcessIsolationStrategyTests
             ApiProvider = "test-provider",
             SystemPrompt = "You are a test agent."
         };
+
+    private static IReadOnlyList<AgentMessage> GetMessages(IAgentHandle handle)
+    {
+        var agentField = handle.GetType().GetField("_agent", BindingFlags.Instance | BindingFlags.NonPublic);
+        agentField.Should().NotBeNull();
+        var agent = agentField!.GetValue(handle) as Agent;
+        agent.Should().NotBeNull();
+        return agent!.State.Messages;
+    }
 
     private sealed class PassthroughContextBuilder : IContextBuilder
     {
