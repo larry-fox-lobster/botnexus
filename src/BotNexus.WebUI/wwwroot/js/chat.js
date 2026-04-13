@@ -11,11 +11,11 @@ import {
     showView, showConfirm, closeSidebar, setBatchRenderingState
 } from './ui.js';
 import {
-    storeManager, getCurrentSessionId, getCurrentAgentId, getStreamState,
+    channelManager, storeManager, getCurrentSessionId, getCurrentAgentId, getStreamState,
     isCurrentSessionStreaming, setCurrentChannelType, getCurrentChannelType
 } from './session-store.js';
 import { hubInvoke, getConnection } from './hub.js';
-import { loadSessions, trackActivity } from './sidebar.js';
+import { loadSessions, trackActivity, updateSidebarBadge } from './sidebar.js';
 import { activeSubAgents } from './events.js';
 import { getShowTools, setShowTools, getShowThinking, setShowThinking } from './storage.js';
 
@@ -28,10 +28,10 @@ let showThinking = true;
 
 // Sync module-level toggle vars from the active session store
 export function syncTogglesFromActiveStore() {
-    const store = storeManager.activeStore;
-    if (store) {
-        showTools = store.showTools;
-        showThinking = store.showThinking;
+    const ctx = channelManager.active;
+    if (ctx) {
+        showTools = ctx.showTools;
+        showThinking = ctx.showThinking;
     }
     // Sync checkbox DOM
     if (dom.toggleTools) dom.toggleTools.checked = showTools;
@@ -47,43 +47,52 @@ let toolElapsedTimer = null;
 const _scrollbackCleanups = new Map();
 const RESPONSE_TIMEOUT_MS = 30000;
 
+/** Get the messages element for the active channel, or null. */
+function getActiveMessagesEl() {
+    return channelManager.active?.messagesEl || null;
+}
+
 // ── Event handler entry points (called from events.js) ──────────────
 
-export function onMessageStart(evt, sid) {
+export function onMessageStart(ctx, evt, sid) {
     markResponseReceived();
-    removeStreamingIndicator();
-    showStreamingIndicator(sid);
+    removeStreamingIndicator(ctx);
+    showStreamingIndicator(sid, ctx);
     showProcessingStatus('Agent is responding...', '🤖', sid);
-    dom.btnAbort.classList.remove('hidden');
-    updateSendButtonState();
+    // Only update shared UI if this is the active channel
+    if (ctx.key === channelManager.activeKey) {
+        dom.btnAbort.classList.remove('hidden');
+        updateSendButtonState();
+    }
 }
 
-export function onContentDelta(text) {
+export function onContentDelta(ctx, text) {
     markResponseReceived();
-    removeStreamingIndicator();
-    appendDelta(text);
+    removeStreamingIndicator(ctx);
+    appendDelta(text, ctx.messagesEl);
+    if (ctx.key === channelManager.activeKey) scrollToBottom(false, ctx.messagesEl);
 }
 
-export function onThinkingDelta(text) {
+export function onThinkingDelta(ctx, text) {
     markResponseReceived();
-    handleThinkingDelta(text);
+    handleThinkingDelta(text, ctx);
 }
 
-export function onToolStart(evt) {
+export function onToolStart(ctx, evt) {
     markResponseReceived();
-    handleToolStart(evt);
+    handleToolStart(evt, ctx);
 }
 
-export function onToolEnd(evt) {
-    handleToolEnd(evt);
+export function onToolEnd(ctx, evt) {
+    handleToolEnd(evt, ctx);
 }
 
-export function onMessageEnd(evt) {
-    finalizeMessage(evt);
+export function onMessageEnd(ctx, evt) {
+    finalizeMessage(evt, ctx);
 }
 
-export function onError(evt) {
-    handleError(evt);
+export function onError(ctx, evt) {
+    handleError(evt, ctx);
 }
 
 // ── Session ID display ──────────────────────────────────────────────
@@ -200,57 +209,63 @@ function clearResponseTimeout() {
 // ── Processing status ───────────────────────────────────────────────
 
 export function syncLoadingUiForActiveSession() {
-    const activeId = getCurrentSessionId();
-    const store = activeId ? storeManager.getStore(activeId) : null;
-    if (!store) {
+    const ctx = channelManager.active;
+    if (!ctx) {
         renderProcessingStatus(false);
         dom.btnAbort.classList.add('hidden');
-        dom.chatMessages.querySelectorAll('.streaming-indicator').forEach(el => el.remove());
         return;
     }
-    const ss = store.streamState;
+    const ss = ctx.streamState;
     renderProcessingStatus(ss.processingVisible, ss.processingStage, ss.processingIcon);
     dom.btnAbort.classList.toggle('hidden', !ss.isStreaming);
     if (!ss.showStreamingIndicator) {
-        dom.chatMessages.querySelectorAll('.streaming-indicator').forEach(el => el.remove());
+        ctx.messagesEl.querySelectorAll('.streaming-indicator').forEach(el => el.remove());
     }
 }
 
-function showProcessingStatus(stage, icon, sessionId = getCurrentSessionId()) {
-    if (!sessionId) return;
-    const ss = getStreamState(sessionId);
+function showProcessingStatus(stage, icon, sessionId) {
+    const ctx = sessionId ? channelManager.getBySessionId(sessionId) : channelManager.active;
+    if (!ctx) return;
+    const ss = ctx.streamState;
     ss.processingVisible = true;
     ss.processingStage = stage || 'Processing...';
     ss.processingIcon = icon || '⏳';
-    if (sessionId !== getCurrentSessionId()) return;
-    renderProcessingStatus(true, ss.processingStage, ss.processingIcon);
+    if (ctx.key === channelManager.activeKey) {
+        renderProcessingStatus(true, ss.processingStage, ss.processingIcon);
+    }
 }
 
-export function hideProcessingStatus(sessionId = getCurrentSessionId()) {
-    if (sessionId) {
-        const ss = getStreamState(sessionId);
+export function hideProcessingStatus(sessionId) {
+    const ctx = sessionId ? channelManager.getBySessionId(sessionId) : channelManager.active;
+    if (ctx) {
+        const ss = ctx.streamState;
         ss.processingVisible = false;
         ss.processingStage = '';
         ss.processingIcon = '⏳';
     }
-    if (sessionId !== getCurrentSessionId()) return;
-    renderProcessingStatus(false);
+    if (!ctx || ctx.key === channelManager.activeKey) {
+        renderProcessingStatus(false);
+    }
 }
 
 // ── Streaming indicator ─────────────────────────────────────────────
 
-function showStreamingIndicator(sessionId = getCurrentSessionId()) {
-    if (!sessionId) return;
-    getStreamState(sessionId).showStreamingIndicator = true;
+function showStreamingIndicator(sessionId, ctx) {
+    const sid = sessionId || getCurrentSessionId();
+    if (!sid && !ctx) return;
+    const ss = ctx ? ctx.streamState : getStreamState(sid);
+    ss.showStreamingIndicator = true;
 }
 
-function hideStreamingIndicator(sessionId = getCurrentSessionId()) {
-    if (sessionId) getStreamState(sessionId).showStreamingIndicator = false;
-    if (sessionId !== getCurrentSessionId()) return;
-    dom.chatMessages.querySelectorAll('.streaming-indicator').forEach(el => el.remove());
+function hideStreamingIndicator(ctx) {
+    const targetCtx = ctx || channelManager.active;
+    if (targetCtx) {
+        targetCtx.streamState.showStreamingIndicator = false;
+        targetCtx.messagesEl.querySelectorAll('.streaming-indicator').forEach(el => el.remove());
+    }
 }
 
-function removeStreamingIndicator() { hideStreamingIndicator(); }
+function removeStreamingIndicator(ctx) { hideStreamingIndicator(ctx); }
 
 // ── Queue management ────────────────────────────────────────────────
 
@@ -280,13 +295,15 @@ function formatCharCount(len) {
     return `${(len / 1000).toFixed(1)}k chars`;
 }
 
-function handleThinkingDelta(text) {
+function handleThinkingDelta(text, ctx) {
     if (!text) return;
-    const ss = getStreamState(getCurrentSessionId());
+    const ss = ctx ? ctx.streamState : getStreamState(getCurrentSessionId());
+    const el = ctx ? ctx.messagesEl : getActiveMessagesEl();
+    if (!el) return;
 
-    let thinkingEl = dom.chatMessages.querySelector('.thinking-block');
+    let thinkingEl = el.querySelector('.thinking-block');
     if (!thinkingEl) {
-        removeStreamingIndicator();
+        removeStreamingIndicator(ctx);
         thinkingEl = document.createElement('div');
         thinkingEl.className = `thinking-block${showThinking ? '' : ' collapsed'}`;
         thinkingEl.innerHTML = `
@@ -298,18 +315,22 @@ function handleThinkingDelta(text) {
             </div>
             <div class="thinking-content"><pre class="thinking-pre"></pre></div>
         `;
-        dom.chatMessages.appendChild(thinkingEl);
+        el.appendChild(thinkingEl);
     }
     thinkingEl.querySelector('.thinking-pre').textContent = ss.thinkingBuffer;
     thinkingEl.querySelector('.thinking-stats').textContent = formatCharCount(ss.thinkingBuffer.length);
-    scrollToBottom();
+    const activeEl = getActiveMessagesEl();
+    if (el === activeEl) scrollToBottom(false, el);
 }
 
-function finalizeThinkingBlock() {
-    const thinkingEl = dom.chatMessages.querySelector('.thinking-block');
+function finalizeThinkingBlock(ctx) {
+    const el = ctx ? ctx.messagesEl : getActiveMessagesEl();
+    if (!el) return;
+    const thinkingEl = el.querySelector('.thinking-block');
     if (thinkingEl) {
-        const charCount = getStreamState(getCurrentSessionId()).thinkingBuffer.length > 0
-            ? ` (${formatCharCount(getStreamState(getCurrentSessionId()).thinkingBuffer.length)})` : '';
+        const ss = ctx ? ctx.streamState : getStreamState(getCurrentSessionId());
+        const charCount = ss.thinkingBuffer.length > 0
+            ? ` (${formatCharCount(ss.thinkingBuffer.length)})` : '';
         thinkingEl.querySelector('.thinking-label').textContent = `Thought process${charCount}`;
         thinkingEl.querySelector('.thinking-stats').textContent = '';
         thinkingEl.classList.add('complete', 'collapsed');
@@ -322,7 +343,9 @@ function finalizeThinkingBlock() {
 }
 
 export function autoCollapseThinking() {
-    const thinkingEl = dom.chatMessages.querySelector('.thinking-block:not(.complete)');
+    const el = getActiveMessagesEl();
+    if (!el) return;
+    const thinkingEl = el.querySelector('.thinking-block:not(.complete)');
     if (thinkingEl && !thinkingEl.classList.contains('collapsed')) {
         thinkingEl.classList.add('collapsed');
         const toggle = thinkingEl.querySelector('.thinking-toggle');
@@ -335,8 +358,8 @@ export function autoCollapseThinking() {
 
 // ── Tool call handling ──────────────────────────────────────────────
 
-function handleToolStart(msg) {
-    const ss = getStreamState(getCurrentSessionId());
+function handleToolStart(msg, ctx) {
+    const ss = ctx ? ctx.streamState : getStreamState(getCurrentSessionId());
     const callId = msg.toolCallId || `tc-${Date.now()}`;
     ss.activeToolCount++;
     ss.toolStartTimes[callId] = Date.now();
@@ -345,12 +368,12 @@ function handleToolStart(msg) {
         toolName: msg.toolName || 'unknown', args: msg.toolArgs || '',
         result: '', status: 'running', depth
     };
-    appendToolCall(callId, msg.toolName, 'running', msg.toolArgs, depth);
-    startToolElapsedTimer();
+    appendToolCall(callId, msg.toolName, 'running', msg.toolArgs, depth, ctx);
+    if (!ctx || ctx.key === channelManager.activeKey) startToolElapsedTimer();
 }
 
-function handleToolEnd(msg) {
-    const ss = getStreamState(getCurrentSessionId());
+function handleToolEnd(msg, ctx) {
+    const ss = ctx ? ctx.streamState : getStreamState(getCurrentSessionId());
     const callId = msg.toolCallId || 'unknown';
     const isError = msg.toolIsError === true;
     const status = isError ? 'error' : 'complete';
@@ -360,7 +383,7 @@ function handleToolEnd(msg) {
     }
     const elapsed = ss.toolStartTimes[callId] ? Math.round((Date.now() - ss.toolStartTimes[callId]) / 1000) : 0;
     delete ss.toolStartTimes[callId];
-    updateToolCallStatus(callId, status, elapsed, msg.toolResult);
+    updateToolCallStatus(callId, status, elapsed, msg.toolResult, ctx);
     if (isError) {
         trackActivity('error', getCurrentAgentId(), `🔧 ${msg.toolName || ss.activeToolCalls[callId]?.toolName || 'tool'} failed`);
     }
@@ -374,7 +397,9 @@ function handleToolEnd(msg) {
     if (Object.keys(ss.toolStartTimes).length === 0) stopToolElapsedTimer();
 }
 
-function appendToolCall(callId, toolName, status, toolArgs, depth) {
+function appendToolCall(callId, toolName, status, toolArgs, depth, ctx) {
+    const el = ctx ? ctx.messagesEl : getActiveMessagesEl();
+    if (!el) return;
     const depthClass = depth > 0 ? ` tool-call-depth-${Math.min(depth, 3)}` : '';
     const div = document.createElement('div');
     div.className = `message tool-call tool-${status}${showTools ? '' : ' hidden'}${depthClass}`;
@@ -400,12 +425,15 @@ function appendToolCall(callId, toolName, status, toolArgs, depth) {
             </div>
         </div>
     `;
-    dom.chatMessages.appendChild(div);
-    scrollToBottom();
+    el.appendChild(div);
+    const activeEl = getActiveMessagesEl();
+    if (el === activeEl) scrollToBottom(false, el);
 }
 
-function updateToolCallStatus(callId, status, elapsed, result) {
-    const el = dom.chatMessages.querySelector(`.tool-call[data-call-id="${callId}"]`);
+function updateToolCallStatus(callId, status, elapsed, result, ctx) {
+    const container = ctx ? ctx.messagesEl : getActiveMessagesEl();
+    if (!container) return;
+    const el = container.querySelector(`.tool-call[data-call-id="${callId}"]`);
     if (!el) return;
     el.classList.remove('tool-running');
     el.classList.add(`tool-${status}`);
@@ -430,9 +458,11 @@ function updateToolCallStatus(callId, status, elapsed, result) {
 function startToolElapsedTimer() {
     if (toolElapsedTimer) return;
     toolElapsedTimer = setInterval(() => {
-        for (const [callId, startTime] of Object.entries(getStreamState(getCurrentSessionId()).toolStartTimes)) {
-            const el = dom.chatMessages.querySelector(`.tool-call[data-call-id="${callId}"] .tool-elapsed`);
-            if (el) el.textContent = `${Math.round((Date.now() - startTime) / 1000)}s`;
+        const ctx = channelManager.active;
+        if (!ctx) return;
+        for (const [callId, startTime] of Object.entries(ctx.streamState.toolStartTimes)) {
+            const toolEl = ctx.messagesEl.querySelector(`.tool-call[data-call-id="${callId}"] .tool-elapsed`);
+            if (toolEl) toolEl.textContent = `${Math.round((Date.now() - startTime) / 1000)}s`;
         }
     }, 1000);
 }
@@ -443,34 +473,42 @@ function stopToolElapsedTimer() {
 
 // ── Message finalization ────────────────────────────────────────────
 
-function finalizeMessage(msg) {
-    const ss = getStreamState(getCurrentSessionId());
+function finalizeMessage(msg, ctx) {
+    const ss = ctx ? ctx.streamState : getStreamState(getCurrentSessionId());
+    const el = ctx ? ctx.messagesEl : getActiveMessagesEl();
     ss.isStreaming = false;
     ss.activeMessageId = null;
-    clearResponseTimeout();
-    dom.btnAbort.classList.add('hidden');
-    removeStreamingIndicator();
-    hideProcessingStatus();
-    finalizeThinkingBlock();
 
-    const streaming = dom.chatMessages.querySelector('.message.assistant.streaming');
-    if (streaming) {
-        streaming.classList.remove('streaming', 'message-streaming');
-        const deltaEl = streaming.querySelector('.delta-content');
-        if (deltaEl) {
-            const rawText = deltaEl.textContent;
-            streaming.dataset.rawContent = rawText;
-            deltaEl.innerHTML = renderMarkdown(rawText);
+    // Only update shared UI for active channel
+    const isActive = !ctx || ctx.key === channelManager.activeKey;
+    if (isActive) {
+        clearResponseTimeout();
+        dom.btnAbort.classList.add('hidden');
+        removeStreamingIndicator(ctx);
+        hideProcessingStatus(ctx?.sessionId || getCurrentSessionId());
+    }
+    finalizeThinkingBlock(ctx);
+
+    if (el) {
+        const streaming = el.querySelector('.message.assistant.streaming');
+        if (streaming) {
+            streaming.classList.remove('streaming', 'message-streaming');
+            const deltaEl = streaming.querySelector('.delta-content');
+            if (deltaEl) {
+                const rawText = deltaEl.textContent;
+                streaming.dataset.rawContent = rawText;
+                deltaEl.innerHTML = renderMarkdown(rawText);
+            }
+            const timeEl = streaming.querySelector('.msg-time');
+            if (timeEl) timeEl.textContent = formatTime(new Date().toISOString());
+
+            const footer = document.createElement('div');
+            footer.className = 'msg-footer';
+            const parts = [];
+            if (ss.activeToolCount > 0) parts.push(`🔧 ${ss.activeToolCount} tool call${ss.activeToolCount > 1 ? 's' : ''}`);
+            if (msg.usage) { const u = formatUsage(msg.usage); if (u) parts.push(u); }
+            if (parts.length > 0) { footer.textContent = parts.join(' · '); streaming.appendChild(footer); }
         }
-        const timeEl = streaming.querySelector('.msg-time');
-        if (timeEl) timeEl.textContent = formatTime(new Date().toISOString());
-
-        const footer = document.createElement('div');
-        footer.className = 'msg-footer';
-        const parts = [];
-        if (ss.activeToolCount > 0) parts.push(`🔧 ${ss.activeToolCount} tool call${ss.activeToolCount > 1 ? 's' : ''}`);
-        if (msg.usage) { const u = formatUsage(msg.usage); if (u) parts.push(u); }
-        if (parts.length > 0) { footer.textContent = parts.join(' · '); streaming.appendChild(footer); }
     }
 
     ss.activeToolCalls = {};
@@ -479,13 +517,16 @@ function finalizeMessage(msg) {
     ss.toolStartTimes = {};
     stopToolElapsedTimer();
     ss.thinkingBuffer = '';
-    resetQueue();
-    setSendingState(false);
-    updateSendButtonState();
-    updateSessionIdDisplay();
-    loadSessions();
-    incrementNewMessageCount();
-    scrollToBottom();
+
+    if (isActive) {
+        resetQueue();
+        setSendingState(false);
+        updateSendButtonState();
+        updateSessionIdDisplay();
+        loadSessions();
+        incrementNewMessageCount();
+        scrollToBottom(false, el);
+    }
 }
 
 function formatUsage(usage) {
@@ -497,16 +538,37 @@ function formatUsage(usage) {
     return parts.join(' ');
 }
 
-function handleError(msg) {
-    getStreamState(getCurrentSessionId()).isStreaming = false;
-    clearResponseTimeout();
-    stopToolElapsedTimer();
-    dom.btnAbort.classList.add('hidden');
-    removeStreamingIndicator();
-    hideProcessingStatus();
-    appendErrorMessage(`❌ ${msg.message || 'Unknown error'}${msg.code ? ` (${msg.code})` : ''}`);
-    setSendingState(false);
-    updateSendButtonState();
+function handleError(msg, ctx) {
+    const ss = ctx ? ctx.streamState : getStreamState(getCurrentSessionId());
+    ss.isStreaming = false;
+    const isActive = !ctx || ctx.key === channelManager.activeKey;
+    if (isActive) {
+        clearResponseTimeout();
+        stopToolElapsedTimer();
+        dom.btnAbort.classList.add('hidden');
+        removeStreamingIndicator(ctx);
+        hideProcessingStatus();
+    }
+    // Always render error to the correct container
+    const el = ctx ? ctx.messagesEl : getActiveMessagesEl();
+    if (el) {
+        const div = document.createElement('div');
+        div.className = 'message assistant message-error';
+        const now = formatTime(new Date().toISOString());
+        div.innerHTML = `
+            <div class="msg-header">
+                <span class="msg-role">AGENT ERROR</span>
+                <span class="msg-time">${now}</span>
+            </div>
+            <div class="msg-content">${escapeHtml(`❌ ${msg.message || 'Unknown error'}${msg.code ? ` (${msg.code})` : ''}`)}</div>
+        `;
+        el.appendChild(div);
+        if (isActive) scrollToBottom(false, el);
+    }
+    if (isActive) {
+        setSendingState(false);
+        updateSendButtonState();
+    }
 }
 
 // ── Chat message rendering ──────────────────────────────────────────
@@ -520,7 +582,8 @@ function stripControlTags(text) {
 }
 
 export function appendChatMessage(role, content, timestamp) {
-    appendChatMessageTo(role, content, dom.chatMessages, timestamp);
+    const el = getActiveMessagesEl();
+    if (el) appendChatMessageTo(role, content, el, timestamp);
 }
 
 function appendChatMessageTo(role, content, container, timestamp) {
@@ -540,18 +603,24 @@ function appendChatMessageTo(role, content, container, timestamp) {
     `;
     div.dataset.rawContent = content;
     container.appendChild(div);
-    if (container === dom.chatMessages) scrollToBottom();
+    // Scroll if this container is the active channel's
+    const activeEl = getActiveMessagesEl();
+    if (container === activeEl) scrollToBottom(false, activeEl);
 }
 
 export function appendSystemMessage(text, level) {
+    const el = getActiveMessagesEl();
+    if (!el) return;
     const div = document.createElement('div');
     div.className = `message system-msg${level ? ' ' + level : ''}`;
     div.textContent = text;
-    dom.chatMessages.appendChild(div);
-    scrollToBottom();
+    el.appendChild(div);
+    scrollToBottom(false, el);
 }
 
 function appendErrorMessage(text) {
+    const el = getActiveMessagesEl();
+    if (!el) return;
     const div = document.createElement('div');
     div.className = 'message assistant message-error';
     const now = formatTime(new Date().toISOString());
@@ -562,15 +631,17 @@ function appendErrorMessage(text) {
         </div>
         <div class="msg-content">${escapeHtml(text)}</div>
     `;
-    dom.chatMessages.appendChild(div);
-    scrollToBottom();
+    el.appendChild(div);
+    scrollToBottom(false, el);
 }
 
-function appendDelta(content) {
+function appendDelta(content, targetEl) {
     if (!content) return;
     content = stripControlTags(content);
     if (!content) return;
-    let streaming = dom.chatMessages.querySelector('.message.assistant.streaming');
+    const el = targetEl || getActiveMessagesEl();
+    if (!el) return;
+    let streaming = el.querySelector('.message.assistant.streaming');
     if (!streaming) {
         streaming = document.createElement('div');
         streaming.className = 'message assistant streaming message-streaming';
@@ -582,15 +653,19 @@ function appendDelta(content) {
             </div>
             <div class="msg-content"><span class="delta-content"></span></div>
         `;
-        dom.chatMessages.appendChild(streaming);
+        el.appendChild(streaming);
     }
     streaming.querySelector('.delta-content').textContent += content;
-    scrollToBottom();
+    const activeEl = getActiveMessagesEl();
+    if (el === activeEl) scrollToBottom(false, el);
 }
 
 // ── History rendering ───────────────────────────────────────────────
 
-function renderHistoryEntry(entry) { renderHistoryEntryTo(entry, dom.chatMessages); }
+function renderHistoryEntry(entry) {
+    const el = getActiveMessagesEl();
+    if (el) renderHistoryEntryTo(entry, el);
+}
 
 function renderHistoryEntryTo(entry, container) {
     if (!entry) return;
@@ -635,9 +710,12 @@ function renderToolCallHistoryTo(tc, container) {
         </div>
     `;
     div.style.cursor = 'pointer';
-    getStreamState(getCurrentSessionId()).activeToolCalls[callId] = {
-        toolName, args: argsStr, result: resultStr, status: 'complete'
-    };
+    const ctx = channelManager.active;
+    if (ctx) {
+        ctx.streamState.activeToolCalls[callId] = {
+            toolName, args: argsStr, result: resultStr, status: 'complete'
+        };
+    }
     container.appendChild(div);
 }
 
@@ -657,7 +735,8 @@ function formatToolArgsPreview(entry) {
 }
 
 function renderHistoryBatch(messages, sessionBoundaries, container) {
-    container = container || dom.chatMessages;
+    container = container || getActiveMessagesEl();
+    if (!container) return;
     const boundaryMap = new Map();
     if (sessionBoundaries) {
         for (const b of sessionBoundaries) boundaryMap.set(b.insertBeforeIndex, b);
@@ -792,8 +871,11 @@ export async function executeReset(commandType = 'reset') {
         const dateStr = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
         const timeStr = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
         divider.innerHTML = `<span class="session-divider-line"></span><span class="session-divider-label">New session started ${dateStr} at ${timeStr}</span><span class="session-divider-line"></span>`;
-        dom.chatMessages.appendChild(divider);
-        scrollToBottom();
+        const el = getActiveMessagesEl();
+        if (el) {
+            el.appendChild(divider);
+            scrollToBottom(false, el);
+        }
         appendSystemMessage('New session started. Previous messages are still visible above.');
     }
 
@@ -843,11 +925,13 @@ async function executeAgents() {
 }
 
 function appendCommandResult(title, body) {
+    const el = getActiveMessagesEl();
+    if (!el) return;
     const div = document.createElement('div');
     div.className = 'message system-msg command-result';
     div.innerHTML = `<div class="command-result-title">${escapeHtml(title)}</div><pre>${escapeHtml(body)}</pre>`;
-    dom.chatMessages.appendChild(div);
-    scrollToBottom();
+    el.appendChild(div);
+    scrollToBottom(false, el);
 }
 
 // ── Chat actions ────────────────────────────────────────────────────
@@ -916,11 +1000,9 @@ export async function sendMessage() {
         const result = await hubInvoke('SendMessage', activeAgentId, channelType, text);
         if (result?.sessionId) {
             const sessionChannelType = result.channelType || channelType;
-            storeManager.getOrCreateStore(result.sessionId, {
-                agentId: result.agentId || activeAgentId,
-                channelType: sessionChannelType
-            });
-            storeManager.switchView(result.sessionId);
+            const ctx = channelManager.getOrCreate(result.agentId || activeAgentId, sessionChannelType);
+            channelManager.registerSession(result.sessionId, ctx);
+            channelManager.activate(ctx.key);
             updateSessionIdDisplay();
         }
     } catch (err) {
@@ -1003,6 +1085,13 @@ export async function openAgentTimeline(agentId, channelType, targetSessionId = 
     stopToolElapsedTimer();
     resetNewMessageCount();
 
+    // Get or create the channel context (creates DOM if needed)
+    const ctx = channelManager.getOrCreate(agentId, channelType);
+
+    // Activate this channel (hides all others, shows this one)
+    channelManager.activate(ctx.key);
+
+    // Highlight in sidebar
     dom.sessionsList.querySelectorAll('.list-item').forEach(el => {
         el.classList.toggle('active',
             el.dataset.agentId === agentId &&
@@ -1013,43 +1102,41 @@ export async function openAgentTimeline(agentId, channelType, targetSessionId = 
     if (agentId) dom.agentSelect.value = agentId;
     dom.agentSelect.classList.add('hidden');
     storeManager.setSelectedAgent(agentId);
-    setCurrentChannelType(channelType);
 
-    // Save old view's DOM before clearing
-    storeManager.snapshotActiveView();
-
-    // Immediately clear display for the new agent — prevents stale data from the
-    // previous agent's view bleeding into this one during async resolution.
-    dom.chatMessages.innerHTML = '';
+    // Update header
     dom.chatMeta.textContent = `Agent: ${agentId} · ${channelDisplayName(channelType)}`;
     dom.chatTitle.textContent = `${agentId} — ${channelDisplayName(channelType)}`;
     document.title = `${agentId} — ${channelDisplayName(channelType)} | BotNexus`;
 
-    // Defer activeViewId — set to null until the real session resolves.
-    // This ensures events from the old session don't render here.
-    storeManager.setActiveView(null, agentId, channelType);
+    // Sync toggles for this channel
+    showTools = ctx.showTools;
+    showThinking = ctx.showThinking;
+    if (dom.toggleTools) dom.toggleTools.checked = showTools;
+    if (dom.toggleThinking) dom.toggleThinking.checked = showThinking;
+
     updateSessionIdDisplay();
-    syncTogglesFromActiveStore();
     syncLoadingUiForActiveSession();
+
     const hash = `#/agents/${encodeURIComponent(agentId)}/channels/${encodeURIComponent(toHubChannelType(channelType))}`;
     if (location.hash !== hash) history.pushState(null, '', hash);
 
+    // Reset unread
+    ctx.unreadCount = 0;
+    updateSidebarBadge(ctx.sessionId, 0);
+
     try {
-        const existingStore = storeManager.findStoreForAgent(agentId, channelType);
-        if (existingStore && existingStore.sessionId) {
-            const warm = storeManager.switchView(existingStore.sessionId);
-            const hasWarmContent = !!dom.chatMessages.querySelector('.history-sentinel');
-            if (warm && hasWarmContent) {
-                scrollToBottom();
-                dom.chatInput.focus();
-                updateSendButtonState();
-                loadChatHeaderModels();
-                fetchSubAgents();
-                return;
-            }
+        // If history already loaded, just scroll and focus
+        if (ctx.historyLoaded) {
+            ctx.messagesEl.scrollTop = ctx.messagesEl.scrollHeight;
+            dom.chatInput.focus();
+            updateSendButtonState();
+            loadChatHeaderModels();
+            fetchSubAgents();
+            return;
         }
 
-        dom.chatMessages.innerHTML = '<div class="loading">Loading timeline...</div>';
+        // Show loading in this channel's container
+        ctx.messagesEl.innerHTML = '<div class="loading">Loading timeline...</div>';
 
         const historyChannelType = toHubChannelType(channelType);
         const data = await fetchJson(
@@ -1057,8 +1144,9 @@ export async function openAgentTimeline(agentId, channelType, targetSessionId = 
         );
 
         if (!data || !data.messages || data.messages.length === 0) {
-            dom.chatMessages.innerHTML = '';
+            ctx.messagesEl.innerHTML = '';
             dom.chatMeta.textContent = `Agent: ${agentId} · No messages yet`;
+            ctx.historyLoaded = true;
             updateSessionIdDisplay();
             loadChatHeaderModels();
             dom.chatInput.focus();
@@ -1066,17 +1154,17 @@ export async function openAgentTimeline(agentId, channelType, targetSessionId = 
         }
 
         const latestSessionId = data.messages[data.messages.length - 1].sessionId;
-        storeManager.getOrCreateStore(latestSessionId, { agentId, channelType });
-        storeManager.switchView(latestSessionId);
+        channelManager.registerSession(latestSessionId, ctx);
 
-        dom.chatMessages.innerHTML = '';
-        renderHistoryBatch(data.messages, data.sessionBoundaries);
-        setupScrollbackObserver(channelType, agentId, data.nextCursor, data.hasMore);
+        ctx.messagesEl.innerHTML = '';
+        renderHistoryBatch(data.messages, data.sessionBoundaries, ctx.messagesEl);
+        setupScrollbackObserver(channelType, agentId, data.nextCursor, data.hasMore, ctx);
+        ctx.historyLoaded = true;
 
         await checkAgentRunningStatus(agentId, latestSessionId);
 
         updateSessionIdDisplay();
-        scrollToBottom();
+        scrollToBottom(true, ctx.messagesEl);
         dom.chatInput.focus();
         updateSendButtonState();
         loadChatHeaderModels();
@@ -1112,14 +1200,17 @@ function createSessionDividerEl(sessionId, timestamp) {
     return divider;
 }
 
-function setupScrollbackObserver(channelType, agentId, initialCursor, initialHasMore) {
-    const viewKey = `${agentId}::${normalizeChannelKey(channelType)}`;
+function setupScrollbackObserver(channelType, agentId, initialCursor, initialHasMore, ctx) {
+    const viewKey = ctx ? ctx.key : `${agentId}::${normalizeChannelKey(channelType)}`;
+    const messagesEl = ctx ? ctx.messagesEl : getActiveMessagesEl();
+    if (!messagesEl) return () => {};
+
     const oldCleanup = _scrollbackCleanups.get(viewKey);
     if (oldCleanup) oldCleanup();
 
     const sentinel = document.createElement('div');
     sentinel.className = 'history-sentinel';
-    dom.chatMessages.prepend(sentinel);
+    messagesEl.prepend(sentinel);
 
     let nextCursor = initialCursor;
     let hasMore = initialHasMore !== false;
@@ -1133,7 +1224,7 @@ function setupScrollbackObserver(channelType, agentId, initialCursor, initialHas
 
     const observer = new IntersectionObserver(entries => {
         if (entries[0].isIntersecting && !isFetching && nextCursor !== null) fetchOlder();
-    }, { root: dom.chatMessages, rootMargin: '200px 0px 0px 0px' });
+    }, { root: messagesEl, rootMargin: '200px 0px 0px 0px' });
     observer.observe(sentinel);
 
     async function fetchOlder() {
@@ -1143,8 +1234,8 @@ function setupScrollbackObserver(channelType, agentId, initialCursor, initialHas
         const data = await fetchJson(
             `/channels/${encodeURIComponent(historyChannelType)}/agents/${encodeURIComponent(agentId)}/history?cursor=${encodeURIComponent(nextCursor)}&limit=50`
         );
-        if (getCurrentAgentId() !== agentId ||
-            normalizeChannelKey(getCurrentChannelType()) !== normalizeChannelKey(channelType)) {
+        // Check this is still the right context
+        if (ctx && channelManager.activeKey !== ctx.key) {
             isFetching = false; return;
         }
         if (!data || !data.messages || data.messages.length === 0) {
@@ -1152,11 +1243,11 @@ function setupScrollbackObserver(channelType, agentId, initialCursor, initialHas
             showEndOfHistory(sentinel);
             isFetching = false; return;
         }
-        const scrollHeightBefore = dom.chatMessages.scrollHeight;
+        const scrollHeightBefore = messagesEl.scrollHeight;
         const fragment = document.createDocumentFragment();
         renderHistoryBatch(data.messages, data.sessionBoundaries, fragment);
         sentinel.after(fragment);
-        dom.chatMessages.scrollTop += dom.chatMessages.scrollHeight - scrollHeightBefore;
+        messagesEl.scrollTop += messagesEl.scrollHeight - scrollHeightBefore;
         nextCursor = data.nextCursor;
         hasMore = data.hasMore;
         hideTopSpinner(sentinel);
@@ -1336,7 +1427,8 @@ export function clearSubAgentPanel() {
 }
 
 export function clearChatMessages() {
-    dom.chatMessages.innerHTML = '';
+    const el = getActiveMessagesEl();
+    if (el) el.innerHTML = '';
 }
 
 // ── Model selector in chat header ───────────────────────────────────
@@ -1398,39 +1490,41 @@ export async function handleModelChange() {
 
 export function toggleToolVisibility() {
     showTools = dom.toggleTools.checked;
-    const store = storeManager.activeStore;
-    if (store) {
-        store.showTools = showTools;
-        setShowTools(store.agentId, store.channelType, showTools);
+    const ctx = channelManager.active;
+    if (ctx) {
+        ctx.showTools = showTools;
+        setShowTools(ctx.agentId, ctx.channelType, showTools);
     } else {
         setShowTools(null, null, showTools);
     }
-    applyToggleState();
+    applyToggleState(ctx?.messagesEl);
 }
 
 export function toggleThinkingVisibility() {
     showThinking = dom.toggleThinking.checked;
-    const store = storeManager.activeStore;
-    if (store) {
-        store.showThinking = showThinking;
-        setShowThinking(store.agentId, store.channelType, showThinking);
+    const ctx = channelManager.active;
+    if (ctx) {
+        ctx.showThinking = showThinking;
+        setShowThinking(ctx.agentId, ctx.channelType, showThinking);
     } else {
         setShowThinking(null, null, showThinking);
     }
-    applyToggleState();
+    applyToggleState(ctx?.messagesEl);
 }
 
-function applyToggleState(container = dom.chatMessages) {
-    container.querySelectorAll('.tool-call').forEach(el => {
-        el.classList.toggle('hidden', !showTools);
+function applyToggleState(container) {
+    const el = container || getActiveMessagesEl();
+    if (!el) return;
+    el.querySelectorAll('.tool-call').forEach(tc => {
+        tc.classList.toggle('hidden', !showTools);
     });
-    container.querySelectorAll('.thinking-block').forEach(el => {
-        el.classList.toggle('hidden', !showThinking);
-        el.classList.toggle('collapsed', !showThinking);
-        const toggle = el.querySelector('.thinking-toggle');
+    el.querySelectorAll('.thinking-block').forEach(tb => {
+        tb.classList.toggle('hidden', !showThinking);
+        tb.classList.toggle('collapsed', !showThinking);
+        const toggle = tb.querySelector('.thinking-toggle');
         if (toggle) {
             toggle.setAttribute('aria-expanded', showThinking);
-            el.querySelector('.thinking-chevron').textContent = showThinking ? '▾' : '▸';
+            tb.querySelector('.thinking-chevron').textContent = showThinking ? '▾' : '▸';
         }
     });
 }
