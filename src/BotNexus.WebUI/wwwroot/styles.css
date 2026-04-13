@@ -296,7 +296,27 @@ body {
 .header-select:focus { outline: none; border-color: var(--accent); }
 .header-select:disabled { opacity: 0.6; cursor: not-allowed; }
 
-/* === Chat messages area === */
+/* === Channel views container (per-agent+channel DOM) === */
+.channel-views {
+    flex: 1; position: relative; overflow: hidden; min-height: 0;
+}
+.channel-view {
+    display: none; flex-direction: column; height: 100%;
+}
+.channel-view.active {
+    display: flex;
+}
+.channel-messages {
+    flex: 1; overflow-y: auto; padding: 16px 20px;
+    display: flex; flex-direction: column; gap: 8px;
+    min-height: 0;
+}
+.channel-messages::before {
+    content: '';
+    flex: 1;
+}
+
+/* Legacy compat alias */
 .chat-messages {
     flex: 1; overflow-y: auto; padding: 16px 20px;
     display: flex; flex-direction: column; gap: 8px;
@@ -1045,6 +1065,7 @@ body {
     .message { max-width: 95%; }
     .chat-header { padding: 10px 12px; }
     .chat-messages { padding: 12px; }
+    .channel-messages { padding: 12px; }
     .chat-input-area { padding: 8px 12px 12px; }
     .modal-content { width: 95%; }
     .session-id-display { flex-wrap: wrap; }
