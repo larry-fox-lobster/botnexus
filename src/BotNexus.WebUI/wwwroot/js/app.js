@@ -9,7 +9,8 @@ import {
     toggleSidebar, closeSidebar, initSectionToggles, setSidebarCollapsedState
 } from './ui.js';
 import {
-    storeManager, getCurrentSessionId, getCurrentAgentId, isCurrentSessionStreaming
+    storeManager, getCurrentSessionId, getCurrentAgentId, isCurrentSessionStreaming,
+    channelManager
 } from './session-store.js';
 import { initHub, getConnection, manualReconnect } from './hub.js';
 import { registerEventHandlers } from './events.js';
@@ -98,7 +99,8 @@ function initEventListeners() {
 
     dom.agentSelect.addEventListener('change', () => {
         const newAgent = dom.agentSelect.value;
-        const hasMessages = dom.chatMessages.children.length > 0;
+        const activeEl = channelManager.active?.messagesEl;
+        const hasMessages = activeEl ? activeEl.children.length > 0 : false;
         if (hasMessages && getCurrentSessionId() && getCurrentAgentId() && newAgent !== getCurrentAgentId()) {
             showConfirm(
                 `Switch to agent "${newAgent}"? This will start a new session.`,
@@ -134,8 +136,8 @@ function initEventListeners() {
         );
     });
 
-    // Delegated click handlers for dynamic chat content
-    dom.chatMessages.addEventListener('click', (e) => {
+    // Delegated click handlers for dynamic chat content — on channel-views container
+    dom.channelViews.addEventListener('click', (e) => {
         const copyBtn = e.target.closest('.btn-copy-msg');
         if (copyBtn) {
             const msgEl = copyBtn.closest('.message');
@@ -159,7 +161,11 @@ function initEventListeners() {
     });
 
     dom.scrollBottom.addEventListener('click', () => scrollToBottom(true));
-    dom.chatMessages.addEventListener('scroll', updateScrollButton);
+    // Scroll listener delegated via channel activation (each channel-messages gets its own)
+    // We observe scroll on the container element; re-wired when channels are activated.
+    dom.channelViews.addEventListener('scroll', (e) => {
+        if (e.target.classList.contains('channel-messages')) updateScrollButton(e.target);
+    }, true);
     dom.newMessages.addEventListener('click', () => { scrollToBottom(true); resetNewMessageCount(); });
 
     dom.btnReconnect.addEventListener('click', manualReconnect);
