@@ -199,6 +199,28 @@ function initEventListeners() {
         const isCollapsed = toggleSidebar();
         setSidebarCollapsed(isCollapsed);
     });
+    document.querySelectorAll('.rail-icon').forEach((icon) => {
+        icon.addEventListener('click', () => {
+            const view = icon.dataset.view;
+            if (view === 'cron') {
+                openCronView();
+                return;
+            }
+
+            const sectionId = icon.dataset.section;
+            if (!sectionId) return;
+
+            setSidebarCollapsedState(false);
+            setSidebarCollapsed(false);
+
+            const sectionContent = document.getElementById(sectionId);
+            if (!sectionContent) return;
+            sectionContent.classList.remove('collapsed');
+
+            const section = sectionContent.closest('.sidebar-section') || sectionContent;
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
     dom.sidebarOverlay.addEventListener('click', () => {
         closeSidebar();
         setSidebarCollapsed(true);
