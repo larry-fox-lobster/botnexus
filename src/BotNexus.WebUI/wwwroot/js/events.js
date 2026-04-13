@@ -1,8 +1,9 @@
 // BotNexus WebUI — SignalR event handlers
+// All events render to their channel's container, even if hidden.
 
 import { debugLog } from './api.js';
 import {
-    storeManager, getStreamState, getCurrentSessionId, getCurrentAgentId,
+    channelManager, storeManager, getStreamState, getCurrentSessionId, getCurrentAgentId,
     cleanupSessionState, getCurrentChannelType
 } from './session-store.js';
 import { hubInvoke, setConnectionId } from './hub.js';
@@ -13,7 +14,7 @@ import {
     onMessageEnd, onError, updateSessionIdDisplay, syncLoadingUiForActiveSession,
     appendSystemMessage, clearChatMessages, clearSubAgentPanel, renderSubAgentPanel
 } from './chat.js';
-import { loadSessions, setAgentsCache, trackActivity } from './sidebar.js';
+import { loadSessions, setAgentsCache, trackActivity, updateSidebarBadge } from './sidebar.js';
 
 // ── Sub-agent state ─────────────────────────────────────────────────
 
@@ -57,104 +58,84 @@ export function registerEventHandlers(connection) {
     // ── Stream lifecycle ────────────────────────────────────────────
 
     connection.on('MessageStart', (evt) => {
-        const sid = evt?.sessionId || storeManager.activeViewId;
-        {
-            const ss = getStreamState(sid);
-            ss.activeMessageId = evt.messageId;
-            ss.isStreaming = true;
-            ss.activeToolCount = 0;
-            ss.thinkingBuffer = '';
-            ss.toolCallDepth = 0;
-            ss.toolStartTimes = {};
+        const { ctx, isActive } = channelManager.routeEvent(evt);
+        if (!ctx) return;
+        const ss = ctx.streamState;
+        ss.activeMessageId = evt.messageId;
+        ss.isStreaming = true;
+        ss.activeToolCount = 0;
+        ss.thinkingBuffer = '';
+        ss.toolCallDepth = 0;
+        ss.toolStartTimes = {};
+        // Always render to the channel's container
+        onMessageStart(ctx, evt, ctx.sessionId);
+        if (!isActive) {
+            ctx.unreadCount++;
+            updateSidebarBadge(ctx.sessionId, ctx.unreadCount);
         }
-        const { isActive } = storeManager.routeEvent(evt);
-        if (!isActive) return;
-        onMessageStart(evt, sid);
     });
 
     connection.on('ContentDelta', (evt) => {
-        const { isActive } = storeManager.routeEvent(evt);
-        if (!isActive) return;
+        const { ctx, isActive } = channelManager.routeEvent(evt);
+        if (!ctx) return;
         const text = typeof evt === 'string' ? evt : (evt?.contentDelta || evt?.delta || '');
-        if (text) onContentDelta(text);
+        if (text) {
+            onContentDelta(ctx, text);
+            if (!isActive) {
+                ctx.unreadCount++;
+                updateSidebarBadge(ctx.sessionId, ctx.unreadCount);
+            }
+        }
     });
 
     connection.on('ThinkingDelta', (evt) => {
-        const sid = evt?.sessionId || storeManager.activeViewId;
-        const ss = getStreamState(sid);
+        const { ctx, isActive } = channelManager.routeEvent(evt);
+        if (!ctx) return;
         const text = evt?.thinkingContent || evt?.delta || '';
-        if (text) ss.thinkingBuffer += text;
-        const { isActive } = storeManager.routeEvent(evt);
-        if (!isActive) return;
-        if (text) onThinkingDelta(text);
+        if (text) ctx.streamState.thinkingBuffer += text;
+        if (text) onThinkingDelta(ctx, text);
     });
 
     connection.on('ToolStart', (evt) => {
-        const sid = evt?.sessionId || storeManager.activeViewId;
-        const { isActive } = storeManager.routeEvent(evt);
-        if (!isActive) {
-            const ss = getStreamState(sid);
-            const callId = evt.toolCallId || `tc-${Date.now()}`;
-            ss.activeToolCount++;
-            ss.toolStartTimes[callId] = Date.now();
-            ss.activeToolCalls[callId] = {
-                toolName: evt.toolName || 'unknown', args: evt.toolArgs || '',
-                result: '', status: 'running', depth: evt.depth || ss.toolCallDepth
-            };
-            return;
-        }
-        onToolStart(evt);
+        const { ctx, isActive } = channelManager.routeEvent(evt);
+        if (!ctx) return;
+        // Always render tool to the channel's container
+        onToolStart(ctx, evt);
     });
 
     connection.on('ToolEnd', (evt) => {
-        const sid = evt?.sessionId || storeManager.activeViewId;
-        const { isActive } = storeManager.routeEvent(evt);
-        if (!isActive) {
-            const ss = getStreamState(sid);
-            const callId = evt.toolCallId || 'unknown';
-            if (ss.activeToolCalls[callId]) {
-                ss.activeToolCalls[callId].result = evt.toolResult || '';
-                ss.activeToolCalls[callId].status = evt.toolIsError ? 'error' : 'complete';
-            }
-            delete ss.toolStartTimes[callId];
-            return;
-        }
-        onToolEnd(evt);
+        const { ctx, isActive } = channelManager.routeEvent(evt);
+        if (!ctx) return;
+        onToolEnd(ctx, evt);
     });
 
     connection.on('MessageEnd', (evt) => {
-        const sid = evt?.sessionId || storeManager.activeViewId;
-        const ss = getStreamState(sid);
-        ss.isStreaming = false;
-        ss.activeMessageId = null;
-        const { isActive } = storeManager.routeEvent(evt);
+        const { ctx, isActive } = channelManager.routeEvent(evt);
+        if (!ctx) return;
+        ctx.streamState.isStreaming = false;
+        ctx.streamState.activeMessageId = null;
+        onMessageEnd(ctx, evt);
         if (!isActive) {
-            ss.activeToolCalls = {};
-            ss.activeToolCount = 0;
-            ss.toolCallDepth = 0;
-            ss.toolStartTimes = {};
-            ss.thinkingBuffer = '';
-            ss.showStreamingIndicator = false;
-            ss.processingVisible = false;
-            ss.processingStage = '';
-            ss.processingIcon = '⏳';
-            return;
+            ctx.unreadCount++;
+            updateSidebarBadge(ctx.sessionId, ctx.unreadCount);
         }
-        onMessageEnd(evt);
     });
 
     connection.on('Error', (evt) => {
-        const sid = evt?.sessionId || storeManager.activeViewId;
-        getStreamState(sid).isStreaming = false;
-        const { isActive } = storeManager.routeEvent(evt);
-        if (!isActive) return;
-        onError(evt);
+        const { ctx, isActive } = channelManager.routeEvent(evt);
+        if (!ctx) return;
+        ctx.streamState.isStreaming = false;
+        onError(ctx, evt);
+        if (!isActive) {
+            ctx.unreadCount++;
+            updateSidebarBadge(ctx.sessionId, ctx.unreadCount);
+        }
     });
 
     // ── Sub-agent lifecycle ─────────────────────────────────────────
 
     connection.on('SubAgentSpawned', (evt) => {
-        const { isActive } = storeManager.routeEvent(evt);
+        const { ctx, isActive } = channelManager.routeEvent(evt);
         if (!evt?.subAgentId) return;
         activeSubAgents.set(evt.subAgentId, {
             subAgentId: evt.subAgentId,
@@ -171,7 +152,7 @@ export function registerEventHandlers(connection) {
     });
 
     connection.on('SubAgentCompleted', (evt) => {
-        const { isActive } = storeManager.routeEvent(evt);
+        const { ctx, isActive } = channelManager.routeEvent(evt);
         if (!evt?.subAgentId) return;
         const sa = activeSubAgents.get(evt.subAgentId);
         if (sa) {
@@ -186,7 +167,7 @@ export function registerEventHandlers(connection) {
     });
 
     connection.on('SubAgentFailed', (evt) => {
-        const { isActive } = storeManager.routeEvent(evt);
+        const { ctx, isActive } = channelManager.routeEvent(evt);
         if (!evt?.subAgentId) return;
         const sa = activeSubAgents.get(evt.subAgentId);
         if (sa) {
@@ -201,7 +182,7 @@ export function registerEventHandlers(connection) {
     });
 
     connection.on('SubAgentKilled', (evt) => {
-        const { isActive } = storeManager.routeEvent(evt);
+        const { ctx, isActive } = channelManager.routeEvent(evt);
         if (!evt?.subAgentId) return;
         const sa = activeSubAgents.get(evt.subAgentId);
         if (sa) {
