@@ -141,6 +141,10 @@ export class SessionStoreManager {
         if (evt?.channelType && !store.channelType) store.channelType = evt.channelType;
 
         if (!this.#activeViewId) {
+            // During a view switch, don't auto-claim the active view
+            if (this.#isSwitchingView) {
+                return { isActive: false };
+            }
             this.#activeViewId = sessionId;
             if (store.agentId) this.#selectedAgentId = store.agentId;
             if (store.channelType) currentChannelType = store.channelType;
@@ -148,7 +152,14 @@ export class SessionStoreManager {
             return { isActive: true };
         }
 
-        const isActive = sessionId === this.#activeViewId;
+        let isActive = sessionId === this.#activeViewId;
+        // Guard: even if session matches, reject events from a different agent
+        if (isActive && evt?.agentId) {
+            const activeStore = this.#stores.get(this.#activeViewId);
+            if (activeStore?.agentId && evt.agentId !== activeStore.agentId) {
+                isActive = false;
+            }
+        }
         if (!isActive) {
             store.unreadCount++;
             updateSidebarBadge(sessionId, store.unreadCount);
