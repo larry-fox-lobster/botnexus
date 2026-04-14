@@ -525,7 +525,8 @@ internal sealed class InProcessAgentHandle : IAgentHandle, IHealthCheckable
             {
                 var streamEvent = agentEvent switch
                 {
-                    MessageStartEvent => new AgentStreamEvent { Type = AgentStreamEventType.MessageStart, MessageId = messageId },
+                    MessageStartEvent start when start.Message is AssistantAgentMessage
+                        => new AgentStreamEvent { Type = AgentStreamEventType.MessageStart, MessageId = messageId },
                     MessageUpdateEvent update when update.ContentDelta is not null => update.IsThinking
                         ? new AgentStreamEvent
                         {
@@ -556,7 +557,8 @@ internal sealed class InProcessAgentHandle : IAgentHandle, IHealthCheckable
                         ToolIsError = toolEnd.IsError,
                         MessageId = messageId
                     },
-                    MessageEndEvent => new AgentStreamEvent { Type = AgentStreamEventType.MessageEnd, MessageId = messageId },
+                    MessageEndEvent end when end.Message is AssistantAgentMessage
+                        => new AgentStreamEvent { Type = AgentStreamEventType.MessageEnd, MessageId = messageId },
                     _ => null
                 };
 
