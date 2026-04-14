@@ -56,6 +56,37 @@ public sealed class PlatformConfigurationTests
     }
 
     [Fact]
+    public async Task PlatformConfigLoader_LoadAsync_WithAgentFileAccess_DeserializesPolicy()
+    {
+        using var fixture = new PlatformConfigFixture();
+        var configPath = Path.Combine(fixture.RootPath, "agent-file-access.json");
+        var json = """
+                   {
+                     "agents": {
+                       "agent-a": {
+                         "provider": "copilot",
+                         "model": "gpt-4.1",
+                         "fileAccess": {
+                           "allowedReadPaths": ["Q:\\repos\\botnexus\\docs"],
+                           "allowedWritePaths": ["Q:\\repos\\botnexus\\artifacts"],
+                           "deniedPaths": ["Q:\\repos\\botnexus\\docs\\secrets"]
+                         }
+                       }
+                     }
+                   }
+                   """;
+        await File.WriteAllTextAsync(configPath, json);
+
+        var config = await PlatformConfigLoader.LoadAsync(configPath, validateOnLoad: false);
+        var fileAccess = config.Agents!["agent-a"].FileAccess;
+
+        fileAccess.Should().NotBeNull();
+        fileAccess!.AllowedReadPaths.Should().Equal(@"Q:\repos\botnexus\docs");
+        fileAccess.AllowedWritePaths.Should().Equal(@"Q:\repos\botnexus\artifacts");
+        fileAccess.DeniedPaths.Should().Equal(@"Q:\repos\botnexus\docs\secrets");
+    }
+
+    [Fact]
     public async Task PlatformConfigLoader_LoadAsync_WithExplicitConfigPath_LoadsSpecifiedFile()
     {
         using var fixture = new PlatformConfigFixture();

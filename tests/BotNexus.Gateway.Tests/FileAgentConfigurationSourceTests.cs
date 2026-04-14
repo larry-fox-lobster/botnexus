@@ -83,6 +83,35 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadAsync_WithFileAccess_MapsFileAccessPolicy()
+    {
+        _fileSystem.File.WriteAllText(
+            Path.Combine(_directoryPath, "agent-a.json"),
+            """
+            {
+              "agentId": "agent-a",
+              "displayName": "Agent A",
+              "modelId": "model-x",
+              "apiProvider": "provider-x",
+              "fileAccess": {
+                "allowedReadPaths": ["Q:\\repos\\botnexus\\docs"],
+                "allowedWritePaths": ["Q:\\repos\\botnexus\\artifacts"],
+                "deniedPaths": ["Q:\\repos\\botnexus\\docs\\secrets"]
+              }
+            }
+            """);
+
+        var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>(), _fileSystem);
+
+        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+
+        descriptor.FileAccess.Should().NotBeNull();
+        descriptor.FileAccess!.AllowedReadPaths.Should().Equal(@"Q:\repos\botnexus\docs");
+        descriptor.FileAccess.AllowedWritePaths.Should().Equal(@"Q:\repos\botnexus\artifacts");
+        descriptor.FileAccess.DeniedPaths.Should().Equal(@"Q:\repos\botnexus\docs\secrets");
+    }
+
+    [Fact]
     public async Task LoadAsync_WithRelativeSystemPromptFile_LoadsPromptContent()
     {
         var promptDirectory = Path.Combine(_directoryPath, "prompts");

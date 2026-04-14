@@ -133,6 +133,37 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadAsync_WithFileAccessPolicy_MapsFileAccess()
+    {
+        var config = new PlatformConfig
+        {
+            Agents = new Dictionary<string, AgentDefinitionConfig>
+            {
+                ["assistant"] = new()
+                {
+                    Provider = "copilot",
+                    Model = "gpt-4.1",
+                    FileAccess = new FileAccessPolicyConfig
+                    {
+                        AllowedReadPaths = [@"Q:\repos\botnexus\docs"],
+                        AllowedWritePaths = [@"Q:\repos\botnexus\artifacts"],
+                        DeniedPaths = [@"Q:\repos\botnexus\docs\secrets"]
+                    }
+                }
+            }
+        };
+
+        var source = new PlatformConfigAgentSource(Options.Create(config), _configDirectory, new ListLogger<PlatformConfigAgentSource>());
+
+        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+
+        descriptor.FileAccess.Should().NotBeNull();
+        descriptor.FileAccess!.AllowedReadPaths.Should().Equal(@"Q:\repos\botnexus\docs");
+        descriptor.FileAccess.AllowedWritePaths.Should().Equal(@"Q:\repos\botnexus\artifacts");
+        descriptor.FileAccess.DeniedPaths.Should().Equal(@"Q:\repos\botnexus\docs\secrets");
+    }
+
+    [Fact]
     public async Task PlatformConfigAgentSource_LoadsAgents_ThatInProcessIsolationCanCreate()
     {
         var source = new PlatformConfigAgentSource(
@@ -184,6 +215,72 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
 
         handle.AgentId.Should().Be("assistant");
         handle.SessionId.Should().Be("session-1");
+    }
+
+    [Fact]
+    public async Task PlatformConfigAgentSource_FileAccessPolicy_FlowsToPathValidator()
+    {
+        var source = new PlatformConfigAgentSource(
+            Options.Create(new PlatformConfig
+            {
+                Agents = new Dictionary<string, AgentDefinitionConfig>
+                {
+                    ["assistant"] = new()
+                    {
+                        Provider = "test-provider",
+                        Model = "test-model",
+                        IsolationStrategy = "in-process",
+                        FileAccess = new FileAccessPolicyConfig
+                        {
+                            AllowedReadPaths = [@"Q:\repos\botnexus\docs"],
+                            DeniedPaths = [@"Q:\repos\botnexus\docs\secrets"]
+                        },
+                        Enabled = true
+                    }
+                }
+            }),
+            _configDirectory,
+            new ListLogger<PlatformConfigAgentSource>());
+
+        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var toolFactory = new CapturingAgentToolFactory();
+
+        var modelRegistry = new ModelRegistry();
+        modelRegistry.Register("test-provider", new LlmModel(
+            Id: "test-model",
+            Name: "test-model",
+            Api: "responses",
+            Provider: "test-provider",
+            BaseUrl: "https://llm.test",
+            Reasoning: false,
+            Input: ["text"],
+            Cost: new ModelCost(0, 0, 0, 0),
+            ContextWindow: 8192,
+            MaxTokens: 1024));
+
+        var strategy = new InProcessIsolationStrategy(
+            new LlmClient(new ApiProviderRegistry(), modelRegistry),
+            CreateGatewayAuthManagerWithTempAuthPath(),
+            new PassthroughContextBuilder(),
+            toolFactory,
+            new TestWorkspaceManager(_configDirectory),
+            new DefaultToolRegistry(Array.Empty<IAgentTool>()),
+            new StubMemoryStoreFactory(),
+            new ServiceCollection().BuildServiceProvider(),
+            NullLogger<InProcessIsolationStrategy>.Instance);
+
+        _ = await strategy.CreateAsync(
+            descriptor,
+            new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1") });
+
+        var pathValidator = toolFactory.CapturedPathValidator;
+        pathValidator.Should().NotBeNull();
+        pathValidator!.ValidateAndResolve(@"Q:\repos\botnexus\docs\guide.md", FileAccessMode.Read)
+            .Should()
+            .Be(@"Q:\repos\botnexus\docs\guide.md");
+        pathValidator.ValidateAndResolve(@"Q:\repos\botnexus\docs\secrets\tokens.txt", FileAccessMode.Read)
+            .Should()
+            .BeNull();
     }
 
     [Fact]
@@ -241,6 +338,17 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
     {
         public IReadOnlyList<IAgentTool> CreateTools(string workingDirectory, IPathValidator? pathValidator = null)
             => [new ReadTool(workingDirectory)];
+    }
+
+    private sealed class CapturingAgentToolFactory : IAgentToolFactory
+    {
+        public IPathValidator? CapturedPathValidator { get; private set; }
+
+        public IReadOnlyList<IAgentTool> CreateTools(string workingDirectory, IPathValidator? pathValidator = null)
+        {
+            CapturedPathValidator = pathValidator;
+            return [];
+        }
     }
 
     private sealed class TestWorkspaceManager : IAgentWorkspaceManager
