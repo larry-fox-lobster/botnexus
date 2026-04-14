@@ -279,6 +279,8 @@ public sealed class AgentDefinitionConfig
     public SoulAgentConfig? Soul { get; set; }
     /// <summary>Session access configuration for this agent's session tool.</summary>
     public SessionAccessConfig? SessionAccess { get; set; }
+    /// <summary>File access policy for this agent's file tools.</summary>
+    public FileAccessPolicyConfig? FileAccess { get; set; }
 
     /// <summary>
     /// Extension-specific configuration keyed by extension ID.
@@ -288,6 +290,19 @@ public sealed class AgentDefinitionConfig
 
     /// <summary>Tool policy overrides for this agent.</summary>
     public ToolPolicyConfig? ToolPolicy { get; set; }
+}
+
+/// <summary>Per-agent file access policy configuration.</summary>
+public sealed class FileAccessPolicyConfig
+{
+    /// <summary>Paths the agent can read (exact paths or glob patterns).</summary>
+    public List<string>? AllowedReadPaths { get; set; }
+
+    /// <summary>Paths the agent can write (exact paths or glob patterns).</summary>
+    public List<string>? AllowedWritePaths { get; set; }
+
+    /// <summary>Paths explicitly denied even if otherwise allowed.</summary>
+    public List<string>? DeniedPaths { get; set; }
 }
 
 /// <summary>Per-agent tool policy configuration that overrides default risk classifications.</summary>
