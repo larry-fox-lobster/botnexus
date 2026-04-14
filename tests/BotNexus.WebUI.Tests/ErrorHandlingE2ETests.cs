@@ -27,7 +27,7 @@ public sealed class ErrorHandlingE2ETests
         });
 
         await host.SendMessageAsync("error-1");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .message.message-error .msg-content")).ToContainTextAsync("Unknown error");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.message-error .msg-content")).ToContainTextAsync("Unknown error");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -43,7 +43,7 @@ public sealed class ErrorHandlingE2ETests
         });
 
         await host.SendMessageAsync("error-2");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .message.message-error")).ToBeVisibleAsync();
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.message-error")).ToBeVisibleAsync();
         await host.WaitForAbortButtonHiddenAsync();
         await host.WaitForProcessingBarHiddenAsync();
     }

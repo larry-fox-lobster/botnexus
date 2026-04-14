@@ -19,7 +19,7 @@ public sealed class ModalDialogE2ETests
         await host.Page.ClickAsync("#btn-stop-gateway");
         await Assertions.Expect(host.Page.Locator("#confirm-dialog")).ToBeVisibleAsync();
         await host.Page.ClickAsync("#btn-confirm-ok");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .message.system-msg")).ToContainTextAsync("Gateway restart initiated.");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.system-msg")).ToContainTextAsync("Gateway restart initiated.");
     }
 
     [PlaywrightFact(Timeout = 90000)]

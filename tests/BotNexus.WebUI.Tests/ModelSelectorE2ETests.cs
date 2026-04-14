@@ -49,7 +49,7 @@ public sealed class ModelSelectorE2ETests
                 select.dispatchEvent(new Event('change', { bubbles: true }));
             }");
         var selected = await host.Page.InputValueAsync("#model-select");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .message.system-msg").Last).ToContainTextAsync($"Model changed to {selected}");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.system-msg").Last).ToContainTextAsync($"Model changed to {selected}");
 
         var agent = await host.ApiClient.GetFromJsonAsync<JsonElement>($"/api/agents/{AgentA}");
         agent.GetProperty("modelId").GetString().Should().Be(selected);
@@ -77,7 +77,7 @@ public sealed class ModelSelectorE2ETests
                 select.dispatchEvent(new Event('change', { bubbles: true }));
             }");
         var selected = await host.Page.InputValueAsync("#model-select");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .message.system-msg").Last).ToContainTextAsync($"Model changed to {selected}");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.system-msg").Last).ToContainTextAsync($"Model changed to {selected}");
     }
 
     private async Task<WebUiE2ETestHost> OpenChatAsync()

@@ -158,12 +158,15 @@ internal sealed class WebUiE2ETestHost : IAsyncDisposable
         await Page.ClickAsync("#btn-abort");
     }
 
+    /// <summary>Selector for the active channel's message container (replaced #chat-messages).</summary>
+    internal const string ActiveChat = ".channel-view.active .channel-messages";
+
     public Task<int> GetChatMessageCountAsync()
-        => Page.Locator("#chat-messages .message").CountAsync();
+        => Page.Locator($"{ActiveChat} .message").CountAsync();
 
     public async Task WaitForSystemMessageAsync(string text, int timeoutMs = 15000)
     {
-        await Assertions.Expect(Page.Locator("#chat-messages .message.system-msg")).ToContainTextAsync(
+        await Assertions.Expect(Page.Locator($"{ActiveChat} .message.system-msg")).ToContainTextAsync(
             text,
             new() { Timeout = timeoutMs });
     }
@@ -175,7 +178,7 @@ internal sealed class WebUiE2ETestHost : IAsyncDisposable
         {
             var processingVisible = await IsElementVisibleAsync("#processing-status:not(.hidden)");
             var abortVisible = await IsElementVisibleAsync("#btn-abort:not(.hidden)");
-            var hasStreamingMessage = await IsElementVisibleAsync("#chat-messages .message.assistant.streaming");
+            var hasStreamingMessage = await IsElementVisibleAsync($"{ActiveChat} .message.assistant.streaming");
             if (!processingVisible && !abortVisible && !hasStreamingMessage)
                 return;
 

@@ -107,7 +107,7 @@ public sealed class SessionSwitchingE2ETests
         });
 
         await host.Page.Locator($"#sessions-list .list-item[data-agent-id='{AgentB}'][data-channel-type='web chat']").First.ClickAsync();
-        await Assertions.Expect(host.Page.Locator("#chat-messages .loading")).ToContainTextAsync("Loading timeline...", new() { Timeout = 15000 });
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .loading")).ToContainTextAsync("Loading timeline...", new() { Timeout = 15000 });
         await Assertions.Expect(host.Page.Locator("#chat-input")).ToBeDisabledAsync(new() { Timeout = 5000 });
         await Assertions.Expect(host.Page.Locator("#btn-send")).ToBeDisabledAsync(new() { Timeout = 5000 });
 
@@ -146,10 +146,10 @@ public sealed class SessionSwitchingE2ETests
 
         var badge = host.Page.Locator($"#sessions-list .list-item[data-agent-id='{AgentA}'][data-channel-type='web chat'] .unread-badge");
         await Assertions.Expect(badge).ToBeVisibleAsync(new() { Timeout = 15000 });
-        (await host.Page.Locator("#chat-messages").InnerTextAsync()).Should().NotContain("background-event-2");
+        (await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat}").InnerTextAsync()).Should().NotContain("background-event-2");
 
         await host.OpenAgentTimelineAsync(AgentA);
-        await Assertions.Expect(host.Page.Locator("#chat-messages")).ToContainTextAsync(
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat}")).ToContainTextAsync(
             "background-event-2",
             new() { Timeout = 15000 });
     }

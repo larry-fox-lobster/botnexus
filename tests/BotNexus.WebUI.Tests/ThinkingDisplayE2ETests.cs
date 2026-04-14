@@ -27,7 +27,7 @@ public sealed class ThinkingDisplayE2ETests
         });
 
         await host.SendMessageAsync("thinking-block");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .thinking-block .thinking-pre")).ToContainTextAsync("considering options");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .thinking-block .thinking-pre")).ToContainTextAsync("considering options");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -43,7 +43,7 @@ public sealed class ThinkingDisplayE2ETests
         });
 
         await host.SendMessageAsync("thinking-count");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .thinking-block .thinking-stats").Last).ToContainTextAsync("chars");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .thinking-block .thinking-stats").Last).ToContainTextAsync("chars");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -60,10 +60,10 @@ public sealed class ThinkingDisplayE2ETests
         });
 
         await host.SendMessageAsync("toggle-thinking-block");
-        var block = host.Page.Locator("#chat-messages .thinking-block").First;
-        await host.Page.ClickAsync("#chat-messages .thinking-block .thinking-toggle");
+        var block = host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .thinking-block").First;
+        await host.Page.ClickAsync($"{WebUiE2ETestHost.ActiveChat} .thinking-block .thinking-toggle");
         (await block.GetAttributeAsync("class")).Should().NotContain("collapsed");
-        await host.Page.ClickAsync("#chat-messages .thinking-block .thinking-toggle");
+        await host.Page.ClickAsync($"{WebUiE2ETestHost.ActiveChat} .thinking-block .thinking-toggle");
         (await block.GetAttributeAsync("class")).Should().Contain("collapsed");
     }
 
@@ -82,7 +82,7 @@ public sealed class ThinkingDisplayE2ETests
 
         await host.SendMessageAsync("auto-collapse");
         await host.WaitForStreamingCompleteAsync();
-        await Assertions.Expect(host.Page.Locator("#chat-messages .thinking-block .thinking-pre").First)
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .thinking-block .thinking-pre").First)
             .ToContainTextAsync("expanded then collapse");
     }
 
@@ -99,7 +99,7 @@ public sealed class ThinkingDisplayE2ETests
         });
 
         await host.SendMessageAsync("header-toggle");
-        var block = host.Page.Locator("#chat-messages .thinking-block").First;
+        var block = host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .thinking-block").First;
         (await block.GetAttributeAsync("class")).Should().Contain("collapsed");
 
         await SetThinkingVisibilityAsync(host, true);

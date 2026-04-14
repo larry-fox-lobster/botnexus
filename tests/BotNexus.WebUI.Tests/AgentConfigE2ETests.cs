@@ -33,7 +33,7 @@ public sealed class AgentConfigE2ETests
         const string displayName = "Agent A Updated";
         await host.Page.FillAsync("#cfg-displayName", displayName);
         await host.Page.ClickAsync("#btn-agent-save");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .message.system-msg")).ToContainTextAsync("Agent settings saved.");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.system-msg")).ToContainTextAsync("Agent settings saved.");
 
         var agent = await host.ApiClient.GetFromJsonAsync<JsonElement>($"/api/agents/{AgentA}");
         agent.GetProperty("displayName").GetString().Should().Be(displayName);

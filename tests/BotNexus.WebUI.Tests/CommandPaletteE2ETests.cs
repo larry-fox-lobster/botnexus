@@ -49,7 +49,7 @@ public sealed class CommandPaletteE2ETests
         await host.Page.FillAsync("#chat-input", "/");
         await host.Page.PressAsync("#chat-input", "ArrowDown");
         await host.Page.PressAsync("#chat-input", "Enter");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .message.system-msg")).ToContainTextAsync("New session started");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.system-msg")).ToContainTextAsync("New session started");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -68,7 +68,7 @@ public sealed class CommandPaletteE2ETests
         var host = await OpenChatAsync();
         await host.Page.FillAsync("#chat-input", "/help");
         await host.Page.PressAsync("#chat-input", "Enter");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .command-result .command-result-title")).ToContainTextAsync("Available Commands");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .command-result .command-result-title")).ToContainTextAsync("Available Commands");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -81,7 +81,7 @@ public sealed class CommandPaletteE2ETests
         await host.Page.FillAsync("#chat-input", "/reset");
         await host.Page.PressAsync("#chat-input", "Enter");
 
-        await Assertions.Expect(host.Page.Locator("#chat-messages")).ToContainTextAsync("reset");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat}")).ToContainTextAsync("reset");
         await Assertions.Expect(host.Page.Locator("#session-id-display")).ToBeHiddenAsync();
     }
 

@@ -40,7 +40,7 @@ public sealed class CopyInteractionsE2ETests
         await host.WaitForStreamingCompleteAsync();
         await StubClipboardAsync(host);
 
-        await host.Page.ClickAsync("#chat-messages .message.assistant .btn-copy-msg");
+        await host.Page.ClickAsync($"{WebUiE2ETestHost.ActiveChat} .message.assistant .btn-copy-msg");
         var copied = await host.Page.EvaluateAsync<string>("() => window.__copiedText || ''");
         copied.Should().Be("**bold** text");
     }

@@ -26,9 +26,9 @@ public sealed class StreamingDisplayE2ETests
         });
 
         await host.SendMessageAsync("progressive");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .delta-content")).ToContainTextAsync("hello ");
-        (await host.Page.Locator("#chat-messages .delta-content").InnerTextAsync()).Should().NotContain("world");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .delta-content")).ToContainTextAsync("hello world");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .delta-content")).ToContainTextAsync("hello ");
+        (await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .delta-content").InnerTextAsync()).Should().NotContain("world");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .delta-content")).ToContainTextAsync("hello world");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -42,7 +42,7 @@ public sealed class StreamingDisplayE2ETests
 
         await host.SendMessageAsync("markdown");
         await host.WaitForStreamingCompleteAsync();
-        await Assertions.Expect(host.Page.Locator("#chat-messages .message.assistant .msg-content strong")).ToContainTextAsync("bold");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.assistant .msg-content strong")).ToContainTextAsync("bold");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -106,7 +106,7 @@ public sealed class StreamingDisplayE2ETests
 
         await host.SendMessageAsync("tool-footer");
         await host.WaitForStreamingCompleteAsync();
-        await Assertions.Expect(host.Page.Locator("#chat-messages .message.assistant .msg-footer")).ToContainTextAsync("1 tool call");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.assistant .msg-footer")).ToContainTextAsync("1 tool call");
     }
 
     private async Task<WebUiE2ETestHost> OpenChatAsync()

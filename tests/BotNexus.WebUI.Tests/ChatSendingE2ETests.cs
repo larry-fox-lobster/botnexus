@@ -59,7 +59,7 @@ public sealed class ChatSendingE2ETests
     {
         var host = await OpenChatAsync();
         await host.SendMessageAsync("bubble-check");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .message.user").Last).ToContainTextAsync("bubble-check");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.user").Last).ToContainTextAsync("bubble-check");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -78,7 +78,7 @@ public sealed class ChatSendingE2ETests
         var host = await OpenChatAsync();
         await host.SendMessageAsync("stream-me");
         await host.WaitForStreamingCompleteAsync();
-        await Assertions.Expect(host.Page.Locator("#chat-messages .message.assistant .msg-content")).ToContainTextAsync("echo:agent-a:stream-me");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.assistant .msg-content")).ToContainTextAsync("echo:agent-a:stream-me");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -91,7 +91,7 @@ public sealed class ChatSendingE2ETests
         var invocations = host.GetHubInvocationMessages("SendMessage");
         invocations.Should().Contain(message =>
             message.Contains("agent-a", StringComparison.OrdinalIgnoreCase) &&
-            message.Contains("web chat", StringComparison.OrdinalIgnoreCase));
+            message.Contains("signalr", StringComparison.OrdinalIgnoreCase));
     }
 
     [PlaywrightFact(Timeout = 90000)]

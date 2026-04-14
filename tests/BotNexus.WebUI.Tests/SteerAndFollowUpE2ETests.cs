@@ -29,7 +29,7 @@ public sealed class SteerAndFollowUpE2ETests
         await host.Page.FillAsync("#chat-input", "steer now");
         await host.Page.ClickAsync("#btn-send");
         await WaitForDispatchContentAsync(host, "steer now");
-        await Assertions.Expect(host.Page.Locator("#chat-messages .message.system-msg")).ToContainTextAsync("🧭 Steering: steer now");
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.system-msg")).ToContainTextAsync("🧭 Steering: steer now");
     }
 
     [PlaywrightFact(Timeout = 90000)]

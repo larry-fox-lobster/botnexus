@@ -23,13 +23,13 @@ public sealed class ScrollbackE2ETests
         _fixture.SeedScrollbackHistory(AgentA, sessionCount: 2, entriesPerSession: 40);
 
         await host.OpenAgentTimelineAsync(AgentA);
-        await Assertions.Expect(host.Page.Locator("#chat-messages .history-sentinel")).ToHaveCountAsync(1);
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .history-sentinel")).ToHaveCountAsync(1);
 
         var atBottom = await host.Page.EvaluateAsync<bool>(
-            "() => { const el = document.querySelector('#chat-messages'); return Math.abs((el.scrollHeight - el.clientHeight) - el.scrollTop) < 4; }");
+            "() => { const el = document.querySelector('.channel-view.active .channel-messages'); return Math.abs((el.scrollHeight - el.clientHeight) - el.scrollTop) < 4; }");
         atBottom.Should().BeTrue();
 
-        var lastMessage = await host.Page.Locator("#chat-messages .message .msg-content").Last.InnerTextAsync();
+        var lastMessage = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message .msg-content").Last.InnerTextAsync();
         lastMessage.Should().Contain("agent-a-s1-m39");
     }
 
@@ -40,13 +40,13 @@ public sealed class ScrollbackE2ETests
         _fixture.SeedScrollbackHistory(AgentA, sessionCount: 2, entriesPerSession: 40);
 
         await host.OpenAgentTimelineAsync(AgentA);
-        var initialCount = await host.Page.Locator("#chat-messages .message").CountAsync();
+        var initialCount = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message").CountAsync();
 
-        await host.Page.EvaluateAsync("() => document.querySelector('#chat-messages').scrollTop = 0");
+        await host.Page.EvaluateAsync("() => document.querySelector('.channel-view.active .channel-messages').scrollTop = 0");
         await host.Page.WaitForFunctionAsync(
-            $"() => document.querySelectorAll('#chat-messages .message').length > {initialCount}");
+            $"() => document.querySelectorAll('.channel-view.active .channel-messages .message').length > {initialCount}");
 
-        var finalCount = await host.Page.Locator("#chat-messages .message").CountAsync();
+        var finalCount = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message").CountAsync();
         finalCount.Should().BeGreaterThan(initialCount);
     }
 
@@ -57,7 +57,7 @@ public sealed class ScrollbackE2ETests
         _fixture.SeedScrollbackHistory(AgentA, sessionCount: 2, entriesPerSession: 40);
 
         await host.OpenAgentTimelineAsync(AgentA);
-        var dividerCount = await host.Page.Locator("#chat-messages .session-divider").CountAsync();
+        var dividerCount = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .session-divider").CountAsync();
 
         dividerCount.Should().BeGreaterThan(0);
     }
@@ -69,9 +69,9 @@ public sealed class ScrollbackE2ETests
         _fixture.SeedScrollbackHistory(AgentA, sessionCount: 2, entriesPerSession: 40);
 
         await host.OpenAgentTimelineAsync(AgentA);
-        await host.Page.EvaluateAsync("() => document.querySelector('#chat-messages').scrollTop = 0");
+        await host.Page.EvaluateAsync("() => document.querySelector('.channel-view.active .channel-messages').scrollTop = 0");
 
-        var marker = host.Page.Locator("#chat-messages .end-of-history");
+        var marker = host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .end-of-history");
         await Assertions.Expect(marker).ToBeVisibleAsync(new() { Timeout = 15000 });
         await Assertions.Expect(marker).ToContainTextAsync("Beginning of conversation history");
     }
@@ -84,20 +84,20 @@ public sealed class ScrollbackE2ETests
 
         await host.OpenAgentTimelineAsync(AgentA);
 
-        await host.Page.EvaluateAsync("() => document.querySelector('#chat-messages').scrollTop = 0");
+        await host.Page.EvaluateAsync("() => document.querySelector('.channel-view.active .channel-messages').scrollTop = 0");
         var anchor = await host.Page.EvaluateAsync<ScrollAnchor>(
             @"() => {
-                const chat = document.querySelector('#chat-messages');
+                const chat = document.querySelector('.channel-view.active .channel-messages');
                 const first = chat.querySelector('.message .msg-content');
                 return { text: first?.innerText ?? '', top: first?.getBoundingClientRect().top ?? 0, count: chat.querySelectorAll('.message').length };
             }");
 
         await host.Page.WaitForFunctionAsync(
-            $"() => document.querySelectorAll('#chat-messages .message').length > {anchor.Count}");
+            $"() => document.querySelectorAll('.channel-view.active .channel-messages .message').length > {anchor.Count}");
 
         var topAfter = await host.Page.EvaluateAsync<double>(
             @"anchorText => {
-                const items = Array.from(document.querySelectorAll('#chat-messages .message .msg-content'));
+                const items = Array.from(document.querySelectorAll('.channel-view.active .channel-messages .message .msg-content'));
                 const target = items.find(el => el.innerText === anchorText);
                 return target ? target.getBoundingClientRect().top : Number.NaN;
             }",
@@ -115,19 +115,19 @@ public sealed class ScrollbackE2ETests
         _fixture.SeedScrollbackHistory(AgentB, sessionCount: 1, entriesPerSession: 12);
 
         await host.OpenAgentTimelineAsync(AgentA);
-        var beforeLoadCount = await host.Page.Locator("#chat-messages .message").CountAsync();
-        await host.Page.EvaluateAsync("() => document.querySelector('#chat-messages').scrollTop = 0");
+        var beforeLoadCount = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message").CountAsync();
+        await host.Page.EvaluateAsync("() => document.querySelector('.channel-view.active .channel-messages').scrollTop = 0");
         await host.Page.WaitForFunctionAsync(
-            $"() => document.querySelectorAll('#chat-messages .message').length > {beforeLoadCount}");
+            $"() => document.querySelectorAll('.channel-view.active .channel-messages .message').length > {beforeLoadCount}");
 
-        var loadedFromAgentA = await host.Page.Locator("#chat-messages .message .msg-content").First.InnerTextAsync();
+        var loadedFromAgentA = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message .msg-content").First.InnerTextAsync();
 
         await host.OpenAgentTimelineAsync(AgentB);
         await Assertions.Expect(host.Page.Locator("#chat-title")).ToContainTextAsync(AgentB, new() { Timeout = 15000 });
-        await Assertions.Expect(host.Page.Locator("#chat-messages .history-sentinel")).ToHaveCountAsync(1);
-        await Assertions.Expect(host.Page.Locator("#chat-messages .end-of-history")).ToBeVisibleAsync();
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .history-sentinel")).ToHaveCountAsync(1);
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .end-of-history")).ToBeVisibleAsync();
 
-        (await host.Page.Locator("#chat-messages").InnerTextAsync()).Should().NotContain(loadedFromAgentA);
+        (await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat}").InnerTextAsync()).Should().NotContain(loadedFromAgentA);
     }
 
     private sealed class ScrollAnchor

@@ -21,7 +21,7 @@ public sealed class HistoryPaginationE2ETests
         _fixture.SeedScrollbackHistory(AgentA, sessionCount: 3, entriesPerSession: 20);
         await host.OpenAgentTimelineAsync(AgentA);
 
-        var dividerCount = await host.Page.Locator("#chat-messages .session-divider").CountAsync();
+        var dividerCount = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .session-divider").CountAsync();
         dividerCount.Should().BeGreaterThanOrEqualTo(2);
     }
 
@@ -32,16 +32,16 @@ public sealed class HistoryPaginationE2ETests
         _fixture.SeedScrollbackHistory(AgentA, sessionCount: 4, entriesPerSession: 40);
         await host.OpenAgentTimelineAsync(AgentA);
 
-        await Assertions.Expect(host.Page.Locator("#chat-messages .history-sentinel")).ToHaveCountAsync(1);
-        var initialMessages = await host.Page.Locator("#chat-messages .message").CountAsync();
-        var initialDividers = await host.Page.Locator("#chat-messages .session-divider").CountAsync();
+        await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .history-sentinel")).ToHaveCountAsync(1);
+        var initialMessages = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message").CountAsync();
+        var initialDividers = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .session-divider").CountAsync();
 
-        await host.Page.EvaluateAsync("() => document.querySelector('#chat-messages').scrollTop = 0");
+        await host.Page.EvaluateAsync("() => document.querySelector('.channel-view.active .channel-messages').scrollTop = 0");
         await host.Page.WaitForFunctionAsync(
-            $"() => document.querySelectorAll('#chat-messages .message').length > {initialMessages}");
+            $"() => document.querySelectorAll('.channel-view.active .channel-messages .message').length > {initialMessages}");
 
-        var finalMessages = await host.Page.Locator("#chat-messages .message").CountAsync();
-        var finalDividers = await host.Page.Locator("#chat-messages .session-divider").CountAsync();
+        var finalMessages = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message").CountAsync();
+        var finalDividers = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .session-divider").CountAsync();
         finalMessages.Should().BeGreaterThan(initialMessages);
         finalDividers.Should().BeGreaterThanOrEqualTo(initialDividers);
     }
