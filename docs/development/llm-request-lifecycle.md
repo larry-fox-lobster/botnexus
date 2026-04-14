@@ -211,6 +211,6 @@ This is fundamentally how all current LLM APIs work — the statefulness is enti
 
 ## See Also
 
-- [Architecture Overview](overview.md) — Full system architecture
+- [Architecture Overview](../architecture/overview.md) — Full system architecture
 - [Workspace and Memory](workspace-and-memory.md) — Agent workspace, memory, and context files
-- [System Layers](system-layers.md) — Layer-by-layer breakdown
+- [Message Flow](message-flow.md) — Channel dispatch and routing

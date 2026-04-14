@@ -26,7 +26,7 @@ User → SignalR Client → GatewayHub.SubscribeAll()
 
 1. Client connects to SignalR hub at `/gateway`
 2. Calls `SubscribeAll()` to receive all session metadata
-3. Hub joins client to all active session groups: `session:{sessionId}`
+3. Hub joins client to all non-Sealed session groups: `session:{sessionId}`
 4. Client receives list of available sessions with metadata
 
 **Key Code:**
@@ -223,16 +223,15 @@ SignalR Group: session:{sessionId} → All Subscribed Clients
 
 ```
 Active → Suspended → Sealed
-         ↓
-      Expired (auto-cleanup)
 ```
 
 **Status Definitions:**
 
 - **Active**: Currently accepting new messages
 - **Suspended**: Paused, can be resumed
-- **Sealed**: Completed, read-only (e.g., old soul sessions)
-- **Expired**: Archived due to inactivity (internal status)
+- **Sealed**: Completed, read-only — terminal state (e.g., old soul sessions, completed cron sessions)
+
+**Visibility Rule:** Any non-Sealed session is visible to clients. `IsInteractive` on the session determines whether the user can send messages.
 
 ### Session Types
 

@@ -41,7 +41,7 @@ The codebase uses raw strings for domain concepts—`AgentId = "test-agent"`, `C
 Domain logic scattered across 13 projects without shared vocabulary. Session stores normalize keys differently. Each project reimplements string validation.
 
 ### Problem: Domain Language Misalignment
-Code doesn't speak the domain. We mutate `SessionStatus.Closed` to mean "sealed by expiration", but the name suggests deletion. Identity generation for sub-agents uses string concatenation (`"agent::subagent::123"`) instead of a first-class concept.
+Code doesn't speak the domain. The older codebase used `SessionStatus.Closed` when it meant "sealed by expiration" — the name suggested deletion when the intent was permanent archival (now corrected to `SessionStatus.Sealed`). Identity generation for sub-agents uses string concatenation (`"agent::subagent::123"`) instead of a first-class concept.
 
 ### Solution: Value Objects and Smart Enums
 - **Value Objects** — Stack-allocated, type-safe wrappers around validated primitives (AgentId, SessionId, ChannelKey)
