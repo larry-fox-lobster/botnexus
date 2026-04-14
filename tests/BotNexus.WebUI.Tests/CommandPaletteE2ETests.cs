@@ -82,7 +82,7 @@ public sealed class CommandPaletteE2ETests
         await host.Page.PressAsync("#chat-input", "Enter");
 
         await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat}")).ToContainTextAsync("reset");
-        await Assertions.Expect(host.Page.Locator("#session-id-display")).ToBeHiddenAsync();
+        await Assertions.Expect(host.Page.Locator("#session-id-text")).ToContainTextAsync("Session: —");
     }
 
     private async Task<WebUiE2ETestHost> OpenChatAsync()

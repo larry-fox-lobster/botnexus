@@ -28,6 +28,7 @@ public sealed class AgentConfigE2ETests
     public async Task SaveConfig_PutsUpdatedAgent()
     {
         await using var host = await _fixture.CreatePageAsync();
+        await host.OpenAgentTimelineAsync(AgentA);
         await host.Page.ClickAsync($"#agents-list .list-item:has-text('{AgentA}')");
 
         const string displayName = "Agent A Updated";

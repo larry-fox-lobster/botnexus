@@ -127,7 +127,9 @@ export function scrollToBottom(force, el) {
     if (isBatchRendering) return;
     const target = el || dom.channelViews?.querySelector('.channel-view.active .channel-messages');
     if (!target) return;
-    if (force || !userScrolledUp) {
+    if (force) {
+        target.scrollTop = target.scrollHeight;
+    } else if (!userScrolledUp) {
         requestAnimationFrame(() => { target.scrollTop = target.scrollHeight; });
     }
     updateScrollButton(target);

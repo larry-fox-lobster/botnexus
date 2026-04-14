@@ -99,6 +99,7 @@ public sealed class ThinkingDisplayE2ETests
         });
 
         await host.SendMessageAsync("header-toggle");
+        await host.WaitForStreamingCompleteAsync();
         var block = host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .thinking-block").First;
         (await block.GetAttributeAsync("class")).Should().Contain("collapsed");
 

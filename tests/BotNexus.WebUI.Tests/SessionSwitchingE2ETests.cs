@@ -24,6 +24,7 @@ public sealed class SessionSwitchingE2ETests
 
         await host.OpenAgentTimelineAsync(AgentA);
         var sessionA = await host.SendMessageAsync("basic-a");
+        await host.WaitForStreamingCompleteAsync();
 
         await host.OpenAgentTimelineAsync(AgentB);
         var sessionB = await host.SendMessageAsync("basic-b");

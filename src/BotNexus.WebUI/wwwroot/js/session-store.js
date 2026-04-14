@@ -239,6 +239,7 @@ export class ChannelManager {
         if (agentId && channelType) {
             const ctx = this.getOrCreate(agentId, channelType);
             if (sessionId) this.registerSession(sessionId, ctx);
+            else if (sessionId === null) ctx.sessionId = null;
             this.activate(ctx.key);
         } else if (sessionId) {
             let ctx = this.#sessionIndex.get(sessionId);

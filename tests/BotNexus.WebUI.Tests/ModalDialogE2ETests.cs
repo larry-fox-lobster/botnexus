@@ -16,6 +16,7 @@ public sealed class ModalDialogE2ETests
     public async Task ConfirmDialog_OkExecutesCallback()
     {
         await using var host = await _fixture.CreatePageAsync();
+        await host.OpenAgentTimelineAsync("agent-a");
         await host.Page.ClickAsync("#btn-stop-gateway");
         await Assertions.Expect(host.Page.Locator("#confirm-dialog")).ToBeVisibleAsync();
         await host.Page.ClickAsync("#btn-confirm-ok");

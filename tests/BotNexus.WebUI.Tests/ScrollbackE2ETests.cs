@@ -26,7 +26,7 @@ public sealed class ScrollbackE2ETests
         await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .history-sentinel")).ToHaveCountAsync(1);
 
         var atBottom = await host.Page.EvaluateAsync<bool>(
-            "() => { const el = document.querySelector('.channel-view.active .channel-messages'); return Math.abs((el.scrollHeight - el.clientHeight) - el.scrollTop) < 4; }");
+            "() => { const el = document.querySelector('.channel-view.active .channel-messages'); return el && el.scrollHeight > el.clientHeight && Math.abs((el.scrollHeight - el.clientHeight) - el.scrollTop) < 4; }");
         atBottom.Should().BeTrue();
 
         var lastMessage = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message .msg-content").Last.InnerTextAsync();

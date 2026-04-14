@@ -59,6 +59,7 @@ export function onMessageStart(ctx, evt, sid) {
     removeStreamingIndicator(ctx);
     showStreamingIndicator(sid, ctx);
     showProcessingStatus('Agent is responding...', '🤖', sid);
+    decrementQueue();
     // Only update shared UI if this is the active channel
     if (ctx.key === channelManager.activeKey) {
         dom.btnAbort.classList.remove('hidden');
@@ -143,12 +144,11 @@ export function updateSendButtonState() {
         dom.btnSend.disabled = true;
         return;
     }
-    if (channelManager.isRestRequestInFlight) {
-        dom.btnSend.disabled = true;
-        return;
-    }
-    dom.chatInput.disabled = false;
+    // Streaming check must run before isRestRequestInFlight — the hub invoke
+    // blocks for the full stream so isRestRequestInFlight stays true during
+    // streaming.  Users still need to steer/follow-up while the stream runs.
     if (isCurrentSessionStreaming() && connection?.state === signalR.HubConnectionState.Connected) {
+        dom.chatInput.disabled = false;
         dom.btnSend.disabled = !hasText;
         if (sendModeFollowUp) {
             dom.btnSend.textContent = '📨 Follow-up';
@@ -165,6 +165,11 @@ export function updateSendButtonState() {
         dom.btnSendMode.classList.toggle('followup-mode', sendModeFollowUp);
         return;
     }
+    if (channelManager.isRestRequestInFlight) {
+        dom.btnSend.disabled = true;
+        return;
+    }
+    dom.chatInput.disabled = false;
     dom.btnSend.classList.remove('btn-steer', 'btn-followup');
     dom.btnSend.textContent = 'Send';
     dom.chatInput.placeholder = 'Type a message... (Enter to send, Shift+Enter for newline)';
@@ -577,8 +582,7 @@ function stripControlTags(text) {
     if (!text) return text;
     return text.replace(/\[\[\s*reply_to_current\s*\]\]/gi, '')
                .replace(/\[\[\s*reply_to:\s*\S+\s*\]\]/gi, '')
-               .replace(/\[\[reply_to_current\]\]/g, '')
-               .trim();
+               .replace(/\[\[reply_to_current\]\]/g, '');
 }
 
 export function appendChatMessage(role, content, timestamp) {
@@ -992,7 +996,6 @@ export async function sendMessage() {
     trackActivity('message', activeAgentId, text.substring(0, 60));
     setSendingState(true);
     if (activeSessionId) getStreamState(activeSessionId).isStreaming = true;
-    incrementQueue();
     startResponseTimeout();
 
     try {
@@ -1002,10 +1005,14 @@ export async function sendMessage() {
             const sessionChannelType = result.channelType || channelType;
             const ctx = channelManager.getOrCreate(result.agentId || activeAgentId, sessionChannelType);
             channelManager.registerSession(result.sessionId, ctx);
-            channelManager.activate(ctx.key);
+            // Only re-activate if user hasn't navigated away during the async invoke
+            if (channelManager.activeKey === ctx.key) {
+                channelManager.activate(ctx.key);
+            }
             setLastContext(result.agentId || activeAgentId, sessionChannelType, result.sessionId);
             updateSessionIdDisplay();
         }
+        setSendingState(false);
     } catch (err) {
         appendSystemMessage(`Error: ${err.message}`, 'error');
         if (activeSessionId) getStreamState(activeSessionId).isStreaming = false;
@@ -1163,13 +1170,15 @@ export async function openAgentTimeline(agentId, channelType, targetSessionId = 
 
         ctx.messagesEl.innerHTML = '';
         renderHistoryBatch(data.messages, data.sessionBoundaries, ctx.messagesEl);
-        setupScrollbackObserver(channelType, agentId, data.nextCursor, data.hasMore, ctx);
         ctx.historyLoaded = true;
 
         await checkAgentRunningStatus(agentId, latestSessionId);
 
         updateSessionIdDisplay();
         scrollToBottom(true, ctx.messagesEl);
+        // Set up the scrollback observer after scrolling so the sentinel is out
+        // of view and the IntersectionObserver doesn't fire prematurely.
+        setupScrollbackObserver(channelType, agentId, data.nextCursor, data.hasMore, ctx);
         dom.chatInput.focus();
         updateSendButtonState();
         loadChatHeaderModels();
@@ -1248,6 +1257,7 @@ function setupScrollbackObserver(channelType, agentId, initialCursor, initialHas
             showEndOfHistory(sentinel);
             isFetching = false; return;
         }
+        hideTopSpinner(sentinel);
         const scrollHeightBefore = messagesEl.scrollHeight;
         const fragment = document.createDocumentFragment();
         renderHistoryBatch(data.messages, data.sessionBoundaries, fragment);
@@ -1255,7 +1265,6 @@ function setupScrollbackObserver(channelType, agentId, initialCursor, initialHas
         messagesEl.scrollTop += messagesEl.scrollHeight - scrollHeightBefore;
         nextCursor = data.nextCursor;
         hasMore = data.hasMore;
-        hideTopSpinner(sentinel);
         isFetching = false;
         if (!hasMore) { observer.disconnect(); showEndOfHistory(sentinel); }
     }

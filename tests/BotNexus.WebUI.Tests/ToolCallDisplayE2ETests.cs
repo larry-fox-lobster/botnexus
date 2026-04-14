@@ -99,26 +99,26 @@ public sealed class ToolCallDisplayE2ETests
         await host.WaitForStreamingCompleteAsync();
         var tool = host.Page.Locator(".tool-call[data-call-id='tc-toggle']").First;
 
-        (await tool.GetAttributeAsync("class")).Should().Contain("hidden");
-        await SetToolsVisibilityAsync(host, true);
         (await tool.GetAttributeAsync("class")).Should().NotContain("hidden");
         await SetToolsVisibilityAsync(host, false);
         (await tool.GetAttributeAsync("class")).Should().Contain("hidden");
+        await SetToolsVisibilityAsync(host, true);
+        (await tool.GetAttributeAsync("class")).Should().NotContain("hidden");
     }
 
     [PlaywrightFact(Timeout = 90000)]
-    public async Task ToolCalls_HiddenByDefault()
+    public async Task ToolCalls_VisibleByDefault()
     {
         var host = await OpenChatAsync();
         host.Supervisor.EnqueueAgentStreamPlan(AgentA, new RecordingStreamPlan
         {
-            ToolCalls = { new StreamToolCall("tc-hidden", "functions.search", new Dictionary<string, object?> { ["query"] = "abc" }, "ok") },
+            ToolCalls = { new StreamToolCall("tc-visible", "functions.search", new Dictionary<string, object?> { ["query"] = "abc" }, "ok") },
             ContentDeltas = { "done" }
         });
 
-        await host.SendMessageAsync("tool-hidden");
+        await host.SendMessageAsync("tool-visible");
         await host.WaitForStreamingCompleteAsync();
-        (await host.Page.Locator(".tool-call[data-call-id='tc-hidden']").First.GetAttributeAsync("class")).Should().Contain("hidden");
+        (await host.Page.Locator(".tool-call[data-call-id='tc-visible']").First.GetAttributeAsync("class")).Should().NotContain("hidden");
     }
 
     private async Task<WebUiE2ETestHost> OpenChatAsync()
