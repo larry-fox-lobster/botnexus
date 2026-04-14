@@ -20,6 +20,10 @@ public sealed record Location
     /// </summary>
     public string? Path { get; init; }
     /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
+    public string? Description { get; init; }
+    /// <summary>
     /// Gets or sets the properties.
     /// </summary>
     public IReadOnlyDictionary<string, string> Properties { get; init; } = new Dictionary<string, string>();

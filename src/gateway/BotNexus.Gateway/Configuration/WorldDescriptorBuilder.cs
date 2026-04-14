@@ -87,7 +87,15 @@ public static class WorldDescriptorBuilder
     {
         Dictionary<string, Location> locations = new(StringComparer.OrdinalIgnoreCase);
 
-        static string? NormalizePath(string? path) => string.IsNullOrWhiteSpace(path) ? null : Path.GetFullPath(path);
+        static string? NormalizePath(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return null;
+
+            var expanded = ExpandUserHome(path.Trim())
+                .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            return Path.GetFullPath(expanded);
+        }
 
         void UpsertLocation(Location location) => locations[location.Name] = location;
 
@@ -212,9 +220,77 @@ public static class WorldDescriptorBuilder
             }
         }
 
+        if (config.Gateway?.Locations is not null)
+        {
+            foreach (var (locationName, locationConfig) in config.Gateway.Locations)
+            {
+                if (string.IsNullOrWhiteSpace(locationName) || locationConfig is null)
+                    continue;
+
+                var type = string.IsNullOrWhiteSpace(locationConfig.Type)
+                    ? LocationType.FileSystem
+                    : LocationType.FromString(locationConfig.Type);
+                var resolvedPath = ResolveConfiguredLocationPath(type, locationConfig);
+                var properties = locationConfig.Properties is null
+                    ? new Dictionary<string, string>()
+                    : new Dictionary<string, string>(locationConfig.Properties, StringComparer.OrdinalIgnoreCase);
+
+                UpsertLocation(new Location
+                {
+                    Name = locationName.Trim(),
+                    Type = type,
+                    Path = resolvedPath,
+                    Description = locationConfig.Description,
+                    Properties = properties
+                });
+            }
+        }
+
         return locations.Values
             .OrderBy(location => location.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static string? ResolveConfiguredLocationPath(LocationType locationType, LocationConfig locationConfig)
+    {
+        if (locationType == LocationType.FileSystem)
+            return NormalizeConfiguredPath(locationConfig.Path);
+
+        if (locationType == LocationType.Database)
+            return locationConfig.ConnectionString;
+
+        if (locationType == LocationType.Api || locationType == LocationType.McpServer || locationType == LocationType.RemoteNode)
+            return locationConfig.Endpoint;
+
+        return NormalizeConfiguredPath(locationConfig.Path)
+            ?? locationConfig.Endpoint
+            ?? locationConfig.ConnectionString;
+    }
+
+    private static string? NormalizeConfiguredPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+
+        var expanded = ExpandUserHome(path.Trim())
+            .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+        return Path.GetFullPath(expanded);
+    }
+
+    private static string ExpandUserHome(string path)
+    {
+        if (!path.StartsWith('~'))
+            return path;
+
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (path.Length == 1)
+            return home;
+
+        var first = path[1];
+        if (first == Path.DirectorySeparatorChar || first == Path.AltDirectorySeparatorChar)
+            return Path.Combine(home, path[2..]);
+
+        return path;
     }
 
     private static IReadOnlyList<CrossWorldPermission> ResolveCrossWorldPermissions(PlatformConfig config)
