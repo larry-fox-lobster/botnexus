@@ -100,8 +100,8 @@ if ($PSBoundParameters.ContainsKey('OtlpPort') -and -not (Test-PortAvailable -Po
 
 if (-not $SkipBuild) {
     Write-Host ""
-    Write-Host "[build] Building BotNexus.Probe..." -ForegroundColor Cyan
-    dotnet build $probeSln --nologo --tl:off
+    Write-Host "[build] Building BotNexus.Probe (Release)..." -ForegroundColor Cyan
+    dotnet build $probeSln --nologo --tl:off -c Release
     if ($LASTEXITCODE -ne 0) {
         throw "Probe build failed."
     }
@@ -110,7 +110,7 @@ if (-not $SkipBuild) {
 
 # --- Assemble arguments ---
 
-$runArgs = @("run", "--project", $probeProject, "--no-build", "--no-launch-profile", "--")
+$runArgs = @("run", "--project", $probeProject, "--no-build", "--no-launch-profile", "-c", "Release", "--")
 $runArgs += "--port", $Port
 
 if ($GatewayUrl) {
