@@ -2,7 +2,7 @@
 
 import {
     API_BASE, fetchJson, normalizeChannelKey, toHubChannelType, channelDisplayName,
-    debugLog
+    debugLog, serverLog
 } from './api.js';
 import {
     dom, $, escapeHtml, formatTime, relativeTime, renderMarkdown, scrollToBottom,
@@ -1000,7 +1000,9 @@ export async function sendMessage() {
 
     try {
         const channelType = toHubChannelType(activeCtx?.channelType || getCurrentChannelType() || 'Web Chat');
+        serverLog('info', 'SendMessage request', { agentId: activeAgentId, channelType, sessionId: activeSessionId, textLength: text.length });
         const result = await hubInvoke('SendMessage', activeAgentId, channelType, text);
+        serverLog('info', 'SendMessage response', { agentId: result?.agentId || activeAgentId, sessionId: result?.sessionId, channelType: result?.channelType || channelType });
         if (result?.sessionId) {
             const sessionChannelType = result.channelType || channelType;
             const ctx = channelManager.getOrCreate(result.agentId || activeAgentId, sessionChannelType);
@@ -1014,6 +1016,7 @@ export async function sendMessage() {
         }
         setSendingState(false);
     } catch (err) {
+        serverLog('error', 'SendMessage failed', { agentId: activeAgentId, sessionId: activeSessionId, error: err?.message || String(err) });
         appendSystemMessage(`Error: ${err.message}`, 'error');
         if (activeSessionId) getStreamState(activeSessionId).isStreaming = false;
         setSendingState(false);

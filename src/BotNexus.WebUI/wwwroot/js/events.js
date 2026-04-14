@@ -1,7 +1,7 @@
 // BotNexus WebUI — SignalR event handlers
 // All events render to their channel's container, even if hidden.
 
-import { debugLog } from './api.js';
+import { debugLog, serverLog } from './api.js';
 import {
     channelManager, getStreamState, getCurrentSessionId, getCurrentAgentId,
     cleanupSessionState, getCurrentChannelType
@@ -31,14 +31,17 @@ export function registerEventHandlers(connection) {
         setStatus('connected');
         hideConnectionBanner();
         debugLog('lifecycle', 'Connected! connectionId:', data.connectionId);
+        serverLog('info', 'Hub Connected event', { connectionId: data.connectionId });
 
         hubInvoke('SubscribeAll').then(result => {
             if (result?.sessions) {
                 channelManager.subscribe(result.sessions);
                 debugLog('lifecycle', `SubscribeAll: ${result.sessions.length} sessions`);
+                serverLog('info', 'SubscribeAll result', { count: result.sessions.length });
             }
         }).catch(err => {
             debugLog('lifecycle', 'SubscribeAll failed:', err.message);
+            serverLog('error', 'SubscribeAll failed', { error: err?.message || String(err) });
         });
     });
 
@@ -124,6 +127,7 @@ export function registerEventHandlers(connection) {
     connection.on('Error', (evt) => {
         const { ctx, isActive } = channelManager.routeEvent(evt);
         if (!ctx) return;
+        serverLog('error', 'Stream error event', { sessionId: ctx.sessionId, error: evt?.errorMessage || evt?.message || evt });
         ctx.streamState.isStreaming = false;
         onError(ctx, evt);
         if (!isActive) {

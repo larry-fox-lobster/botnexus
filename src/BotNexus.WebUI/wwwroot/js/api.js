@@ -59,9 +59,24 @@ export async function fetchJson(path) {
 // ── Debug Logging ───────────────────────────────────────────────────
 
 const DEBUG = true;
+const SERVER_LOG_CATEGORIES = new Set(['lifecycle', 'hub', 'error']);
+const SERVER_LOG_LEVELS = new Set(['error', 'warn', 'warning']);
+
+function toSafeLogData(value) {
+    if (value instanceof Error) return { name: value.name, message: value.message, stack: value.stack };
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value == null) return value;
+    try { return JSON.parse(JSON.stringify(value)); } catch { return String(value); }
+}
+
+function toLogMessage(args) {
+    return args.map(arg => typeof arg === 'string' ? arg : JSON.stringify(toSafeLogData(arg))).join(' ').slice(0, 500);
+}
 
 export function debugLog(category, ...args) {
     if (DEBUG) console.log(`[BotNexus:${category}]`, ...args);
+    if (SERVER_LOG_CATEGORIES.has(String(category || '').toLowerCase())) {
+        serverLog('debug', `[${category}] ${toLogMessage(args)}`, { category, args: args.map(toSafeLogData) }, { skipDebugEcho: true });
+    }
 }
 
 // ── Version Management ──────────────────────────────────────────────
@@ -99,11 +114,15 @@ function _scheduleVersionPoll() {
 }
 
 /** Post client logs to server for unified debugging. */
-export function serverLog(level, message, data) {
-    debugLog(level, message, data);
+export function serverLog(level, message, data, options = {}) {
+    const normalizedLevel = String(level || 'info').toLowerCase();
+    if (!options.skipDebugEcho) {
+        const writer = SERVER_LOG_LEVELS.has(normalizedLevel) ? console.warn : console.log;
+        writer(`[BotNexus:${normalizedLevel}]`, message, data);
+    }
     fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ level, message, data, version: CLIENT_VERSION, timestamp: new Date().toISOString() })
+        body: JSON.stringify({ level: normalizedLevel, message, data: toSafeLogData(data), version: CLIENT_VERSION, timestamp: new Date().toISOString() })
     }).catch(() => {});
 }
