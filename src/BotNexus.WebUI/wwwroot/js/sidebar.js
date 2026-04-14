@@ -15,6 +15,7 @@ import {
 import { hubInvoke, getConnection, getConnectionId } from './hub.js';
 import { openAgentTimeline, startNewChat, appendSystemMessage } from './chat.js';
 import { getCollapsedAgents, toggleAgentCollapsed, getCachedAgents, setCachedAgents, getCachedSessions, setCachedSessions } from './storage.js';
+import { openLocationsView as openLocationsCanvasView } from './locations.js';
 
 // ── Caches ──────────────────────────────────────────────────────────
 
@@ -770,6 +771,7 @@ export function toggleActivity() {
 // ── Cron View ───────────────────────────────────────────────────────
 
 export function openCronView() { showView('cron-view'); loadCronJobs(); }
+export function openLocationsView() { return openLocationsCanvasView(); }
 
 export async function loadCronJobs() {
     const body = $('#cron-body');

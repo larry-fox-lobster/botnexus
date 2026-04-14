@@ -20,6 +20,7 @@
                 <button class="rail-icon" data-section="extensions-list" title="Extensions" aria-label="Extensions">🧩</button>
                 <button class="rail-icon" data-section="agents-list" title="Agents" aria-label="Agents">🧠</button>
                 <button class="rail-icon" data-view="cron" title="Cron" aria-label="Cron">⏰</button>
+                <button class="rail-icon" data-view="locations" title="Locations" aria-label="Locations">📍</button>
                 <button class="rail-icon" data-section="activity-feed" title="Activity" aria-label="Activity">📊</button>
             </div>
             <div class="sidebar-header">
@@ -77,6 +78,12 @@
             <div class="sidebar-section">
                 <div class="section-header" data-view="cron">
                     <span>⏰ Cron</span>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-header" data-view="locations">
+                    <span>📍 Locations</span>
                 </div>
             </div>
 
@@ -217,6 +224,33 @@
                 </div>
                 <div class="cron-body" id="cron-body">
                     <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <div id="locations-view" class="view-panel hidden">
+                <div class="locations-header">
+                    <h2>📍 Locations</h2>
+                    <div class="locations-actions">
+                        <button id="btn-locations-add" class="btn btn-primary">+ Add</button>
+                        <button id="btn-locations-refresh" class="btn btn-secondary">↻ Refresh</button>
+                    </div>
+                </div>
+                <div class="locations-body">
+                    <table class="locations-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Path/Endpoint</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="locations-body">
+                            <tr><td colspan="6">Loading locations...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </main>

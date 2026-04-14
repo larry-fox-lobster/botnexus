@@ -41,6 +41,7 @@ export const dom = {
     debugModal:          $('#debug-modal'),
     agentConfigView:     $('#agent-config-view'),
     cronView:            $('#cron-view'),
+    locationsView:       $('#locations-view'),
     confirmDialog:       $('#confirm-dialog'),
     sessionIdDisplay:    $('#session-id-display'),
     sessionIdText:       $('#session-id-text'),
@@ -245,7 +246,7 @@ export function getConfirmCallback() { return confirmCallback; }
 // ── View Switching ──────────────────────────────────────────────────
 
 export function showView(viewId) {
-    ['welcome-screen', 'chat-view', 'agent-config-view', 'cron-view'].forEach(id => {
+    ['welcome-screen', 'chat-view', 'agent-config-view', 'cron-view', 'locations-view'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.toggle('hidden', id !== viewId);
     });
@@ -299,7 +300,7 @@ export function setSidebarCollapsedState(isCollapsed) {
 
 // ── Section Toggles ─────────────────────────────────────────────────
 
-export function initSectionToggles(onCronView) {
+export function initSectionToggles(onViewRequested) {
     $$('.section-header[data-toggle]').forEach(header => {
         header.addEventListener('click', (e) => {
             if (e.target.closest('.btn-icon') || e.target.closest('.toggle-switch')) return;
@@ -309,7 +310,7 @@ export function initSectionToggles(onCronView) {
     });
     $$('.section-header[data-view]').forEach(header => {
         header.addEventListener('click', () => {
-            if (header.dataset.view === 'cron' && onCronView) onCronView();
+            if (onViewRequested) onViewRequested(header.dataset.view);
         });
     });
 }

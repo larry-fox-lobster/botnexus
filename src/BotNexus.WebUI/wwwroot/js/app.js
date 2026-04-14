@@ -18,7 +18,7 @@ import {
     initSidebar, loadSessions, loadChannels, loadExtensions, loadAgents,
     openAddAgentForm, closeAgentForm, saveAgent, loadModelsForProvider,
     showAddCronForm, applyActivityFilters, toggleActivity,
-    closeDebugModal, openCronView
+    closeDebugModal, openCronView, openLocationsView
 } from './sidebar.js';
 import {
     sendMessage, abortRequest, startNewChat, updateSendButtonState,
@@ -212,6 +212,10 @@ function initEventListeners() {
                 openCronView();
                 return;
             }
+            if (view === 'locations') {
+                openLocationsView();
+                return;
+            }
 
             const sectionId = icon.dataset.section;
             if (!sectionId) return;
@@ -305,7 +309,15 @@ function init() {
     try {
         console.log('[botnexus] init start');
         initMarkdown();
-        initSectionToggles(openCronView);
+        initSectionToggles((view) => {
+            if (view === 'cron') {
+                openCronView();
+                return;
+            }
+            if (view === 'locations') {
+                openLocationsView();
+            }
+        });
         initEventListeners();
         initSidebar();
         startHealthCheck();
