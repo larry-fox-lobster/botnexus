@@ -1,6 +1,6 @@
 ---
 name: session-debug
-description: Fast session investigation without hunting through files and databases. Use when debugging session state, resuming issues, message routing, checking what sessions exist for an agent, or reviewing gateway logs for errors.
+description: Fast session investigation using BotNexus Probe CLI (preferred) or Python helper scripts. Use when debugging session state, resuming issues, message routing, checking what sessions exist for an agent, reviewing gateway logs for errors, or correlating events across logs/sessions/traces.
 metadata:
   domain: debugging
   confidence: high
@@ -60,9 +60,49 @@ session_history: id (autoincrement), session_id, role, content,
 
 ## How to Investigate
 
-### Step 1: Use the helper scripts
+### Step 1: Use BotNexus Probe (preferred)
 
-**Always use the Python helper scripts** in `.squad/skills/session-debug/` instead of manual queries. They handle path resolution, DB connection, and output formatting in a single tool call.
+**Prefer the Probe CLI** (`tools/BotNexus.Probe`) for all diagnostic queries. It parses logs, sessions, and OTEL traces with a single tool, outputs structured JSON for agent consumption, and supports correlation-first search across all data sources.
+
+```powershell
+# Correlate — search by ANY ID across logs, sessions, and traces (THE KEY COMMAND)
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- correlate 5b0cea38
+
+# Search logs by session, correlation, agent, or level
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- logs --session 5b0cea38 --take 50
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- logs --level error --take 20
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- logs --correlation xyz789
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- logs --agent myagent --take 50
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- logs --search "SubscribeAll" --level error
+
+# List and inspect sessions
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- sessions
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- session 5b0cea38 --take 20
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- session 5b0cea38 --search "error"
+
+# List log files
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- files
+
+# Check live Gateway status and data (requires running Gateway)
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- gateway status --gateway http://localhost:5005
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- gateway logs --gateway http://localhost:5005 --limit 50
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- gateway agents --gateway http://localhost:5005
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- gateway sessions --gateway http://localhost:5005
+
+# Add --text for human-readable output instead of JSON
+dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- logs --level error --text
+```
+
+**Probe also has a web UI** for interactive investigation. Launch with:
+```powershell
+.\scripts\start-probe.ps1                                         # connects to Gateway on localhost:5005
+.\scripts\start-probe.ps1 -Port 5051 -OtlpPort 4318              # custom port + OTLP traces
+```
+Then open `http://localhost:5050` — Dashboard, Logs, Sessions, Traces, Live Activity, and Correlate pages.
+
+### Step 2: Fallback — Python helper scripts
+
+If Probe isn't built or you need direct DB access (e.g., querying SQLite session metadata not in JSONL files), use the Python helper scripts in `.squad/skills/session-debug/`:
 
 ```powershell
 # Find a session by partial ID
@@ -86,18 +126,19 @@ python .squad/skills/session-debug/log-search.py "5b0cea38" --last-hours 4
 python .squad/skills/session-debug/log-search.py "SubscribeAll" --level ERR
 ```
 
-### Step 2: Common Investigations
+### Step 3: Common Investigations
 
 **Session not resuming after restart:**
-1. `python .squad/skills/session-debug/session-lookup.py {partial-id}` — is it in the DB?
-2. Check `status` — must be `Active` (not Sealed/Expired)
-3. Check `session_type` — must be `user-agent` (not cron/soul)
-4. Check `channel_type` — should be `signalr` for WebUI
-5. Check history count — 0 means empty session (won't show in channel history)
-6. `python .squad/skills/session-debug/log-search.py "SubscribeAll"` — did the client subscribe?
+1. `dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- correlate {partial-id}` — find all traces of the session
+2. `python .squad/skills/session-debug/session-lookup.py {partial-id}` — check DB status directly
+3. Check `status` — must be `Active` (not Sealed/Expired)
+4. Check `session_type` — must be `user-agent` (not cron/soul)
+5. Check `channel_type` — should be `signalr` for WebUI
+6. Check history count — 0 means empty session (won't show in channel history)
+7. `dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- logs --search "SubscribeAll"` — did the client subscribe?
 
 **Messages going to wrong session:**
-1. `python .squad/skills/session-debug/log-search.py "SendMessage"` — check routing
+1. `dotnet run --project tools/BotNexus.Probe/src/BotNexus.Probe -- logs --search "SendMessage"` — check routing
 2. Check `contentDelta` events include `sessionId` (fix in commit 28a0329)
 3. Check if `routeEvent` is dropping events (console.warn in browser)
 
