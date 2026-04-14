@@ -2,7 +2,7 @@
 
 import { debugLog, serverLog, getClientVersion } from './api.js';
 import { setStatus, showConnectionBanner, hideConnectionBanner } from './ui.js';
-import { storeManager } from './session-store.js';
+import { channelManager } from './session-store.js';
 
 let connection = null;
 let connectionId = null;
@@ -58,7 +58,7 @@ export function initHub(registerEvents) {
         debugLog('lifecycle', 'Reconnected');
         hubInvoke('SubscribeAll').then(result => {
             if (result?.sessions) {
-                storeManager.subscribe(result.sessions);
+                channelManager.subscribe(result.sessions);
                 debugLog('lifecycle', `Reconnect SubscribeAll: ${result.sessions.length} sessions`);
             }
         }).catch(err => {

@@ -95,7 +95,7 @@ export function setSelectedModel(modelId) { setString(GENERAL.selectedModel, mod
 
 // ── Last Active Context ────────────────────────────────────────────
 // Read once at startup as fallback when no hash route is present.
-// Each tab's runtime state is in-memory (storeManager).
+// Each tab's runtime state is in-memory (channelManager).
 
 export function getLastContext() {
     return {

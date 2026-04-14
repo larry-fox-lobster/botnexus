@@ -259,7 +259,6 @@ export const SessionStoreManager = ChannelManager;
 // ── Singletons ──────────────────────────────────────────────────────
 
 export const channelManager = new ChannelManager();
-export const storeManager = channelManager; // compat alias
 
 // ── Shared channel state (compat) ───────────────────────────────────
 

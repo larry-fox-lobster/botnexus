@@ -11,7 +11,7 @@ import {
     showView, showConfirm, closeSidebar, setBatchRenderingState
 } from './ui.js';
 import {
-    channelManager, storeManager, getCurrentSessionId, getCurrentAgentId, getStreamState,
+    channelManager, getCurrentSessionId, getCurrentAgentId, getStreamState,
     isCurrentSessionStreaming, setCurrentChannelType, getCurrentChannelType
 } from './session-store.js';
 import { hubInvoke, getConnection } from './hub.js';
@@ -138,12 +138,12 @@ export function copySessionId() {
 export function updateSendButtonState() {
     const hasText = !!dom.chatInput.value.trim();
     const connection = getConnection();
-    if (storeManager.isSwitchingView) {
+    if (channelManager.isSwitchingView) {
         dom.chatInput.disabled = true;
         dom.btnSend.disabled = true;
         return;
     }
-    if (storeManager.isRestRequestInFlight) {
+    if (channelManager.isRestRequestInFlight) {
         dom.btnSend.disabled = true;
         return;
     }
@@ -174,7 +174,7 @@ export function updateSendButtonState() {
 }
 
 export function setSendingState(isSending) {
-    storeManager.setRestRequestInFlight(isSending);
+    channelManager.setRestRequestInFlight(isSending);
     dom.btnSend.classList.toggle('btn-sending', isSending);
     dom.btnSend.textContent = isSending ? 'Sending' : 'Send';
     updateSendButtonState();
@@ -879,10 +879,10 @@ export async function executeReset(commandType = 'reset') {
         appendSystemMessage('New session started. Previous messages are still visible above.');
     }
 
-    storeManager.setActiveView(null, getCurrentAgentId(), getCurrentChannelType());
+    channelManager.setActiveView(null, getCurrentAgentId(), getCurrentChannelType());
     syncLoadingUiForActiveSession();
     updateSessionIdDisplay();
-    storeManager.setSelectedAgent(dom.agentSelect.value || getCurrentAgentId());
+    channelManager.setSelectedAgent(dom.agentSelect.value || getCurrentAgentId());
     loadSessions();
 }
 
@@ -937,13 +937,13 @@ function appendCommandResult(title, body) {
 // ── Chat actions ────────────────────────────────────────────────────
 
 export async function sendMessage() {
-    if (storeManager.isSwitchingView) {
+    if (channelManager.isSwitchingView) {
         appendSystemMessage('Please wait for session switch to complete.', 'warning');
         return;
     }
-    const activeStore = storeManager.activeStore;
-    const activeAgentId = activeStore?.agentId || storeManager.activeAgentId;
-    const activeSessionId = storeManager.activeViewId;
+    const activeCtx = channelManager.active;
+    const activeAgentId = activeCtx?.agentId || channelManager.activeAgentId;
+    const activeSessionId = channelManager.activeViewId;
     if (!activeAgentId) return;
     const text = dom.chatInput.value.trim();
     if (!text) return;
@@ -996,7 +996,7 @@ export async function sendMessage() {
     startResponseTimeout();
 
     try {
-        const channelType = toHubChannelType(activeStore?.channelType || getCurrentChannelType() || 'Web Chat');
+        const channelType = toHubChannelType(activeCtx?.channelType || getCurrentChannelType() || 'Web Chat');
         const result = await hubInvoke('SendMessage', activeAgentId, channelType, text);
         if (result?.sessionId) {
             const sessionChannelType = result.channelType || channelType;
@@ -1032,10 +1032,10 @@ export async function abortRequest() {
 export function startNewChat() {
     const agentId = dom.agentSelect.value || null;
     if (!agentId) return;
-    storeManager.setActiveView(null, agentId, 'Web Chat');
+    channelManager.setActiveView(null, agentId, 'Web Chat');
     syncLoadingUiForActiveSession();
     resetQueue();
-    storeManager.setSelectedAgent(agentId);
+    channelManager.setSelectedAgent(agentId);
     setCurrentChannelType('Web Chat');
     openAgentTimeline(agentId, 'Web Chat');
 }
@@ -1049,9 +1049,9 @@ export async function deleteSession(sessionId) {
                 const res = await fetch(`${API_BASE}/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
                 if (res.ok || res.status === 204) {
                     if (getCurrentSessionId() === sessionId) {
-                        storeManager.setActiveView(null, null, getCurrentChannelType());
+                        channelManager.setActiveView(null, null, getCurrentChannelType());
                         syncLoadingUiForActiveSession();
-                        storeManager.setSelectedAgent(null);
+                        channelManager.setSelectedAgent(null);
                         updateSessionIdDisplay();
                         showView('welcome-screen');
                     }
@@ -1076,10 +1076,10 @@ export async function openSession(sessionId, agentId) {
 // ── Agent timeline ──────────────────────────────────────────────────
 
 export async function openAgentTimeline(agentId, channelType, targetSessionId = null) {
-    storeManager.setSwitchingView(true);
+    channelManager.setSwitchingView(true);
     updateSendButtonState();
 
-    if (storeManager.isRestRequestInFlight) setSendingState(false);
+    if (channelManager.isRestRequestInFlight) setSendingState(false);
     resetQueue();
     clearResponseTimeout();
     stopToolElapsedTimer();
@@ -1101,7 +1101,7 @@ export async function openAgentTimeline(agentId, channelType, targetSessionId = 
     showView('chat-view');
     if (agentId) dom.agentSelect.value = agentId;
     dom.agentSelect.classList.add('hidden');
-    storeManager.setSelectedAgent(agentId);
+    channelManager.setSelectedAgent(agentId);
 
     // Update header
     dom.chatMeta.textContent = `Agent: ${agentId} · ${channelDisplayName(channelType)}`;
@@ -1169,7 +1169,7 @@ export async function openAgentTimeline(agentId, channelType, targetSessionId = 
         updateSendButtonState();
         loadChatHeaderModels();
     } finally {
-        storeManager.setSwitchingView(false);
+        channelManager.setSwitchingView(false);
         updateSendButtonState();
     }
 }

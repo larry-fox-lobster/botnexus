@@ -9,7 +9,7 @@ import {
     toggleSidebar, closeSidebar, initSectionToggles, setSidebarCollapsedState
 } from './ui.js';
 import {
-    storeManager, getCurrentSessionId, getCurrentAgentId, isCurrentSessionStreaming,
+    getCurrentSessionId, getCurrentAgentId, isCurrentSessionStreaming,
     channelManager
 } from './session-store.js';
 import { initHub, getConnection, manualReconnect } from './hub.js';

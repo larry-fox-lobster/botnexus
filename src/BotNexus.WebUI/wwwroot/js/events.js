@@ -3,7 +3,7 @@
 
 import { debugLog } from './api.js';
 import {
-    channelManager, storeManager, getStreamState, getCurrentSessionId, getCurrentAgentId,
+    channelManager, getStreamState, getCurrentSessionId, getCurrentAgentId,
     cleanupSessionState, getCurrentChannelType
 } from './session-store.js';
 import { hubInvoke, setConnectionId } from './hub.js';
@@ -34,7 +34,7 @@ export function registerEventHandlers(connection) {
 
         hubInvoke('SubscribeAll').then(result => {
             if (result?.sessions) {
-                storeManager.subscribe(result.sessions);
+                channelManager.subscribe(result.sessions);
                 debugLog('lifecycle', `SubscribeAll: ${result.sessions.length} sessions`);
             }
         }).catch(err => {
@@ -43,10 +43,10 @@ export function registerEventHandlers(connection) {
     });
 
     connection.on('SessionReset', (data) => {
-        const sid = data?.sessionId || storeManager.activeViewId;
+        const sid = data?.sessionId || channelManager.activeViewId;
         cleanupSessionState(sid);
-        if (sid !== storeManager.activeViewId) return;
-        storeManager.setActiveView(null, getCurrentAgentId(), getCurrentChannelType());
+        if (sid !== channelManager.activeViewId) return;
+        channelManager.setActiveView(null, getCurrentAgentId(), getCurrentChannelType());
         updateSessionIdDisplay();
         syncLoadingUiForActiveSession();
         clearSubAgentPanel();

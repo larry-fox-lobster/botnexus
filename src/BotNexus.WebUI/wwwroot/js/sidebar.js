@@ -9,7 +9,7 @@ import {
     showView, renderMarkdown
 } from './ui.js';
 import {
-    storeManager, getCurrentSessionId, getCurrentAgentId, getStreamState,
+    channelManager, getCurrentSessionId, getCurrentAgentId, getStreamState,
     isCurrentSessionStreaming, getCurrentChannelType
 } from './session-store.js';
 import { hubInvoke, getConnection, getConnectionId } from './hub.js';
@@ -27,7 +27,7 @@ export function setAgentsCache(agents) { agentsCache = agents || []; }
 // ── Sidebar Badge ───────────────────────────────────────────────────
 
 export function updateSidebarBadge(sessionId, count) {
-    const store = storeManager.getStore(sessionId);
+    const store = channelManager.getStore(sessionId);
     if (!store?.agentId) return;
     const channelKey = normalizeChannelKey(store.channelType || getCurrentChannelType() || 'web chat');
     const el = dom.sessionsList.querySelector(
@@ -144,7 +144,7 @@ export async function loadSessions() {
                 <span class="item-meta">No sessions</span>`;
             emptyEl.addEventListener('click', () => {
                 dom.agentSelect.value = agentId;
-                storeManager.setSelectedAgent(agentId);
+                channelManager.setSelectedAgent(agentId);
                 startNewChat();
             });
             channelsDiv.appendChild(emptyEl);
@@ -306,7 +306,7 @@ export async function loadAgents() {
                 <span class="item-meta" style="font-size:0.68rem;">${escapeHtml(statusLabel)}</span>
             </div>
             <span class="item-meta">${model ? 'Model: ' + escapeHtml(model) : ''}</span>`;
-        el.addEventListener('click', () => { storeManager.setSelectedAgent(name); openAgentConfig(name); });
+        el.addEventListener('click', () => { channelManager.setSelectedAgent(name); openAgentConfig(name); });
         dom.agentsList.appendChild(el);
     }
     populateAgentSelect(agents);
@@ -323,7 +323,7 @@ export function populateAgentSelect(agents) {
         dom.agentSelect.appendChild(opt);
     }
     if (!getCurrentAgentId() && agents.length > 0) {
-        storeManager.setSelectedAgent(agents[0].name || agents[0].agentId || agents[0].id);
+        channelManager.setSelectedAgent(agents[0].name || agents[0].agentId || agents[0].id);
     }
     if (getCurrentAgentId() && !dom.agentSelect.value) {
         dom.agentSelect.value = getCurrentAgentId();
@@ -352,7 +352,7 @@ export async function openAgentConfig(agentId) {
     });
     $('#btn-agent-chat').onclick = () => {
         showView('chat-view');
-        storeManager.setSelectedAgent(agentId);
+        channelManager.setSelectedAgent(agentId);
         dom.agentSelect.value = agentId;
         startNewChat();
     };
