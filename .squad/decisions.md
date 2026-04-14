@@ -14047,3 +14047,32 @@ The spec is well-researched, correctly identifies real problems, and proposes so
 - Gateway correlation and activity streaming
 
 ---
+
+
+---
+
+# Farnsworth Decision: Probe CLI Mode
+
+- **Date:** 2026-04-14
+- **Owner:** Farnsworth
+- **Context:** BotNexus.Probe previously only supported long-running web server diagnostics.
+
+## Decision
+
+Implement a dual-mode entrypoint in `Program.cs`:
+
+1. **Serve mode** remains default and backward-compatible (`probe`, `probe serve`, and old `--port/--gateway/--logs/--sessions/--otlp-port` args).
+2. **CLI mode** is enabled when the first token is a known subcommand (`logs`, `sessions`, `session`, `correlate`, `files`, `gateway`, `traces`, `trace`), and runs without starting Kestrel.
+
+## Rationale
+
+- Keeps existing Probe web workflows unchanged.
+- Enables fast, scriptable diagnostics for agents and terminal users.
+- Preserves existing parser/client contracts by reusing `SerilogFileParser`, `JsonlSessionReader`, `GatewayClient`, and `TraceStore`.
+
+## Consequences
+
+- CLI commands now return standardized exit codes: `0` success, `1` error, `2` no results.
+- CLI defaults to JSON output (machine-friendly) with opt-in `--text` output for humans.
+- Startup banner now explicitly warns when gateway is not configured.
+
