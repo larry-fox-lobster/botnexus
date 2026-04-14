@@ -67,7 +67,7 @@
 ### feature-multi-session-connection
 **Verdict:** obsolete
 **Action:** Archive
-**Assessment:** Status already says "IMPLEMENTED". Subscribe-all model is live — `SubscribeAll` on connect, `switchView()` is client-side DOM swap, no JoinSession/LeaveSession round-trips.
+**Assessment:** Status already says "IMPLEMENTED". Subscribe-all model is live — `SubscribeAll` on connect, `switchView()` shows/hides per-channel containers, no JoinSession/LeaveSession round-trips.
 
 ### feature-planning-pipeline
 **Verdict:** still-valid

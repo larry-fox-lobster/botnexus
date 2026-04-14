@@ -237,6 +237,7 @@ Controls which file paths agents can access via file tools (`read`, `write`, `ed
 - Exact paths allow the directory and all children
 - Glob patterns (`*`, `**`, `?`) supported via `FileSystemName.MatchesSimpleExpression`
 - `~` expands to user home directory
+- `@location-name` references a named Location defined in `gateway.locations` (e.g., `@repo-botnexus`). This is the preferred form — it enables validation via `botnexus doctor locations`, UI management, and portability
 - Workspace (`~/.botnexus/agents/{id}/workspace`) is always accessible
 - Deny list takes priority over allow list
 - Per-agent `fileAccess` replaces the world default (not merged)
