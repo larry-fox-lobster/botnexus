@@ -18,7 +18,7 @@ BotNexus is a modular AI agent execution platform built in C#/.NET. This guide w
 | [11 — Provider development guide](11-provider-development-guide.md) | Provider tutorial | Implement IApiProvider: SSE parsing, stop reason mapping (Phase 4), tool calls |
 | [05 — Glossary](05-glossary.md) | Reference | All key terms and concepts in the codebase |
 
-See also [Architecture overview](../architecture/overview.md), [System layers](../architecture/system-layers.md), and [Architecture deep dive](../architecture/deep-dive.md) in the architecture folder.
+See also [Architecture overview](../architecture/overview.md) in the architecture folder.
 
 ### Focused deep dives
 
@@ -59,7 +59,7 @@ These standalone documents cover specific topics in depth with full code example
 1. [Provider system](01-providers.md) — streaming protocol and provider implementation
 2. [Agent event system](agent-events.md) — lifecycle events, hooks, and message queues
 3. [Tool security model](tool-security.md) — how tools are sandboxed
-4. [Architecture deep dive](../architecture/deep-dive.md) — complete technical details
+4. [Architecture overview](../architecture/overview.md) — complete technical details
 
 **Quick reference:** Jump straight to the [Glossary](05-glossary.md) for any term.
 
