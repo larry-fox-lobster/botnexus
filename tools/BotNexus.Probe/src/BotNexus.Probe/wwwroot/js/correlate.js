@@ -38,9 +38,9 @@
     const container = $('#correlate-results');
     container.innerHTML = '';
 
-    const logs = data.logs || data.logEntries || [];
-    const sessions = data.sessions || data.sessionMessages || [];
-    const traces = data.traces || data.traceSpans || [];
+    const logs = Array.isArray(data.logs) ? data.logs : (data.logs?.items || data.logEntries || []);
+    const sessions = Array.isArray(data.sessions) ? data.sessions : (data.sessions?.items || data.sessionMessages || []);
+    const traces = Array.isArray(data.traces) ? data.traces : (data.traces?.items || data.traceSpans || []);
 
     const totalItems = logs.length + sessions.length + traces.length;
     if (totalItems === 0) {
