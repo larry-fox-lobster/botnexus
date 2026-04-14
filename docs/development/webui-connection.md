@@ -1,13 +1,13 @@
 # WebUI Architecture and Connection Flow
 
-This document describes the BotNexus WebUI architecture, including the SignalR connection model, DOM-swap switching, and multi-session management.
+This document describes the BotNexus WebUI architecture, including the SignalR connection model, per-channel containers, and multi-session management.
 
 ## Overview
 
 The WebUI is a **channel-centric, multi-session interface** that connects to the Gateway via SignalR. Key characteristics:
 
 - **Subscribe-All Model**: Connect once, subscribe to all sessions
-- **DOM-Swap Switching**: Switch sessions via client-side DOM replacement (no server join/leave)
+- **Per-Channel Containers**: Each agent+channel gets its own permanent DOM container — no DOM swapping
 - **Auto-Session on Send**: Sessions created automatically on first message
 - **Per-Session Stores**: Independent state management per session
 - **Streaming Updates**: Real-time agent responses via SignalR events
@@ -37,12 +37,12 @@ The WebUI is a **channel-centric, multi-session interface** that connects to the
 │  │  - agentId: string                                    │  │
 │  │  - channelType: string                                │  │
 │  │  - streamState: { isStreaming, ... }                 │  │
-│  │  - cachedDom: DocumentFragment                        │  │
+│  │  - containerId: string (permanent DOM container)      │  │
 │  └───────────────────┬───────────────────────────────────┘  │
 │                      │                                       │
 │  ┌───────────────────▼───────────────────────────────────┐  │
 │  │              DOM Renderer                             │  │
-│  │  - elChatMessages (main chat area)                    │  │
+│  │  - per-channel containers (permanent, show/hide)      │  │
 │  │  - elSidebar (session list)                           │  │
 │  │  - marked.js (Markdown rendering)                     │  │
 │  │  - DOMPurify (XSS sanitization)                       │  │
@@ -308,7 +308,7 @@ class SessionStore {
         this.agentId = info.agentId || null;
         this.channelType = info.channelType || null;
         this.streamState = SessionStore.createStreamState();
-        this.cachedDom = null;
+        this.containerId = null;  // permanent DOM container ID
         this.timelineMeta = null;
         this.lastViewed = null;
         this.unreadCount = 0;
@@ -382,15 +382,10 @@ class SessionStoreManager {
     }
     
     switchView(sessionId) {
+        // Hide the previously visible container
         if (this.#activeViewId && this.#activeViewId !== sessionId) {
-            // Cache current DOM
-            const oldStore = this.#stores.get(this.#activeViewId);
-            if (oldStore && elChatMessages.children.length > 0) {
-                oldStore.cachedDom = document.createDocumentFragment();
-                while (elChatMessages.firstChild) {
-                    oldStore.cachedDom.appendChild(elChatMessages.firstChild);
-                }
-            }
+            const oldContainer = getChannelContainer(this.#activeViewId);
+            if (oldContainer) oldContainer.style.display = 'none';
         }
         
         this.#activeViewId = sessionId;
@@ -398,12 +393,9 @@ class SessionStoreManager {
         store.lastViewed = Date.now();
         store.unreadCount = 0;
         
-        // Restore cached DOM or clear
-        elChatMessages.innerHTML = '';
-        if (store.cachedDom) {
-            elChatMessages.appendChild(store.cachedDom.cloneNode(true));
-            store.cachedDom = null;
-        }
+        // Show (or create) the permanent container for this session
+        const container = getOrCreateChannelContainer(sessionId, store.agentId);
+        container.style.display = '';
         
         updateActiveSessionHighlight();
         scrollToBottom();
@@ -411,19 +403,20 @@ class SessionStoreManager {
 }
 ```
 
-**DOM-Swap Strategy:**
+**Per-Channel Container Strategy:**
 
-1. **Switch Away**: Cache current DOM to `DocumentFragment`
-2. **Switch To**: Restore cached DOM (or render empty)
-3. **No Server Round-Trip**: Switching is instant, client-side only
-4. **SignalR Events**: Route to correct store via `sessionId`
+1. **Each session** gets a permanent DOM container created on first event
+2. **Switch Away**: Hide the current container (`display: none`)
+3. **Switch To**: Show the target container — no content rebuild needed
+4. **No Server Round-Trip**: Switching is instant, client-side only
+5. **SignalR Events**: Route to the correct container by `sessionId`
 
 **Benefits:**
 
-- Instant session switching (no network latency)
-- Preserves scroll position and state
-- Supports multi-session streaming (events routed to correct store)
-- Efficient memory usage (cached fragments are lightweight)
+- Instant session switching (no network latency, no DOM rebuild)
+- No content loss — containers persist even when not visible
+- Supports multi-session streaming (events always append to the correct container)
+- Simpler than DOM fragment caching — no clone/restore logic
 
 ## Rendering Pipeline
 
@@ -588,10 +581,10 @@ function renderSidebar() {
 
 1. **Subscribe-All Model**: Single connection subscribes to all sessions upfront
 2. **Auto-Session on Send**: Sessions created implicitly on first message
-3. **DOM-Swap Switching**: Client-side session switching without server round-trip
+3. **Per-Channel Containers**: Each agent+channel gets a permanent DOM container — show/hide, not swap
 4. **Per-Session Stores**: Independent state management per session
 5. **SignalR Group Broadcast**: Events routed to session groups (`session:{sessionId}`)
-6. **Cached DOM**: Preserve UI state when switching sessions
+6. **Persistent Containers**: No content loss when switching — containers persist even when hidden
 7. **Markdown Rendering**: `marked.js` + `DOMPurify` for safe rendering
 8. **Streaming Events**: Real-time deltas via SignalR for smooth UX
 
@@ -599,7 +592,7 @@ function renderSidebar() {
 
 - Connection setup: ~100-200ms (WebSocket handshake + negotiation)
 - SubscribeAll: ~50-100ms (depends on session count)
-- Session switch: <10ms (DOM swap, no network)
+- Session switch: <10ms (show/hide container, no network)
 - Message send: ~50-200ms (HTTP round-trip to hub)
 - Streaming latency: ~20-50ms per delta (SignalR overhead)
 
@@ -607,7 +600,7 @@ function renderSidebar() {
 
 - SignalR groups scale to ~10K connections per hub
 - Client stores limited to 20 sessions (LRU eviction)
-- DOM caching prevents re-rendering overhead
+- Per-channel containers avoid re-rendering overhead on switch
 - Markdown rendering is client-side (no server load)
 
 **Future Enhancements:**
