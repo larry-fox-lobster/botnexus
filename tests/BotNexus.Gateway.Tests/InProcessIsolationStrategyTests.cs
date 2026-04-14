@@ -82,7 +82,7 @@ public sealed class InProcessIsolationStrategyTests
     }
 
     [Fact]
-    public async Task CreateAsync_WithHistoryInContext_SeedsAgentInitialMessages()
+    public async Task CreateAsync_WithHistoryInContext_SeedsOnlyUserAndAssistantMessages()
     {
         var strategy = CreateStrategyWithRegisteredModel();
         var context = new AgentExecutionContext
@@ -106,14 +106,54 @@ public sealed class InProcessIsolationStrategyTests
         var handle = await strategy.CreateAsync(CreateDescriptor(), context);
         var messages = GetMessages(handle);
 
-        messages.Should().HaveCount(4);
+        // Tool and system entries are filtered out to prevent orphaned tool results
+        // from causing LLM provider rejection.
+        messages.Should().HaveCount(2);
         messages[0].Should().BeEquivalentTo(new AgentCoreUserMessage("hi"));
         messages[1].Should().BeEquivalentTo(new AssistantAgentMessage("hello"));
-        messages[2].Should().BeEquivalentTo(new SystemAgentMessage("rules"));
-        messages[3].Should().BeEquivalentTo(new ToolResultAgentMessage(
-            "call-1",
-            "read",
-            new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, "tool output")])));
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithMixedHistoryTypes_FiltersToolAndSystemEntries()
+    {
+        var strategy = CreateStrategyWithRegisteredModel();
+        var context = new AgentExecutionContext
+        {
+            SessionId = BotNexus.Domain.Primitives.SessionId.From("session-mixed"),
+            History =
+            [
+                new SessionEntry { Role = BotNexus.Domain.Primitives.MessageRole.User, Content = "search for cats" },
+                new SessionEntry { Role = BotNexus.Domain.Primitives.MessageRole.Assistant, Content = "I'll search for that." },
+                new SessionEntry
+                {
+                    Role = BotNexus.Domain.Primitives.MessageRole.Tool,
+                    Content = "Tool 'search' started.",
+                    ToolName = "search",
+                    ToolCallId = "call-1"
+                },
+                new SessionEntry
+                {
+                    Role = BotNexus.Domain.Primitives.MessageRole.Tool,
+                    Content = "Found 3 results.",
+                    ToolName = "search",
+                    ToolCallId = "call-1"
+                },
+                new SessionEntry { Role = BotNexus.Domain.Primitives.MessageRole.Assistant, Content = "Here are the results." },
+                new SessionEntry { Role = BotNexus.Domain.Primitives.MessageRole.System, Content = "Agent stream error: timeout" },
+                new SessionEntry { Role = BotNexus.Domain.Primitives.MessageRole.User, Content = "thanks" },
+                new SessionEntry { Role = BotNexus.Domain.Primitives.MessageRole.Assistant, Content = "You're welcome!" },
+            ]
+        };
+
+        var handle = await strategy.CreateAsync(CreateDescriptor(), context);
+        var messages = GetMessages(handle);
+
+        messages.Should().HaveCount(5);
+        messages[0].Should().BeEquivalentTo(new AgentCoreUserMessage("search for cats"));
+        messages[1].Should().BeEquivalentTo(new AssistantAgentMessage("I'll search for that."));
+        messages[2].Should().BeEquivalentTo(new AssistantAgentMessage("Here are the results."));
+        messages[3].Should().BeEquivalentTo(new AgentCoreUserMessage("thanks"));
+        messages[4].Should().BeEquivalentTo(new AssistantAgentMessage("You're welcome!"));
     }
 
     private static InProcessIsolationStrategy CreateStrategyWithRegisteredModel()

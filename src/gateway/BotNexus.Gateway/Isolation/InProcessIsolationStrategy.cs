@@ -289,12 +289,19 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         List<AgentMessage>? initialMessages = null;
         if (context.History.Count > 0)
         {
+            // Only inject user and assistant messages from history. Tool-role entries
+            // become orphaned ToolResultMessages (no matching tool_use in the preceding
+            // assistant message) which causes the LLM provider to reject the conversation.
+            // System entries are also excluded — the agent's system prompt is set separately.
             initialMessages = context.History
+                .Where(e => e.Role == Domain.Primitives.MessageRole.User
+                         || e.Role == Domain.Primitives.MessageRole.Assistant)
                 .Select(ConvertSessionEntryToAgentMessage)
                 .ToList();
 
-            _logger.LogInformation("Injecting {Count} history messages into agent context for session '{SessionId}'",
-                initialMessages.Count, context.SessionId);
+            _logger.LogInformation(
+                "Injecting {Count} history messages (of {Total} entries) into agent context for session '{SessionId}'",
+                initialMessages.Count, context.History.Count, context.SessionId);
         }
 
         var options = new AgentOptions(
