@@ -483,6 +483,10 @@ function finalizeMessage(msg, ctx) {
     const el = ctx ? ctx.messagesEl : getActiveMessagesEl();
     ss.isStreaming = false;
     ss.activeMessageId = null;
+    ss.processingVisible = false;
+    ss.processingStage = '';
+    ss.processingIcon = '⏳';
+    ss.showStreamingIndicator = false;
 
     // Only update shared UI for active channel
     const isActive = !ctx || ctx.key === channelManager.activeKey;
