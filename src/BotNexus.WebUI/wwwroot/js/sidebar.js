@@ -152,11 +152,11 @@ export async function loadSessions() {
             for (const ls of latestByChannel.values()) {
                 const ct = normalizeChannelKey(ls.channelType);
                 const dn = channelDisplayName(ct);
-                const isActive = getCurrentAgentId() === agentId &&
+                const isViewing = getCurrentAgentId() === agentId &&
                     currentChannel && normalizeChannelKey(currentChannel) === ct;
 
                 const el = document.createElement('div');
-                el.className = 'list-item' + (isActive ? ' active' : '');
+                el.className = 'list-item' + (isViewing ? ' viewing' : '');
                 el.dataset.agentId = agentId;
                 el.dataset.channelType = ct;
 
@@ -164,7 +164,7 @@ export async function loadSessions() {
                 const emoji = channelEmoji(ct);
                 el.innerHTML = `
                     <div class="list-item-row">
-                        <span class="item-title">${emoji} ${escapeHtml(dn)}${isActive ? ' (active)' : ''}</span>
+                        <span class="item-title">${emoji} ${escapeHtml(dn)}</span>
                     </div>
                     <span class="item-meta">${timeStr}</span>`;
                 el.addEventListener('click', () => openAgentTimeline(agentId, ct, ls.sessionId));

@@ -199,7 +199,7 @@ body {
     display: flex; flex-direction: column; gap: 2px;
 }
 .list-item:hover { background: rgba(255,255,255,0.06); }
-.list-item.active { background: var(--bg-tertiary); }
+.list-item.viewing { background: var(--bg-tertiary); }
 .list-item-row { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
 .list-item .item-title {
     font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

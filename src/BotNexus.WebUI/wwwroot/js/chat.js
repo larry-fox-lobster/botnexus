@@ -1106,9 +1106,9 @@ export async function openAgentTimeline(agentId, channelType, targetSessionId = 
     // Activate this channel (hides all others, shows this one)
     channelManager.activate(ctx.key);
 
-    // Highlight in sidebar
+    // Highlight currently viewed channel in sidebar
     dom.sessionsList.querySelectorAll('.list-item').forEach(el => {
-        el.classList.toggle('active',
+        el.classList.toggle('viewing',
             el.dataset.agentId === agentId &&
             normalizeChannelKey(el.dataset.channelType) === normalizeChannelKey(channelType));
     });
