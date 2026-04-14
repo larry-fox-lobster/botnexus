@@ -88,7 +88,7 @@ public sealed class PlatformConfigAgentSource(
                 Soul = CloneSoulConfig(agentConfig.Soul),
                 SessionAccessLevel = agentConfig.SessionAccess?.Level ?? "own",
                 SessionAllowedAgents = agentConfig.SessionAccess?.AllowedAgents?.ToArray() ?? [],
-                FileAccess = MapFileAccessPolicy(agentConfig.FileAccess),
+                FileAccess = MapFileAccessPolicy(agentConfig.FileAccess, platformConfig.Gateway?.FileAccess),
                 ExtensionConfig = agentConfig.Extensions ?? new Dictionary<string, JsonElement>()
             };
 
@@ -159,16 +159,18 @@ public sealed class PlatformConfigAgentSource(
         };
     }
 
-    private static FileAccessPolicy? MapFileAccessPolicy(FileAccessPolicyConfig? fileAccess)
+    private static FileAccessPolicy? MapFileAccessPolicy(FileAccessPolicyConfig? agentLevel, FileAccessPolicyConfig? worldLevel)
     {
-        if (fileAccess is null)
+        // Agent-level policy takes full precedence if set
+        var effective = agentLevel ?? worldLevel;
+        if (effective is null)
             return null;
 
         return new FileAccessPolicy
         {
-            AllowedReadPaths = fileAccess.AllowedReadPaths?.ToArray() ?? [],
-            AllowedWritePaths = fileAccess.AllowedWritePaths?.ToArray() ?? [],
-            DeniedPaths = fileAccess.DeniedPaths?.ToArray() ?? []
+            AllowedReadPaths = effective.AllowedReadPaths?.ToArray() ?? [],
+            AllowedWritePaths = effective.AllowedWritePaths?.ToArray() ?? [],
+            DeniedPaths = effective.DeniedPaths?.ToArray() ?? []
         };
     }
 

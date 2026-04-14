@@ -88,6 +88,8 @@ public sealed class GatewaySettingsConfig
     public List<CrossWorldPermissionConfig>? CrossWorldPermissions { get; set; }
     /// <summary>Cross-world federation settings for gateway-to-gateway communication.</summary>
     public CrossWorldFederationConfig? CrossWorld { get; set; }
+    /// <summary>Default file access policy applied to all agents unless overridden per-agent.</summary>
+    public FileAccessPolicyConfig? FileAccess { get; set; }
 }
 
 /// <summary>Configuration for granting communication with another world.</summary>
