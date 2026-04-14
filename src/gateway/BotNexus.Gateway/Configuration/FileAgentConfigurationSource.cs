@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.IO.Abstractions;
+using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
@@ -156,7 +157,8 @@ public sealed class FileAgentConfigurationSource(string directoryPath, ILogger<F
             MaxConcurrentSessions = config.MaxConcurrentSessions ?? 0,
             Metadata = ConvertObject(config.Metadata),
             IsolationOptions = ConvertObject(config.IsolationOptions),
-            Soul = CloneSoulConfig(config.Soul)
+            Soul = CloneSoulConfig(config.Soul),
+            FileAccess = MapFileAccessPolicy(config.FileAccess)
         };
     }
 
@@ -172,6 +174,19 @@ public sealed class FileAgentConfigurationSource(string directoryPath, ILogger<F
             DayBoundary = soulConfig.DayBoundary,
             ReflectionOnSeal = soulConfig.ReflectionOnSeal,
             ReflectionPrompt = soulConfig.ReflectionPrompt
+        };
+    }
+
+    private static FileAccessPolicy? MapFileAccessPolicy(FileAccessPolicyConfig? fileAccess)
+    {
+        if (fileAccess is null)
+            return null;
+
+        return new FileAccessPolicy
+        {
+            AllowedReadPaths = fileAccess.AllowedReadPaths?.ToArray() ?? [],
+            AllowedWritePaths = fileAccess.AllowedWritePaths?.ToArray() ?? [],
+            DeniedPaths = fileAccess.DeniedPaths?.ToArray() ?? []
         };
     }
 
@@ -336,5 +351,7 @@ public sealed class FileAgentConfigurationSource(string directoryPath, ILogger<F
         public IReadOnlyList<string>? SubAgents { get; init; }
 
         public IReadOnlyList<string>? SubAgentIds { get; init; }
+
+        public FileAccessPolicyConfig? FileAccess { get; init; }
     }
 }

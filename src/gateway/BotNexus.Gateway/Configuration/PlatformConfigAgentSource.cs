@@ -1,5 +1,6 @@
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Agents;
 using BotNexus.Domain.Primitives;
 using Microsoft.Extensions.Logging;
@@ -87,6 +88,7 @@ public sealed class PlatformConfigAgentSource(
                 Soul = CloneSoulConfig(agentConfig.Soul),
                 SessionAccessLevel = agentConfig.SessionAccess?.Level ?? "own",
                 SessionAllowedAgents = agentConfig.SessionAccess?.AllowedAgents?.ToArray() ?? [],
+                FileAccess = MapFileAccessPolicy(agentConfig.FileAccess),
                 ExtensionConfig = agentConfig.Extensions ?? new Dictionary<string, JsonElement>()
             };
 
@@ -154,6 +156,19 @@ public sealed class PlatformConfigAgentSource(
             DayBoundary = soulConfig.DayBoundary,
             ReflectionOnSeal = soulConfig.ReflectionOnSeal,
             ReflectionPrompt = soulConfig.ReflectionPrompt
+        };
+    }
+
+    private static FileAccessPolicy? MapFileAccessPolicy(FileAccessPolicyConfig? fileAccess)
+    {
+        if (fileAccess is null)
+            return null;
+
+        return new FileAccessPolicy
+        {
+            AllowedReadPaths = fileAccess.AllowedReadPaths?.ToArray() ?? [],
+            AllowedWritePaths = fileAccess.AllowedWritePaths?.ToArray() ?? [],
+            DeniedPaths = fileAccess.DeniedPaths?.ToArray() ?? []
         };
     }
 
