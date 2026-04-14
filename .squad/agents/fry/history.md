@@ -319,3 +319,30 @@ The `showStreamingIndicator()` function appended an "Agent is thinking..." div t
 
 **Files changed:** `index.html`, `styles.css`, `app.js` (3 files, +54 lines)
 **Validation:** `node --check app.js` passed.
+
+## Learnings — BotNexus.Probe Web UI
+
+### Architecture Decisions
+- **Pure vanilla HTML/CSS/JS** — no build tooling, no frameworks. Static files served from wwwroot/ via ASP.NET.
+- **Dark theme** with CSS custom properties for the full color palette (--bg, --surface, --card, --primary, etc.) at :root level.
+- **ProbeApi static class** in probe.js wraps all fetch() calls with consistent error handling. SSE via EventSource for live stream.
+- **IIFE pattern** for all page-specific JS to avoid global scope pollution. Only functions called from inline HTML handlers are exposed via window.
+- **DOM helper functions** ($, ___BEGIN___COMMAND_DONE_MARKER___$LASTEXITCODE, el) in probe.js eliminate repetitive createElement boilerplate across all pages.
+
+### Key File Paths
+- `tools/BotNexus.Probe/src/BotNexus.Probe/wwwroot/css/probe.css` — Complete dark theme stylesheet (~22KB)
+- `tools/BotNexus.Probe/src/BotNexus.Probe/wwwroot/js/probe.js` — ProbeApi client + shared utilities (~8KB)
+- `tools/BotNexus.Probe/src/BotNexus.Probe/wwwroot/index.html` — Dashboard with status cards + quick correlate
+- `tools/BotNexus.Probe/src/BotNexus.Probe/wwwroot/logs.html` — Log browser with sticky filter bar
+- `tools/BotNexus.Probe/src/BotNexus.Probe/wwwroot/sessions.html` — Split-panel session viewer
+- `tools/BotNexus.Probe/src/BotNexus.Probe/wwwroot/traces.html` — OTEL trace waterfall visualization
+- `tools/BotNexus.Probe/src/BotNexus.Probe/wwwroot/live.html` — SSE-powered live activity stream
+- `tools/BotNexus.Probe/src/BotNexus.Probe/wwwroot/correlate.html` — Cross-source correlation pivot page
+- Page-specific JS in `wwwroot/js/`: dashboard.js, logs.js, sessions.js, traces.js, live.js, correlate.js
+
+### Patterns
+- Log levels color-coded: DEBUG=gray, INFO=cyan, WARN=yellow, ERROR=red, FATAL=magenta
+- All timestamps displayed in local timezone with UTC tooltip
+- Correlation is the central concept — every ID is clickable and links to the correlate page
+- Trace waterfall calculates bar positions from nanosecond timestamps relative to trace start
+- Handles both flat span arrays and OTLP ResourceSpans format for trace data

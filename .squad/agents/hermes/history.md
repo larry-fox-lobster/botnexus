@@ -112,3 +112,7 @@
 - Cross-store consistency validation complete
 - Test Discipline: Updated all affected test suites when ExistenceQuery/SessionStoreBase APIs changed. Ensured contract compliance before store implementations.
 - Validation: 794/794 gateway tests passing. Build green (0 errors, 0 warnings).
+
+## Learnings
+- 2026-04-14: For BotNexus.Probe, comprehensive parser coverage works best with real temp files and explicit newline/case/filter edge-case assertions across Serilog and JSONL readers.
+- 2026-04-14: Probe currently keeps OTLP and CLI parsing logic in non-public methods; reflection-based tests provide reliable coverage without changing production API shape.

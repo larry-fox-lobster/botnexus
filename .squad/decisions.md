@@ -13955,3 +13955,95 @@ Depends on Waves 2-4. Highest-risk items. ~2-3 weeks. Ready to start after Wave 
 The spec is well-researched, correctly identifies real problems, and proposes sound solutions. It loses points for scope ambition (mixing DDD alignment with speculative features), missing serialization strategy detail, and underestimating GatewaySession decomposition. With the modifications above (D1-D8), the spec is actionable and the wave plan provides a safe execution path.
 
 ---
+
+---
+
+## Farnsworth Probe Architecture Decision (2026-04-14)
+
+**Decision Date:** 2026-04-14  
+**Decided By:** Farnsworth (Backend Dev)  
+**Status:** Implemented
+
+**Context:** Built standalone BotNexus.Probe diagnostic backend under tools/BotNexus.Probe with no project references to core BotNexus assemblies.
+
+**Decision:** Implemented a fully independent ASP.NET Core minimal API app targeting net10.0 with file-streaming parsers and bounded in-memory trace storage.
+
+**Key Choices:**
+- Keep Probe isolated from BotNexus contracts: parse Serilog text logs and session JSONL directly
+- Use IAsyncEnumerable-based readers for logs/sessions to avoid full-file loading
+- Add optional OTLP JSON receiver at POST /v1/traces only when --otlp-port is provided
+- Integrate Gateway via lightweight HttpClient proxy + SignalR hub client with auto-reconnect
+- Provide /api/correlate/{id} to unify log, session, and trace evidence for diagnostics
+
+**Implementation Paths:**
+- tools/BotNexus.Probe/src/BotNexus.Probe/Program.cs
+- tools/BotNexus.Probe/src/BotNexus.Probe/LogIngestion/*
+- tools/BotNexus.Probe/src/BotNexus.Probe/Gateway/*
+- tools/BotNexus.Probe/src/BotNexus.Probe/Otel/*
+- tools/BotNexus.Probe/src/BotNexus.Probe/Api/*
+
+**Validation:** Build clean (0 warnings), all tests passing.
+
+---
+
+## Fry Probe UI Patterns Decision (2026-04-14)
+
+**Decision Date:** 2026-04-14  
+**Decided By:** Fry (Web Dev)  
+**Status:** Implemented
+
+**Context:** Built the complete web UI for BotNexus.Probe diagnostic tool — 14 files across HTML, CSS, and JS.
+
+**Decisions:**
+
+1. **No build tooling** — Pure vanilla HTML/CSS/JS. Each page loads probe.js (shared) + {page}.js (specific). No bundler, no transpiler, no node_modules.
+
+2. **ProbeApi static class** — Single API client in probe.js wraps all fetch() calls. SSE via native EventSource. All calls target same origin (no CORS).
+
+3. **CSS custom properties for theming** — Full dark palette defined once at :root. Any future theme changes happen in one place.
+
+4. **IIFE isolation** — Every page JS file is wrapped in an IIFE. Only inline-handler functions (e.g., doSearch, toggleConnection) are explicitly exposed on window.
+
+5. **Correlation-first navigation** — Every clickable ID (session, correlation, agent, trace) links to the correlate page. This is the hub of the diagnostic tool.
+
+6. **Dual OTLP format support** — Trace viewer handles both flat span arrays and nested OTLP ResourceSpans format, since the backend may normalize differently.
+
+**API Contract Assumptions:**
+- GET /api/logs?level=&sessionId=&correlationId=&agentId=&search=&from=&to=&file=&skip=&take=
+- GET /api/logs/files
+- GET /api/sessions
+- GET /api/sessions/{id}?skip=&take=
+- GET /api/traces
+- GET /api/traces/{traceId}
+- GET /api/gateway/status
+- GET /api/gateway/logs
+- GET /api/gateway/agents
+- GET /api/correlate/{id}
+- GET /api/gateway/activity (SSE stream)
+
+---
+
+## Hermes Probe Test Patterns Decision (2026-04-14)
+
+**Decision Date:** 2026-04-14  
+**Decided By:** Hermes (Test Eng)  
+**Status:** Implemented
+
+**Context:** BotNexus.Probe testing for log ingestion, OTLP ingestion, trace storage, and options parsing. 33 tests total, all passing.
+
+**Decision:** Use file-backed temp test data for ingestion flows and reflection-based tests for non-public parsing helpers (Program CLI parsing and OtlpTraceReceiver.ParseSpans) rather than changing production visibility solely for tests.
+
+**Rationale:** 
+- Preserves production encapsulation while still giving deterministic, high-signal coverage of parsing and filtering behavior
+- Tests remain resilient and comprehensive
+
+**Consequence:** If implementation method names change, reflection-based tests may need targeted updates.
+
+**Test Coverage:**
+- Log parser ingestion flow (file-backed)
+- OTLP receiver span parsing (reflection-based)
+- Trace store filtering and retrieval
+- CLI options parsing and validation
+- Gateway correlation and activity streaming
+
+---
