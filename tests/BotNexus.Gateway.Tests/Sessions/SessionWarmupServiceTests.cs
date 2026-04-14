@@ -92,6 +92,25 @@ public sealed class SessionWarmupServiceTests
     }
 
     [Fact]
+    public async Task WarmupService_HidesCronChannelSessionsEvenWhenSessionTypeIsUserAgent()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var userAgent = CreateSession("user-agent", "agent-a", SessionStatus.Active, now, channelType: BotNexus.Domain.Primitives.ChannelKey.From("signalr"));
+        var leakedCron = CreateSession("cron-leak", "agent-a", SessionStatus.Active, now.AddMinutes(-1), BotNexus.Domain.Primitives.SessionType.UserAgent, BotNexus.Domain.Primitives.ChannelKey.From("cron"));
+
+        var store = CreateSessionStore(userAgent, leakedCron);
+        var service = CreateService(store.Object, CreateRegistry("agent-a"), new SessionWarmupOptions());
+
+        await service.StartAsync(CancellationToken.None);
+        var visibleIds = (await service.GetAvailableSessionsAsync("agent-a", CancellationToken.None))
+            .Select(summary => summary.SessionId)
+            .ToList();
+
+        visibleIds.Should().Contain("user-agent");
+        visibleIds.Should().NotContain("cron-leak");
+    }
+
+    [Fact]
     public async Task WarmupService_HidesSealedChannelSessionWhenNewerActiveSiblingExists()
     {
         var now = DateTimeOffset.UtcNow;
@@ -146,6 +165,25 @@ public sealed class SessionWarmupServiceTests
 
         available.Count(summary => summary.AgentId == "agent-a").Should().BeLessThanOrEqualTo(3);
         available.Count(summary => summary.AgentId == "agent-b").Should().BeLessThanOrEqualTo(3);
+    }
+
+    [Fact]
+    public async Task WarmupService_WhenConfigured_ReturnsAllVisibleSessionsWithoutChannelCollapse()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var older = CreateSession("telegram-older", "agent-a", SessionStatus.Active, now.AddMinutes(-5), channelType: BotNexus.Domain.Primitives.ChannelKey.From("telegram"));
+        var newest = CreateSession("telegram-newer", "agent-a", SessionStatus.Active, now.AddMinutes(-1), channelType: BotNexus.Domain.Primitives.ChannelKey.From("telegram"));
+
+        var store = CreateSessionStore(older, newest);
+        var service = CreateService(store.Object, CreateRegistry("agent-a"), new SessionWarmupOptions
+        {
+            CollapseChannelContinuations = false
+        });
+
+        await service.StartAsync(CancellationToken.None);
+        var sessions = await service.GetAvailableSessionsAsync("agent-a", CancellationToken.None);
+
+        sessions.Select(summary => summary.SessionId).Should().Contain(["telegram-older", "telegram-newer"]);
     }
 
     [Fact]

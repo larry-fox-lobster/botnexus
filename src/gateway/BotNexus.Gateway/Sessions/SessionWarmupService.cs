@@ -156,7 +156,7 @@ public sealed class SessionWarmupService : ISessionWarmupService, IHostedService
         var maxSessions = Math.Max(0, options.MaxSessionsPerAgent);
 
         var sessions = await _sessionStore.ListAsync(AgentId.From(agentId), ct);
-        var summaries = GetVisibleSessionsAsync(sessions, updatedAfter)
+        var summaries = GetVisibleSessionsAsync(sessions, updatedAfter, options.CollapseChannelContinuations)
             .OrderByDescending(static session => session.UpdatedAt)
             .Take(maxSessions)
             .Select(static session => new SessionSummary(
@@ -173,16 +173,23 @@ public sealed class SessionWarmupService : ISessionWarmupService, IHostedService
         return summaries;
     }
 
-    private static IEnumerable<GatewaySession> GetVisibleSessionsAsync(IEnumerable<GatewaySession> sessions, DateTimeOffset updatedAfter)
+    private static IEnumerable<GatewaySession> GetVisibleSessionsAsync(
+        IEnumerable<GatewaySession> sessions,
+        DateTimeOffset updatedAfter,
+        bool collapseChannelContinuations)
     {
         var visibleCandidates = sessions
             .Where(session =>
                 session.SessionType.Equals(SessionType.UserAgent)
+                && (!session.ChannelType.HasValue || !session.ChannelType.Value.Equals(ChannelKey.From("cron")))
                 && (session.Status == GatewaySessionStatus.Active
                     || session.Status == GatewaySessionStatus.Suspended
                     || session.Status == GatewaySessionStatus.Sealed)
                 && session.UpdatedAt >= updatedAfter)
             .ToArray();
+
+        if (!collapseChannelContinuations)
+            return visibleCandidates;
 
         var visible = visibleCandidates
             .Where(static session => !session.ChannelType.HasValue)

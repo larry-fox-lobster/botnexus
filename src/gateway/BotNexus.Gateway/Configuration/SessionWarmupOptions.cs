@@ -5,6 +5,7 @@ public sealed class SessionWarmupOptions
     public bool Enabled { get; set; } = true;
     public int MaxSessionsPerAgent { get; set; } = 10;
     public int RetentionWindowHours { get; set; } = 24;
+    public bool CollapseChannelContinuations { get; set; } = true;
 
     public TimeSpan RetentionWindow
     {
