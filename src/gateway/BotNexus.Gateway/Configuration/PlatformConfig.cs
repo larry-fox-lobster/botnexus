@@ -84,12 +84,36 @@ public sealed class GatewaySettingsConfig
     public ExtensionsConfig? Extensions { get; set; }
     /// <summary>World identity shown by gateway clients.</summary>
     public WorldIdentity? World { get; set; }
+    /// <summary>Named locations registry for resource management.</summary>
+    public Dictionary<string, LocationConfig>? Locations { get; set; }
     /// <summary>Optional explicit cross-world communication permissions.</summary>
     public List<CrossWorldPermissionConfig>? CrossWorldPermissions { get; set; }
     /// <summary>Cross-world federation settings for gateway-to-gateway communication.</summary>
     public CrossWorldFederationConfig? CrossWorld { get; set; }
     /// <summary>Default file access policy applied to all agents unless overridden per-agent.</summary>
     public FileAccessPolicyConfig? FileAccess { get; set; }
+}
+
+/// <summary>Named location configuration for resource access.</summary>
+public sealed class LocationConfig
+{
+    /// <summary>Location type: filesystem, api, mcp-server, database, remote-node.</summary>
+    public string Type { get; set; } = "filesystem";
+
+    /// <summary>Path for filesystem locations.</summary>
+    public string? Path { get; set; }
+
+    /// <summary>Endpoint URL for api/mcp-server/remote-node locations.</summary>
+    public string? Endpoint { get; set; }
+
+    /// <summary>Connection string for database locations.</summary>
+    public string? ConnectionString { get; set; }
+
+    /// <summary>Human-readable description.</summary>
+    public string? Description { get; set; }
+
+    /// <summary>Extensible properties.</summary>
+    public Dictionary<string, string>? Properties { get; set; }
 }
 
 /// <summary>Configuration for granting communication with another world.</summary>

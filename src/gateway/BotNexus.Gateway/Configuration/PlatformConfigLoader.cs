@@ -143,6 +143,8 @@ public static class PlatformConfigLoader
                 "The gateway will continue with best-effort compatibility.");
         }
 
+        ValidateLocationWarnings(config.Gateway?.Locations, warnings);
+
         return warnings;
     }
 
@@ -167,6 +169,7 @@ public static class PlatformConfigLoader
 
         ValidatePath(config.Gateway?.AgentsDirectory, "gateway.agentsDirectory", errors);
         ValidatePath(config.Gateway?.SessionsDirectory, "gateway.sessionsDirectory", errors);
+        ValidateLocations(config.Gateway?.Locations, errors);
         ValidateSessionStore(config.Gateway?.SessionStore, errors);
         ValidateCors(config.Gateway?.Cors, errors);
         ValidateCrossWorld(config.Gateway?.CrossWorld, errors);
@@ -296,6 +299,7 @@ public static class PlatformConfigLoader
         migrated |= TryMigrateObject(root, "cors", gateway.Cors, value => gateway.Cors = value);
         migrated |= TryMigrateObject(root, "rateLimit", gateway.RateLimit, value => gateway.RateLimit = value);
         migrated |= TryMigrateObject(root, "extensions", gateway.Extensions, value => gateway.Extensions = value);
+        migrated |= TryMigrateObject(root, "locations", gateway.Locations, value => gateway.Locations = value);
         migrated |= TryMigrateObject(root, "crossWorld", gateway.CrossWorld, value => gateway.CrossWorld = value);
 
         if (migrated || config.Gateway is not null)
@@ -505,6 +509,128 @@ public static class PlatformConfigLoader
 
         errors.Add("gateway.sessionStore.type must be either 'InMemory', 'File', or 'Sqlite'.");
     }
+
+    private static void ValidateLocations(Dictionary<string, LocationConfig>? locations, List<string> errors)
+    {
+        if (locations is null)
+            return;
+
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (locationName, locationConfig) in locations)
+        {
+            if (string.IsNullOrWhiteSpace(locationName))
+            {
+                errors.Add("gateway.locations contains an empty location key.");
+                continue;
+            }
+
+            var normalizedName = locationName.Trim();
+            if (!seenNames.Add(normalizedName))
+            {
+                errors.Add($"gateway.locations contains duplicate location name '{normalizedName}' (case-insensitive).");
+                continue;
+            }
+
+            if (locationConfig is null)
+            {
+                errors.Add($"gateway.locations.{normalizedName} configuration is required.");
+                continue;
+            }
+
+            var type = string.IsNullOrWhiteSpace(locationConfig.Type)
+                ? "filesystem"
+                : locationConfig.Type.Trim();
+            var fieldPath = $"gateway.locations.{normalizedName}";
+
+            if (!TryValidateLocationType(type))
+                errors.Add($"{fieldPath}.type must be one of: filesystem, api, mcp-server, database, remote-node.");
+
+            if (type.Equals("filesystem", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(locationConfig.Path))
+                {
+                    errors.Add($"{fieldPath}.path is required for filesystem locations.");
+                    continue;
+                }
+
+                ValidatePath(locationConfig.Path, $"{fieldPath}.path", errors);
+            }
+            else if (type.Equals("api", StringComparison.OrdinalIgnoreCase)
+                     || type.Equals("mcp-server", StringComparison.OrdinalIgnoreCase)
+                     || type.Equals("remote-node", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(locationConfig.Endpoint))
+                {
+                    errors.Add($"{fieldPath}.endpoint is required for {type} locations.");
+                    continue;
+                }
+
+                if (!Uri.TryCreate(locationConfig.Endpoint, UriKind.Absolute, out var endpointUri)
+                    || (endpointUri.Scheme != Uri.UriSchemeHttp && endpointUri.Scheme != Uri.UriSchemeHttps))
+                {
+                    errors.Add($"{fieldPath}.endpoint must be a valid http or https absolute URL.");
+                }
+            }
+            else if (type.Equals("database", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(locationConfig.ConnectionString))
+                    errors.Add($"{fieldPath}.connectionString is required for database locations.");
+            }
+        }
+    }
+
+    private static void ValidateLocationWarnings(Dictionary<string, LocationConfig>? locations, List<string> warnings)
+    {
+        if (locations is null)
+            return;
+
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (locationName, locationConfig) in locations)
+        {
+            if (string.IsNullOrWhiteSpace(locationName))
+            {
+                warnings.Add("gateway.locations contains an empty location key.");
+                continue;
+            }
+
+            var normalizedName = locationName.Trim();
+            if (!seenNames.Add(normalizedName))
+                warnings.Add($"gateway.locations contains duplicate location name '{normalizedName}' (case-insensitive).");
+
+            if (locationConfig is null)
+            {
+                warnings.Add($"gateway.locations.{normalizedName} configuration is missing.");
+                continue;
+            }
+
+            var type = string.IsNullOrWhiteSpace(locationConfig.Type)
+                ? "filesystem"
+                : locationConfig.Type.Trim();
+            var fieldPath = $"gateway.locations.{normalizedName}";
+            if (!TryValidateLocationType(type))
+            {
+                warnings.Add($"{fieldPath}.type is unknown '{type}'.");
+                continue;
+            }
+
+            if (type.Equals("filesystem", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(locationConfig.Path))
+                warnings.Add($"{fieldPath}.path is missing for filesystem location.");
+            if ((type.Equals("api", StringComparison.OrdinalIgnoreCase)
+                 || type.Equals("mcp-server", StringComparison.OrdinalIgnoreCase)
+                 || type.Equals("remote-node", StringComparison.OrdinalIgnoreCase))
+                && string.IsNullOrWhiteSpace(locationConfig.Endpoint))
+                warnings.Add($"{fieldPath}.endpoint is missing for {type} location.");
+            if (type.Equals("database", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(locationConfig.ConnectionString))
+                warnings.Add($"{fieldPath}.connectionString is missing for database location.");
+        }
+    }
+
+    private static bool TryValidateLocationType(string type)
+        => type.Equals("filesystem", StringComparison.OrdinalIgnoreCase)
+           || type.Equals("api", StringComparison.OrdinalIgnoreCase)
+           || type.Equals("mcp-server", StringComparison.OrdinalIgnoreCase)
+           || type.Equals("database", StringComparison.OrdinalIgnoreCase)
+           || type.Equals("remote-node", StringComparison.OrdinalIgnoreCase);
 
     private static void ValidateCors(CorsConfig? cors, List<string> errors)
     {

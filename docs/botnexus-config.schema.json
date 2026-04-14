@@ -51,79 +51,20 @@
         "$ref": "#/definitions/ChannelConfig"
       }
     },
-    "extensions": {
-      "oneOf": [
-        {
-          "type": "null"
-        },
-        {
-          "$ref": "#/definitions/ExtensionsConfig"
-        }
-      ]
-    },
     "apiKey": {
       "type": [
         "null",
         "string"
       ]
     },
-    "apiKeys": {
-      "type": [
-        "null",
-        "object"
-      ],
-      "additionalProperties": {
-        "$ref": "#/definitions/ApiKeyConfig"
-      }
-    },
-    "listenUrl": {
-      "type": [
-        "null",
-        "string"
-      ]
-    },
-    "defaultAgentId": {
-      "type": [
-        "null",
-        "string"
-      ]
-    },
-    "agentsDirectory": {
-      "type": [
-        "null",
-        "string"
-      ]
-    },
-    "sessionsDirectory": {
-      "type": [
-        "null",
-        "string"
-      ]
-    },
-    "sessionStore": {
+    "cron": {
       "oneOf": [
         {
           "type": "null"
         },
         {
-          "$ref": "#/definitions/SessionStoreConfig"
+          "$ref": "#/definitions/CronConfig"
         }
-      ]
-    },
-    "cors": {
-      "oneOf": [
-        {
-          "type": "null"
-        },
-        {
-          "$ref": "#/definitions/CorsConfig"
-        }
-      ]
-    },
-    "logLevel": {
-      "type": [
-        "null",
-        "string"
       ]
     }
   },
@@ -166,6 +107,16 @@
             }
           ]
         },
+        "compaction": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/CompactionOptions"
+            }
+          ]
+        },
         "cors": {
           "oneOf": [
             {
@@ -173,6 +124,16 @@
             },
             {
               "$ref": "#/definitions/CorsConfig"
+            }
+          ]
+        },
+        "rateLimit": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/RateLimitConfig"
             }
           ]
         },
@@ -200,6 +161,54 @@
               "$ref": "#/definitions/ExtensionsConfig"
             }
           ]
+        },
+        "world": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/WorldIdentity"
+            }
+          ]
+        },
+        "locations": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": {
+            "$ref": "#/definitions/LocationConfig"
+          }
+        },
+        "crossWorldPermissions": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/CrossWorldPermissionConfig"
+          }
+        },
+        "crossWorld": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/CrossWorldFederationConfig"
+            }
+          ]
+        },
+        "fileAccess": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/FileAccessPolicyConfig"
+            }
+          ]
         }
       }
     },
@@ -214,6 +223,46 @@
           ]
         },
         "filePath": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "connectionString": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "CompactionOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preservedTurns": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxSummaryChars": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "tokenThresholdRatio": {
+          "type": "number",
+          "format": "double"
+        },
+        "contextWindowTokens": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "summarizationModel": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "summarizationProvider": {
           "type": [
             "null",
             "string"
@@ -233,6 +282,23 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "RateLimitConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "requestsPerMinute": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "windowSeconds": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -302,11 +368,261 @@
         }
       }
     },
+    "WorldIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "emoji": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "LocationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "path": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "endpoint": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "connectionString": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "description": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "properties": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "CrossWorldPermissionConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "targetWorldId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "allowedAgents": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowInbound": {
+          "type": "boolean"
+        },
+        "allowOutbound": {
+          "type": "boolean"
+        }
+      }
+    },
+    "CrossWorldFederationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "peers": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": {
+            "$ref": "#/definitions/CrossWorldPeerConfig"
+          }
+        },
+        "inbound": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/CrossWorldInboundConfig"
+            }
+          ]
+        },
+        "agents": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": {
+            "$ref": "#/definitions/CrossWorldAgentConfig"
+          }
+        }
+      }
+    },
+    "CrossWorldPeerConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "worldId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "endpoint": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "apiKey": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "CrossWorldInboundConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allowedWorlds": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "apiKeys": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "CrossWorldAgentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "worldId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "agentId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "description": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "FileAccessPolicyConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowedReadPaths": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowedWritePaths": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "deniedPaths": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "AgentDefinitionConfig": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "provider": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "displayName": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "description": {
           "type": [
             "null",
             "string"
@@ -318,11 +634,47 @@
             "string"
           ]
         },
+        "allowedModels": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "systemPromptFiles": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "systemPromptFile": {
           "type": [
             "null",
             "string"
           ]
+        },
+        "toolIds": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "subAgents": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         },
         "isolationStrategy": {
           "type": [
@@ -330,8 +682,218 @@
             "string"
           ]
         },
+        "maxConcurrentSessions": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "metadata": {
+          "oneOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "isolationOptions": {
+          "oneOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
         "enabled": {
           "type": "boolean"
+        },
+        "memory": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/MemoryAgentConfig"
+            }
+          ]
+        },
+        "soul": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/SoulAgentConfig"
+            }
+          ]
+        },
+        "sessionAccess": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/SessionAccessConfig"
+            }
+          ]
+        },
+        "fileAccess": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/FileAccessPolicyConfig"
+            }
+          ]
+        },
+        "extensions": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": {}
+        },
+        "toolPolicy": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/ToolPolicyConfig"
+            }
+          ]
+        }
+      }
+    },
+    "MemoryAgentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "indexing": {
+          "type": "string"
+        },
+        "search": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/MemorySearchAgentConfig"
+            }
+          ]
+        }
+      }
+    },
+    "MemorySearchAgentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "defaultTopK": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "temporalDecay": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/TemporalDecayAgentConfig"
+            }
+          ]
+        }
+      }
+    },
+    "TemporalDecayAgentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "halfLifeDays": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "SoulAgentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "dayBoundary": {
+          "type": "string"
+        },
+        "reflectionOnSeal": {
+          "type": "boolean"
+        },
+        "reflectionPrompt": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "SessionAccessConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "type": "string"
+        },
+        "allowedAgents": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ToolPolicyConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "alwaysApprove": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "neverApprove": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "denied": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -339,6 +901,9 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
         "apiKey": {
           "type": [
             "null",
@@ -356,6 +921,15 @@
             "null",
             "string"
           ]
+        },
+        "models": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -373,6 +947,94 @@
           "type": "boolean"
         },
         "settings": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "CronConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "tickIntervalSeconds": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "jobs": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": {
+            "$ref": "#/definitions/CronJobConfig"
+          }
+        }
+      }
+    },
+    "CronJobConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "schedule": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "actionType": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "agentId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "message": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "webhookUrl": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "shellCommand": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "createdBy": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "metadata": {
           "type": [
             "null",
             "object"
