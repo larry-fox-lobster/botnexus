@@ -27,9 +27,14 @@ foreach ($proj in $projects) {
     $projDir = $proj.DirectoryName
     $projName = $proj.BaseName
 
-    # Derive extension ID from project name (e.g., BotNexus.Extensions.Skills → botnexus-skills)
-    $extId = $projName -replace '^BotNexus\.Extensions\.', '' -replace '([a-z])([A-Z])', '$1-$2'
-    $extId = "botnexus-$($extId.ToLowerInvariant())"
+    # Get extension ID from manifest (authoritative) or derive from project name
+    $manifest = Join-Path $projDir "botnexus-extension.json"
+    if (Test-Path $manifest) {
+        $extId = (Get-Content $manifest -Raw | ConvertFrom-Json).id
+    } else {
+        $shortName = $projName -replace '^BotNexus\.Extensions\.', ''
+        $extId = "botnexus-" + ($shortName -creplace '(?<=[a-z])(?=[A-Z])', '-').ToLowerInvariant()
+    }
 
     # Find build output
     $srcDir = Join-Path $projDir "bin" $Configuration
