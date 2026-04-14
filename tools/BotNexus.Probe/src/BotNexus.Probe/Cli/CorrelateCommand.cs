@@ -11,6 +11,7 @@ public static class CorrelateCommand
         string[] args,
         SerilogFileParser logParser,
         JsonlSessionReader sessionReader,
+        SessionDbReader? sessionDbReader,
         TraceStore traceStore,
         CancellationToken cancellationToken)
     {
@@ -23,13 +24,10 @@ public static class CorrelateCommand
         var id = args[0];
         var take = ParseTake(args[1..]);
         var logs = new List<LogEntry>();
-        var sessions = new List<SessionMessage>();
+        var sessions = new List<object>();
 
-        var logQuery = new LogQuery(
-            CorrelationId: id,
-            SessionId: id,
-            AgentId: id,
-            SearchText: id);
+        // Search logs with OR logic across all fields
+        var logQuery = new LogQuery(AnyId: id);
 
         await foreach (var logEntry in logParser.ParseDirectoryAsync(options.LogsPath, logQuery, cancellationToken))
         {
@@ -40,6 +38,7 @@ public static class CorrelateCommand
             }
         }
 
+        // Search JSONL session files
         if (Directory.Exists(options.SessionsPath))
         {
             foreach (var sessionFile in Directory.EnumerateFiles(options.SessionsPath, "*.jsonl", SearchOption.TopDirectoryOnly))
@@ -51,7 +50,15 @@ public static class CorrelateCommand
                         continue;
                     }
 
-                    sessions.Add(message);
+                    sessions.Add(new
+                    {
+                        source = "jsonl",
+                        sessionId = message.SessionId,
+                        role = message.Role,
+                        content = message.Content,
+                        timestamp = message.Timestamp,
+                        agentId = message.AgentId
+                    });
                     if (sessions.Count >= take)
                     {
                         break;
@@ -62,6 +69,78 @@ public static class CorrelateCommand
                 {
                     break;
                 }
+            }
+        }
+
+        // Search SQLite DB — session by ID, history by session ID, and content search
+        if (sessionDbReader is not null)
+        {
+            try
+            {
+                var detail = await sessionDbReader.GetSessionAsync(id, cancellationToken);
+                if (detail is not null)
+                {
+                    sessions.Add(new
+                    {
+                        source = "sqlite",
+                        match = "sessions.id",
+                        sessionId = detail.Id,
+                        agentId = detail.AgentId,
+                        channelType = detail.ChannelType,
+                        sessionType = detail.SessionType,
+                        status = detail.Status,
+                        createdAt = detail.CreatedAt
+                    });
+                }
+
+                var remaining = take - sessions.Count;
+
+                if (remaining > 0)
+                {
+                    var bySessionId = await sessionDbReader.GetHistoryAsync(id, take: Math.Min(remaining, 100), ct: cancellationToken);
+                    foreach (var entry in bySessionId)
+                    {
+                        sessions.Add(new
+                        {
+                            source = "sqlite",
+                            match = "session_history.session_id",
+                            sessionId = entry.SessionId,
+                            role = entry.Role,
+                            content = entry.Content,
+                            timestamp = entry.Timestamp,
+                            toolName = entry.ToolName
+                        });
+                    }
+                }
+
+                remaining = take - sessions.Count;
+
+                if (remaining > 0)
+                {
+                    var byContent = await sessionDbReader.SearchHistoryAsync(id, null, Math.Min(remaining, 100), cancellationToken);
+                    foreach (var entry in byContent)
+                    {
+                        if (entry.SessionId == id)
+                        {
+                            continue;
+                        }
+
+                        sessions.Add(new
+                        {
+                            source = "sqlite",
+                            match = "session_history.content",
+                            sessionId = entry.SessionId,
+                            role = entry.Role,
+                            content = entry.Content,
+                            timestamp = entry.Timestamp,
+                            toolName = entry.ToolName
+                        });
+                    }
+                }
+            }
+            catch
+            {
+                // Best effort only.
             }
         }
 
@@ -90,14 +169,14 @@ public static class CorrelateCommand
     private static string FormatText(
         string id,
         IReadOnlyList<LogEntry> logs,
-        IReadOnlyList<SessionMessage> sessions,
+        IReadOnlyList<object> sessions,
         IReadOnlyList<SpanModel> traces)
     {
         var output = new StringBuilder();
         output.AppendLine($"🔎 Correlation: {id}");
         output.AppendLine("━━━━━━━━━━━━━━━━━━━━━━");
         output.AppendLine($"📄 Logs: {logs.Count} entries found");
-        output.AppendLine($"💬 Sessions: {sessions.Count} messages matched");
+        output.AppendLine($"💬 Sessions: {sessions.Count} items matched");
         output.AppendLine($"🔗 Traces: {traces.Count} spans found");
 
         if (logs.Count > 0)
@@ -113,10 +192,10 @@ public static class CorrelateCommand
         if (sessions.Count > 0)
         {
             output.AppendLine();
-            output.AppendLine("--- Session Messages ---");
-            foreach (var message in sessions)
+            output.AppendLine("--- Session Data ---");
+            foreach (var item in sessions)
             {
-                output.AppendLine($"[{message.Timestamp?.ToLocalTime():HH:mm:ss}] {message.Role}: {message.Content}");
+                output.AppendLine($"  {item}");
             }
         }
 

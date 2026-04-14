@@ -20,11 +20,8 @@ public static class CorrelationEndpoints
             var logs = new List<LogEntry>();
             var sessions = new List<object>();
 
-            var logQuery = new LogQuery(
-                CorrelationId: id,
-                SessionId: id,
-                AgentId: id,
-                SearchText: id);
+            // Search logs with OR logic — matches correlationId, sessionId, agentId, message, exception, or any property
+            var logQuery = new LogQuery(AnyId: id);
 
             await foreach (var logEntry in logParser.ParseDirectoryAsync(options.LogsPath, logQuery, cancellationToken))
             {
@@ -35,6 +32,7 @@ public static class CorrelationEndpoints
                 }
             }
 
+            // Search JSONL session files
             if (Directory.Exists(options.SessionsPath))
             {
                 foreach (var sessionFile in Directory.EnumerateFiles(options.SessionsPath, "*.jsonl", SearchOption.TopDirectoryOnly))
@@ -68,10 +66,12 @@ public static class CorrelationEndpoints
                 }
             }
 
-            if (sessions.Count < normalizedTake && sessionDbReader is not null)
+            // Search SQLite DB — session by ID, history by session ID, agent ID, and content
+            if (sessionDbReader is not null)
             {
                 try
                 {
+                    // Direct session match
                     var detail = await sessionDbReader.GetSessionAsync(id, cancellationToken);
                     if (detail is not null)
                     {
@@ -81,36 +81,48 @@ public static class CorrelationEndpoints
                             match = "sessions.id",
                             sessionId = detail.Id,
                             agentId = detail.AgentId,
+                            channelType = detail.ChannelType,
+                            sessionType = detail.SessionType,
                             status = detail.Status,
                             createdAt = detail.CreatedAt
                         });
                     }
 
-                    var bySessionId = await sessionDbReader.GetHistoryAsync(id, take: Math.Min(normalizedTake - sessions.Count, 100), ct: cancellationToken);
-                    foreach (var entry in bySessionId)
-                    {
-                        sessions.Add(new
-                        {
-                            source = "sqlite",
-                            match = "session_history.session_id",
-                            sessionId = entry.SessionId,
-                            role = entry.Role,
-                            content = entry.Content,
-                            timestamp = entry.Timestamp,
-                            toolName = entry.ToolName
-                        });
+                    var remaining = normalizedTake - sessions.Count;
 
-                        if (sessions.Count >= normalizedTake)
+                    // History by session ID
+                    if (remaining > 0)
+                    {
+                        var bySessionId = await sessionDbReader.GetHistoryAsync(id, take: Math.Min(remaining, 100), ct: cancellationToken);
+                        foreach (var entry in bySessionId)
                         {
-                            break;
+                            sessions.Add(new
+                            {
+                                source = "sqlite",
+                                match = "session_history.session_id",
+                                sessionId = entry.SessionId,
+                                role = entry.Role,
+                                content = entry.Content,
+                                timestamp = entry.Timestamp,
+                                toolName = entry.ToolName
+                            });
                         }
                     }
 
-                    if (sessions.Count < normalizedTake)
+                    remaining = normalizedTake - sessions.Count;
+
+                    // Content search across all session history
+                    if (remaining > 0)
                     {
-                        var byContent = await sessionDbReader.SearchHistoryAsync(id, null, Math.Min(normalizedTake - sessions.Count, 100), cancellationToken);
+                        var byContent = await sessionDbReader.SearchHistoryAsync(id, null, Math.Min(remaining, 100), cancellationToken);
                         foreach (var entry in byContent)
                         {
+                            // Avoid duplicates from the session_id search above
+                            if (entry.SessionId == id)
+                            {
+                                continue;
+                            }
+
                             sessions.Add(new
                             {
                                 source = "sqlite",
@@ -121,11 +133,6 @@ public static class CorrelationEndpoints
                                 timestamp = entry.Timestamp,
                                 toolName = entry.ToolName
                             });
-
-                            if (sessions.Count >= normalizedTake)
-                            {
-                                break;
-                            }
                         }
                     }
                 }
@@ -135,6 +142,7 @@ public static class CorrelationEndpoints
                 }
             }
 
+            // Search OTLP traces — traceId, spanId, and all attribute values
             var traceMatches = tracesEnabled
                 ? traceStore.GetTraces(10_000)
                     .Where(span =>

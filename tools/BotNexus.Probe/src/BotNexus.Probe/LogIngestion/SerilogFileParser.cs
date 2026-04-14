@@ -86,6 +86,7 @@ public sealed partial class SerilogFileParser
 
     private static bool Matches(LogEntry entry, LogQuery query)
     {
+        // Time/level filters always apply (AND logic)
         if (!string.IsNullOrWhiteSpace(query.Level) && !entry.Level.Equals(query.Level, StringComparison.OrdinalIgnoreCase))
         {
             return false;
@@ -101,6 +102,24 @@ public sealed partial class SerilogFileParser
             return false;
         }
 
+        // AnyId: OR across all fields — correlationId, sessionId, agentId, message, exception, and every property value
+        if (!string.IsNullOrWhiteSpace(query.AnyId))
+        {
+            if (Contains(entry.CorrelationId, query.AnyId) ||
+                Contains(entry.SessionId, query.AnyId) ||
+                Contains(entry.AgentId, query.AnyId) ||
+                Contains(entry.Channel, query.AnyId) ||
+                Contains(entry.Message, query.AnyId) ||
+                Contains(entry.Exception, query.AnyId) ||
+                (entry.Properties?.Any(p => Contains(p.Value, query.AnyId)) is true))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        // Standard AND filters for the /api/logs endpoint
         if (!string.IsNullOrWhiteSpace(query.CorrelationId) && !Contains(entry.CorrelationId, query.CorrelationId))
         {
             return false;
@@ -179,6 +198,32 @@ public sealed partial class SerilogFileParser
         return null;
     }
 
+    /// <summary>
+    /// Extracts key=value pairs from inline message text.
+    /// Handles formats like: "Hub SendMessage: agent=nova session=abc123 connection=xyz"
+    /// </summary>
+    private static Dictionary<string, string> ExtractInlineProperties(string message)
+    {
+        var output = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var match in InlinePropertyRegex().EnumerateMatches(message.AsSpan()))
+        {
+            var segment = message.AsSpan(match.Index, match.Length);
+            var eqIndex = segment.IndexOf('=');
+            if (eqIndex > 0 && eqIndex < segment.Length - 1)
+            {
+                var key = segment[..eqIndex].ToString();
+                var value = segment[(eqIndex + 1)..].ToString();
+                output[key] = value;
+            }
+        }
+
+        return output;
+    }
+
+    [GeneratedRegex(@"(?<!\w)(?:agent|session|channel|connection|correlat\w*|source|caller)=\S+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex InlinePropertyRegex();
+
     private sealed class PendingEntry(
         DateTimeOffset timestamp,
         string level,
@@ -190,10 +235,32 @@ public sealed partial class SerilogFileParser
 
         public static PendingEntry FromHeader(Match headerMatch, DateTime fileDate, long lineNumber)
         {
-            var timestamp = ParseTimestamp(fileDate, headerMatch.Groups["time"].Value);
-            var properties = ParseProperties(headerMatch.Groups["props"].Success ? headerMatch.Groups["props"].Value : null);
-            var message = headerMatch.Groups["message"].Value.Trim();
-            var level = headerMatch.Groups["level"].Value.Trim();
+            DateTimeOffset timestamp;
+            string level;
+            string message;
+            Dictionary<string, string> properties;
+
+            if (headerMatch.Groups["datetime"].Success)
+            {
+                // Full ISO format: 2026-04-13 22:00:06.588 -07:00 [INF] Message
+                var dt = headerMatch.Groups["datetime"].Value;
+                var offset = headerMatch.Groups["offset"].Value;
+                timestamp = DateTimeOffset.TryParse($"{dt} {offset}", out var parsed)
+                    ? parsed
+                    : ParseTimestamp(fileDate, dt);
+                level = headerMatch.Groups["level"].Value.Trim();
+                message = headerMatch.Groups["message"].Value.Trim();
+                properties = ExtractInlineProperties(message);
+            }
+            else
+            {
+                // Legacy: [HH:mm:ss LVL] Message {Properties}
+                timestamp = ParseTimestamp(fileDate, headerMatch.Groups["time"].Value);
+                level = headerMatch.Groups["level2"].Value.Trim();
+                message = headerMatch.Groups["message2"].Value.Trim();
+                properties = ParseProperties(headerMatch.Groups["props"].Success ? headerMatch.Groups["props"].Value : null);
+            }
+
             return new PendingEntry(timestamp, level, message, properties, lineNumber);
         }
 
@@ -217,16 +284,18 @@ public sealed partial class SerilogFileParser
                 level,
                 message,
                 exception,
-                ResolveProperty(properties, "CorrelationId", "correlationId", "correlation_id"),
-                ResolveProperty(properties, "SessionId", "sessionId", "session_id"),
-                ResolveProperty(properties, "AgentId", "agentId", "agent_id"),
-                ResolveProperty(properties, "Channel", "ChannelType", "channel"),
+                ResolveProperty(properties, "CorrelationId", "correlationId", "correlation_id", "correlation"),
+                ResolveProperty(properties, "SessionId", "sessionId", "session_id", "session"),
+                ResolveProperty(properties, "AgentId", "agentId", "agent_id", "agent"),
+                ResolveProperty(properties, "Channel", "ChannelType", "channel", "channelType"),
                 Path.GetFileName(sourceFile),
                 lineNumber,
                 readOnlyProps);
         }
     }
 
-    [GeneratedRegex(@"^\[(?<time>\d{2}:\d{2}:\d{2})\s+(?<level>[A-Z]+)\]\s(?<message>.*?)(?:\s\{(?<props>.*)\})?$", RegexOptions.Compiled)]
+    // Matches: 2026-04-13 22:00:06.588 -07:00 [INF] Message
+    // Also matches legacy: [HH:mm:ss LVL] Message {Properties}
+    [GeneratedRegex(@"^(?:(?<datetime>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s+(?<offset>[+-]\d{2}:\d{2})\s+\[(?<level>[A-Z]+)\]\s(?<message>.*)|\[(?<time>\d{2}:\d{2}:\d{2})\s+(?<level2>[A-Z]+)\]\s(?<message2>.*?)(?:\s\{(?<props>.*)\})?)$", RegexOptions.Compiled)]
     private static partial Regex HeaderLine();
 }

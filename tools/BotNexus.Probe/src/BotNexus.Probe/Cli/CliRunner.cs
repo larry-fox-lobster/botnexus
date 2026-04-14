@@ -46,7 +46,7 @@ public static class CliRunner
                     "logs" => await LogsCommand.RunAsync(options, commandArgs, logParser, cancellationToken),
                     "sessions" => await SessionsCommand.ListAsync(options, commandArgs, sessionReader, sessionDbReader, cancellationToken),
                     "session" => await SessionsCommand.GetAsync(options, commandArgs, sessionReader, sessionDbReader, cancellationToken),
-                    "correlate" => await CorrelateCommand.RunAsync(options, commandArgs, logParser, sessionReader, traceStore, cancellationToken),
+                    "correlate" => await CorrelateCommand.RunAsync(options, commandArgs, logParser, sessionReader, sessionDbReader, traceStore, cancellationToken),
                     "files" => await FilesCommand.RunAsync(options, commandArgs, cancellationToken),
                     "gateway" => await GatewayCommand.RunAsync(options, commandArgs, cancellationToken),
                     "traces" => await TracesCommand.ListAsync(options, commandArgs, traceStore),

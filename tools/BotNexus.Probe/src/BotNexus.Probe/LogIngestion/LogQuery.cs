@@ -7,4 +7,5 @@ public sealed record LogQuery(
     string? CorrelationId = null,
     string? SessionId = null,
     string? AgentId = null,
-    string? SearchText = null);
+    string? SearchText = null,
+    string? AnyId = null);
