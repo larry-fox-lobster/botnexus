@@ -302,18 +302,27 @@ async function restoreInitialView() {
 // ── Init ─────────────────────────────────────────────────────────────
 
 function init() {
-    initMarkdown();
-    initSectionToggles(openCronView);
-    initEventListeners();
-    initSidebar();
-    startHealthCheck();
-    setStatus('online');
-    updateSendButtonState();
-    initHub(registerEventHandlers);
-    initSubAgentPanel();
-    initVersionCheck();
-    setSidebarCollapsedState(getSidebarCollapsed());
-    void restoreInitialView();
+    try {
+        console.log('[botnexus] init start');
+        initMarkdown();
+        initSectionToggles(openCronView);
+        initEventListeners();
+        initSidebar();
+        startHealthCheck();
+        setStatus('online');
+        updateSendButtonState();
+        console.log('[botnexus] calling initHub...');
+        initHub(registerEventHandlers);
+        console.log('[botnexus] initHub complete');
+        initSubAgentPanel();
+        initVersionCheck();
+        setSidebarCollapsedState(getSidebarCollapsed());
+        void restoreInitialView();
+        console.log('[botnexus] init complete');
+    } catch (err) {
+        console.error('[botnexus] INIT FAILED:', err);
+        document.title = 'BotNexus — INIT ERROR';
+    }
 }
 
 if (document.readyState === 'loading') {
