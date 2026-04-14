@@ -241,7 +241,8 @@ public static class GatewayServiceCollectionExtensions
             new PlatformConfigAgentSource(
                 serviceProvider.GetRequiredService<IOptions<PlatformConfig>>(),
                 configDirectory,
-                serviceProvider.GetRequiredService<ILogger<PlatformConfigAgentSource>>()));
+                serviceProvider.GetRequiredService<ILogger<PlatformConfigAgentSource>>(),
+                serviceProvider.GetRequiredService<ILocationResolver>()));
         services.Replace(ServiceDescriptor.Singleton<IAgentConfigurationWriter>(serviceProvider =>
         {
             var home = serviceProvider.GetRequiredService<BotNexusHome>();

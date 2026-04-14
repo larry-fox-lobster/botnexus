@@ -1,4 +1,5 @@
 using BotNexus.Gateway.Abstractions.Agents;
+using BotNexus.Gateway.Abstractions.Configuration;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Agents;
@@ -15,11 +16,13 @@ namespace BotNexus.Gateway.Configuration;
 public sealed class PlatformConfigAgentSource(
     IOptions<PlatformConfig> configOptions,
     string configDirectory,
-    ILogger<PlatformConfigAgentSource> logger) : IAgentConfigurationSource
+    ILogger<PlatformConfigAgentSource> logger,
+    ILocationResolver? locationResolver = null) : IAgentConfigurationSource
 {
     private readonly IOptions<PlatformConfig> _configOptions = configOptions;
     private readonly string _configDirectory = Path.GetFullPath(configDirectory);
     private readonly ILogger<PlatformConfigAgentSource> _logger = logger;
+    private readonly ILocationResolver? _locationResolver = locationResolver;
 
     /// <inheritdoc />
     public Task<IReadOnlyList<AgentDescriptor>> LoadAsync(CancellationToken cancellationToken = default)
@@ -159,7 +162,7 @@ public sealed class PlatformConfigAgentSource(
         };
     }
 
-    private static FileAccessPolicy? MapFileAccessPolicy(FileAccessPolicyConfig? agentLevel, FileAccessPolicyConfig? worldLevel)
+    private FileAccessPolicy? MapFileAccessPolicy(FileAccessPolicyConfig? agentLevel, FileAccessPolicyConfig? worldLevel)
     {
         // Agent-level policy takes full precedence if set
         var effective = agentLevel ?? worldLevel;
@@ -168,10 +171,71 @@ public sealed class PlatformConfigAgentSource(
 
         return new FileAccessPolicy
         {
-            AllowedReadPaths = effective.AllowedReadPaths?.ToArray() ?? [],
-            AllowedWritePaths = effective.AllowedWritePaths?.ToArray() ?? [],
-            DeniedPaths = effective.DeniedPaths?.ToArray() ?? []
+            AllowedReadPaths = ResolvePolicyPaths(effective.AllowedReadPaths, nameof(FileAccessPolicy.AllowedReadPaths)),
+            AllowedWritePaths = ResolvePolicyPaths(effective.AllowedWritePaths, nameof(FileAccessPolicy.AllowedWritePaths)),
+            DeniedPaths = ResolvePolicyPaths(effective.DeniedPaths, nameof(FileAccessPolicy.DeniedPaths))
         };
+    }
+
+    private string[] ResolvePolicyPaths(IReadOnlyList<string>? paths, string policyField)
+    {
+        if (paths is null || paths.Count == 0)
+            return [];
+
+        List<string> resolvedPaths = new(paths.Count);
+        foreach (var path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !path.StartsWith('@'))
+            {
+                resolvedPaths.Add(path);
+                continue;
+            }
+
+            var resolvedPath = ResolveLocationReference(path);
+            if (resolvedPath is not null)
+            {
+                resolvedPaths.Add(resolvedPath);
+                continue;
+            }
+
+            _logger.LogWarning(
+                "Skipping unresolved location reference '{LocationReference}' in file access policy field '{PolicyField}'.",
+                path,
+                policyField);
+        }
+
+        return resolvedPaths.ToArray();
+    }
+
+    private string? ResolveLocationReference(string path)
+    {
+        if (_locationResolver is null)
+            return null;
+
+        var reference = path[1..];
+        if (string.IsNullOrWhiteSpace(reference))
+            return null;
+
+        var separatorIndex = reference.IndexOfAny(['/', '\\']);
+        var locationName = separatorIndex >= 0 ? reference[..separatorIndex] : reference;
+        if (string.IsNullOrWhiteSpace(locationName))
+            return null;
+
+        var basePath = _locationResolver.ResolvePath(locationName);
+        if (string.IsNullOrWhiteSpace(basePath))
+            return null;
+
+        if (separatorIndex < 0 || separatorIndex == reference.Length - 1)
+            return Path.GetFullPath(basePath);
+
+        var subPath = reference[(separatorIndex + 1)..];
+        if (string.IsNullOrWhiteSpace(subPath))
+            return Path.GetFullPath(basePath);
+
+        var normalizedSubPath = subPath
+            .Replace('/', Path.DirectorySeparatorChar)
+            .Replace('\\', Path.DirectorySeparatorChar);
+        return Path.GetFullPath(Path.Combine(basePath, normalizedSubPath));
     }
 
     private static IReadOnlyDictionary<string, object?> ConvertObject(JsonElement? element)
