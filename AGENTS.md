@@ -1,5 +1,24 @@
 # Agent Guidelines for BotNexus
 
+## Document Ownership
+
+Some docs have a YAML front-matter header indicating ownership:
+
+```yaml
+---
+owner: human          # human | ai | shared
+author: Jon Bullen
+ai-policy: minimal    # minimal | collaborative | open
+---
+```
+
+**Respect these headers:**
+- `minimal` — Fix typos and broken links only. No restructuring, no content removal. Substantive changes require explicit human approval.
+- `collaborative` — May propose additions but must not remove or rewrite existing content without approval.
+- `open` (default if no header) — May freely update, but don't delete useful content.
+
+**If a doc has `owner: human` and `ai-policy: minimal`, do not rewrite or remove it during cleanup tasks.** This convention exists because a previous cleanup accidentally removed a human-authored document.
+
 ## Test Enforcement
 
 **All tests must pass before any task is considered complete.** No exceptions.
