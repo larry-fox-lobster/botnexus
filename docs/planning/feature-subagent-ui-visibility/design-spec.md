@@ -3,7 +3,7 @@ id: feature-subagent-ui-visibility
 title: Sub-Agent Session Visibility in WebUI
 type: feature
 priority: medium
-status: in-progress
+status: delivered
 created: 2026-04-10
 updated: 2026-04-17
 author: nova
