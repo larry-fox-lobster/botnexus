@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BotNexus.AgentCore.Hooks;
 using BotNexus.Tools.Utils;
 
@@ -157,16 +158,33 @@ public sealed class SafetyHooks
 
     private static string? ReadFirstEditNewText(IReadOnlyDictionary<string, object?> args)
     {
-        if (!args.TryGetValue("edits", out var edits) || edits is not IEnumerable<object?> list)
+        if (!args.TryGetValue("edits", out var edits) || edits is null)
         {
             return null;
         }
 
-        foreach (var entry in list)
+        // Handle JsonElement arrays (from StreamingJsonParser)
+        if (edits is JsonElement { ValueKind: JsonValueKind.Array } element)
         {
-            if (entry is IReadOnlyDictionary<string, object?> dictionary)
+            foreach (var entry in element.EnumerateArray())
             {
-                return ReadString(dictionary, "newText");
+                if (entry.ValueKind == JsonValueKind.Object && entry.TryGetProperty("newText", out var newText))
+                {
+                    return newText.GetString();
+                }
+            }
+            return null;
+        }
+
+        // Handle CLR collection (legacy/direct path)
+        if (edits is IEnumerable<object?> list)
+        {
+            foreach (var entry in list)
+            {
+                if (entry is IReadOnlyDictionary<string, object?> dictionary)
+                {
+                    return ReadString(dictionary, "newText");
+                }
             }
         }
 

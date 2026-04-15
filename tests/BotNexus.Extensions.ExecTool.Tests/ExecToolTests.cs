@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using BotNexus.AgentCore.Types;
 using BotNexus.Extensions.ExecTool;
+using BotNexus.Providers.Core.Utilities;
 using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
 
@@ -338,6 +339,20 @@ public class ExecToolTests : IDisposable
         var text = GetResultText(result);
         text.Should().Contain("stdout_msg");
         text.Should().Contain("stderr_msg");
+    }
+
+    [Fact]
+    public async Task PrepareArgumentsAsync_WithStreamingJsonParserOutput_ParsesCommand()
+    {
+        // Simulate the real flow: StreamingJsonParser produces dict with JsonElement arrays
+        var parsed = StreamingJsonParser.Parse("{\"command\": [\"echo\", \"hello\"]}");
+
+        var prepared = await _tool.PrepareArgumentsAsync(parsed);
+
+        prepared.Should().ContainKey("command");
+        var command = prepared["command"] as IReadOnlyList<string>;
+        command.Should().NotBeNull();
+        command.Should().BeEquivalentTo(["echo", "hello"]);
     }
 
     #region Helpers

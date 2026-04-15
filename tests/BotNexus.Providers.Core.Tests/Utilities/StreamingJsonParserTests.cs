@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BotNexus.Providers.Core.Utilities;
 using FluentAssertions;
 
@@ -63,9 +64,81 @@ public class StreamingJsonParserTests
         var result = StreamingJsonParser.Parse("{\"items\": [1, 2, 3]}");
 
         result.Should().ContainKey("items");
-        var items = result["items"] as List<object?>;
-        items.Should().NotBeNull();
-        items.Should().HaveCount(3);
+        var items = result["items"];
+        items.Should().BeOfType<JsonElement>();
+        var element = (JsonElement)items!;
+        element.ValueKind.Should().Be(JsonValueKind.Array);
+        element.GetArrayLength().Should().Be(3);
+    }
+
+    [Fact]
+    public void ArrayOfStrings_PreservedAsJsonElement()
+    {
+        var result = StreamingJsonParser.Parse("{\"command\": [\"echo\", \"hello\"]}");
+
+        result.Should().ContainKey("command");
+        var command = result["command"];
+        command.Should().BeOfType<JsonElement>();
+        var element = (JsonElement)command!;
+        element.ValueKind.Should().Be(JsonValueKind.Array);
+        element.GetArrayLength().Should().Be(2);
+        var items = element.EnumerateArray().ToList();
+        items[0].GetString().Should().Be("echo");
+        items[1].GetString().Should().Be("hello");
+    }
+
+    [Fact]
+    public void ArrayOfObjects_PreservedAsJsonElement()
+    {
+        var result = StreamingJsonParser.Parse("{\"edits\": [{\"oldText\": \"a\", \"newText\": \"b\"}]}");
+
+        result.Should().ContainKey("edits");
+        var edits = result["edits"];
+        edits.Should().BeOfType<JsonElement>();
+        var element = (JsonElement)edits!;
+        element.ValueKind.Should().Be(JsonValueKind.Array);
+        element.GetArrayLength().Should().Be(1);
+        var first = element[0];
+        first.ValueKind.Should().Be(JsonValueKind.Object);
+        first.GetProperty("oldText").GetString().Should().Be("a");
+        first.GetProperty("newText").GetString().Should().Be("b");
+    }
+
+    [Fact]
+    public void NestedObjectsInDictionary_StillParsed()
+    {
+        var result = StreamingJsonParser.Parse("{\"outer\": {\"inner\": \"value\"}}");
+
+        result.Should().ContainKey("outer");
+        var outer = result["outer"] as Dictionary<string, object?>;
+        outer.Should().NotBeNull();
+        outer!["inner"].Should().Be("value");
+    }
+
+    [Fact]
+    public void MixedTypesInArray_PreservedAsJsonElement()
+    {
+        var result = StreamingJsonParser.Parse("{\"items\": [1, \"two\", true, null]}");
+
+        result.Should().ContainKey("items");
+        var items = result["items"];
+        items.Should().BeOfType<JsonElement>();
+        var element = (JsonElement)items!;
+        element.ValueKind.Should().Be(JsonValueKind.Array);
+        element.GetArrayLength().Should().Be(4);
+    }
+
+    [Fact]
+    public void PartialJson_ArrayUnclosed_Repaired()
+    {
+        var result = StreamingJsonParser.Parse("{\"items\": [1, 2");
+
+        result.Should().ContainKey("items");
+        var items = result["items"];
+        items.Should().BeOfType<JsonElement>();
+        var element = (JsonElement)items!;
+        element.ValueKind.Should().Be(JsonValueKind.Array);
+        element.GetArrayLength().Should().BeGreaterThanOrEqualTo(2);
     }
 
     [Fact]

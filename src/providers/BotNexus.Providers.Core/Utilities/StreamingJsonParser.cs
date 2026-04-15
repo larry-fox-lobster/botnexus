@@ -141,7 +141,7 @@ public static class StreamingJsonParser
         JsonValueKind.False => false,
         JsonValueKind.String => element.GetString(),
         JsonValueKind.Number => element.TryGetInt64(out var l) ? l : element.GetDouble(),
-        JsonValueKind.Array => element.EnumerateArray().Select(ConvertElement).ToList(),
+        JsonValueKind.Array => element.Clone(),
         JsonValueKind.Object => ElementToDictionary(element),
         _ => element.ToString()
     };

@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\extensions\tools\exec\BotNexus.Extensions.ExecTool\BotNexus.Extensions.ExecTool.csproj" />
+    <ProjectReference Include="..\..\src\providers\BotNexus.Providers.Core\BotNexus.Providers.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
