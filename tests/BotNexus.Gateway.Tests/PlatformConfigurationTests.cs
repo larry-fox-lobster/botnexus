@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text.Json;
+using BotNexus.Domain.World;
 using BotNexus.Gateway.Abstractions.Agents;
+using BotNexus.Gateway.Abstractions.Configuration;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Extensions;
@@ -344,6 +346,7 @@ public sealed class PlatformConfigurationTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddBotNexusGateway();
+        services.AddSingleton<ILocationResolver>(new StubLocationResolver());
         services.AddPlatformConfiguration(fixture.ConfigPath);
 
         using var provider = services.BuildServiceProvider();
@@ -788,5 +791,12 @@ public sealed class PlatformConfigurationTests
             string? format,
             params object?[]? args)
             => Write(args is { Length: > 0 } ? string.Format(format ?? string.Empty, args) : format);
+    }
+
+    private sealed class StubLocationResolver : ILocationResolver
+    {
+        public Location? Resolve(string locationName) => null;
+        public string? ResolvePath(string locationName) => null;
+        public IReadOnlyList<Location> GetAll() => [];
     }
 }
