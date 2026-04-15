@@ -34,6 +34,7 @@ const SIDEBAR_SUBAGENT_STATUS = {
     Failed:    { icon: '❌', label: 'Failed',    css: 'failed' },
     Killed:    { icon: '🛑', label: 'Killed',    css: 'killed' },
     TimedOut:  { icon: '⏱',  label: 'Timed Out', css: 'timedout' },
+    Expired:   { icon: '✅', label: 'Completed', css: 'completed' },
     Sealed:    { icon: '🔒', label: 'Sealed',    css: 'sealed' }
 };
 

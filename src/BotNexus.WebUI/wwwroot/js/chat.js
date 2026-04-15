@@ -1322,7 +1322,10 @@ const SUBAGENT_STATUS_MAP = {
     Completed: { icon: '✅', label: 'Completed', css: 'completed' },
     Failed:    { icon: '❌', label: 'Failed',    css: 'failed' },
     Killed:    { icon: '🛑', label: 'Killed',    css: 'killed' },
-    TimedOut:  { icon: '⏱',  label: 'Timed Out', css: 'timedout' }
+    TimedOut:  { icon: '⏱',  label: 'Timed Out', css: 'timedout' },
+    Active:    { icon: '🟢', label: 'Running',   css: 'running' },
+    Expired:   { icon: '✅', label: 'Completed', css: 'completed' },
+    Sealed:    { icon: '🔒', label: 'Sealed',    css: 'sealed' }
 };
 
 export async function fetchSubAgents() {
@@ -1477,7 +1480,7 @@ export function updateSubAgentViewStatus(newStatus) {
     if (!_subAgentViewSessionId) return;
 
     const statusInfo = SUBAGENT_STATUS_MAP[newStatus] || SUBAGENT_STATUS_MAP.Running;
-    const isTerminal = ['Completed', 'Failed', 'Killed', 'TimedOut'].includes(newStatus);
+    const isTerminal = ['Completed', 'Failed', 'Killed', 'TimedOut', 'Expired', 'Sealed'].includes(newStatus);
 
     // Update the status span in the read-only banner
     const banner = document.getElementById('subagent-readonly-banner');
@@ -1559,7 +1562,7 @@ export async function openSubAgentSession(sessionId) {
         rawStatus = 'Completed';
     }
     const statusInfo = SUBAGENT_STATUS_MAP[rawStatus] || SUBAGENT_STATUS_MAP.Running;
-    const isTerminal = ['Completed', 'Failed', 'Killed', 'TimedOut'].includes(rawStatus);
+    const isTerminal = ['Completed', 'Failed', 'Killed', 'TimedOut', 'Expired', 'Sealed'].includes(rawStatus);
 
     // Use the current active channel's context for display (overlay model).
     // We stash the existing innerHTML so we can restore it on close.
@@ -1568,6 +1571,11 @@ export async function openSubAgentSession(sessionId) {
 
     _subAgentViewSessionId = sessionId;
     _subAgentViewCtx = ctx;
+
+    // Highlight the viewed sub-agent in the sidebar
+    document.querySelectorAll('.subagent-sidebar-item.viewing').forEach(el => el.classList.remove('viewing'));
+    const sidebarItem = document.querySelector(`.subagent-sidebar-item[data-session-id="${sessionId}"]`);
+    if (sidebarItem) sidebarItem.classList.add('viewing');
 
     // Save existing content for restore
     ctx._savedMessagesHtml = ctx.messagesEl.innerHTML;
@@ -1668,8 +1676,9 @@ export function closeSubAgentView(silent = false) {
 
     if (!ctx || silent) return;
 
-    // Remove readonly mode
+    // Remove readonly mode and sidebar highlight
     dom.chatView.classList.remove('readonly-mode');
+    document.querySelectorAll('.subagent-sidebar-item.viewing').forEach(el => el.classList.remove('viewing'));
 
     // Restore saved messages content
     if (ctx._savedMessagesHtml !== undefined) {

@@ -221,8 +221,8 @@ When opening a sub-agent session:
 | `src/BotNexus.WebUI/wwwroot/js/sidebar.js` | `parseSubAgentSession()`, `SIDEBAR_SUBAGENT_STATUS` map, sub-agent grouping under parent agent, seal button on terminal items, sealed session filtering |
 | `src/BotNexus.WebUI/wwwroot/js/chat.js` | `openSubAgentSession()` — read-only conversation view with banner, seal button, close button, live streaming for active sessions |
 | `src/BotNexus.WebUI/wwwroot/js/api.js` | `sealSession(sessionId)` — PATCH helper |
-| `src/BotNexus.WebUI/wwwroot/css/styles.css` | `.seal-btn`, `.readonly-banner`, `.readonly-seal-btn`, `.subagent-sidebar-item` styling |
-| `tests/BotNexus.Gateway.Tests/SessionsControllerTests.cs` | 8 seal endpoint tests: happy path (Expired→Sealed), idempotent (204), 404, 400 non-subagent, 409 active, 409 suspended, persistence, response body |
+| `src/BotNexus.WebUI/wwwroot/styles.css` | `.seal-btn`, `.readonly-banner`, `.readonly-seal-btn`, `.subagent-sidebar-item` styling |
+| `tests/BotNexus.Gateway.Tests/SessionsControllerTests.cs` | 12 seal endpoint tests: happy path, idempotent (204), 404, 400, 409 active/suspended, persistence, response body, concurrent seal, property preservation, ID format variations, timestamp update |
 | `tests/BotNexus.WebUI.Tests/SubAgentPanelE2ETests.cs` | E2E tests for sub-agent sidebar visibility, read-only view, seal flow |
 
 **Not changed** (no modifications needed): `storage.js` — existing `getCollapsedAgents()`/`toggleAgentCollapsed()` helpers were sufficient.
