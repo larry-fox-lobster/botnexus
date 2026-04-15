@@ -120,7 +120,7 @@ public sealed class EditTool : IAgentTool
     {
         var rawPath = arguments["path"]?.ToString()
                       ?? throw new ArgumentException("Missing required argument: path.");
-        var edits = ReadEdits(arguments);
+        var edits = arguments["edits"] as IReadOnlyList<EditEntry> ?? ReadEdits(arguments);
 
         var fullPath = _validator?.ValidateAndResolve(rawPath, FileAccessMode.Write);
         if (_validator is not null && fullPath is null)
@@ -210,6 +210,7 @@ public sealed class EditTool : IAgentTool
     {
         return value switch
         {
+            EditEntry entry => entry,
             JsonElement element => ParseEditElement(element),
             IReadOnlyDictionary<string, object?> dict => new EditEntry(
                 ReadRequiredString(dict, "oldText"),

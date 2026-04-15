@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BotNexus.Tools;
 using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
@@ -225,6 +226,54 @@ public sealed class EditToolTests
             .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         outputLines.Should().HaveCountLessThanOrEqualTo(12);
         outputLines.Should().Contain(line => line.StartsWith("@@ -", StringComparison.Ordinal) && line.EndsWith(" @@", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithPreparedArguments_DoesNotDoubleParse()
+    {
+        // Regression test: PrepareArgumentsAsync converts edits into EditEntry objects.
+        // Before the fix, ExecuteAsync would re-parse those entries via ReadEdits, hitting
+        // "Each edits entry must be an object." because EditEntry wasn't handled.
+        var filePath = Path.Combine(_tempDirectory, "double-parse.txt");
+        await _fileSystem.File.WriteAllTextAsync(filePath, "hello world");
+
+        using var doc = JsonDocument.Parse("""{"edits": [{"oldText": "hello", "newText": "goodbye"}]}""");
+        var editsElement = doc.RootElement.GetProperty("edits").Clone();
+
+        var rawArgs = new Dictionary<string, object?>
+        {
+            ["path"] = "double-parse.txt",
+            ["edits"] = editsElement
+        };
+
+        var preparedArgs = await _tool.PrepareArgumentsAsync(rawArgs);
+        var result = await _tool.ExecuteAsync("test-call", preparedArgs);
+
+        result.Content[0].Value.Should().Contain("Successfully replaced");
+        (await _fileSystem.File.ReadAllTextAsync(filePath)).Should().Be("goodbye world");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRawJsonElementArgs_StillWorks()
+    {
+        // Exercises the fallback path where ExecuteAsync is called directly with
+        // raw JsonElement args, bypassing PrepareArgumentsAsync.
+        var filePath = Path.Combine(_tempDirectory, "raw-json.txt");
+        await _fileSystem.File.WriteAllTextAsync(filePath, "hello world");
+
+        using var doc = JsonDocument.Parse("""{"edits": [{"oldText": "hello", "newText": "goodbye"}]}""");
+        var editsElement = doc.RootElement.GetProperty("edits").Clone();
+
+        var rawArgs = new Dictionary<string, object?>
+        {
+            ["path"] = "raw-json.txt",
+            ["edits"] = editsElement
+        };
+
+        var result = await _tool.ExecuteAsync("test-call", rawArgs);
+
+        result.Content[0].Value.Should().Contain("Successfully replaced");
+        (await _fileSystem.File.ReadAllTextAsync(filePath)).Should().Be("goodbye world");
     }
 
 }
