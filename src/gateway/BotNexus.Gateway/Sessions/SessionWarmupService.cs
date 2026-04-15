@@ -180,12 +180,14 @@ public sealed class SessionWarmupService : ISessionWarmupService, IHostedService
         DateTimeOffset updatedAfter,
         bool collapseChannelContinuations)
     {
-        // Core design: any session that is not Sealed is visible.
-        // IsInteractive on the session determines if the user can send messages.
+        // Only surface user-agent sessions; hide internal types (Soul, Cron, AgentSubAgent, etc.)
+        // and sessions delivered via the "cron" channel even if typed as UserAgent.
         var visibleCandidates = sessions
             .Where(session =>
-                session.Status != GatewaySessionStatus.Sealed
-                && session.UpdatedAt >= updatedAfter)
+                session.UpdatedAt >= updatedAfter
+                && session.SessionType.Equals(SessionType.UserAgent)
+                && (!session.ChannelType.HasValue
+                    || !string.Equals(session.ChannelType.Value.Value, "cron", StringComparison.OrdinalIgnoreCase)))
             .ToArray();
 
         if (!collapseChannelContinuations)

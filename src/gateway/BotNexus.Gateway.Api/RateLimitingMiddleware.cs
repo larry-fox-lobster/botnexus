@@ -45,6 +45,13 @@ public sealed class RateLimitingMiddleware
             await _next(context);
             return;
         }
+
+        if (IsExemptPath(context.Request.Path))
+        {
+            await _next(context);
+            return;
+        }
+
         var requestsPerMinute = configuredRateLimit?.RequestsPerMinute > 0
             ? configuredRateLimit.RequestsPerMinute
             : DefaultRequestsPerMinute;
@@ -137,6 +144,14 @@ public sealed class RateLimitingMiddleware
         /// Gets or sets the request count.
         /// </summary>
         public int RequestCount { get; set; }
+    }
+
+    private static bool IsExemptPath(PathString path)
+    {
+        var value = path.Value;
+        if (string.IsNullOrEmpty(value)) return false;
+        return value.Equals("/health", StringComparison.OrdinalIgnoreCase)
+            || IsStaticFileRequest(path);
     }
 
     private static bool IsStaticFileRequest(PathString path)

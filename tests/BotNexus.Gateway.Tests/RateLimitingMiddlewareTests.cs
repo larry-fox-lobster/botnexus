@@ -339,6 +339,7 @@ public sealed class RateLimitingMiddlewareTests
             {
                 RateLimit = new RateLimitConfig
                 {
+                    Enabled = true,
                     RequestsPerMinute = requestsPerMinute,
                     WindowSeconds = windowSeconds
                 }

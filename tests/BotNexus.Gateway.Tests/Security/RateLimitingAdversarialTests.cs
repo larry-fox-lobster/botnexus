@@ -88,6 +88,7 @@ public sealed class RateLimitingAdversarialTests
             {
                 RateLimit = new RateLimitConfig
                 {
+                    Enabled = true,
                     RequestsPerMinute = requestsPerMinute,
                     WindowSeconds = windowSeconds
                 }
