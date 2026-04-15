@@ -682,6 +682,76 @@ public sealed class SessionsControllerTests
         statusProp!.GetValue(body).Should().Be("Sealed");
     }
 
+    [Fact]
+    public async Task Seal_ConcurrentSealRequests_SecondReturns204()
+    {
+        var store = new InMemorySessionStore();
+        var session = await store.GetOrCreateAsync("parent::subagent::concurrent1", "agent-a");
+        session.Status = SessionStatus.Expired;
+        var controller = new SessionsController(store);
+
+        var first = await controller.Seal("parent::subagent::concurrent1", CancellationToken.None);
+        var second = await controller.Seal("parent::subagent::concurrent1", CancellationToken.None);
+
+        first.Should().BeOfType<OkObjectResult>();
+        second.Should().BeOfType<NoContentResult>();
+        session.Status.Should().Be(SessionStatus.Sealed);
+    }
+
+    [Fact]
+    public async Task Seal_PreservesOtherSessionProperties()
+    {
+        var store = new InMemorySessionStore();
+        var session = await store.GetOrCreateAsync("parent::subagent::preserve1", "agent-b");
+        session.Status = SessionStatus.Expired;
+        session.Metadata["key1"] = "value1";
+        var originalCreatedAt = session.CreatedAt;
+        var originalAgentId = session.AgentId;
+        var originalSessionType = session.SessionType;
+        var controller = new SessionsController(store);
+
+        await controller.Seal("parent::subagent::preserve1", CancellationToken.None);
+
+        var saved = await store.GetAsync("parent::subagent::preserve1", CancellationToken.None);
+        saved.Should().NotBeNull();
+        saved!.Status.Should().Be(SessionStatus.Sealed);
+        saved.CreatedAt.Should().Be(originalCreatedAt);
+        saved.AgentId.Should().Be(originalAgentId);
+        saved.SessionType.Should().Be(originalSessionType);
+        saved.Metadata["key1"].Should().Be("value1");
+    }
+
+    [Theory]
+    [InlineData("parent-session::subagent::abc123")]
+    [InlineData("long-parent-id-with-dashes::subagent::short")]
+    public async Task Seal_SubAgentSessionId_VariousFormats(string sessionId)
+    {
+        var store = new InMemorySessionStore();
+        var session = await store.GetOrCreateAsync(sessionId, "agent-a");
+        session.Status = SessionStatus.Expired;
+        var controller = new SessionsController(store);
+
+        var result = await controller.Seal(sessionId, CancellationToken.None);
+
+        result.Should().BeOfType<OkObjectResult>();
+        session.Status.Should().Be(SessionStatus.Sealed);
+    }
+
+    [Fact]
+    public async Task Seal_UpdatesTimestamp()
+    {
+        var store = new InMemorySessionStore();
+        var session = await store.GetOrCreateAsync("parent::subagent::timestamp1", "agent-a");
+        session.Status = SessionStatus.Expired;
+        var pastTimestamp = session.UpdatedAt.AddMinutes(-5);
+        session.UpdatedAt = pastTimestamp;
+        var controller = new SessionsController(store);
+
+        await controller.Seal("parent::subagent::timestamp1", CancellationToken.None);
+
+        session.UpdatedAt.Should().BeAfter(pastTimestamp);
+    }
+
     private static ControllerContext CreateControllerContext(string callerId)
     {
         var httpContext = new DefaultHttpContext();

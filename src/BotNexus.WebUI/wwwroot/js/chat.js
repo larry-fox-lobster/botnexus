@@ -1469,6 +1469,59 @@ export function clearChatMessages() {
 export function getSubAgentViewSessionId() { return _subAgentViewSessionId; }
 
 /**
+ * Reactively update the read-only banner status when a sub-agent lifecycle
+ * event fires while the user is viewing that sub-agent's session.
+ * @param {string} newStatus — one of: Completed, Failed, Killed, TimedOut
+ */
+export function updateSubAgentViewStatus(newStatus) {
+    if (!_subAgentViewSessionId) return;
+
+    const statusInfo = SUBAGENT_STATUS_MAP[newStatus] || SUBAGENT_STATUS_MAP.Running;
+    const isTerminal = ['Completed', 'Failed', 'Killed', 'TimedOut'].includes(newStatus);
+
+    // Update the status span in the read-only banner
+    const banner = document.getElementById('subagent-readonly-banner');
+    if (!banner) return;
+
+    const statusEl = banner.querySelector('.readonly-status');
+    if (statusEl) {
+        statusEl.innerHTML = `${statusInfo.icon} ${escapeHtml(statusInfo.label)}`;
+    }
+
+    // Update the chat meta line
+    if (dom.chatMeta) {
+        dom.chatMeta.textContent = `Read-only · ${newStatus}`;
+    }
+
+    // Show the seal button if terminal and not already present
+    if (isTerminal && !banner.querySelector('#btn-seal-subagent')) {
+        const closeBtn = banner.querySelector('#btn-close-subagent');
+        const sealBtn = document.createElement('button');
+        sealBtn.className = 'readonly-seal-btn';
+        sealBtn.id = 'btn-seal-subagent';
+        sealBtn.textContent = 'Seal';
+        sealBtn.addEventListener('click', async () => {
+            sealBtn.disabled = true;
+            sealBtn.textContent = 'Sealing…';
+            const ok = await sealSession(_subAgentViewSessionId);
+            if (ok) {
+                closeSubAgentView();
+                loadSessions();
+            } else {
+                sealBtn.disabled = false;
+                sealBtn.textContent = 'Seal';
+                appendSystemMessage('Failed to seal session.', 'error');
+            }
+        });
+        if (closeBtn) {
+            banner.insertBefore(sealBtn, closeBtn);
+        } else {
+            banner.appendChild(sealBtn);
+        }
+    }
+}
+
+/**
  * Open a read-only conversation view for a sub-agent session.
  * Fetches history from `GET /sessions/{sessionId}/history`, renders it into
  * the active channel's message container with a sticky read-only banner, and

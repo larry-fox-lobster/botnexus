@@ -12,7 +12,8 @@ import { setStatus, hideConnectionBanner } from './ui.js';
 import {
     onMessageStart, onContentDelta, onThinkingDelta, onToolStart, onToolEnd,
     onMessageEnd, onError, updateSessionIdDisplay, syncLoadingUiForActiveSession,
-    appendSystemMessage, clearChatMessages, clearSubAgentPanel, renderSubAgentPanel
+    appendSystemMessage, clearChatMessages, clearSubAgentPanel, renderSubAgentPanel,
+    getSubAgentViewSessionId, updateSubAgentViewStatus
 } from './chat.js';
 import { loadSessions, setAgentsCache, trackActivity, updateSidebarBadge } from './sidebar.js';
 
@@ -20,6 +21,18 @@ import { loadSessions, setAgentsCache, trackActivity, updateSidebarBadge } from 
 
 export const activeSubAgents = new Map();
 export function clearActiveSubAgents() { activeSubAgents.clear(); }
+
+/** Check if a sub-agent lifecycle event matches the currently-open read-only view and update the banner. */
+function checkSubAgentViewUpdate(evt, newStatus) {
+    const viewSessionId = getSubAgentViewSessionId();
+    if (!viewSessionId || !evt?.subAgentId) return;
+    // Match if subAgentId IS the viewed session ID, or if the viewed session
+    // ID follows the parentSession::subagent::subAgentId convention.
+    if (evt.subAgentId === viewSessionId ||
+        viewSessionId.endsWith('::subagent::' + evt.subAgentId)) {
+        updateSubAgentViewStatus(newStatus);
+    }
+}
 
 // ── Handler registration ────────────────────────────────────────────
 
@@ -168,6 +181,7 @@ export function registerEventHandlers(connection) {
         if (!isActive) return;
         renderSubAgentPanel();
         trackActivity('response', getCurrentAgentId(), `✅ Sub-agent completed: ${evt.name || evt.subAgentId}`);
+        checkSubAgentViewUpdate(evt, 'Completed');
     });
 
     connection.on('SubAgentFailed', (evt) => {
@@ -183,6 +197,7 @@ export function registerEventHandlers(connection) {
         renderSubAgentPanel();
         const icon = evt.timedOut ? '⏱' : '❌';
         trackActivity('error', getCurrentAgentId(), `${icon} Sub-agent failed: ${evt.name || evt.subAgentId}`);
+        checkSubAgentViewUpdate(evt, evt.timedOut ? 'TimedOut' : 'Failed');
     });
 
     connection.on('SubAgentKilled', (evt) => {
@@ -196,5 +211,6 @@ export function registerEventHandlers(connection) {
         if (!isActive) return;
         renderSubAgentPanel();
         trackActivity('tool', getCurrentAgentId(), `🛑 Sub-agent killed: ${evt.name || evt.subAgentId}`);
+        checkSubAgentViewUpdate(evt, 'Killed');
     });
 }

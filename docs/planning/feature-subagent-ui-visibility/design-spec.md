@@ -5,7 +5,7 @@ type: feature
 priority: medium
 status: in-progress
 created: 2026-04-10
-updated: 2026-04-15
+updated: 2026-04-17
 author: nova
 depends_on: []
 tags: [webui, subagent, session, ux]
@@ -97,9 +97,19 @@ function parseSubAgentSession(session) {
 }
 ```
 
+### Session status vs sub-agent lifecycle status
+
+> **Important:** `SessionStatus` and sub-agent lifecycle status are **separate enums** tracked in different places.
+>
+> **`SessionStatus`** (on the `Session` domain entity) has four values: `Active` · `Suspended` · `Expired` · `Sealed`. These govern the session lifecycle — whether the session can accept messages, is paused, has timed out, or has been sealed from the UI.
+>
+> **`SubAgentInfo.Status`** (returned by `/api/sessions/{sessionId}/subagents`) tracks the sub-agent _execution_ lifecycle: `Running` · `Completed` · `Failed` · `Killed` · `TimedOut`. These are the states shown in the sub-agent panel and sidebar status icons.
+>
+> When a sub-agent finishes (any terminal `SubAgentInfo.Status`), its **session** transitions to `Expired` — not to a matching session status. The `Sealed` session status is only set explicitly via the seal endpoint. This distinction matters because the seal endpoint guards against `SessionStatus` values, not sub-agent lifecycle states.
+
 ### Seal endpoint
 
-Need a new endpoint following the existing suspend/resume pattern:
+New endpoint following the existing suspend/resume pattern:
 
 ```
 PATCH /api/sessions/{sessionId}/seal
@@ -107,11 +117,18 @@ PATCH /api/sessions/{sessionId}/seal
 
 Sets `session.Status = SessionStatus.Sealed` and `session.UpdatedAt = now`.
 
-**Preconditions** (from design review):
-- Session must exist → `404 NotFound`
-- Session must be a sub-agent (`SessionId.IsSubAgent`) → `400 BadRequest` if not
-- Session status must be terminal (Completed/Failed/Killed) → `409 Conflict` if Active
-- Already sealed → `204 NoContent` (idempotent)
+**Precondition guards** (from design review, confirmed in implementation):
+
+| Check | Guard | Response |
+|-------|-------|----------|
+| Session not found | `ISessionStore.GetAsync` returns null | `404 NotFound` |
+| Not a sub-agent | `!SessionId.IsSubAgent` | `400 BadRequest` |
+| Still active or suspended | `session.Status ∈ {Active, Suspended}` | `409 Conflict` |
+| Already sealed | `session.Status == Sealed` | `204 NoContent` (idempotent) |
+
+**Success** (`session.Status == Expired`): Sets status to `Sealed`, persists to store, returns `200 OK` with `{ sessionId, status, updatedAt }`.
+
+**Side effects**: Publishes `GatewayActivityType.SessionStatusChanged` so connected clients update the sidebar in real time.
 
 ### Sidebar rendering changes
 
@@ -180,8 +197,11 @@ When opening a sub-agent session:
 4. **Rapid completion** — sub-agent finishes before user opens it. History is fully persisted, browsable
 5. **Cron-spawned sub-agents** — parent session is a cron session. Group under the cron's agent, not a separate group
 6. **Session from before fix** — old sub-agent sessions with `::` in agentId may exist. `parseSubAgentSession` checks `sessionType === 'agent-subagent'` first. If parent agentId can't be parsed, show in an "Other Sessions" catch-all group at the bottom of the sidebar
-7. **Seal while running** — Seal endpoint MUST reject requests where session status is `Active`. Only terminal states (Completed/Failed/Killed) can be sealed. This prevents orphaning a running conversation.
+7. **Seal while running** — Seal endpoint rejects requests where session status is `Active` or `Suspended` (`409 Conflict`). Only `Expired` sessions can transition to `Sealed`. This prevents orphaning a running conversation
 8. **Status map completeness** — `SUBAGENT_STATUS_MAP` must include `Sealed: { icon: '🔒', label: 'Sealed', css: 'sealed' }` for consistent display
+9. **Channel grouping mismatch** — Sub-agent sessions MUST NOT pass through the `latestByChannel` grouping path in `loadSessions()`. They lack meaningful channel types and would render misleadingly as "Web Chat" items. They are rendered as a flat list in a separate `.agent-group-subagents` container after channel items
+10. **Orphaned sub-agent sessions** — if a sub-agent's parent `agentId` doesn't match any registered agent (e.g., agent was unregistered), show in an "Other Sessions" catch-all group at the bottom of the sidebar rather than silently dropping them
+11. **Sealed sessions accumulate in API response** — `/api/sessions` returns sealed sessions. For P0, client-side filtering is acceptable. Server-side `?status=` query parameter is P1 tech debt to reduce payload size over time
 
 ## Testing Plan
 
@@ -193,13 +213,16 @@ When opening a sub-agent session:
 6. Refresh page → verify sub-agent sessions still visible (persisted)
 7. Open on two browsers → verify both see sub-agent sessions
 
-## Files to Change
+## Files Changed
 
 | File | Change |
 |------|--------|
-| `SessionsController.cs` | Add `Seal` endpoint (follow suspend/resume pattern) |
-| `sidebar.js` | Sub-agent grouping, rendering, seal action (leverage existing collapse helpers) |
-| `chat.js` | `openSubAgentSession()` with RO mode (existing sub-agent panel stays) |
-| `styles.css` | Sub-agent sidebar items, RO banner |
-| `api.js` | Seal API call helper |
-| `storage.js` | Sub-agent collapse state helpers if needed (section collapse already built) |
+| `src/gateway/BotNexus.Gateway.Api/Controllers/SessionsController.cs` | `Seal` endpoint — `PATCH /sessions/{sessionId}/seal` with precondition guards (404/400/409/204) |
+| `src/BotNexus.WebUI/wwwroot/js/sidebar.js` | `parseSubAgentSession()`, `SIDEBAR_SUBAGENT_STATUS` map, sub-agent grouping under parent agent, seal button on terminal items, sealed session filtering |
+| `src/BotNexus.WebUI/wwwroot/js/chat.js` | `openSubAgentSession()` — read-only conversation view with banner, seal button, close button, live streaming for active sessions |
+| `src/BotNexus.WebUI/wwwroot/js/api.js` | `sealSession(sessionId)` — PATCH helper |
+| `src/BotNexus.WebUI/wwwroot/css/styles.css` | `.seal-btn`, `.readonly-banner`, `.readonly-seal-btn`, `.subagent-sidebar-item` styling |
+| `tests/BotNexus.Gateway.Tests/SessionsControllerTests.cs` | 8 seal endpoint tests: happy path (Expired→Sealed), idempotent (204), 404, 400 non-subagent, 409 active, 409 suspended, persistence, response body |
+| `tests/BotNexus.WebUI.Tests/SubAgentPanelE2ETests.cs` | E2E tests for sub-agent sidebar visibility, read-only view, seal flow |
+
+**Not changed** (no modifications needed): `storage.js` — existing `getCollapsedAgents()`/`toggleAgentCollapsed()` helpers were sufficient.

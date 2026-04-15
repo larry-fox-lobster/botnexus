@@ -123,12 +123,23 @@ export async function loadSessions() {
     // Separate sub-agent sessions from regular sessions
     const subAgentsByParent = {};
     const regularSessionsByAgent = {};
+    const orphanedSubAgents = [];
     for (const [agentId, sessions2] of Object.entries(sessionsByAgent)) {
         for (const s of sessions2) {
             const parsed = parseSubAgentSession(s);
             if (parsed && parsed.parentAgentId) {
                 if (!subAgentsByParent[parsed.parentAgentId]) subAgentsByParent[parsed.parentAgentId] = [];
                 subAgentsByParent[parsed.parentAgentId].push({ ...s, _parsed: parsed });
+            } else if (s.sessionType === 'agent-subagent') {
+                // Sub-agent with unparseable ID (old :: format) or missing parentAgentId
+                orphanedSubAgents.push({
+                    ...s,
+                    _parsed: parsed || {
+                        parentSessionId: null,
+                        parentAgentId: null,
+                        subAgentUniqueId: (s.sessionId || s.key || '').substring(0, 8)
+                    }
+                });
             } else {
                 if (!regularSessionsByAgent[agentId]) regularSessionsByAgent[agentId] = [];
                 regularSessionsByAgent[agentId].push(s);
@@ -286,6 +297,84 @@ export async function loadSessions() {
 
         dom.sessionsList.appendChild(group);
     }
+
+    // ── Orphaned sub-agent sessions (parent agent not registered) ────
+    const registeredAgentIds = new Set(agents.map(a => a.agentId || a.name));
+    for (const [parentId, subs] of Object.entries(subAgentsByParent)) {
+        if (!registeredAgentIds.has(parentId)) {
+            orphanedSubAgents.push(...subs);
+        }
+    }
+
+    if (orphanedSubAgents.length > 0) {
+        orphanedSubAgents.sort((a, b) => {
+            const aStatus = a.status || 'Active';
+            const bStatus = b.status || 'Active';
+            if (aStatus === 'Active' && bStatus !== 'Active') return -1;
+            if (bStatus === 'Active' && aStatus !== 'Active') return 1;
+            return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+        });
+
+        const group = document.createElement('div');
+        group.className = 'agent-group';
+
+        const header = document.createElement('div');
+        header.className = 'agent-group-header' + (collapsedAgents.has('Other Sessions') ? ' collapsed' : '');
+        header.innerHTML = `<span class="collapse-icon">▼</span> Other Sessions`;
+        header.addEventListener('click', () => {
+            header.classList.toggle('collapsed');
+            toggleAgentCollapsed('Other Sessions', header.classList.contains('collapsed'));
+        });
+        group.appendChild(header);
+
+        const subDiv = document.createElement('div');
+        subDiv.className = 'agent-group-subagents';
+
+        for (const sa of orphanedSubAgents) {
+            if ((sa.status || '').toLowerCase() === 'sealed') continue;
+
+            const statusInfo = SIDEBAR_SUBAGENT_STATUS[sa.status] || SIDEBAR_SUBAGENT_STATUS.Active;
+            const label = sa._parsed?.subAgentUniqueId
+                ? sa._parsed.subAgentUniqueId.substring(0, 8)
+                : (sa.agentId || sa.sessionId || sa.key);
+
+            const item = document.createElement('div');
+            item.className = `subagent-sidebar-item ${statusInfo.css}`;
+            item.dataset.sessionId = sa.sessionId || sa.key;
+
+            let html = `<span class="subagent-status-icon">${statusInfo.icon}</span>`;
+            html += `<span class="subagent-label">${escapeHtml(sa.name || label)}</span>`;
+
+            const isTerminal = ['completed', 'failed', 'killed', 'timedout'].includes((sa.status || '').toLowerCase());
+            if (isTerminal) {
+                html += `<button class="seal-btn" title="Seal session">🔒</button>`;
+            }
+
+            item.innerHTML = html;
+
+            item.addEventListener('click', (e) => {
+                if (e.target.closest('.seal-btn')) return;
+                openSubAgentSession(sa.sessionId || sa.key);
+            });
+
+            const sealBtn = item.querySelector('.seal-btn');
+            if (sealBtn) {
+                sealBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const ok = await sealSession(sa.sessionId || sa.key);
+                    if (ok) loadSessions();
+                });
+            }
+
+            subDiv.appendChild(item);
+        }
+
+        if (subDiv.children.length > 0) {
+            group.appendChild(subDiv);
+            dom.sessionsList.appendChild(group);
+        }
+    }
+
     sessionsInitialLoad = false;
 }
 
