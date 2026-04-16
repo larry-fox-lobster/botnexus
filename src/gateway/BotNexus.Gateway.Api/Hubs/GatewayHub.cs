@@ -175,7 +175,10 @@ public sealed class GatewayHub : Hub
         _logger.LogInformation("Hub SendMessage: agent={AgentId} channel={ChannelType} session={SessionId} connection={ConnectionId} content={Content}",
             typedAgentId, typedChannelType, session.SessionId, Context.ConnectionId, content.Length > 50 ? content[..50] + "..." : content);
 
-        await DispatchMessageAsync(typedAgentId, session.SessionId, content, "message");
+        _ = SafeDispatchAsync(
+            () => DispatchMessageAsync(typedAgentId, session.SessionId, content, "message"),
+            typedAgentId,
+            session.SessionId);
 
         return new
         {
@@ -212,19 +215,22 @@ public sealed class GatewayHub : Hub
 
         var parts = contentParts.Select(ConvertToDomainContentPart).ToList();
 
-        await _dispatcher.DispatchAsync(
-            new InboundMessage
-            {
-                ChannelType = ChannelKey.From("signalr"),
-                SenderId = Context.ConnectionId,
-                ConversationId = session.SessionId.Value,
-                SessionId = session.SessionId.Value,
-                TargetAgentId = typedAgentId.Value,
-                Content = content,
-                ContentParts = parts,
-                Metadata = new Dictionary<string, object?> { ["messageType"] = "message-with-media" }
-            },
-            CancellationToken.None);
+        _ = SafeDispatchAsync(
+            () => _dispatcher.DispatchAsync(
+                new InboundMessage
+                {
+                    ChannelType = ChannelKey.From("signalr"),
+                    SenderId = Context.ConnectionId,
+                    ConversationId = session.SessionId.Value,
+                    SessionId = session.SessionId.Value,
+                    TargetAgentId = typedAgentId.Value,
+                    Content = content,
+                    ContentParts = parts,
+                    Metadata = new Dictionary<string, object?> { ["messageType"] = "message-with-media" }
+                },
+                CancellationToken.None),
+            typedAgentId,
+            session.SessionId);
 
         return new
         {
@@ -247,6 +253,43 @@ public sealed class GatewayHub : Hub
                 Metadata = new Dictionary<string, object?> { ["messageType"] = messageType }
             },
             CancellationToken.None);
+
+    /// <summary>
+    /// Fire-and-forget dispatch wrapper. Catches exceptions and publishes them
+    /// via the activity stream so the client receives error events.
+    /// </summary>
+    private async Task SafeDispatchAsync(Func<Task> dispatch, AgentId agentId, SessionId sessionId)
+    {
+        try
+        {
+            await dispatch();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Dispatch failed for agent '{AgentId}' session '{SessionId}'",
+                agentId,
+                sessionId);
+
+            try
+            {
+                await _activity.PublishAsync(
+                    new GatewayActivity
+                    {
+                        Type = GatewayActivityType.Error,
+                        AgentId = agentId.Value,
+                        SessionId = sessionId.Value,
+                        Message = $"Agent dispatch failed: {ex.Message}"
+                    },
+                    CancellationToken.None);
+            }
+            catch
+            {
+                // Best-effort error notification
+            }
+        }
+    }
 
     private static MessageContentPart ConvertToDomainContentPart(MediaContentPartDto dto)
     {
@@ -276,22 +319,26 @@ public sealed class GatewayHub : Hub
         var typedAgentId = NormalizeAgentId(agentId);
         var typedSessionId = NormalizeSessionId(sessionId);
         ArgumentException.ThrowIfNullOrWhiteSpace(content);
-        return _dispatcher.DispatchAsync(
-            new InboundMessage
-            {
-                ChannelType = ChannelKey.From("signalr"),
-                SenderId = Context.ConnectionId,
-                ConversationId = typedSessionId.Value,
-                SessionId = typedSessionId.Value,
-                TargetAgentId = typedAgentId.Value,
-                Content = content,
-                Metadata = new Dictionary<string, object?>
+        _ = SafeDispatchAsync(
+            () => _dispatcher.DispatchAsync(
+                new InboundMessage
                 {
-                    ["messageType"] = "steer",
-                    ["control"] = "steer"
-                }
-            },
-            CancellationToken.None);
+                    ChannelType = ChannelKey.From("signalr"),
+                    SenderId = Context.ConnectionId,
+                    ConversationId = typedSessionId.Value,
+                    SessionId = typedSessionId.Value,
+                    TargetAgentId = typedAgentId.Value,
+                    Content = content,
+                    Metadata = new Dictionary<string, object?>
+                    {
+                        ["messageType"] = "steer",
+                        ["control"] = "steer"
+                    }
+                },
+                CancellationToken.None),
+            typedAgentId,
+            typedSessionId);
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -306,7 +353,11 @@ public sealed class GatewayHub : Hub
         var typedAgentId = NormalizeAgentId(agentId);
         var typedSessionId = NormalizeSessionId(sessionId);
         ArgumentException.ThrowIfNullOrWhiteSpace(content);
-        return DispatchMessageAsync(typedAgentId, typedSessionId, content, "message");
+        _ = SafeDispatchAsync(
+            () => DispatchMessageAsync(typedAgentId, typedSessionId, content, "message"),
+            typedAgentId,
+            typedSessionId);
+        return Task.CompletedTask;
     }
 
     /// <summary>
