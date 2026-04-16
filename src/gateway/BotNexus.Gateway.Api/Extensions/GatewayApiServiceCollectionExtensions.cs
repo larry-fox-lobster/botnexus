@@ -27,6 +27,7 @@ public static class GatewayApiServiceCollectionExtensions
         services.AddSingleton<IInternalTrigger>(provider => provider.GetRequiredService<SoulTrigger>());
         services.AddSingleton<SignalRChannelAdapter>();
         services.AddSingleton<IChannelAdapter>(provider => provider.GetRequiredService<SignalRChannelAdapter>());
+        services.AddHostedService<SubAgentSignalRBridge>();
         services.AddControllers()
             .AddApplicationPart(typeof(GatewayApiServiceCollectionExtensions).Assembly);
 
