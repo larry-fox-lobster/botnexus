@@ -133,6 +133,15 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
             var assembly = loadContext.LoadFromAssemblyPath(extension.EntryAssemblyPath);
 
             var discoveredImplementations = DiscoverImplementations(assembly);
+            if (discoveredImplementations.Count > 0)
+            {
+                _logger.LogDebug(
+                    "Extension '{ExtensionId}' discovered {Count} implementation(s): {Implementations}",
+                    extension.Manifest.Id,
+                    discoveredImplementations.Count,
+                    string.Join(", ", discoveredImplementations.Select(d => $"{d.ServiceContract.Name}->{d.Implementation.Name}")));
+            }
+
             var hookHandlerTypes = DiscoverHookHandlers(assembly);
             var registeredServiceNames = RegisterServices(discoveredImplementations);
             RegisterHookHandlers(hookHandlerTypes, registeredServiceNames);
@@ -284,7 +293,7 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
             $"Extension '{manifest.Id}' has unresolved dependencies: {string.Join(", ", missingDependencies)}.");
     }
 
-    private static IReadOnlyList<(Type ServiceContract, Type Implementation)> DiscoverImplementations(Assembly assembly)
+    private IReadOnlyList<(Type ServiceContract, Type Implementation)> DiscoverImplementations(Assembly assembly)
     {
         var types = GetLoadableTypes(assembly);
         List<(Type ServiceContract, Type Implementation)> implementations = [];
@@ -297,7 +306,23 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
             foreach (var contract in DiscoverableServiceContracts)
             {
                 if (contract.IsAssignableFrom(implementationType))
+                {
                     implementations.Add((contract, implementationType));
+                }
+                else if (implementationType.GetInterfaces().Any(i => i.FullName == contract.FullName))
+                {
+                    // Type implements an interface with the same name but different assembly identity.
+                    // This means the extension loaded its own copy of a shared assembly instead of
+                    // using the host's version. Check ExtensionAssemblyLoadContext.HostAssemblies.
+                    _logger.LogWarning(
+                        "Type '{Implementation}' implements '{ContractName}' from assembly '{ExtAssembly}' "
+                        + "but the host expects it from '{HostAssembly}'. Add the shared assembly to "
+                        + "ExtensionAssemblyLoadContext.HostAssemblies to fix type identity.",
+                        implementationType.FullName,
+                        contract.FullName,
+                        implementationType.GetInterfaces().First(i => i.FullName == contract.FullName).Assembly.GetName().Name,
+                        contract.Assembly.GetName().Name);
+                }
             }
         }
 

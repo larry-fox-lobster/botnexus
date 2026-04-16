@@ -11,8 +11,10 @@ internal sealed class ExtensionAssemblyLoadContext : AssemblyLoadContext
     private static readonly HashSet<string> HostAssemblies = new(StringComparer.OrdinalIgnoreCase)
     {
         "BotNexus.AgentCore",
+        "BotNexus.Domain",
         "BotNexus.Providers.Core",
         "BotNexus.Gateway.Abstractions",
+        "BotNexus.Gateway.Contracts",
         "Microsoft.Extensions.DependencyInjection.Abstractions",
         "Microsoft.Extensions.Logging.Abstractions",
         "Microsoft.Extensions.Logging",
