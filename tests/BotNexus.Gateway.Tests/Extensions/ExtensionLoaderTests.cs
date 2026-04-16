@@ -53,6 +53,28 @@ public sealed class ExtensionLoaderTests : IDisposable
     }
 
     [Fact]
+    public async Task DiscoverAsync_AllowsMediaHandlerExtensionType()
+    {
+        var mediaHandler = Path.Combine(_rootPath, "media-handler");
+        Directory.CreateDirectory(mediaHandler);
+        await File.WriteAllTextAsync(Path.Combine(mediaHandler, "entry.dll"), "placeholder");
+        await File.WriteAllTextAsync(Path.Combine(mediaHandler, "botnexus-extension.json"), JsonSerializer.Serialize(new ExtensionManifest
+        {
+            Id = "media-handler-extension",
+            Name = "Media Handler",
+            Version = "1.0.0",
+            EntryAssembly = "entry.dll",
+            ExtensionTypes = ["media-handler"]
+        }));
+
+        var loader = CreateLoader(new ServiceCollection());
+
+        var discovered = await loader.DiscoverAsync(_rootPath);
+
+        discovered.Should().Contain(x => x.Manifest.Id == "media-handler-extension");
+    }
+
+    [Fact]
     public async Task LoadAsync_RegistersDiscoveredTypes_InCollectibleAssemblyLoadContext_AndSupportsUnload()
     {
         var extensionDirectory = Path.Combine(_rootPath, "telegram-extension");

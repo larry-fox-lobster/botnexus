@@ -9,6 +9,7 @@ using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Extensions;
 using BotNexus.Gateway.Abstractions.Hooks;
 using BotNexus.Gateway.Abstractions.Isolation;
+using BotNexus.Gateway.Abstractions.Media;
 using BotNexus.Gateway.Abstractions.Routing;
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Abstractions.Sessions;
@@ -37,7 +38,8 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
         typeof(IAgentCommunicator),
         typeof(IActivityBroadcaster),
         typeof(IAgentTool),
-        typeof(ICommandContributor)
+        typeof(ICommandContributor),
+        typeof(IMediaHandler)
     ];
 
     private readonly IServiceCollection _services;
@@ -259,7 +261,8 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
             "activity-broadcaster",
             "tool",
             "command",
-            "hook-handler"
+            "hook-handler",
+            "media-handler"
         };
 
         var invalidTypes = extensionTypes

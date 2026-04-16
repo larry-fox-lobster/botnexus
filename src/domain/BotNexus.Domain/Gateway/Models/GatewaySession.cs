@@ -223,6 +223,18 @@ public sealed record SessionEntry
     /// <summary>Message content.</summary>
     public required string Content { get; init; }
 
+    /// <summary>
+    /// Original content parts as received from the channel (before media processing).
+    /// Null for text-only messages.
+    /// </summary>
+    public IReadOnlyList<MessageContentPart>? OriginalContentParts { get; init; }
+
+    /// <summary>
+    /// Content parts after media pipeline processing (e.g., audio → transcription).
+    /// Null when no processing occurred.
+    /// </summary>
+    public IReadOnlyList<MessageContentPart>? ProcessedContentParts { get; init; }
+
     /// <summary>When this entry was recorded.</summary>
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
 

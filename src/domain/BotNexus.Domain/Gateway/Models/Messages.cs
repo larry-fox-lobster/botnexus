@@ -22,6 +22,12 @@ public sealed record InboundMessage
     /// <summary>The message text content.</summary>
     public required string Content { get; init; }
 
+    /// <summary>
+    /// Optional multi-modal content parts. When present, the message includes
+    /// non-text content (audio, images, etc.) alongside or instead of <see cref="Content"/>.
+    /// </summary>
+    public IReadOnlyList<MessageContentPart>? ContentParts { get; init; }
+
     /// <summary>When the message was received.</summary>
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
 
