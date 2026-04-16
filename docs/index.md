@@ -5,7 +5,7 @@
 ## Quick Start
 
 ```bash
-git clone https://github.com/your-org/botnexus.git
+git clone https://github.com/sytone/botnexus.git
 cd botnexus
 dotnet build BotNexus.slnx
 dotnet run --project src/gateway/BotNexus.Gateway.Api

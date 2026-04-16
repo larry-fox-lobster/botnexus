@@ -24,7 +24,7 @@ Optional but recommended:
 Clone the BotNexus repository:
 
 ```bash
-git clone https://github.com/your-org/botnexus.git
+git clone https://github.com/sytone/botnexus.git
 cd botnexus
 ```
 

@@ -29,7 +29,7 @@ Before you begin, ensure you have:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/botnexus.git
+git clone https://github.com/sytone/botnexus.git
 cd botnexus
 ```
 

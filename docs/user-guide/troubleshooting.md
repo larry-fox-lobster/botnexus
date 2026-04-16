@@ -887,7 +887,7 @@ If you can't resolve an issue:
    - [Extension Development](extensions.md)
 
 2. **Search existing issues:**
-   - [GitHub Issues](https://github.com/your-org/botnexus/issues)
+   - [GitHub Issues](https://github.com/sytone/botnexus/issues)
 
 3. **Open a new issue:**
    - Include BotNexus version
@@ -898,7 +898,7 @@ If you can't resolve an issue:
    - Describe steps to reproduce
 
 4. **Community support:**
-   - [Discussions](https://github.com/your-org/botnexus/discussions)
+   - [Discussions](https://github.com/sytone/botnexus/discussions)
    - [Discord](https://discord.gg/botnexus) (if available)
 
 ---

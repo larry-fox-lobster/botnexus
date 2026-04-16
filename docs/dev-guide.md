@@ -46,7 +46,7 @@ Three commands from clone to running Gateway:
 
 ```powershell
 # 1. Clone the repository
-git clone https://github.com/your-org/botnexus.git && cd botnexus
+git clone https://github.com/sytone/botnexus.git && cd botnexus
 
 # 2. Build the solution
 dotnet build BotNexus.slnx
