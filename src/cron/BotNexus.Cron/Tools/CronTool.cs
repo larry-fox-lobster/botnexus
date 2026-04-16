@@ -30,6 +30,7 @@ public sealed class CronTool(
                   "enum": ["list", "create", "update", "delete", "run"]
                 },
                 "jobId": { "type": "string", "description": "Optional - for update/delete/run." },
+                "includeSystem": { "type": "boolean", "description": "When true, include system-provisioned jobs (e.g., heartbeat) in list output. Default: false." },
                 "name": { "type": "string", "description": "Job name (for create)." },
                 "schedule": { "type": "string", "description": "Standard 5-field cron expression (minute hour day month weekday). The expression is evaluated in the timezone specified by 'timeZone', or UTC if omitted. Example: '30 22 * * *' with timeZone 'America/Los_Angeles' fires at 10:30 PM Pacific daily." },
                 "timeZone": { "type": "string", "description": "IANA timezone name for the schedule (e.g. 'America/Los_Angeles', 'Europe/London', 'Asia/Tokyo'). When set, the cron expression is interpreted in this timezone (including DST adjustments). Defaults to UTC if omitted." },
@@ -77,7 +78,7 @@ public sealed class CronTool(
         var action = arguments["action"]?.ToString() ?? string.Empty;
         return action switch
         {
-            "list" => await ListAsync(cancellationToken).ConfigureAwait(false),
+            "list" => await ListAsync(arguments, cancellationToken).ConfigureAwait(false),
             "create" => await CreateAsync(arguments, cancellationToken).ConfigureAwait(false),
             "update" => await UpdateAsync(arguments, cancellationToken).ConfigureAwait(false),
             "delete" => await DeleteAsync(arguments, cancellationToken).ConfigureAwait(false),
@@ -86,13 +87,14 @@ public sealed class CronTool(
         };
     }
 
-    private async Task<AgentToolResult> ListAsync(CancellationToken cancellationToken)
+    private async Task<AgentToolResult> ListAsync(IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken)
     {
+        var includeSystem = arguments.TryGetValue("includeSystem", out var val) && val is true or "true" or "True";
         var jobs = await cronStore.ListAsync(ct: cancellationToken).ConfigureAwait(false);
-        var nonSystemJobs = jobs.Where(job => !job.System);
+        var filtered = includeSystem ? jobs : jobs.Where(job => !job.System);
         var visible = allowCrossAgentCron
-            ? nonSystemJobs.ToList()
-            : nonSystemJobs.Where(job => string.Equals(job.CreatedBy, _agentId, StringComparison.OrdinalIgnoreCase)).ToList();
+            ? filtered.ToList()
+            : filtered.Where(job => string.Equals(job.CreatedBy, _agentId, StringComparison.OrdinalIgnoreCase)).ToList();
 
         return TextResult(JsonSerializer.Serialize(visible, JsonOptions));
     }
