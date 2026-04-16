@@ -1,48 +1,114 @@
-# Planning Index
+# 🗺️ Planning Index
 
-> Auto-maintained by Nova. Last updated: 2025-07-23.
-
-## Active
-
-| ID | Type | Priority | Status | Created | Summary |
-|----|------|----------|--------|---------|---------|
-| bug-exec-process-disconnect | bug | high | ready | 2026-07-18 | ExecTool and ProcessTool built on wrong assumptions about process lifecycle |
-| bug-session-lifecycle-fragmentation | bug | high | ready | 2026-04-15 | 7 session creation paths, no single truth; sub-agent sessions never persisted |
-| bug-session-switching-ui | bug | high | partially-delivered | 2026-04-10 | Cross-session message bleed when switching agents in WebUI |
-| bug-steering-delivery-latency | bug | high | draft | 2026-04-10 | Steering messages delivered too late to influence agent behavior |
-| bug-steering-message-visibility | bug | medium | draft | 2026-04-10 | Steering messages not visible in conversation flow in WebUI |
-| feature-context-visibility | feature | medium | draft | 2026-04-10 | /context command to show token usage, context window state |
-| feature-media-pipeline | feature | high | draft | 2026-07-14 | Audio transcription and extensible media type pipeline |
-| feature-planning-pipeline | process | n/a | active | 2026-04-10 | Planning folder conventions and spec lifecycle (this process) |
-| feature-spec-driven-squad-automation | feature | medium | draft | 2025-07-23 | Automate Squad execution based on spec status transitions |
-| improvement-memory-lifecycle | improvement | high | draft | 2026-04-10 | Memory persistence, compaction, and dreaming consolidation |
-| improvement-skills-path-resolution | improvement | medium | draft | 2026-04-15 | Expose skill base path on load so agents can resolve relative file refs |
-| message-queue-injection-timing | bug | -- | planning | -- | User messages queued during multi-tool turns not visible until turn completes |
-
-## Archived / Done
-
-| ID | Type | Priority | Status | Created | Summary |
-|----|------|----------|--------|---------|---------|
-| bug-edit-tool-double-parse | bug | high | done | 2026-04-14 | EditTool double-parses edits argument, breaking all edit calls |
-| bug-pathutils-ignores-file-access-policy | bug | high | done | 2026-04-14 | PathUtils enforces workspace-only, ignoring FileAccessPolicy |
-| bug-session-resumption | bug | critical | in-progress | 2026-04-10 | Session rehydration fails after gateway restart; regressed after initial fix |
-| bug-subagent-spawn-path | bug | critical | delivered | 2026-04-14 | Sub-agent AgentId contains :: which creates illegal Windows paths |
-| bug-tool-argument-type-mismatch | bug | high | done | 2026-04-14 | Type mismatch between StreamingJsonParser and tool argument parsers |
-| ddd-refactoring | -- | -- | done | -- | Domain-driven design refactoring of entire codebase |
-| feature-agent-delay-tool | feature | medium | draft | 2026-07-17 | Agent delay/wait tool for pausing mid-turn |
-| feature-agent-file-access-policy | feature | high | delivered | 2026-07-18 | Per-agent file access policy configuration |
-| feature-extension-contributed-commands | feature | medium | delivered | 2026-04-15 | Extension-contributed commands for WebUI/TUI command palette |
-| feature-file-watcher-tool | feature | medium | draft | 2026-07-19 | File watcher tool for reactive file change monitoring |
-| feature-infinite-scrollback | feature | -- | draft | 2025-07-24 | Infinite scrollback without DOM wipe; paginated history loading |
-| feature-location-management | feature | -- | -- | -- | Location management (minimal spec) |
-| feature-multi-session-connection | feature | -- | -- | -- | Multi-session SignalR connection architecture |
-| feature-session-visibility | feature | high | implemented | 2026-04-11 | Session visibility rules for multi-session UI |
-| feature-subagent-spawning | feature | high | done | 2026-04-10 | Sub-agent spawning for parallel work delegation |
-| feature-subagent-ui-visibility | feature | medium | delivered | 2026-04-10 | Sub-agent sessions visible in WebUI sidebar |
-| feature-tool-permission-model | feature | -- | done | 2026-04-11 | Per-agent file system permission model |
-| improvement-agent-trust-paths | improvement | medium | draft | 2026-04-10 | Configurable per-agent trusted file paths |
-| improvement-datetime-awareness | improvement | medium | draft | 2026-04-10 | Agent datetime/timezone awareness in system prompt |
+> Maintained by Nova ✨ | Last updated: 2026-07-16
+>
+> Generated from spec frontmatter via `build-index.ps1` — don't hand-edit, rebuild instead.
 
 ---
 
-_To update: Nova maintains this index. Run `/planning index` (future) or ask Nova to refresh it._
+## 🔥 Active
+
+### 🐛 Bugs
+
+| Item                                                                             | Pri    | Status  | Since   | What's Wrong                                                                 |
+|----------------------------------------------------------------------------------|--------|---------|---------|------------------------------------------------------------------------------|
+| [bug-session-switching-ui](bug-session-switching-ui/design-spec.md)              | 🔴 high | partial | Apr '26 | Session switching broken during active agent work                            |
+| [bug-steering-message-visibility](bug-steering-message-visibility/design-spec.md)| 🟡 med  | draft   | Apr '26 | Steering messages not visible in conversation flow                           |
+| [message-queue-injection-timing](message-queue-injection-timing/design-spec.md)  | 🟡 med  | planning| Jul '25 | User messages queued during multi-tool turns not visible until turn completes |
+
+### ✨ Features
+
+| Item                                                                                             | Pri    | Status  | Since   | What It Does                                                               |
+|--------------------------------------------------------------------------------------------------|--------|---------|---------|----------------------------------------------------------------------------|
+| [feature-ask-user-tool](feature-ask-user-tool/design-spec.md)                                   | 🔴 high | design  | Apr '26 | Interactive ask_user tool — free-form, single/multi choice, hybrid input   |
+| [feature-api-documentation](feature-api-documentation/design-spec.md)                           | 🟡 med  | draft   | Jul '25 | REST, SignalR, and .NET API reference — OpenAPI, DocFX, interactive docs   |
+| [feature-architecture-documentation](feature-architecture-documentation/design-spec.md)         | 🟡 med  | draft   | Jul '25 | Architecture documentation — arc42, C4, ADRs                               |
+| [feature-code-documentation](feature-code-documentation/design-spec.md)                         | 🟡 med  | draft   | Jul '25 | Contributing guide, XML comment standards, developer guides                |
+| [feature-context-visibility](feature-context-visibility/design-spec.md)                         | 🟡 med  | draft   | Apr '26 | /context command to show token usage, context window state                 |
+| [feature-prompt-templates](feature-prompt-templates/design-spec.md)                             | 🟡 med  | planning| Jul '26 | Saved parameterized prompt templates for agents, cron, and interactive use |
+| [feature-spec-driven-squad-automation](feature-spec-driven-squad-automation/design-spec.md)     | 🟡 med  | draft   | Jul '25 | Automate Squad execution based on spec status transitions                  |
+
+### 🔧 Improvements
+
+| Item                                                                                       | Pri    | Status | Since   | What It Improves                                                            |
+|--------------------------------------------------------------------------------------------|--------|--------|---------|-----------------------------------------------------------------------------|
+| [improvement-memory-lifecycle](improvement-memory-lifecycle/design-spec.md)                | 🔴 high | draft  | Apr '26 | Memory persistence, compaction, and dreaming consolidation                  |
+| [improvement-skills-path-resolution](improvement-skills-path-resolution/design-spec.md)   | 🟡 med  | draft  | Apr '26 | Expose skill base path on load so agents can resolve relative file refs     |
+
+### 📋 Process
+
+| Item                                                                       | Status | Since   | Purpose                                                    |
+|----------------------------------------------------------------------------|--------|---------|------------------------------------------------------------|
+| [feature-planning-pipeline](feature-planning-pipeline/design-spec.md)     | active | Apr '26 | Planning folder conventions and spec lifecycle (this process) |
+
+---
+
+## ✅ Archived / Done
+
+<details>
+<summary>🐛 Bugs — 9 resolved</summary>
+
+| Item                                  | Pri      | Status      | Since   | Summary                                                                     |
+|---------------------------------------|----------|-------------|---------|-----------------------------------------------------------------------------|
+| bug-session-resumption                | 🔥 crit  | in-progress | Apr '26 | Session rehydration fails after gateway restart; regressed                  |
+| bug-subagent-spawn-path               | 🔥 crit  | delivered   | Apr '26 | Sub-agent AgentId contains :: creating illegal Windows paths                |
+| bug-edit-tool-double-parse            | 🔴 high  | done        | Apr '26 | EditTool double-parses edits argument                                       |
+| bug-exec-process-disconnect           | 🔴 high  | done        | Jul '26 | ExecTool and ProcessTool built on wrong assumptions about process lifecycle |
+| bug-pathutils-ignores-file-access-policy | 🔴 high | done       | Apr '26 | PathUtils enforces workspace-only, ignoring FileAccessPolicy                |
+| bug-session-lifecycle-fragmentation   | 🔴 high  | done        | Apr '26 | 7 session creation paths, no single truth                                   |
+| bug-steering-delivery-latency         | 🔴 high  | done        | Apr '26 | Steering messages delivered too late to influence agent behavior             |
+| bug-tool-argument-type-mismatch       | 🔴 high  | done        | Apr '26 | Type mismatch between StreamingJsonParser and tool argument parsers          |
+| bug-subagent-realtime-updates         | 🟡 med   | done        | Jul '26 | Sub-agent SignalR bridge missing — WebUI only showed on refresh             |
+
+</details>
+
+<details>
+<summary>✨ Features — 8 shipped</summary>
+
+| Item                                  | Pri     | Status      | Since   | Summary                                                          |
+|---------------------------------------|---------|-------------|---------|------------------------------------------------------------------|
+| feature-user-documentation            | 🔴 high | delivered   | Jul '25 | User docs — Diátaxis, tutorials, how-tos, reference, GitHub Pages|
+| feature-tool-permission-model         | 🔴 high | done        | Apr '26 | Per-agent file system permission model                           |
+| feature-agent-file-access-policy      | 🔴 high | delivered   | Jul '26 | Per-agent file access policy configuration                       |
+| feature-subagent-spawning             | 🔴 high | done        | Apr '26 | Sub-agent spawning for parallel work delegation                  |
+| feature-session-visibility            | 🔴 high | implemented | Apr '26 | Session visibility rules for multi-session UI                    |
+| feature-media-pipeline                | 🔴 high | delivered   | Jul '26 | Audio transcription and extensible media type pipeline           |
+| feature-subagent-ui-visibility        | 🟡 med  | delivered   | Apr '26 | Sub-agent sessions visible in WebUI sidebar                      |
+| feature-extension-contributed-commands| 🟡 med  | delivered   | Apr '26 | Extension-contributed commands for WebUI/TUI command palette     |
+
+</details>
+
+<details>
+<summary>✨ Features — archived drafts</summary>
+
+| Item                        | Pri    | Status | Since   | Summary                                             |
+|-----------------------------|--------|--------|---------|-----------------------------------------------------|
+| feature-file-watcher-tool   | 🟡 med | draft  | Jul '26 | File watcher tool for reactive file change monitoring|
+| feature-infinite-scrollback | 🟡 med | draft  | Jul '25 | Infinite scrollback without DOM wipe; paginated history |
+| feature-agent-delay-tool    | 🟡 med | draft  | Jul '26 | Agent delay/wait tool for pausing mid-turn          |
+| feature-location-management | 🟡 med | done   | Jul '26 | Location management                                 |
+
+</details>
+
+<details>
+<summary>🔧 Improvements — 6 completed</summary>
+
+| Item                                    | Pri    | Status    | Since   | Summary                                                                   |
+|-----------------------------------------|--------|-----------|---------|---------------------------------------------------------------------------|
+| improvement-heartbeat-service           | 🔴 high | delivered | Jul '26 | Heartbeat service — reliable periodic agent polling via cron              |
+| improvement-subagent-completion-handling | 🔴 high | delivered | Jul '26 | Sub-agent completion wake-up — parent agents miss completions when idle   |
+| ddd-refactoring                         | 🔴 high | done      | Jul '25 | Domain-driven design refactoring of entire codebase                       |
+| improvement-memory-indexing             | 🔴 high | done      | Jul '26 | MemoryIndexer never registered; added hosted service + CLI backfill       |
+| improvement-extension-config-inheritance| 🟡 med  | delivered | Jul '25 | World-level extension config defaults with agent-level deep-merge overrides|
+| improvement-datetime-awareness          | 🟡 med  | draft     | Apr '26 | Agent datetime/timezone awareness in system prompt                        |
+| improvement-agent-trust-paths           | 🟡 med  | draft     | Apr '26 | Configurable per-agent trusted file paths                                 |
+
+</details>
+
+---
+
+> **Legend:** 🔥 critical · 🔴 high · 🟡 medium · 🟢 low · ⚪ unset
+>
+> **Statuses:** planning → draft → design → ready → in-progress → delivered → done
+>
+> **Rebuild:** `pwsh docs/planning/build-index.ps1` → JSON → Nova regenerates this file

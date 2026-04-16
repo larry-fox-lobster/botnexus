@@ -1,3 +1,12 @@
+---
+id: feature-tool-permission-model
+title: "Per-Agent File System Permission Model"
+type: feature
+priority: high
+status: done
+created: 2026-04-11
+---
+
 # Design Spec: Per-Agent File System Permission Model
 
 **Date:** 2026-04-11

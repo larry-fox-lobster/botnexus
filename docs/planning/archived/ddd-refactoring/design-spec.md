@@ -1,5 +1,10 @@
 ---
+id: ddd-refactoring
+title: "BotNexus Domain-Driven Design Refactoring Plan"
+type: improvement
+priority: high
 status: done
+created: 2025-07-24
 ---
 
 # BotNexus Domain-Driven Design Refactoring Plan

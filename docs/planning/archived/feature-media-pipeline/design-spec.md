@@ -16,7 +16,7 @@ ddd_types: [InboundMessage, OutboundMessage, ChannelKey, SessionEntry, IChannelA
 
 **Type**: Feature
 **Priority**: High (architecture validation — proves extension model for non-text media)
-**Status**: In Progress
+**Status**: Delivered
 **Author**: Nova (via Jon)
 
 ## Problem

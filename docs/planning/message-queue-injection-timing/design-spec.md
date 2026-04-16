@@ -1,3 +1,12 @@
+---
+id: message-queue-injection-timing
+title: "Message Queue Injection Timing"
+type: bug
+priority: medium
+status: planning
+created: 2025-07-17
+---
+
 # Message Queue Injection Timing
 
 ## Status: planning

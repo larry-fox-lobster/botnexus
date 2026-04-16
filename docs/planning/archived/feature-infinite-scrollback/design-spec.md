@@ -1,3 +1,12 @@
+---
+id: feature-infinite-scrollback
+title: "Infinite Scrollback History"
+type: feature
+priority: medium
+status: draft
+created: 2025-07-24
+---
+
 # Design Spec — Infinite Scrollback History
 
 | Field            | Value                                           |

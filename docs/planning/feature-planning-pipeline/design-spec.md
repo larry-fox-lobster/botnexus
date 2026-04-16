@@ -86,12 +86,30 @@ How to verify it works.
 Unresolved decisions.
 ```
 
+### INDEX.md Convention
+
+The index is grouped by **type** (🐛 Bugs → ✨ Features → 🔧 Improvements → 📋 Process), then sorted by **priority** within each group.
+
+**Active section:** Full tables with relative links to design specs, emoji priority indicators, short month/year dates.
+
+**Archived section:** Collapsed `<details>` blocks per type to keep the page scannable.
+
+**Priority legend:** 🔥 critical · 🔴 high · 🟡 medium · 🟢 low · ⚪ unset
+
+**Status flow:** planning → draft → design → ready → in-progress → delivered → done
+
+**Table columns (Active):** `Item | Pri | Status | Since | Description`
+**Table columns (Archived):** `Item | Pri | Status | Resolved | Summary`
+
+Keep it visual, scannable, and linkable. The index is the first thing someone reads — make it count.
+
 ### Nova's Responsibilities
 1. Create planning items proactively when issues are discovered
 2. Do real web research (not just from memory)
 3. Include industry comparisons with sources
 4. Write specs detailed enough for the squad to implement without further context
 5. Flag open questions that need Jon's decision
+6. Keep INDEX.md grouped by type, sorted by priority
 
 ## Status: Active
 This convention is live as of 2026-04-10.
