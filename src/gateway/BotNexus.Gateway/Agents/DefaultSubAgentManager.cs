@@ -5,6 +5,7 @@ using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Diagnostics;
+using BotNexus.AgentCore.Types;
 using BotNexus.Domain.Primitives;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -27,6 +28,7 @@ public sealed class DefaultSubAgentManager : ISubAgentManager
     private readonly ConcurrentDictionary<string, AgentId> _parentAgentIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, AgentId> _childAgentIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _timeouts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> _processedCompletions = new(StringComparer.OrdinalIgnoreCase);
 
     public DefaultSubAgentManager(
         IAgentSupervisor supervisor,
@@ -220,6 +222,12 @@ public sealed class DefaultSubAgentManager : ISubAgentManager
         if (!_subAgents.TryGetValue(subAgentId, out var existing))
             return;
 
+        if (!_processedCompletions.TryAdd(subAgentId, 0))
+        {
+            _logger.LogDebug("Skipping duplicate completion for sub-agent '{SubAgentId}'.", subAgentId);
+            return;
+        }
+
         if (existing.Status == SubAgentStatus.Killed)
             return;
 
@@ -267,14 +275,22 @@ public sealed class DefaultSubAgentManager : ISubAgentManager
         if (string.IsNullOrWhiteSpace(parentAgentId))
             return;
 
-        var followUp = $"Sub-agent {subAgentId} {DescribeStatus(updated.Status)}. Summary:\n{normalizedSummary}";
+        var completionMessage = new SubAgentCompletionMessage
+        {
+            SubAgentId = subAgentId,
+            Status = DescribeStatus(updated.Status),
+            Summary = normalizedSummary,
+            CompletedAt = updated.CompletedAt ?? DateTimeOffset.UtcNow
+        };
+
+        var followUp = completionMessage.Content;
 
         try
         {
             var parentHandle = await _supervisor.GetOrCreateAsync(parentAgentId, updated.ParentSessionId, ct);
             if (parentHandle.IsRunning)
             {
-                await parentHandle.FollowUpAsync(followUp, ct);
+                await parentHandle.FollowUpAsync(completionMessage, ct);
             }
             else
             {

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using BotNexus.AgentCore.Types;
 using BotNexus.Domain.Primitives;
 using BotNexus.Channels.Core;
 using BotNexus.Channels.Tui;
@@ -308,6 +309,7 @@ public sealed class Phase5IntegrationTests
         public Task AbortAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SteerAsync(string message, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task FollowUpAsync(string message, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task FollowUpAsync(AgentMessage message, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public ValueTask DisposeAsync()
         {
@@ -411,4 +413,3 @@ public sealed class Phase5IntegrationTests
         }
     }
 }
-

@@ -707,6 +707,13 @@ internal sealed class InProcessAgentHandle : IAgentHandle, IHealthCheckable, IAg
     }
 
     /// <inheritdoc />
+    public Task FollowUpAsync(AgentMessage message, CancellationToken cancellationToken = default)
+    {
+        _agent.FollowUp(message);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
     public Task<bool> PingAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(_agent.Status != AgentStatus.Aborting);
 

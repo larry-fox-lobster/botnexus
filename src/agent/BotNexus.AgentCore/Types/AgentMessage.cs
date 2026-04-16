@@ -87,3 +87,25 @@ public sealed record ToolResultAgentMessage(
 /// Use AgentContext.SystemPrompt to set a persistent system message instead.
 /// </remarks>
 public sealed record SystemAgentMessage(string Content) : AgentMessage("system");
+
+/// <summary>
+/// Message representing a sub-agent completion event, distinct from regular user-authored messages.
+/// Carries structured metadata about the completed sub-agent while remaining LLM-compatible.
+/// </summary>
+public sealed record SubAgentCompletionMessage : AgentMessage
+{
+    public SubAgentCompletionMessage() : base("user")
+    {
+    }
+
+    public required string SubAgentId { get; init; }
+    public required string Status { get; init; }
+    public required string Summary { get; init; }
+    public DateTimeOffset CompletedAt { get; init; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// Structured text representation used when this message is rendered as provider user content.
+    /// </summary>
+    public string Content
+        => $"[Sub-Agent Completion: {SubAgentId}]{Environment.NewLine}Status: {Status}{Environment.NewLine}Summary:{Environment.NewLine}{Summary}";
+}

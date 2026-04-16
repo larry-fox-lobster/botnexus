@@ -34,6 +34,9 @@ internal static class MessageConverter
                 case AgentUserMessage user:
                     providerMessages.Add(ToProviderUserMessage(user, timestamp));
                     break;
+                case SubAgentCompletionMessage completion:
+                    providerMessages.Add(ToProviderSubAgentCompletionMessage(completion));
+                    break;
                 case AssistantAgentMessage assistant:
                     providerMessages.Add(ToProviderAssistantMessage(assistant, timestamp));
                     break;
@@ -120,6 +123,13 @@ internal static class MessageConverter
         return new ProviderUserMessage(
             Content: new UserMessageContent(blocks),
             Timestamp: fallbackTimestamp);
+    }
+
+    private static ProviderUserMessage ToProviderSubAgentCompletionMessage(SubAgentCompletionMessage completion)
+    {
+        return new ProviderUserMessage(
+            Content: new UserMessageContent(completion.Content),
+            Timestamp: completion.CompletedAt.ToUnixTimeMilliseconds());
     }
 
     private static ProviderAssistantMessage ToProviderAssistantMessage(AssistantAgentMessage assistant, long fallbackTimestamp)

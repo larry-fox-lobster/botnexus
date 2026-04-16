@@ -46,6 +46,7 @@ public static class DefaultMessageConverter
         return message switch
         {
             AgentUserMessage user => ToProviderUserMessage(user),
+            SubAgentCompletionMessage completion => ToProviderSubAgentCompletionMessage(completion),
             AssistantAgentMessage assistant => ToProviderAssistantMessage(assistant),
             ToolResultAgentMessage toolResult => ToProviderToolResultMessage(toolResult),
             _ => null
@@ -75,6 +76,13 @@ public static class DefaultMessageConverter
         return new ProviderUserMessage(
             Content: new UserMessageContent(blocks),
             Timestamp: timestamp);
+    }
+
+    private static Message ToProviderSubAgentCompletionMessage(SubAgentCompletionMessage completion)
+    {
+        return new ProviderUserMessage(
+            Content: new UserMessageContent(completion.Content),
+            Timestamp: completion.CompletedAt.ToUnixTimeMilliseconds());
     }
 
     private static Message ToProviderAssistantMessage(AssistantAgentMessage assistant)

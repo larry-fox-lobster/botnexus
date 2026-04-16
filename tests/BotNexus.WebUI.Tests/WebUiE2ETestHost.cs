@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
+using BotNexus.AgentCore.Types;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway;
 using BotNexus.Gateway.Abstractions.Agents;
@@ -569,6 +570,14 @@ internal sealed class RecordingAgentHandle(AgentId agentId, SessionId sessionId,
         _followUps.Enqueue(message);
         return Task.CompletedTask;
     }
+
+    public Task FollowUpAsync(AgentMessage message, CancellationToken cancellationToken = default)
+        => FollowUpAsync(message switch
+        {
+            SubAgentCompletionMessage completion => completion.Content,
+            UserMessage user => user.Content,
+            _ => message.ToString() ?? string.Empty
+        }, cancellationToken);
 
     private async Task<bool> DelayWithAbortAsync(int delayMs, CancellationToken cancellationToken)
     {

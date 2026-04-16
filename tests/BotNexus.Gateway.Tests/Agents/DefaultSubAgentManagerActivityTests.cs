@@ -3,6 +3,7 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
+using BotNexus.AgentCore.Types;
 using BotNexus.Gateway.Configuration;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -128,6 +129,8 @@ public sealed class DefaultSubAgentManagerActivityTests
             .ReturnsAsync(new AgentResponse { Content = "completed" });
         handle.Setup(h => h.FollowUpAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
+        handle.Setup(h => h.FollowUpAsync(It.IsAny<AgentMessage>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         return handle;
     }
 
@@ -140,6 +143,8 @@ public sealed class DefaultSubAgentManagerActivityTests
         handle.Setup(h => h.PromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
         handle.Setup(h => h.FollowUpAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        handle.Setup(h => h.FollowUpAsync(It.IsAny<AgentMessage>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         return handle;
     }
@@ -157,6 +162,8 @@ public sealed class DefaultSubAgentManagerActivityTests
                 return new AgentResponse { Content = "never" };
             });
         handle.Setup(h => h.FollowUpAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        handle.Setup(h => h.FollowUpAsync(It.IsAny<AgentMessage>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         return handle;
     }

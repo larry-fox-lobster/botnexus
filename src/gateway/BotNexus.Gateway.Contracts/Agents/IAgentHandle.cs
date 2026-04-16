@@ -1,4 +1,5 @@
 using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.AgentCore.Types;
 using BotNexus.Domain.Primitives;
 
 namespace BotNexus.Gateway.Abstractions.Agents;
@@ -69,4 +70,12 @@ public interface IAgentHandle : IAsyncDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A task that completes when the message is queued.</returns>
     Task FollowUpAsync(string message, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Queues a typed follow-up message to be processed after the current agent run completes.
+    /// </summary>
+    /// <param name="message">The follow-up message to queue.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task that completes when the message is queued.</returns>
+    Task FollowUpAsync(AgentMessage message, CancellationToken cancellationToken = default);
 }

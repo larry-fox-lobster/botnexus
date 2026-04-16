@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using BotNexus.AgentCore.Types;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Activity;
 using BotNexus.Gateway.Abstractions.Agents;
@@ -378,6 +379,7 @@ public sealed class CopilotIntegrationTests
         public Task AbortAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SteerAsync(string message, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task FollowUpAsync(string message, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task FollowUpAsync(AgentMessage message, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public ValueTask DisposeAsync()
         {
@@ -453,6 +455,5 @@ public sealed class CopilotIntegrationTests
         }
     }
 }
-
 
 
