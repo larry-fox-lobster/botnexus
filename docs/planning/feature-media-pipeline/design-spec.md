@@ -3,7 +3,7 @@ id: feature-media-pipeline
 title: "Media Pipeline — Audio Transcription and Extensible Media Types"
 type: feature
 priority: high
-status: draft
+status: delivered
 created: 2026-07-14
 updated: 2026-07-14
 author: nova
@@ -16,7 +16,7 @@ ddd_types: [InboundMessage, OutboundMessage, ChannelKey, SessionEntry, IChannelA
 
 **Type**: Feature
 **Priority**: High (architecture validation — proves extension model for non-text media)
-**Status**: Draft
+**Status**: In Progress
 **Author**: Nova (via Jon)
 
 ## Problem
