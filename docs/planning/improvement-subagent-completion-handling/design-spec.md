@@ -3,13 +3,13 @@ id: improvement-subagent-completion-handling
 title: "Sub-Agent Completion Handling — Reliable Parent Wake-Up"
 type: improvement
 priority: high
-status: in-progress
+status: delivered
 created: 2026-07-26
 ---
 
 # Improvement: Sub-Agent Completion Handling
 
-**Status:** in-progress
+**Status:** delivered
 **Priority:** high
 **Created:** 2026-07-26
 
