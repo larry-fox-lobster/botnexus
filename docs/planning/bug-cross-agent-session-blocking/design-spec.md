@@ -1,7 +1,7 @@
 ---
 type: bug
 priority: high
-status: in-progress
+status: delivered
 created: 2026-07-16
 title: "Cross-Agent Session Blocking — Response Delivery Stalls While Another Agent Runs"
 ---
