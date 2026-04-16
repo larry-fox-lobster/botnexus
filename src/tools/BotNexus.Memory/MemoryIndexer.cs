@@ -64,7 +64,22 @@ public sealed class MemoryIndexer(
         var store = _storeFactory.Create(lifecycleEvent.AgentId);
         await store.InitializeAsync(cancellationToken).ConfigureAwait(false);
 
-        var existing = await store.GetBySessionAsync(lifecycleEvent.SessionId, int.MaxValue, cancellationToken).ConfigureAwait(false);
+        await IndexSessionCoreAsync(session, lifecycleEvent.AgentId, lifecycleEvent.SessionId, store, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Core indexing logic that extracts user/assistant turn pairs from a session and inserts
+    /// any turns not already indexed into the memory store.
+    /// </summary>
+    /// <returns>The number of new turns indexed.</returns>
+    internal static async Task<int> IndexSessionCoreAsync(
+        GatewaySession session,
+        AgentId agentId,
+        SessionId sessionId,
+        IMemoryStore store,
+        CancellationToken ct)
+    {
+        var existing = await store.GetBySessionAsync(sessionId, int.MaxValue, ct).ConfigureAwait(false);
         var indexedTurns = existing
             .Where(entry => entry.TurnIndex.HasValue)
             .Select(entry => entry.TurnIndex!.Value)
@@ -73,9 +88,11 @@ public sealed class MemoryIndexer(
         var history = session.GetHistorySnapshot();
         SessionEntry? pendingUser = null;
         int? pendingTurnIndex = null;
+        var turnsIndexed = 0;
+
         for (var i = 0; i < history.Count; i++)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            ct.ThrowIfCancellationRequested();
             var entry = history[i];
             if (entry.Role.Equals(MessageRole.Tool))
                 continue;
@@ -95,8 +112,8 @@ public sealed class MemoryIndexer(
                 var memory = new MemoryEntry
                 {
                     Id = string.Empty,
-                    AgentId = lifecycleEvent.AgentId,
-                    SessionId = lifecycleEvent.SessionId,
+                    AgentId = agentId,
+                    SessionId = sessionId,
                     TurnIndex = pendingTurnIndex,
                     SourceType = "conversation",
                     Content = $"User: {pendingUser.Content}\nAssistant: {entry.Content}",
@@ -108,12 +125,83 @@ public sealed class MemoryIndexer(
                     IsArchived = false
                 };
 
-                await store.InsertAsync(memory, cancellationToken).ConfigureAwait(false);
+                await store.InsertAsync(memory, ct).ConfigureAwait(false);
                 indexedTurns.Add(pendingTurnIndex.Value);
+                turnsIndexed++;
             }
 
             pendingUser = null;
             pendingTurnIndex = null;
         }
+
+        return turnsIndexed;
+    }
+
+    /// <summary>
+    /// Backfills memory entries from all existing sessions in the session store.
+    /// Can be called standalone without the hosted service running.
+    /// </summary>
+    /// <param name="sessionStore">The session store to read sessions from.</param>
+    /// <param name="storeFactory">Factory to create per-agent memory stores.</param>
+    /// <param name="logger">Logger for progress reporting.</param>
+    /// <param name="agentFilter">Optional agent ID to limit backfill to a single agent.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A summary of sessions processed and turns indexed.</returns>
+    public static async Task<BackfillResult> BackfillAsync(
+        ISessionStore sessionStore,
+        IMemoryStoreFactory storeFactory,
+        ILogger logger,
+        AgentId? agentFilter = null,
+        CancellationToken ct = default)
+    {
+        var sessions = await sessionStore.ListAsync(agentFilter, ct).ConfigureAwait(false);
+        logger.LogInformation("Memory backfill starting — {SessionCount} session(s) to process.", sessions.Count);
+
+        var totalTurns = 0;
+        var sessionsProcessed = 0;
+
+        foreach (var session in sessions)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var agentId = session.AgentId;
+            var sessionId = session.SessionId;
+
+            try
+            {
+                var store = storeFactory.Create(agentId);
+                await store.InitializeAsync(ct).ConfigureAwait(false);
+
+                var turnsIndexed = await IndexSessionCoreAsync(session, agentId, sessionId, store, ct).ConfigureAwait(false);
+                sessionsProcessed++;
+                totalTurns += turnsIndexed;
+
+                if (turnsIndexed > 0)
+                {
+                    logger.LogInformation(
+                        "Indexed {TurnsIndexed} turn(s) from session '{SessionId}' (agent: {AgentId}).",
+                        turnsIndexed, sessionId, agentId);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to backfill session '{SessionId}' (agent: {AgentId}).", sessionId, agentId);
+            }
+        }
+
+        logger.LogInformation(
+            "Memory backfill complete — {SessionsProcessed} session(s) processed, {TotalTurns} turn(s) indexed.",
+            sessionsProcessed, totalTurns);
+
+        return new BackfillResult(sessionsProcessed, totalTurns);
     }
 }
+
+/// <summary>
+/// Summary of a memory backfill operation.
+/// </summary>
+public readonly record struct BackfillResult(int SessionsProcessed, int TurnsIndexed);

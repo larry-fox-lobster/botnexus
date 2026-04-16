@@ -12,6 +12,7 @@ using var serviceProvider = new ServiceCollection()
     .AddSingleton<DoctorCommand>()
     .AddSingleton<InitCommand>()
     .AddSingleton<AgentCommands>()
+    .AddSingleton<MemoryCommands>()
     .AddSingleton<ConfigCommands>()
     .AddSingleton<LocationsCommand>()
     .BuildServiceProvider();
@@ -21,6 +22,7 @@ root.AddGlobalOption(verboseOption);
 root.AddCommand(serviceProvider.GetRequiredService<ValidateCommand>().Build(verboseOption));
 root.AddCommand(serviceProvider.GetRequiredService<InitCommand>().Build(verboseOption));
 root.AddCommand(serviceProvider.GetRequiredService<AgentCommands>().Build(verboseOption));
+root.AddCommand(serviceProvider.GetRequiredService<MemoryCommands>().Build(verboseOption));
 root.AddCommand(serviceProvider.GetRequiredService<ConfigCommands>().Build(verboseOption));
 root.AddCommand(serviceProvider.GetRequiredService<LocationsCommand>().Build(verboseOption));
 root.AddCommand(serviceProvider.GetRequiredService<DoctorCommand>().Build(verboseOption));
