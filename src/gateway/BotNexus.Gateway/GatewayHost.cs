@@ -380,7 +380,11 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
                 else
                 {
                     var response = await handle.PromptAsync(message.Content, cancellationToken);
-                    if (ResolveChannelAdapter(message.ChannelType) is { } ch)
+                    if (IsHeartbeatAck(response.Content))
+                    {
+                        _logger.LogDebug("Heartbeat ack from agent '{AgentId}' session '{SessionId}'", agentId, sessionId);
+                    }
+                    else if (ResolveChannelAdapter(message.ChannelType) is { } ch)
                     {
                         await ch.SendAsync(new OutboundMessage
                         {
@@ -607,6 +611,16 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
             string stringValue when bool.TryParse(stringValue, out var parsed) => !parsed,
             _ => true
         };
+    }
+
+    private static bool IsHeartbeatAck(string? response)
+    {
+        if (string.IsNullOrWhiteSpace(response))
+            return false;
+
+        var trimmed = response.Trim();
+        return trimmed.Equals("HEARTBEAT_OK", StringComparison.Ordinal)
+               || trimmed.StartsWith("HEARTBEAT_OK", StringComparison.Ordinal);
     }
 
     private static string GetQueueKey(InboundMessage message)

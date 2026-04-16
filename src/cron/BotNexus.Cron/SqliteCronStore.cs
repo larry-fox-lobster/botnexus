@@ -46,6 +46,7 @@ public sealed class SqliteCronStore(string dbPath, IFileSystem? fileSystem = nul
                     webhook_url TEXT NULL,
                     shell_command TEXT NULL,
                     enabled INTEGER NOT NULL DEFAULT 1,
+                    system INTEGER NOT NULL DEFAULT 0,
                     time_zone TEXT NULL,
                     created_by TEXT NULL,
                     created_at TEXT NOT NULL,
@@ -83,6 +84,14 @@ public sealed class SqliteCronStore(string dbPath, IFileSystem? fileSystem = nul
             try { await migrate.ExecuteNonQueryAsync(ct).ConfigureAwait(false); }
             catch (SqliteException) { /* column already exists */ }
 
+            // Migrate existing databases: add system column if missing.
+            await using var migrateSystem = connection.CreateCommand();
+            migrateSystem.CommandText = """
+                ALTER TABLE cron_jobs ADD COLUMN system INTEGER NOT NULL DEFAULT 0;
+                """;
+            try { await migrateSystem.ExecuteNonQueryAsync(ct).ConfigureAwait(false); }
+            catch (SqliteException) { /* column already exists */ }
+
             _initialized = true;
         }
         finally
@@ -112,11 +121,11 @@ public sealed class SqliteCronStore(string dbPath, IFileSystem? fileSystem = nul
             command.CommandText = """
                 INSERT INTO cron_jobs (
                     id, name, schedule, action_type, agent_id, message, webhook_url, shell_command,
-                    enabled, time_zone, created_by, created_at, last_run_at, next_run_at, last_run_status, last_run_error, metadata_json
+                    enabled, system, time_zone, created_by, created_at, last_run_at, next_run_at, last_run_status, last_run_error, metadata_json
                 )
                 VALUES (
                     $id, $name, $schedule, $actionType, $agentId, $message, $webhookUrl, $shellCommand,
-                    $enabled, $timeZone, $createdBy, $createdAt, $lastRunAt, $nextRunAt, $lastRunStatus, $lastRunError, $metadataJson
+                    $enabled, $system, $timeZone, $createdBy, $createdAt, $lastRunAt, $nextRunAt, $lastRunStatus, $lastRunError, $metadataJson
                 )
                 """;
             BindJob(command, created);
@@ -139,7 +148,7 @@ public sealed class SqliteCronStore(string dbPath, IFileSystem? fileSystem = nul
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT id, name, schedule, action_type, agent_id, message, webhook_url, shell_command,
-                   enabled, time_zone, created_by, created_at, last_run_at, next_run_at, last_run_status, last_run_error, metadata_json
+                   enabled, system, time_zone, created_by, created_at, last_run_at, next_run_at, last_run_status, last_run_error, metadata_json
             FROM cron_jobs
             WHERE id = $id
             """;
@@ -160,7 +169,7 @@ public sealed class SqliteCronStore(string dbPath, IFileSystem? fileSystem = nul
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT id, name, schedule, action_type, agent_id, message, webhook_url, shell_command,
-                   enabled, time_zone, created_by, created_at, last_run_at, next_run_at, last_run_status, last_run_error, metadata_json
+                   enabled, system, time_zone, created_by, created_at, last_run_at, next_run_at, last_run_status, last_run_error, metadata_json
             FROM cron_jobs
             WHERE $agentId IS NULL OR agent_id = $agentId
             ORDER BY created_at DESC
@@ -189,11 +198,11 @@ public sealed class SqliteCronStore(string dbPath, IFileSystem? fileSystem = nul
             command.CommandText = """
                 INSERT INTO cron_jobs (
                     id, name, schedule, action_type, agent_id, message, webhook_url, shell_command,
-                    enabled, time_zone, created_by, created_at, last_run_at, next_run_at, last_run_status, last_run_error, metadata_json
+                    enabled, system, time_zone, created_by, created_at, last_run_at, next_run_at, last_run_status, last_run_error, metadata_json
                 )
                 VALUES (
                     $id, $name, $schedule, $actionType, $agentId, $message, $webhookUrl, $shellCommand,
-                    $enabled, $timeZone, $createdBy, $createdAt, $lastRunAt, $nextRunAt, $lastRunStatus, $lastRunError, $metadataJson
+                    $enabled, $system, $timeZone, $createdBy, $createdAt, $lastRunAt, $nextRunAt, $lastRunStatus, $lastRunError, $metadataJson
                 )
                 ON CONFLICT(id) DO UPDATE SET
                     name = excluded.name,
@@ -204,6 +213,7 @@ public sealed class SqliteCronStore(string dbPath, IFileSystem? fileSystem = nul
                     webhook_url = excluded.webhook_url,
                     shell_command = excluded.shell_command,
                     enabled = excluded.enabled,
+                    system = excluded.system,
                     time_zone = excluded.time_zone,
                     created_by = excluded.created_by,
                     created_at = excluded.created_at,
@@ -383,6 +393,7 @@ public sealed class SqliteCronStore(string dbPath, IFileSystem? fileSystem = nul
         command.Parameters.AddWithValue("$webhookUrl", (object?)job.WebhookUrl ?? DBNull.Value);
         command.Parameters.AddWithValue("$shellCommand", (object?)job.ShellCommand ?? DBNull.Value);
         command.Parameters.AddWithValue("$enabled", job.Enabled ? 1 : 0);
+        command.Parameters.AddWithValue("$system", job.System ? 1 : 0);
         command.Parameters.AddWithValue("$timeZone", (object?)job.TimeZone ?? DBNull.Value);
         command.Parameters.AddWithValue("$createdBy", (object?)job.CreatedBy ?? DBNull.Value);
         command.Parameters.AddWithValue("$createdAt", job.CreatedAt.ToString("O"));
@@ -395,7 +406,7 @@ public sealed class SqliteCronStore(string dbPath, IFileSystem? fileSystem = nul
 
     private static CronJob ReadJob(SqliteDataReader reader)
     {
-        var metadataJson = reader.IsDBNull(16) ? null : reader.GetString(16);
+        var metadataJson = reader.IsDBNull(17) ? null : reader.GetString(17);
         return new CronJob
         {
             Id = reader.GetString(0),
@@ -407,13 +418,14 @@ public sealed class SqliteCronStore(string dbPath, IFileSystem? fileSystem = nul
             WebhookUrl = reader.IsDBNull(6) ? null : reader.GetString(6),
             ShellCommand = reader.IsDBNull(7) ? null : reader.GetString(7),
             Enabled = !reader.IsDBNull(8) && reader.GetInt32(8) != 0,
-            TimeZone = reader.IsDBNull(9) ? null : reader.GetString(9),
-            CreatedBy = reader.IsDBNull(10) ? null : reader.GetString(10),
-            CreatedAt = ParseDate(reader.GetString(11)),
-            LastRunAt = reader.IsDBNull(12) ? null : ParseDate(reader.GetString(12)),
-            NextRunAt = reader.IsDBNull(13) ? null : ParseDate(reader.GetString(13)),
-            LastRunStatus = reader.IsDBNull(14) ? null : reader.GetString(14),
-            LastRunError = reader.IsDBNull(15) ? null : reader.GetString(15),
+            System = !reader.IsDBNull(9) && reader.GetInt32(9) != 0,
+            TimeZone = reader.IsDBNull(10) ? null : reader.GetString(10),
+            CreatedBy = reader.IsDBNull(11) ? null : reader.GetString(11),
+            CreatedAt = ParseDate(reader.GetString(12)),
+            LastRunAt = reader.IsDBNull(13) ? null : ParseDate(reader.GetString(13)),
+            NextRunAt = reader.IsDBNull(14) ? null : ParseDate(reader.GetString(14)),
+            LastRunStatus = reader.IsDBNull(15) ? null : reader.GetString(15),
+            LastRunError = reader.IsDBNull(16) ? null : reader.GetString(16),
             Metadata = DeserializeMetadata(metadataJson)
         };
     }

@@ -16,6 +16,7 @@
     <Compile Include="ICronStore.cs" />
     <Compile Include="SqliteCronStore.cs" />
     <Compile Include="CronOptions.cs" />
+    <Compile Include="HeartbeatCronProvisioner.cs" />
     <Compile Include="CronScheduler.cs" />
     <Compile Include="ActionStubs\AgentPromptActionStub.cs" />
     <Compile Include="ActionStubs\WebhookActionStub.cs" />

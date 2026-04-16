@@ -11,6 +11,8 @@ public sealed record CronJob
     public string? WebhookUrl { get; init; }
     public string? ShellCommand { get; init; }
     public bool Enabled { get; init; } = true;
+    /// <summary>Whether this is a system-provisioned job (e.g., heartbeat). Hidden from default listings.</summary>
+    public bool System { get; init; }
     public string? TimeZone { get; init; }
     public string? CreatedBy { get; init; }
     public DateTimeOffset CreatedAt { get; init; }

@@ -222,6 +222,7 @@ public sealed class CronScheduler(
                     WebhookUrl = configuredJob.WebhookUrl,
                     ShellCommand = configuredJob.ShellCommand,
                     Enabled = configuredJob.Enabled,
+                    System = configuredJob.System,
                     TimeZone = configuredJob.TimeZone,
                     CreatedBy = configuredJob.CreatedBy,
                     CreatedAt = DateTimeOffset.UtcNow,
@@ -241,6 +242,7 @@ public sealed class CronScheduler(
                 WebhookUrl = configuredJob.WebhookUrl,
                 ShellCommand = configuredJob.ShellCommand,
                 Enabled = configuredJob.Enabled,
+                System = configuredJob.System,
                 TimeZone = configuredJob.TimeZone ?? existing.TimeZone,
                 CreatedBy = configuredJob.CreatedBy ?? existing.CreatedBy,
                 Metadata = configuredJob.Metadata ?? existing.Metadata

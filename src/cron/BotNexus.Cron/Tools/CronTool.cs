@@ -89,9 +89,10 @@ public sealed class CronTool(
     private async Task<AgentToolResult> ListAsync(CancellationToken cancellationToken)
     {
         var jobs = await cronStore.ListAsync(ct: cancellationToken).ConfigureAwait(false);
+        var nonSystemJobs = jobs.Where(job => !job.System);
         var visible = allowCrossAgentCron
-            ? jobs
-            : jobs.Where(job => string.Equals(job.CreatedBy, _agentId, StringComparison.OrdinalIgnoreCase)).ToList();
+            ? nonSystemJobs.ToList()
+            : nonSystemJobs.Where(job => string.Equals(job.CreatedBy, _agentId, StringComparison.OrdinalIgnoreCase)).ToList();
 
         return TextResult(JsonSerializer.Serialize(visible, JsonOptions));
     }

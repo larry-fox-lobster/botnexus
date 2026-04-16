@@ -1,7 +1,9 @@
 using BotNexus.Gateway.Abstractions.Agents;
+using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Triggers;
 using BotNexus.Domain.Primitives;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace BotNexus.Cron.Actions;
 
@@ -27,6 +29,19 @@ public sealed class AgentPromptAction : ICronAction
 
         var registry = context.Services.GetService<IAgentRegistry>();
         var descriptor = registry?.Get(AgentId.From(agentId));
+
+        if (context.Job.System
+            && context.Job.Id.StartsWith("heartbeat:", StringComparison.OrdinalIgnoreCase)
+            && descriptor?.Heartbeat?.QuietHours is { Enabled: true } quietHours)
+        {
+            if (IsInQuietHours(quietHours, quietHours.Timezone ?? descriptor.Soul?.Timezone ?? "UTC"))
+            {
+                context.Services.GetService<ILogger<AgentPromptAction>>()?.LogDebug(
+                    "Skipping heartbeat for agent '{AgentId}' — quiet hours active.", agentId);
+                return;
+            }
+        }
+
         var preferredTriggerType = descriptor?.Soul?.Enabled == true
             ? TriggerType.Soul
             : TriggerType.Cron;
@@ -43,5 +58,32 @@ public sealed class AgentPromptAction : ICronAction
             .ConfigureAwait(false);
 
         context.RecordSessionId(sessionId);
+    }
+
+    private static bool IsInQuietHours(QuietHoursConfig config, string timezoneId)
+    {
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(timezoneId);
+            var localNow = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, tz);
+            var currentTime = localNow.TimeOfDay;
+
+            if (!TimeSpan.TryParse(config.Start, out var start) ||
+                !TimeSpan.TryParse(config.End, out var end))
+                return false;
+
+            if (start <= end)
+                return currentTime >= start && currentTime < end;
+
+            return currentTime >= start || currentTime < end;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return false;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return false;
+        }
     }
 }
