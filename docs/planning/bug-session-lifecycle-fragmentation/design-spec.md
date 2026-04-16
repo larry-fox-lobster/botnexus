@@ -3,7 +3,7 @@ id: bug-session-lifecycle-fragmentation
 title: "Session Lifecycle Fragmentation — 7 Paths, No Single Truth"
 type: bug
 priority: high
-status: ready
+status: done
 created: 2026-04-15
 updated: 2026-04-15
 author: nova

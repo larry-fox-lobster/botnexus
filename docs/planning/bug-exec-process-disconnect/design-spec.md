@@ -3,7 +3,7 @@ id: bug-exec-process-disconnect
 title: "ExecTool and ProcessTool Built on Wrong Assumptions"
 type: bug
 priority: high
-status: ready
+status: done
 created: 2026-07-18
 updated: 2026-07-18
 author: nova
@@ -15,7 +15,7 @@ ddd_types: [IAgentTool, ExecTool, ProcessTool]
 
 **Type**: Bug
 **Priority**: High
-**Status**: Ready
+**Status**: Done
 **Author**: Nova
 
 ## Problem
