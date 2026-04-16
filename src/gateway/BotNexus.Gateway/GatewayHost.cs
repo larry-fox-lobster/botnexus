@@ -271,9 +271,9 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
                     await stopTask;
             }
 
-            if (session.Status == SessionStatus.Expired)
+            if (session.Status is SessionStatus.Expired or SessionStatus.Sealed)
             {
-                _logger.LogInformation("Reactivating expired session {SessionId}", sessionId);
+                _logger.LogInformation("Reactivating {Status} session {SessionId}", session.Status, sessionId);
                 session.Status = SessionStatus.Active;
                 session.ExpiresAt = null;
             }

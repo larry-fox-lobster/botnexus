@@ -270,12 +270,15 @@ public sealed class GatewayHostTests
     }
 
     [Fact]
-    public async Task DispatchAsync_ClosedSession_RejectsMessage()
+    public async Task DispatchAsync_SealedSession_ReactivatesAndProcesses()
     {
         var router = new Mock<IMessageRouter>();
         router.Setup(r => r.ResolveAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(["agent-a"]);
+        var handle = CreatePromptHandle("agent-a", "session-1", "agent-response");
         var supervisor = new Mock<IAgentSupervisor>();
+        supervisor.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(handle.Object);
         var sessions = new InMemorySessionStore();
         var session = await sessions.GetOrCreateAsync("session-1", "agent-a");
         session.Status = SessionStatus.Sealed;
@@ -285,11 +288,9 @@ public sealed class GatewayHostTests
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
-        supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()), Times.Never);
-        channel.Verify(c => c.SendAsync(
-                It.Is<OutboundMessage>(m => m.Content.Contains("cannot accept", StringComparison.OrdinalIgnoreCase)),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
+        var reloaded = await sessions.GetAsync("session-1");
+        reloaded!.Status.Should().Be(SessionStatus.Active);
+        supervisor.Verify(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -694,27 +695,25 @@ public sealed class GatewayHostTests
     }
 
     [Fact]
-    public async Task DispatchAsync_WithClosedSession_RejectsMessagesWithoutPromptingAgent()
+    public async Task DispatchAsync_WithSuspendedSession_RejectsMessagesWithoutPromptingAgent()
     {
         var router = new Mock<IMessageRouter>();
         router.Setup(r => r.ResolveAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(["agent-a"]);
         var supervisor = new Mock<IAgentSupervisor>();
-        var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"), Status = SessionStatus.Sealed };
-        var sessions = new Mock<ISessionStore>();
-        sessions.Setup(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(session);
-        sessions.Setup(s => s.GetAsync("session-1", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(session);
+        var sessions = new InMemorySessionStore();
+        var session = await sessions.GetOrCreateAsync("session-1", "agent-a");
+        session.Status = SessionStatus.Suspended;
+        await sessions.SaveAsync(session);
         var channel = CreateChannelAdapter("web", supportsStreaming: false);
-        await using var host = CreateHost(supervisor.Object, router.Object, sessions.Object, new RecordingActivityBroadcaster(), CreateChannelManager(channel.Object));
+        await using var host = CreateHost(supervisor.Object, router.Object, sessions, new RecordingActivityBroadcaster(), CreateChannelManager(channel.Object));
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
         await host.DispatchAsync(CreateMessage("again", sessionId: "session-1"));
 
         supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()), Times.Never);
         channel.Verify(c => c.SendAsync(
-                It.Is<OutboundMessage>(m => m.Content.Contains("cannot accept", StringComparison.OrdinalIgnoreCase)),
+                It.Is<OutboundMessage>(m => m.Content.Contains("suspended", StringComparison.OrdinalIgnoreCase)),
                 It.IsAny<CancellationToken>()),
             Times.Exactly(2));
     }

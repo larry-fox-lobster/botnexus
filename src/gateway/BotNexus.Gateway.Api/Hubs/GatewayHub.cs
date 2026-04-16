@@ -543,7 +543,7 @@ public sealed class GatewayHub : Hub
         var session = await _sessions.GetOrCreateAsync(sessionId, agentId, Context.ConnectionAborted);
 
         var needsSave = false;
-        if (session.Status == SessionStatus.Expired)
+        if (session.Status is SessionStatus.Expired or SessionStatus.Sealed)
         {
             session.Status = SessionStatus.Active;
             session.ExpiresAt = null;
