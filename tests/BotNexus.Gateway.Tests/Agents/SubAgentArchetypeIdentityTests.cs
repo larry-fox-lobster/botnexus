@@ -98,11 +98,13 @@ public sealed class SubAgentArchetypeIdentityTests
         var handle = new Mock<IAgentHandle>();
         handle.SetupGet(h => h.AgentId).Returns(parentAgentId);
         handle.SetupGet(h => h.SessionId).Returns(parentSessionId);
-        handle.SetupGet(h => h.IsRunning).Returns(false);
+        handle.SetupGet(h => h.IsRunning).Returns(true);
         handle.Setup(h => h.PromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AgentResponse { Content = "ok" });
-        handle.Setup(h => h.FollowUpAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .Returns<string, CancellationToken>(async (_, ct) =>
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+                return new AgentResponse { Content = "never" };
+            });
 
         var supervisor = new Mock<IAgentSupervisor>();
         supervisor
