@@ -136,50 +136,52 @@ public class ScenarioRunner
 
     private static string PrepareTestConfig()
     {
-        // Create isolated config directory for the test gateway
         var testConfigDir = Path.Combine(Path.GetTempPath(), "botnexus-integration-test",
             Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(testConfigDir);
 
-        // Copy auth.json from user profile (provider credentials)
         var userHome = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".botnexus");
+
+        // Copy auth.json (provider credentials)
         var authFile = Path.Combine(userHome, "auth.json");
         if (File.Exists(authFile))
             File.Copy(authFile, Path.Combine(testConfigDir, "auth.json"));
 
-        // Create minimal config.json with test-friendly settings
-        var config = new
+        // Copy the FULL config.json from the user's setup — we need providers, gateway settings, etc.
+        // Only strip out agents (we register our own test agents via API)
+        var userConfigPath = Path.Combine(userHome, "config.json");
+        if (File.Exists(userConfigPath))
         {
-            providers = LoadProvidersFromUserConfig(userHome),
-            gateway = new
+            var userConfig = JsonDocument.Parse(File.ReadAllText(userConfigPath));
+            using var ms = new MemoryStream();
+            using (var writer = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
             {
-                port = 0, // will be overridden by command line
-                corsOrigins = new[] { "*" }
-            },
-            agents = new Dictionary<string, object>() // empty — agents registered via API
-        };
-
-        File.WriteAllText(
-            Path.Combine(testConfigDir, "config.json"),
-            JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+                writer.WriteStartObject();
+                foreach (var prop in userConfig.RootElement.EnumerateObject())
+                {
+                    if (prop.Name.Equals("agents", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Write empty agents — we register test agents via API
+                        writer.WriteStartObject("agents");
+                        writer.WriteEndObject();
+                    }
+                    else
+                    {
+                        prop.WriteTo(writer);
+                    }
+                }
+                writer.WriteEndObject();
+            }
+            File.WriteAllBytes(Path.Combine(testConfigDir, "config.json"), ms.ToArray());
+        }
+        else
+        {
+            // Fallback: minimal config
+            File.WriteAllText(Path.Combine(testConfigDir, "config.json"), "{}");
+        }
 
         return testConfigDir;
-    }
-
-    private static object? LoadProvidersFromUserConfig(string userHome)
-    {
-        var configPath = Path.Combine(userHome, "config.json");
-        if (!File.Exists(configPath)) return null;
-
-        try
-        {
-            var doc = JsonDocument.Parse(File.ReadAllText(configPath));
-            if (doc.RootElement.TryGetProperty("providers", out var providers))
-                return JsonSerializer.Deserialize<object>(providers.GetRawText());
-        }
-        catch { }
-        return null;
     }
 
     private static Process StartGateway(string gatewayDll, int port, string configDir)

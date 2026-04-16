@@ -7,7 +7,7 @@
       "id": "test-rapid",
       "display_name": "Rapid",
       "model": "gpt-4.1",
-      "provider": "copilot",
+      "provider": "github-copilot",
       "system_prompt": "Reply with exactly one word: OK"
     }
   ],

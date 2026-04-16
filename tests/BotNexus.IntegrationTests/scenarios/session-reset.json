@@ -7,7 +7,7 @@
       "id": "test-echo",
       "display_name": "Echo",
       "model": "gpt-4.1",
-      "provider": "copilot",
+      "provider": "github-copilot",
       "system_prompt": "Echo the user message back exactly."
     }
   ],

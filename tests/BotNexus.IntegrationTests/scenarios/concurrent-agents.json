@@ -7,14 +7,14 @@
       "id": "test-alpha",
       "display_name": "Alpha",
       "model": "gpt-4.1",
-      "provider": "copilot",
+      "provider": "github-copilot",
       "system_prompt": "You are Alpha. Reply with exactly: ALPHA_OK"
     },
     {
       "id": "test-beta", 
       "display_name": "Beta",
       "model": "gpt-4.1",
-      "provider": "copilot",
+      "provider": "github-copilot",
       "system_prompt": "You are Beta. Reply with exactly: BETA_OK"
     }
   ],

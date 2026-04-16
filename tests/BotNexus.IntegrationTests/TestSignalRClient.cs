@@ -26,16 +26,28 @@ public class TestSignalRClient : IAsyncDisposable
         {
             _connection.On<JsonElement>(method, payload =>
             {
-                var sessionId = payload.TryGetProperty("sessionId", out var sid)
-                    ? sid.GetString() ?? "unknown" : "global";
+                // Extract sessionId — handle both string and {value: "..."} shapes
+                string sessionId = "unknown";
+                if (payload.TryGetProperty("sessionId", out var sid))
+                {
+                    if (sid.ValueKind == JsonValueKind.String)
+                        sessionId = sid.GetString() ?? "unknown";
+                    else if (sid.ValueKind == JsonValueKind.Object && sid.TryGetProperty("value", out var val))
+                        sessionId = val.GetString() ?? "unknown";
+                }
 
                 var contentDelta = payload.TryGetProperty("contentDelta", out var cd)
                     ? cd.GetString() : null;
 
                 var evt = new ReceivedEvent(method, DateTimeOffset.UtcNow, payload, contentDelta);
-                _events.GetOrAdd(sessionId, _ => []).Add(evt);
+                var eventList = _events.GetOrAdd(sessionId, _ => []);
+                lock (eventList) { eventList.Add(evt); }
 
-                Console.WriteLine($"    📨 [{method}] session={sessionId[..Math.Min(8, sessionId.Length)]}... {(contentDelta is not null ? $"delta=\"{contentDelta[..Math.Min(40, contentDelta.Length)]}\"" : "")}");
+                // Debug: show raw sessionId shape for first event
+                if (_events.Values.Sum(l => { lock (l) { return l.Count; } }) <= 3)
+                    Console.WriteLine($"    [DEBUG] Raw sessionId JSON: {(payload.TryGetProperty("sessionId", out var dbg) ? dbg.ToString() : "missing")}");
+
+                Console.WriteLine($"    📨 [{method}] sid={sessionId} {(contentDelta is not null ? $"delta=\"{contentDelta[..Math.Min(50, contentDelta.Length)]}\"" : "")}");
             });
         }
     }
@@ -58,11 +70,15 @@ public class TestSignalRClient : IAsyncDisposable
         => _connection.InvokeAsync("ResetSession", agentId, sessionId, ct);
 
     public IReadOnlyList<ReceivedEvent> GetEvents(string sessionId)
-        => _events.GetValueOrDefault(sessionId)?.AsReadOnly() ?? (IReadOnlyList<ReceivedEvent>)[];
+    {
+        if (!_events.TryGetValue(sessionId, out var list)) return [];
+        lock (list) { return list.ToList().AsReadOnly(); }
+    }
 
     public async Task<ReceivedEvent> WaitForEventAsync(string sessionId, string eventType,
         TimeSpan timeout, CancellationToken ct)
     {
+        Console.WriteLine($"    [DEBUG] WaitForEvent: looking for '{eventType}' on sid='{sessionId}'");
         var deadline = DateTimeOffset.UtcNow + timeout;
         while (DateTimeOffset.UtcNow < deadline && !ct.IsCancellationRequested)
         {
