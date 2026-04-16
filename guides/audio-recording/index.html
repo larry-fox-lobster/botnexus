@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://sytone.github.io/botnexus/tutorials/first-agent/">
+        <link rel="canonical" href="https://sytone.github.io/botnexus/guides/audio-recording/">
       
       
-        <link rel="prev" href="../../getting-started-dev/">
+        <link rel="prev" href="../../development/webui-connection/">
       
       
-        <link rel="next" href="../../user-guide/getting-started/">
+        <link rel="next" href="../../features/sub-agent-spawning/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Your First AI Agent - BotNexus Documentation</title>
+        <title>Audio Recording - BotNexus Documentation</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#your-first-ai-agent" class="md-skip">
+        <a href="#audio-recording" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Your First AI Agent
+              Audio Recording
             
           </span>
         </div>
@@ -262,13 +262,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../tutorials/first-agent/" class="md-tabs__link">
           
   
   
@@ -364,11 +362,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../guides/audio-recording/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
           
   
   
@@ -698,31 +698,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
@@ -740,7 +737,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -755,37 +752,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Your First AI Agent
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../tutorials/first-agent/" class="md-nav__link">
         
   
   
@@ -801,136 +771,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#what-youll-build" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What you'll build
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#1-prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1) Prerequisites
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#2-clone-and-build-botnexus" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2) Clone and build BotNexus
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-configure-a-provider" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3) Configure a provider
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-create-your-first-agent" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4) Create your first agent
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#5-add-a-system-prompt" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5) Add a system prompt
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#6-run-the-gateway" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6) Run the gateway
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#7-chat-with-your-agent" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        7) Chat with your agent
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#8-customize-behavior" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        8) Customize behavior
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#9-next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        9) Next steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1891,28 +1731,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
-        
-          
-          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
             
   
   
@@ -1930,7 +1773,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1945,10 +1788,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../guides/audio-recording/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audio Recording
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1964,6 +1834,165 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enable-audio-transcription" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enable Audio Transcription
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enable Audio Transcription">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-download-a-whisper-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Download a Whisper Model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-place-the-model-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Place the Model File
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-configure-the-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Configure the Extension
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#browser-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Browser Requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How It Works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-by-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step by Step
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tips
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2290,10 +2319,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-youll-build" class="md-nav__link">
+  <a href="#quick-start" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What you'll build
+        Quick Start
       
     </span>
   </a>
@@ -2301,10 +2330,116 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#1-prerequisites" class="md-nav__link">
+  <a href="#setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1) Prerequisites
+        Setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enable-audio-transcription" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enable Audio Transcription
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enable Audio Transcription">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-download-a-whisper-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Download a Whisper Model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-place-the-model-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Place the Model File
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-configure-the-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Configure the Extension
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#browser-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Browser Requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How It Works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-by-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step by Step
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tips
       
     </span>
   </a>
@@ -2312,87 +2447,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-clone-and-build-botnexus" class="md-nav__link">
+  <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2) Clone and build BotNexus
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-configure-a-provider" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3) Configure a provider
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-create-your-first-agent" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4) Create your first agent
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#5-add-a-system-prompt" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5) Add a system prompt
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#6-run-the-gateway" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6) Run the gateway
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#7-chat-with-your-agent" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        7) Chat with your agent
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#8-customize-behavior" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        8) Customize behavior
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#9-next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        9) Next steps
+        Troubleshooting
       
     </span>
   </a>
@@ -2416,7 +2474,7 @@
 
 
   
-    <a href="https://github.com/sytone/botnexus/edit/main/docs/tutorials/first-agent.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/sytone/botnexus/edit/main/docs/guides/audio-recording.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -2424,180 +2482,188 @@
   
 
 
-<h1 id="your-first-ai-agent">Your First AI Agent<a class="headerlink" href="#your-first-ai-agent" title="Permanent link">&para;</a></h1>
-<p>Build and chat with a custom BotNexus agent in about 15 minutes.</p>
-<p>By the end of this tutorial, you will:</p>
-<ul>
-<li>run BotNexus locally</li>
-<li>configure one AI provider</li>
-<li>create your first agent</li>
-<li>chat with it in the Web UI</li>
-<li>customize its behavior with a system prompt</li>
-</ul>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>This is a <strong>hands-on tutorial</strong>. Copy and run each step in order.</p>
-</div>
-<h2 id="what-youll-build">What you'll build<a class="headerlink" href="#what-youll-build" title="Permanent link">&para;</a></h2>
-<p>You will create an agent named <strong>My First Agent</strong> that:</p>
-<ul>
-<li>uses OpenAI <code>gpt-4.1</code></li>
-<li>responds with a friendly, concise style</li>
-<li>runs in the BotNexus Web UI</li>
-</ul>
+<h1 id="audio-recording">Audio Recording<a class="headerlink" href="#audio-recording" title="Permanent link">&para;</a></h1>
+<p>BotNexus supports voice messages through browser-based audio recording. Record audio directly in the WebUI, and it will be automatically transcribed and sent to your agent.</p>
 <hr />
-<h2 id="1-prerequisites">1) Prerequisites<a class="headerlink" href="#1-prerequisites" title="Permanent link">&para;</a></h2>
-<p>Make sure you have:</p>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>.NET 10 SDK</strong></li>
-<li><strong>git</strong></li>
-<li><strong>One API key</strong> from a supported provider (OpenAI or Anthropic)</li>
+<li>Click the :material-microphone: <strong>microphone button</strong> in the chat input area</li>
+<li>Allow microphone access when your browser prompts</li>
+<li>Speak your message — the button shows :red_circle: while recording</li>
+<li>Click the button again to stop recording</li>
+<li>Optionally type additional text alongside the audio</li>
+<li>Press <strong>Send</strong> — your audio is transcribed and sent to the agent</li>
 </ol>
-<p>Check your tools:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>dotnet<span class="w"> </span>--version
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>git<span class="w"> </span>--version
-</code></pre></div>
-<p>You should see version output for both commands.</p>
+<div class="admonition tip">
+<p class="admonition-title">First time?</p>
+<p>Your browser will ask for microphone permission on the first recording. Grant it once, and you're set for all future sessions.</p>
+</div>
+<hr />
+<h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h2>
+<h3 id="enable-audio-transcription">Enable Audio Transcription<a class="headerlink" href="#enable-audio-transcription" title="Permanent link">&para;</a></h3>
+<p>Audio transcription requires the <strong>Whisper extension</strong> and a GGML model file.</p>
+<h4 id="1-download-a-whisper-model">1. Download a Whisper Model<a class="headerlink" href="#1-download-a-whisper-model" title="Permanent link">&para;</a></h4>
+<p>Download a GGML-format Whisper model. Recommended options:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Size</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ggml-base.en.bin</code></td>
+<td>~142 MB</td>
+<td>English-only, fast, good accuracy</td>
+</tr>
+<tr>
+<td><code>ggml-small.en.bin</code></td>
+<td>~466 MB</td>
+<td>English-only, better accuracy</td>
+</tr>
+<tr>
+<td><code>ggml-base.bin</code></td>
+<td>~142 MB</td>
+<td>Multilingual</td>
+</tr>
+<tr>
+<td><code>ggml-small.bin</code></td>
+<td>~466 MB</td>
+<td>Multilingual, better accuracy</td>
+</tr>
+</tbody>
+</table>
+<p>Models are available from the <a href="https://huggingface.co/sandrohanea/whisper.net/tree/main/classic">Whisper.net model repository</a>.</p>
+<h4 id="2-place-the-model-file">2. Place the Model File<a class="headerlink" href="#2-place-the-model-file" title="Permanent link">&para;</a></h4>
+<p>Copy the <code>.bin</code> file to a location accessible by your BotNexus instance — for example, your BotNexus data directory.</p>
+<h4 id="3-configure-the-extension">3. Configure the Extension<a class="headerlink" href="#3-configure-the-extension" title="Permanent link">&para;</a></h4>
+<p>The Whisper extension supports the following configuration options:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ModelPath</code></td>
+<td><em>(required)</em></td>
+<td>Full path to the GGML model file</td>
+</tr>
+<tr>
+<td><code>Language</code></td>
+<td><code>en</code></td>
+<td>Language code for transcription</td>
+</tr>
+<tr>
+<td><code>MaxConcurrency</code></td>
+<td><code>1</code></td>
+<td>Maximum parallel transcription operations</td>
+</tr>
+<tr>
+<td><code>SupportedMimeTypes</code></td>
+<td>see below</td>
+<td>Audio formats the handler accepts</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Default supported formats:</strong> <code>audio/wav</code>, <code>audio/mpeg</code>, <code>audio/mp3</code>, <code>audio/ogg</code>, <code>audio/webm</code>, <code>audio/flac</code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The WebUI records audio as <strong>WebM/Opus</strong> (<code>audio/webm</code>), which is included in the defaults. No format configuration is needed for standard browser recording.</p>
+</div>
+<h3 id="browser-requirements">Browser Requirements<a class="headerlink" href="#browser-requirements" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Modern browser</strong> with MediaRecorder API support — Chrome, Firefox, or Edge</li>
+<li><strong>Microphone permission</strong> must be granted when prompted</li>
+<li><strong>HTTPS</strong> is required (or <code>localhost</code> for local development)</li>
+</ul>
 <div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>Keep API keys private. Never commit them to source control.</p>
+<p class="admonition-title">Safari support</p>
+<p>Safari has limited MediaRecorder support. For the best experience, use Chrome, Firefox, or Edge.</p>
 </div>
 <hr />
-<h2 id="2-clone-and-build-botnexus">2) Clone and build BotNexus<a class="headerlink" href="#2-clone-and-build-botnexus" title="Permanent link">&para;</a></h2>
-<p>Clone the repository:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/sytone/botnexus.git
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>botnexus
-</code></pre></div>
-<p>Build the solution:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>dotnet<span class="w"> </span>build<span class="w"> </span>BotNexus.slnx
-</code></pre></div>
-<p>You should see output ending with something like:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Build succeeded.
-</code></pre></div>
-<p>If build fails, resolve that first before continuing.</p>
-<hr />
-<h2 id="3-configure-a-provider">3) Configure a provider<a class="headerlink" href="#3-configure-a-provider" title="Permanent link">&para;</a></h2>
-<p>BotNexus reads configuration from <code>~/.botnexus/config.json</code>.</p>
-<ul>
-<li>Windows: <code>C:\Users\&lt;your-user&gt;\.botnexus\config.json</code></li>
-<li>macOS/Linux: <code>~/.botnexus/config.json</code></li>
-</ul>
-<p>Create or edit that file and add this minimal OpenAI provider config:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">&quot;providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">&quot;openai&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">      </span><span class="nt">&quot;apiKey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;your-api-key-here&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="nt">&quot;defaultModel&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpt-4.1&quot;</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">}</span>
-</code></pre></div>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>Replace <code>"your-api-key-here"</code> with your real OpenAI API key.</p>
-</div>
-<hr />
-<h2 id="4-create-your-first-agent">4) Create your first agent<a class="headerlink" href="#4-create-your-first-agent" title="Permanent link">&para;</a></h2>
-<p>In the <strong>same</strong> <code>~/.botnexus/config.json</code>, add an <code>agents</code> section alongside the providers:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">&quot;providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">&quot;openai&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="nt">&quot;apiKey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;your-api-key-here&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="nt">&quot;defaultModel&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpt-4.1&quot;</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="p">},</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="nt">&quot;agents&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="nt">&quot;my-first-agent&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">      </span><span class="nt">&quot;displayName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;My First Agent&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">      </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;openai&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">      </span><span class="nt">&quot;model&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpt-4.1&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">      </span><span class="nt">&quot;enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="p">}</span>
-</code></pre></div>
-<p>That's a complete minimal configuration. BotNexus will load the agent on startup.</p>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>See the <a href="../../configuration/">Configuration Reference</a> for all available agent options including tools, sub-agents, and isolation strategies.</p>
-</div>
-<hr />
-<h2 id="5-add-a-system-prompt">5) Add a system prompt<a class="headerlink" href="#5-add-a-system-prompt" title="Permanent link">&para;</a></h2>
-<p>Create a system prompt file for your agent. By default, BotNexus looks for prompt files in the agent's directory:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>~/.botnexus/agents/my-first-agent/system-prompt.md
-</code></pre></div>
-<p>Create that file with your agent's personality:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>You are a helpful AI assistant named Botty.
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>You are friendly, concise, and always try to help.
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>When asked a question, give a clear and direct answer.
-</code></pre></div>
-<p>Then reference it in your config by adding <code>systemPromptFile</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">&quot;my-first-agent&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">&quot;displayName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;My First Agent&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;openai&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">&quot;model&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpt-4.1&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">&quot;systemPromptFile&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;system-prompt.md&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">&quot;enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">}</span>
-</code></pre></div>
-<hr />
-<h2 id="6-run-the-gateway">6) Run the gateway<a class="headerlink" href="#6-run-the-gateway" title="Permanent link">&para;</a></h2>
-<p>From the repository root, start the API gateway:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>dotnet<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>src/gateway/BotNexus.Gateway.Api
-</code></pre></div>
-<p>When startup completes, open:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>http://localhost:5005
-</code></pre></div>
-<p>You should see the BotNexus Web UI load in your browser.</p>
-<hr />
-<h2 id="7-chat-with-your-agent">7) Chat with your agent<a class="headerlink" href="#7-chat-with-your-agent" title="Permanent link">&para;</a></h2>
-<p>In the Web UI:</p>
+<h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>sequenceDiagram
+    participant User
+    participant Browser as WebUI
+    participant Hub as SignalR Hub
+    participant Pipeline as Media Pipeline
+    participant Whisper as Whisper Handler
+    participant Agent
+
+    User-&gt;&gt;Browser: Click 🎤 to start
+    Browser-&gt;&gt;Browser: MediaRecorder captures audio
+    User-&gt;&gt;Browser: Click 🔴 to stop
+    Browser-&gt;&gt;Hub: SendMessageWithMedia&lt;br/&gt;(text + audio parts)
+    Hub-&gt;&gt;Pipeline: Process ContentParts
+    Pipeline-&gt;&gt;Whisper: BinaryContentPart (audio/webm)
+    Whisper-&gt;&gt;Whisper: Transcribe via Whisper.net
+    Whisper--&gt;&gt;Pipeline: TextContentPart (transcript)
+    Pipeline--&gt;&gt;Hub: Processed message
+    Hub-&gt;&gt;Agent: Dispatch with transcribed text
+    Agent--&gt;&gt;Browser: Stream response</code></pre>
+<h3 id="step-by-step">Step by Step<a class="headerlink" href="#step-by-step" title="Permanent link">&para;</a></h3>
 <ol>
-<li>Select <strong>My First Agent</strong> (or <code>my-first-agent</code>)</li>
-<li>Send a message like:</li>
+<li><strong>Recording</strong> — The browser's MediaRecorder API captures audio from your microphone as WebM/Opus format</li>
+<li><strong>Upload</strong> — When you press Send, the audio is base64-encoded and sent alongside any typed text via the <code>SendMessageWithMedia</code> SignalR method</li>
+<li><strong>Processing</strong> — The media pipeline routes the audio <code>BinaryContentPart</code> to the Whisper transcription handler, which converts speech to text</li>
+<li><strong>Response</strong> — The transcribed text replaces the audio content part in the message and is processed by the agent like any other text input</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Hi Botty! Give me 3 tips for learning BotNexus quickly.
-</code></pre></div>
-<p>You should see a friendly, concise response generated by your agent.</p>
-<p>If you get an auth/provider error, recheck:</p>
+<hr />
+<h2 id="tips">Tips<a class="headerlink" href="#tips" title="Permanent link">&para;</a></h2>
 <ul>
-<li>provider name (<code>openai</code>) matches a key in <code>providers</code></li>
-<li>model name (<code>gpt-4.1</code>) is valid for your provider</li>
-<li>API key is correct</li>
+<li><strong>Combine voice and text</strong> — Type context in the text box, then record a voice question. Both are sent together.</li>
+<li><strong>Quiet environment</strong> — Background noise reduces transcription accuracy. Try to record in a quiet space.</li>
+<li><strong>Speak clearly</strong> — Natural pace and clear enunciation give the best results.</li>
+<li><strong>Check the model</strong> — Larger Whisper models (<code>small</code>, <code>medium</code>) are slower but more accurate. Start with <code>base.en</code> for English and upgrade if needed.</li>
+<li><strong>Monitor the indicator</strong> — The recording indicator (:red_circle:) confirms the microphone is active. If it doesn't appear, check your browser's microphone permission.</li>
 </ul>
 <hr />
-<h2 id="8-customize-behavior">8) Customize behavior<a class="headerlink" href="#8-customize-behavior" title="Permanent link">&para;</a></h2>
-<p>Now change your agent's personality by editing the system prompt file.</p>
-<p>For example, update <code>~/.botnexus/agents/my-first-agent/system-prompt.md</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>You are Botty, a practical mentor.
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>Respond with numbered steps and short explanations.
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>Keep answers under 100 words when possible.
-</code></pre></div>
-<p>Then:</p>
-<ol>
-<li>Stop the running gateway (<code>Ctrl+C</code>)</li>
-<li>Restart it with the same command:</li>
-</ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>dotnet<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>src/gateway/BotNexus.Gateway.Api
-</code></pre></div>
-<p>Send the same chat message again.</p>
-<p>You should notice a different response style that matches your new prompt.</p>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>System prompts are the fastest way to shape agent behavior without writing code.</p>
-</div>
-<p>As a next step, you can add tools to your agent so it can do more than just chat.</p>
-<hr />
-<h2 id="9-next-steps">9) Next steps<a class="headerlink" href="#9-next-steps" title="Permanent link">&para;</a></h2>
-<p>Continue with:</p>
-<ul>
-<li><a href="../../user-guide/getting-started/">User Guide</a> — deeper walkthrough of all features</li>
-<li><a href="../../configuration/">Configuration Reference</a> — every config option explained</li>
-<li><a href="../../extension-development/">Extension Development</a> — build custom tools and providers</li>
-</ul>
-<p>You now have a working BotNexus agent and a repeatable workflow for creating more.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Microphone button doesn't appear</td>
+<td>Check that your browser supports MediaRecorder (Chrome, Firefox, Edge)</td>
+</tr>
+<tr>
+<td>"Permission denied" error</td>
+<td>Allow microphone access in your browser settings</td>
+</tr>
+<tr>
+<td>Recording starts but no audio is captured</td>
+<td>Verify your microphone is selected as the input device in your OS settings</td>
+</tr>
+<tr>
+<td>Transcription returns empty or garbled text</td>
+<td>Try a larger Whisper model, or check that the model file isn't corrupted</td>
+</tr>
+<tr>
+<td>"Whisper model not found" error</td>
+<td>Verify the <code>ModelPath</code> in your extension configuration points to the correct <code>.bin</code> file</td>
+</tr>
+<tr>
+<td>Audio not processed (passes through as binary)</td>
+<td>Ensure the Whisper extension is installed and loaded — check the startup logs</td>
+</tr>
+<tr>
+<td>HTTPS error</td>
+<td>Audio recording requires HTTPS. Use <code>localhost</code> for development or configure TLS</td>
+</tr>
+</tbody>
+</table>
+<p>For general troubleshooting, see the <a href="../../user-guide/troubleshooting/">Troubleshooting Guide</a>.</p>
 
 
 
@@ -2620,7 +2686,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 16, 2026 06:12:30 UTC">April 16, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 16, 2026 07:22:32 UTC">April 16, 2026</span>
   </span>
 
     
@@ -2630,7 +2696,7 @@
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 16, 2026 06:03:41 UTC">April 16, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 16, 2026 07:22:32 UTC">April 16, 2026</span>
   </span>
 
     
