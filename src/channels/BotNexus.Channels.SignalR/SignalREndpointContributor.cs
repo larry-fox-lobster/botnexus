@@ -5,7 +5,8 @@ using Microsoft.Extensions.FileProviders;
 namespace BotNexus.Channels.SignalR;
 
 /// <summary>
-/// Registers the SignalR hub and static file serving for the Blazor WebUI.
+/// Registers the SignalR hub and Blazor WASM client hosting.
+/// All web surface for this channel is self-contained in this extension.
 /// </summary>
 public class SignalREndpointContributor : IEndpointContributor
 {
@@ -13,20 +14,26 @@ public class SignalREndpointContributor : IEndpointContributor
     {
         app.MapHub<GatewayHub>("/hub/gateway");
 
-        // Serve Blazor WASM client at /blazor/
-        var blazorPath = Path.Combine(app.Environment.WebRootPath, "blazor");
-        if (Directory.Exists(blazorPath))
+        // Blazor files are co-located with this extension assembly
+        var extensionDir = Path.GetDirectoryName(typeof(SignalREndpointContributor).Assembly.Location)!;
+        var blazorPath = Path.Combine(extensionDir, "blazor");
+        if (!Directory.Exists(blazorPath))
+            return;
+
+        var blazorFileProvider = new PhysicalFileProvider(blazorPath);
+
+        app.UseStaticFiles(new StaticFileOptions
         {
-            var blazorFileProvider = new PhysicalFileProvider(blazorPath);
+            FileProvider = blazorFileProvider,
+            RequestPath = "/blazor"
+        });
 
-            app.UseStaticFiles(new StaticFileOptions
-            {
-                FileProvider = blazorFileProvider,
-                RequestPath = "/blazor"
-            });
-
-            // SPA fallback: any unmatched /blazor/* route serves the Blazor index.html
-            app.MapFallbackToFile("/blazor/{**path}", "blazor/index.html");
-        }
+        // SPA fallback — serve index.html for client-side routes
+        var indexBytes = File.ReadAllBytes(Path.Combine(blazorPath, "index.html"));
+        app.MapFallback("/blazor/{**path}", context =>
+        {
+            context.Response.ContentType = "text/html";
+            return context.Response.Body.WriteAsync(indexBytes).AsTask();
+        });
     }
 }
