@@ -10,6 +10,26 @@ public class ScenarioDefinition
     [JsonPropertyName("timeout_seconds")]
     public int TimeoutSeconds { get; set; } = 30;
     public List<AgentDefinition> Agents { get; set; } = [];
+
+    /// <summary>
+    /// Sequential steps (legacy single-track mode).
+    /// </summary>
+    public List<ScenarioStep>? Steps { get; set; }
+
+    /// <summary>
+    /// Parallel step tracks — each track runs concurrently like a separate browser tab.
+    /// Use this instead of Steps for true multi-agent concurrency testing.
+    /// </summary>
+    public List<StepTrack>? Tracks { get; set; }
+}
+
+/// <summary>
+/// A named sequence of steps that runs on its own thread.
+/// Each track is like one browser tab interacting with one agent.
+/// </summary>
+public class StepTrack
+{
+    public string Name { get; set; } = "";
     public List<ScenarioStep> Steps { get; set; } = [];
 }
 
@@ -52,6 +72,8 @@ public class ScenarioStep
     [JsonPropertyName("slow_step")]
     public string? SlowStep { get; set; }
     public string? Description { get; set; }
+    [JsonPropertyName("parallel_steps")]
+    public List<ScenarioStep>? ParallelSteps { get; set; }
 }
 
 public class EventWait

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 
@@ -8,62 +9,27 @@ public class StepExecutor
     private readonly TestSignalRClient _client;
     private readonly HttpClient _httpClient;
     private readonly TestLogger _log;
-    private readonly Dictionary<string, string> _stepSessions = new();
-    private readonly Dictionary<string, Stopwatch> _stepTimers = new();
+    private readonly ConcurrentDictionary<string, string> _stepSessions;
+    private readonly ConcurrentDictionary<string, Stopwatch> _stepTimers;
     private string? _lastApiResponse;
     
-    public StepExecutor(TestSignalRClient client, HttpClient httpClient, TestLogger log)
+    public StepExecutor(TestSignalRClient client, HttpClient httpClient, TestLogger log,
+        StepExecutor? sharedState = null)
     {
         _client = client;
         _httpClient = httpClient;
         _log = log;
+        // Track executors share session/timer state with the parent so
+        // post-track assertions can reference labels from any track.
+        _stepSessions = sharedState?._stepSessions ?? new();
+        _stepTimers = sharedState?._stepTimers ?? new();
     }
     
     public async Task ExecuteStepsAsync(List<ScenarioStep> steps, CancellationToken ct)
     {
         foreach (var step in steps)
         {
-            switch (step.Action)
-            {
-                case "send_message":
-                    await ExecuteSendAsync(step, ct);
-                    break;
-                case "wait_for_event":
-                    await ExecuteWaitForEventAsync(step, ct);
-                    break;
-                case "wait_for_events":
-                    await ExecuteWaitForEventsAsync(step, ct);
-                    break;
-                case "reset_session":
-                    await ExecuteResetAsync(step, ct);
-                    break;
-                case "assert":
-                    ExecuteAssert(step);
-                    break;
-                case "delay":
-                    await Task.Delay(TimeSpan.FromSeconds(step.TimeoutSeconds), ct);
-                    break;
-                case "api_get":
-                    await ExecuteApiGetAsync(step, ct);
-                    break;
-                case "api_put":
-                    await ExecuteApiPutAsync(step, ct);
-                    break;
-                case "api_post":
-                    await ExecuteApiPostAsync(step, ct);
-                    break;
-                case "api_delete":
-                    await ExecuteApiDeleteAsync(step, ct);
-                    break;
-                case "assert_api_response":
-                    ExecuteAssertApiResponse(step);
-                    break;
-                case "assert_timing":
-                    ExecuteAssertTiming(step);
-                    break;
-                default:
-                    throw new NotSupportedException($"Unknown action: {step.Action}");
-            }
+            await ExecuteSingleStepAsync(step, ct);
         }
     }
     
@@ -246,9 +212,6 @@ public class StepExecutor
         if (slowLastEvent is not null)
             _log.Write($"⏱️  Timing: slow '{slowLabel}' final event at {slowLastEvent.ReceivedAt:HH:mm:ss.fff}");
 
-        // The critical assertion: fast agent's first content delta should arrive
-        // BEFORE the slow agent's last tool finishes. If it arrives AFTER,
-        // then the fast agent was blocked waiting for the slow agent's tools.
         if (slowLastTool is not null && fastFirstDelta.ReceivedAt > slowLastTool.ReceivedAt)
         {
             var delay = fastFirstDelta.ReceivedAt - slowLastTool.ReceivedAt;
@@ -259,6 +222,58 @@ public class StepExecutor
         }
 
         _log.Write($"✅ assert_timing PASS: {step.Description ?? "fast responded during slow's tool execution"}");
+    }
+
+    /// <summary>
+    /// Execute multiple steps concurrently — mirrors how a real user interacts with
+    /// multiple agents simultaneously (switching tabs, sending messages in parallel).
+    /// </summary>
+    private async Task ExecuteParallelAsync(ScenarioStep step, CancellationToken ct)
+    {
+        var subSteps = step.ParallelSteps
+            ?? throw new InvalidOperationException("parallel requires parallel_steps");
+
+        _log.Write($"⚡ Parallel: launching {subSteps.Count} steps concurrently");
+
+        var tasks = subSteps.Select(async subStep =>
+        {
+            try
+            {
+                await ExecuteSingleStepAsync(subStep, ct);
+            }
+            catch (Exception ex)
+            {
+                _log.Write($"❌ Parallel sub-step '{subStep.Action}' failed: {ex.Message}");
+                throw;
+            }
+        });
+
+        await Task.WhenAll(tasks);
+        _log.Write($"⚡ Parallel: all {subSteps.Count} steps completed");
+    }
+
+    /// <summary>
+    /// Execute a single step — extracted from the foreach loop so parallel can reuse it.
+    /// </summary>
+    private async Task ExecuteSingleStepAsync(ScenarioStep step, CancellationToken ct)
+    {
+        switch (step.Action)
+        {
+            case "send_message": await ExecuteSendAsync(step, ct); break;
+            case "wait_for_event": await ExecuteWaitForEventAsync(step, ct); break;
+            case "wait_for_events": await ExecuteWaitForEventsAsync(step, ct); break;
+            case "reset_session": await ExecuteResetAsync(step, ct); break;
+            case "assert": ExecuteAssert(step); break;
+            case "delay": await Task.Delay(TimeSpan.FromSeconds(step.TimeoutSeconds), ct); break;
+            case "api_get": await ExecuteApiGetAsync(step, ct); break;
+            case "api_put": await ExecuteApiPutAsync(step, ct); break;
+            case "api_post": await ExecuteApiPostAsync(step, ct); break;
+            case "api_delete": await ExecuteApiDeleteAsync(step, ct); break;
+            case "assert_api_response": ExecuteAssertApiResponse(step); break;
+            case "assert_timing": ExecuteAssertTiming(step); break;
+            case "parallel": await ExecuteParallelAsync(step, ct); break;
+            default: throw new NotSupportedException($"Unknown action: {step.Action}");
+        }
     }
 }
 

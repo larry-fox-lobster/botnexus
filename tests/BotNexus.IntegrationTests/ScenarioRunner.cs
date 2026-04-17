@@ -91,9 +91,29 @@ public class ScenarioRunner
             await client.ConnectAsync(cts.Token);
             await client.SubscribeAllAsync(cts.Token);
 
-            // Execute steps
-            var executor = new StepExecutor(client, httpClient, log);
-            await executor.ExecuteStepsAsync(scenario.Steps, cts.Token);
+            // Execute: tracks run concurrently, then sequential steps for assertions
+            var sharedExecutor = new StepExecutor(client, httpClient, log);
+
+            if (scenario.Tracks is { Count: > 0 })
+            {
+                log.Write($"Running {scenario.Tracks.Count} parallel tracks");
+                var trackTasks = scenario.Tracks.Select(track =>
+                {
+                    // Each track gets its own executor but shares the SignalR client
+                    // (just like multiple browser tabs share a connection)
+                    var trackExecutor = new StepExecutor(client, httpClient, log, sharedExecutor);
+                    log.Write($"  ▸ Track '{track.Name}' ({track.Steps.Count} steps)");
+                    return trackExecutor.ExecuteStepsAsync(track.Steps, cts.Token);
+                });
+                await Task.WhenAll(trackTasks);
+                log.Write("All tracks completed");
+            }
+
+            // Sequential post-track steps (assertions, cleanup)
+            if (scenario.Steps is { Count: > 0 })
+            {
+                await sharedExecutor.ExecuteStepsAsync(scenario.Steps, cts.Token);
+            }
 
             // Shut down gateway
             try { gateway.Kill(); } catch { }
