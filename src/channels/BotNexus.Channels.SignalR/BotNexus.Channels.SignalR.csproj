@@ -38,7 +38,8 @@
     <Copy SourceFiles="@(BlazorPublishFiles)" DestinationFolder="$(OutputPath)blazor\%(RecursiveDir)" SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- Deploy extension to ~/.botnexus/extensions/signalr/ so the gateway discovers it -->
+  <!-- Deploy extension to ~/.botnexus/extensions/signalr/ so the gateway discovers it.
+       ContinueOnError prevents build failures when the gateway has DLLs locked. -->
   <Target Name="DeployExtension" AfterTargets="CopyBlazorClient">
     <PropertyGroup>
       <ExtensionDeployDir>$(USERPROFILE)\.botnexus\extensions\signalr\</ExtensionDeployDir>
@@ -47,7 +48,7 @@
       <ExtensionFiles Include="$(OutputPath)**\*.*" Exclude="$(OutputPath)ref\**;$(OutputPath)blazor-publish\**" />
     </ItemGroup>
     <MakeDir Directories="$(ExtensionDeployDir)" />
-    <Copy SourceFiles="@(ExtensionFiles)" DestinationFolder="$(ExtensionDeployDir)%(RecursiveDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ExtensionFiles)" DestinationFolder="$(ExtensionDeployDir)%(RecursiveDir)" SkipUnchangedFiles="true" ContinueOnError="true" />
     <Message Importance="high" Text="Deployed SignalR extension to $(ExtensionDeployDir)" />
   </Target>
 

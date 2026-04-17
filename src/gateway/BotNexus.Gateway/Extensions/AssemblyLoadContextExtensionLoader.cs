@@ -136,7 +136,9 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
         {
             ValidateDependencies(extension.Manifest);
 
-            var loadContext = new ExtensionAssemblyLoadContext(extension.EntryAssemblyPath);
+            var loadContext = new ExtensionAssemblyLoadContext(
+                extension.EntryAssemblyPath,
+                isCollectible: !RequiresNonCollectible(extension.Manifest));
             var assembly = loadContext.LoadFromAssemblyPath(extension.EntryAssemblyPath);
 
             var discoveredImplementations = DiscoverImplementations(assembly);
@@ -321,6 +323,16 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
         throw new InvalidOperationException(
             $"Extension '{manifest.Id}' has unresolved dependencies: {string.Join(", ", missingDependencies)}.");
     }
+
+    /// <summary>
+    /// Extensions that contribute endpoints or use web framework types (SignalR hubs, etc.)
+    /// must be loaded as non-collectible because ASP.NET uses Reflection.Emit for typed
+    /// hub client proxies, which requires non-collectible assemblies.
+    /// </summary>
+    private static bool RequiresNonCollectible(ExtensionManifest manifest)
+        => manifest.ExtensionTypes?.Any(t =>
+            t.Equals("endpoint-contributor", StringComparison.OrdinalIgnoreCase) ||
+            t.Equals("api-contributor", StringComparison.OrdinalIgnoreCase)) is true;
 
     private IReadOnlyList<(Type ServiceContract, Type Implementation)> DiscoverImplementations(Assembly assembly)
     {

@@ -21,8 +21,8 @@ internal sealed class ExtensionAssemblyLoadContext : AssemblyLoadContext
         "Microsoft.Extensions.Options",
     };
 
-    public ExtensionAssemblyLoadContext(string mainAssemblyPath)
-        : base($"BotNexus.Extension::{Path.GetFileNameWithoutExtension(mainAssemblyPath)}::{Guid.NewGuid():N}", isCollectible: true)
+    public ExtensionAssemblyLoadContext(string mainAssemblyPath, bool isCollectible = true)
+        : base($"BotNexus.Extension::{Path.GetFileNameWithoutExtension(mainAssemblyPath)}::{Guid.NewGuid():N}", isCollectible)
     {
         _resolver = new AssemblyDependencyResolver(mainAssemblyPath);
     }

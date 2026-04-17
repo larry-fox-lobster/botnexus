@@ -200,6 +200,12 @@ if (!string.IsNullOrWhiteSpace(listenUrl))
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
+
+// Extension post-build: endpoint + API contributors
+// Must run early so extension static file middleware (e.g., Blazor WASM at /blazor/)
+// is registered before routing catches requests as fallbacks.
+AssemblyLoadContextExtensionLoader.MapExtensionEndpoints(app);
+
 app.UseCors(GatewayCorsPolicy);
 app.UseSerilogRequestLogging();
 app.UseMiddleware<CorrelationIdMiddleware>();
@@ -207,9 +213,6 @@ app.UseMiddleware<GatewayAuthMiddleware>();
 app.UseMiddleware<RateLimitingMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI();
-
-// Extension post-build: endpoint + API contributors
-AssemblyLoadContextExtensionLoader.MapExtensionEndpoints(app);
 
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
