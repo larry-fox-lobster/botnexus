@@ -1,13 +1,17 @@
-@implements IDisposable
+@inject IJSRuntime JS
 
 <div class="chat-panel">
     <header class="chat-header">
-        <h3>@AgentDisplayName</h3>
-        <span class="agent-id-label">@AgentId</span>
+        <h3>@State.DisplayName</h3>
+        <span class="agent-id-label">@State.AgentId</span>
+        @if (State.IsStreaming)
+        {
+            <span class="streaming-badge">Streaming…</span>
+        }
     </header>
 
-    <div class="messages-container">
-        @foreach (var msg in _messages)
+    <div class="messages-container" @ref="_messagesContainer">
+        @foreach (var msg in State.Messages)
         {
             <div class="message @msg.CssClass">
                 <div class="message-role">@msg.Role</div>
@@ -19,11 +23,11 @@
             </div>
         }
 
-        @if (_isStreaming)
+        @if (State.IsStreaming)
         {
             <div class="message assistant streaming">
                 <div class="message-role">Assistant</div>
-                <div class="message-content">@_streamBuffer</div>
+                <div class="message-content">@State.CurrentStreamBuffer</div>
                 <span class="streaming-indicator">●</span>
             </div>
         }
@@ -35,107 +39,38 @@
                   @bind:event="oninput"
                   @onkeydown="HandleKeyDown"
                   placeholder="Type a message…"
-                  disabled="@(!Hub.IsConnected || _isStreaming)" />
+                  disabled="@(!State.IsConnected || State.IsStreaming)" />
         <button class="send-btn"
                 @onclick="SendMessage"
-                disabled="@(!Hub.IsConnected || _isStreaming || string.IsNullOrWhiteSpace(_inputText))">
+                disabled="@(!State.IsConnected || State.IsStreaming || string.IsNullOrWhiteSpace(_inputText))">
             Send
         </button>
     </div>
 </div>
 
 @code {
+    /// <summary>Per-agent session state — the panel reads from and displays this.</summary>
     [Parameter, EditorRequired]
-    public string AgentId { get; set; } = default!;
+    public AgentSessionState State { get; set; } = default!;
 
+    /// <summary>Session manager for sending messages.</summary>
     [Parameter, EditorRequired]
-    public string AgentDisplayName { get; set; } = default!;
+    public AgentSessionManager Manager { get; set; } = default!;
 
-    [Parameter, EditorRequired]
-    public GatewayHubConnection Hub { get; set; } = default!;
-
-    private sealed class ChatMessage
-    {
-        public string Role { get; init; } = "";
-        public string Content { get; set; } = "";
-        public string? ToolName { get; init; }
-        public string CssClass => Role.ToLowerInvariant();
-    }
-
-    private readonly List<ChatMessage> _messages = [];
     private string _inputText = "";
-    private string _streamBuffer = "";
-    private bool _isStreaming;
-    private string? _currentSessionId;
+    private ElementReference _messagesContainer;
 
-    protected override void OnInitialized()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        Hub.OnMessageStart += HandleMessageStart;
-        Hub.OnContentDelta += HandleContentDelta;
-        Hub.OnToolStart += HandleToolStart;
-        Hub.OnToolEnd += HandleToolEnd;
-        Hub.OnMessageEnd += HandleMessageEnd;
-        Hub.OnError += HandleError;
-    }
-
-    private void HandleMessageStart(AgentStreamEvent evt)
-    {
-        _isStreaming = true;
-        _streamBuffer = "";
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void HandleContentDelta(ContentDeltaPayload payload)
-    {
-        // Only show deltas for our session (if we know it), otherwise show all
-        if (_currentSessionId is not null && payload.SessionId != _currentSessionId)
-            return;
-
-        _streamBuffer += payload.ContentDelta ?? "";
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void HandleToolStart(AgentStreamEvent evt)
-    {
-        _messages.Add(new ChatMessage
+        // Auto-scroll to bottom only when user is near the bottom (preserves scroll-up reading)
+        try
         {
-            Role = "Tool",
-            Content = $"Calling {evt.ToolName}…",
-            ToolName = evt.ToolName
-        });
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void HandleToolEnd(AgentStreamEvent evt)
-    {
-        var display = evt.ToolIsError == true
-            ? $"❌ {evt.ToolName} failed"
-            : $"✅ {evt.ToolName} completed";
-        _messages.Add(new ChatMessage { Role = "Tool", Content = display, ToolName = evt.ToolName });
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void HandleMessageEnd(AgentStreamEvent evt)
-    {
-        if (!string.IsNullOrEmpty(_streamBuffer))
-        {
-            _messages.Add(new ChatMessage { Role = "Assistant", Content = _streamBuffer });
+            await JS.InvokeVoidAsync("chatScroll.scrollToBottom", _messagesContainer);
         }
-        _streamBuffer = "";
-        _isStreaming = false;
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void HandleError(AgentStreamEvent evt)
-    {
-        _messages.Add(new ChatMessage
+        catch (JSDisconnectedException)
         {
-            Role = "Error",
-            Content = evt.ErrorMessage ?? "An unknown error occurred."
-        });
-        _isStreaming = false;
-        _streamBuffer = "";
-        InvokeAsync(StateHasChanged);
+            // Component disposed during async call — safe to ignore
+        }
     }
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
@@ -149,32 +84,10 @@
     private async Task SendMessage()
     {
         var text = _inputText?.Trim();
-        if (string.IsNullOrEmpty(text) || !Hub.IsConnected)
+        if (string.IsNullOrEmpty(text) || !State.IsConnected)
             return;
 
         _inputText = "";
-        _messages.Add(new ChatMessage { Role = "User", Content = text });
-
-        try
-        {
-            var result = await Hub.SendMessageAsync(AgentId, "signalr", text);
-            _currentSessionId = result.SessionId;
-        }
-        catch (Exception ex)
-        {
-            _messages.Add(new ChatMessage { Role = "Error", Content = $"Send failed: {ex.Message}" });
-        }
-
-        StateHasChanged();
-    }
-
-    public void Dispose()
-    {
-        Hub.OnMessageStart -= HandleMessageStart;
-        Hub.OnContentDelta -= HandleContentDelta;
-        Hub.OnToolStart -= HandleToolStart;
-        Hub.OnToolEnd -= HandleToolEnd;
-        Hub.OnMessageEnd -= HandleMessageEnd;
-        Hub.OnError -= HandleError;
+        await Manager.SendMessageAsync(State.AgentId, text);
     }
 }

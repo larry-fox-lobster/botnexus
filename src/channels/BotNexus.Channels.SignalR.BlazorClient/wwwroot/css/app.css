@@ -174,6 +174,104 @@ html, body, #app {
     font-size: 0.85rem;
 }
 
+/* ── Agent tabs (Phase 3 multi-session) ────────────────────────────── */
+
+.agent-tab {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s, border-color 0.15s;
+    gap: 0.5rem;
+}
+
+.agent-tab:hover {
+    background: var(--bg-surface);
+    border-color: var(--accent);
+}
+
+.agent-tab.selected {
+    background: var(--bg-surface);
+    border-color: var(--accent);
+}
+
+.agent-tab-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.agent-tab-badges {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+.unread-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.agent-streaming-dot {
+    color: var(--accent);
+    font-size: 0.65rem;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+/* ── Connection status indicator ───────────────────────────────────── */
+
+.connection-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+}
+
+.connection-dot {
+    font-size: 0.6rem;
+}
+
+.connection-label {
+    opacity: 0.9;
+}
+
+/* ── Chat panel wrapper (show/hide for instant switching) ──────────── */
+
+.chat-panel-wrapper {
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.chat-panel-wrapper.active {
+    display: flex;
+}
+
+.chat-panel-wrapper.hidden {
+    display: none;
+}
+
 /* ── Chat area ──────────────────────────────────────────────────────── */
 
 .chat-area {
@@ -219,6 +317,16 @@ html, body, #app {
     font-size: 0.75rem;
     color: var(--text-muted);
     font-family: var(--font-mono);
+}
+
+.streaming-badge {
+    font-size: 0.7rem;
+    color: var(--accent);
+    background: rgba(0, 180, 216, 0.12);
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius);
+    animation: pulse 1s ease-in-out infinite;
+    margin-left: auto;
 }
 
 /* ── Messages ───────────────────────────────────────────────────────── */

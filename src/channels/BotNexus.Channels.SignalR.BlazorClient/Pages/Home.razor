@@ -1,5 +1,5 @@
 @page "/"
-@inject GatewayHubConnection Hub
+@inject AgentSessionManager Manager
 @inject NavigationManager Nav
 @implements IDisposable
 
@@ -9,78 +9,63 @@
     @* ── Agent sidebar ─────────────────────────────────────── *@
     <nav class="agent-list">
         <h3>Agents</h3>
-        <div class="connection-status @ConnectionCssClass">
-            @ConnectionLabel
-        </div>
+        <ConnectionStatus Hub="@Manager.Hub" />
 
-        @if (_agents.Count == 0 && Hub.IsConnected)
+        @if (Manager.Sessions.Count == 0 && Manager.Hub.IsConnected)
         {
             <p class="text-muted">No agents available.</p>
         }
 
-        @foreach (var agent in _agents)
+        @foreach (var (agentId, state) in Manager.Sessions)
         {
-            <button class="agent-btn @(agent.AgentId == _selectedAgentId ? "selected" : "")"
-                    @onclick="() => SelectAgent(agent)">
-                <span class="agent-name">@agent.DisplayName</span>
-                <span class="agent-id">@agent.AgentId</span>
+            <button class="agent-tab @(agentId == Manager.ActiveAgentId ? "selected" : "")"
+                    @onclick="() => SelectAgent(agentId)">
+                <div class="agent-tab-content">
+                    <span class="agent-name">@state.DisplayName</span>
+                    <span class="agent-id">@agentId</span>
+                </div>
+                <div class="agent-tab-badges">
+                    @if (state.UnreadCount > 0)
+                    {
+                        <span class="unread-badge">@state.UnreadCount</span>
+                    }
+                    @if (state.IsStreaming)
+                    {
+                        <span class="agent-streaming-dot" title="Streaming…">●</span>
+                    }
+                </div>
             </button>
         }
     </nav>
 
-    @* ── Chat area ─────────────────────────────────────────── *@
+    @* ── Chat area — one panel per agent, show/hide for instant switching ── *@
     <section class="chat-area">
-        @if (_selectedAgentId is null)
+        @if (Manager.ActiveAgentId is null)
         {
             <div class="empty-state">
                 <p>Select an agent to start chatting.</p>
             </div>
         }
-        else
+
+        @foreach (var (agentId, state) in Manager.Sessions)
         {
-            <ChatPanel AgentId="@_selectedAgentId"
-                       AgentDisplayName="@_selectedAgentName"
-                       Hub="@Hub" />
+            <div class="chat-panel-wrapper @(agentId == Manager.ActiveAgentId ? "active" : "hidden")">
+                <ChatPanel State="@state" Manager="@Manager" />
+            </div>
         }
     </section>
 </div>
 
 @code {
-    private readonly List<AgentSummary> _agents = [];
-    private string? _selectedAgentId;
-    private string? _selectedAgentName;
-
-    private string ConnectionCssClass => Hub.State switch
-    {
-        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected => "status-connected",
-        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connecting => "status-connecting",
-        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Reconnecting => "status-reconnecting",
-        _ => "status-disconnected"
-    };
-
-    private string ConnectionLabel => Hub.State switch
-    {
-        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected => "● Connected",
-        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connecting => "◌ Connecting…",
-        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Reconnecting => "◌ Reconnecting…",
-        _ => "○ Disconnected"
-    };
-
     protected override async Task OnInitializedAsync()
     {
-        Hub.OnConnected += HandleConnected;
-        Hub.OnReconnecting += HandleReconnecting;
-        Hub.OnDisconnected += HandleDisconnected;
+        Manager.OnStateChanged += HandleStateChanged;
 
         try
         {
-            // Derive the hub URL from the current origin.
-            // The Blazor app is served at /blazor/, hub is at /hub/gateway.
             var baseUri = new Uri(Nav.BaseUri);
             var hubUrl = new Uri(baseUri, "/hub/gateway").ToString();
-
-            await Hub.ConnectAsync(hubUrl);
-            await Hub.SubscribeAllAsync();
+            await Manager.InitializeAsync(hubUrl);
         }
         catch (Exception ex)
         {
@@ -88,33 +73,18 @@
         }
     }
 
-    private void HandleConnected(ConnectedPayload payload)
-    {
-        _agents.Clear();
-        _agents.AddRange(payload.Agents);
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void HandleReconnecting()
+    private void HandleStateChanged()
     {
         InvokeAsync(StateHasChanged);
     }
 
-    private void HandleDisconnected()
+    private void SelectAgent(string agentId)
     {
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void SelectAgent(AgentSummary agent)
-    {
-        _selectedAgentId = agent.AgentId;
-        _selectedAgentName = agent.DisplayName;
+        Manager.SetActiveAgent(agentId);
     }
 
     public void Dispose()
     {
-        Hub.OnConnected -= HandleConnected;
-        Hub.OnReconnecting -= HandleReconnecting;
-        Hub.OnDisconnected -= HandleDisconnected;
+        Manager.OnStateChanged -= HandleStateChanged;
     }
 }

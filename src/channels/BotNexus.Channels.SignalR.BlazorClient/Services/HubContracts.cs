@@ -38,6 +38,9 @@ public sealed record AgentStreamEvent
     [JsonPropertyName("type")]
     public string? Type { get; init; }
 
+    [JsonPropertyName("sessionId")]
+    public string? SessionId { get; init; }
+
     [JsonPropertyName("contentDelta")]
     public string? ContentDelta { get; init; }
 
