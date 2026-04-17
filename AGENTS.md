@@ -61,6 +61,10 @@ Build the full solution before running tests to avoid stale assembly issues (e.g
 
 ## Code Practices
 
+### Never Guess Time
+
+**Never assume or calculate the current time.** Always run `Get-Date` to get the local user time. Do not convert UTC timestamps to local time manually — you will get it wrong.
+
 ### No `[Obsolete]` Attributes
 
 **Never mark code as `[Obsolete]`.** This codebase has no external consumers — delete dead code instead of deprecating it. If a method, class, or interface is no longer needed, remove it and update all call sites in the same commit.
