@@ -115,7 +115,9 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         if (descriptor.Memory?.Enabled == true)
         {
             var memoryStore = _memoryStoreFactory.Create(descriptor.AgentId);
-            await memoryStore.InitializeAsync(cancellationToken);
+            // Initialize asynchronously — don't block handle creation.
+            // Memory tools work immediately; the store initializes in the background.
+            _ = memoryStore.InitializeAsync(CancellationToken.None);
             tools.Add(new MemorySearchTool(memoryStore, descriptor.Memory));
             tools.Add(new MemoryGetTool(memoryStore));
         }
@@ -188,15 +190,15 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         var skillsConfig = ResolveExtensionConfig<BotNexus.Extensions.Skills.SkillsConfig>(descriptor, "botnexus-skills");
         tools.Add(new SkillTool(globalSkillsDir, agentSkillsDir, workspaceSkillsDir, skillsConfig));
 
-        // MCP extension — bridge MCP server tools as native IAgentTool instances
+        // MCP extension — bridge MCP server tools as native IAgentTool instances.
+        // Servers start in the background so the agent responds immediately.
+        // Tools are appended to agent.State.Tools as each server comes online.
         McpServerManager? mcpManager = null;
         var mcpConfig = ResolveExtensionConfig<McpExtensionConfig>(descriptor, "botnexus-mcp");
         if (mcpConfig is { Servers.Count: > 0 })
         {
             var mcpLogger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<McpServerManager>();
             mcpManager = new McpServerManager(mcpLogger);
-            var mcpTools = await mcpManager.StartServersAsync(mcpConfig, cancellationToken).ConfigureAwait(false);
-            tools.AddRange(mcpTools);
         }
 
         // MCP Invoke extension — single tool for skill-driven MCP access (lazy server lifecycle)
@@ -337,7 +339,51 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
 
         _logger.LogDebug("Created in-process agent handle for '{AgentId}' session '{SessionId}'", descriptor.AgentId, context.SessionId);
 
+        // Start MCP servers in background — tools become available progressively
+        if (mcpManager is not null && mcpConfig is { Servers.Count: > 0 })
+        {
+            _ = StartMcpServersInBackgroundAsync(agent, mcpManager, mcpConfig, descriptor.AgentId, context.SessionId);
+        }
+
         return handle;
+    }
+
+    /// <summary>
+    /// Starts MCP servers in the background and appends their tools to the agent
+    /// as each server comes online. The agent can respond immediately with non-MCP tools.
+    /// </summary>
+    private async Task StartMcpServersInBackgroundAsync(
+        Agent agent,
+        McpServerManager mcpManager,
+        McpExtensionConfig mcpConfig,
+        AgentId agentId,
+        SessionId sessionId)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "Starting {Count} MCP server(s) in background for '{AgentId}' session '{SessionId}'",
+                mcpConfig.Servers.Count, agentId, sessionId);
+
+            var mcpTools = await mcpManager.StartServersAsync(mcpConfig, CancellationToken.None)
+                .ConfigureAwait(false);
+
+            if (mcpTools.Count > 0)
+            {
+                // Append MCP tools to the agent's live tool list
+                agent.State.Tools = [.. agent.State.Tools, .. mcpTools];
+
+                _logger.LogInformation(
+                    "MCP tools loaded for '{AgentId}': {ToolCount} tool(s) now available. Agent has {TotalTools} total tools.",
+                    agentId, mcpTools.Count, agent.State.Tools.Count);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Background MCP server startup failed for '{AgentId}' session '{SessionId}'. Agent continues without MCP tools.",
+                agentId, sessionId);
+        }
     }
 
     private static bool ResolveAllowCrossAgentCron(AgentDescriptor descriptor)
