@@ -135,14 +135,14 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
             var assembly = loadContext.LoadFromAssemblyPath(extension.EntryAssemblyPath);
 
             var discoveredImplementations = DiscoverImplementations(assembly);
-            if (discoveredImplementations.Count > 0)
-            {
-                _logger.LogDebug(
-                    "Extension '{ExtensionId}' discovered {Count} implementation(s): {Implementations}",
-                    extension.Manifest.Id,
-                    discoveredImplementations.Count,
-                    string.Join(", ", discoveredImplementations.Select(d => $"{d.ServiceContract.Name}->{d.Implementation.Name}")));
-            }
+            _logger.LogWarning(
+                "Extension '{ExtensionId}' from '{Path}': discovered {Count} implementation(s){Details}",
+                extension.Manifest.Id,
+                extension.EntryAssemblyPath,
+                discoveredImplementations.Count,
+                discoveredImplementations.Count > 0
+                    ? ": " + string.Join(", ", discoveredImplementations.Select(d => $"{d.ServiceContract.Name}->{d.Implementation.Name}"))
+                    : " — no discoverable types found");
 
             var hookHandlerTypes = DiscoverHookHandlers(assembly);
             var registeredServiceNames = RegisterServices(discoveredImplementations);
@@ -165,7 +165,7 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
                 _loaded[extension.Manifest.Id] = new LoadedExtensionRuntime(loadedExtension, loadContext);
             }
 
-            _logger.LogInformation(
+            _logger.LogWarning(
                 "Loaded extension '{ExtensionId}' ({Name} v{Version}) with {ServiceCount} service registration(s).",
                 loadedExtension.ExtensionId,
                 loadedExtension.Name,
