@@ -13,8 +13,10 @@ using BotNexus.Gateway.Abstractions.Media;
 using BotNexus.Gateway.Abstractions.Routing;
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Abstractions.Sessions;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace BotNexus.Gateway.Extensions;
@@ -39,7 +41,10 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
         typeof(IActivityBroadcaster),
         typeof(IAgentTool),
         typeof(ICommandContributor),
-        typeof(IMediaHandler)
+        typeof(IMediaHandler),
+        typeof(IEndpointContributor),
+        typeof(IApiContributor),
+        typeof(IHostedService)
     ];
 
     private readonly IServiceCollection _services;
@@ -217,6 +222,25 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
             return _loaded.Values.Select(value => value.LoadedExtension).ToArray();
     }
 
+    /// <summary>
+    /// Runs post-build extension phases: endpoint contributors and API contributors.
+    /// Call after WebApplication.Build() and before app.Run().
+    /// </summary>
+    public static void MapExtensionEndpoints(WebApplication app)
+    {
+        foreach (var contributor in app.Services.GetServices<IEndpointContributor>())
+            contributor.MapEndpoints(app);
+
+        foreach (var apiContributor in app.Services.GetServices<IApiContributor>())
+        {
+            // TODO: determine extension ID for scoped routing
+            // For now, use type name as namespace
+            var extId = apiContributor.GetType().Assembly.GetName().Name ?? "unknown";
+            var group = app.MapGroup($"/api/extensions/{extId}");
+            apiContributor.MapApiRoutes(group);
+        }
+    }
+
     private static ExtensionManifest ReadAndValidateManifest(IFileSystem fileSystem, string manifestPath, string extensionDirectory)
     {
         var manifestJson = fileSystem.File.ReadAllText(manifestPath);
@@ -262,7 +286,9 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
             "tool",
             "command",
             "hook-handler",
-            "media-handler"
+            "media-handler",
+            "endpoint-contributor",
+            "api-contributor"
         };
 
         var invalidTypes = extensionTypes
@@ -357,7 +383,10 @@ public sealed class AssemblyLoadContextExtensionLoader : IExtensionLoader
                 contract == typeof(IIsolationStrategy) ||
                 contract == typeof(IAgentTool) ||
                 contract == typeof(ICommandContributor) ||
-                contract == typeof(IMediaHandler))
+                contract == typeof(IMediaHandler) ||
+                contract == typeof(IEndpointContributor) ||
+                contract == typeof(IApiContributor) ||
+                contract == typeof(IHostedService))
             {
                 _services.AddSingleton(contract, implementation);
             }

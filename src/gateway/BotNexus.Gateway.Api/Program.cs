@@ -209,6 +209,9 @@ app.UseMiddleware<RateLimitingMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI();
 
+// Extension post-build: endpoint + API contributors
+AssemblyLoadContextExtensionLoader.MapExtensionEndpoints(app);
+
 app.MapControllers();
 app.MapHub<GatewayHub>("/hub/gateway");
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
