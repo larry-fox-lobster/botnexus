@@ -1,4 +1,4 @@
-namespace BotNexus.Gateway.Api.Hubs;
+namespace BotNexus.Channels.SignalR;
 
 /// <summary>
 /// DTO for media content parts sent via SignalR.

@@ -1,5 +1,5 @@
 using BotNexus.Gateway.Api.Extensions;
-using BotNexus.Gateway.Api.Hubs;
+using BotNexus.Channels.SignalR;
 using BotNexus.Gateway.Api;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Channels;

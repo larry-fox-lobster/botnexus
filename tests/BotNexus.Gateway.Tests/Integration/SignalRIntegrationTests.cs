@@ -10,7 +10,7 @@ using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Api;
-using BotNexus.Gateway.Api.Hubs;
+using BotNexus.Channels.SignalR;
 using BotNexus.Gateway.Configuration;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;

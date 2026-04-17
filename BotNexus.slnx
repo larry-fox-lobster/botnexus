@@ -29,6 +29,7 @@
   </Folder>
   <Folder Name="/src/channels/">
     <Project Path="src/channels/BotNexus.Channels.Core/BotNexus.Channels.Core.csproj" />
+    <Project Path="src/channels/BotNexus.Channels.SignalR/BotNexus.Channels.SignalR.csproj" />
     <Project Path="src/channels/BotNexus.Channels.Telegram/BotNexus.Channels.Telegram.csproj" />
     <Project Path="src/channels/BotNexus.Channels.Tui/BotNexus.Channels.Tui.csproj" />
   </Folder>
@@ -63,6 +64,7 @@
     <Project Path="tests/BotNexus.AgentCore.Tests/BotNexus.AgentCore.Tests.csproj" />
     <Project Path="tests/BotNexus.Providers.Core.Tests/BotNexus.Providers.Core.Tests.csproj" />
     <Project Path="tests/BotNexus.Providers.Conformance.Tests/BotNexus.Providers.Conformance.Tests.csproj" />
+    <Project Path="tests/BotNexus.IntegrationTests/BotNexus.IntegrationTests.csproj" />
     <Project Path="tests/BotNexus.Memory.Tests/BotNexus.Memory.Tests.csproj" />
     <Project Path="tests/BotNexus.Providers.Anthropic.Tests/BotNexus.Providers.Anthropic.Tests.csproj" />
     <Project Path="tests/BotNexus.Providers.OpenAI.Tests/BotNexus.Providers.OpenAI.Tests.csproj" />

@@ -6,7 +6,7 @@ using BotNexus.Domain.Primitives;
 using Microsoft.Extensions.Logging;
 using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
 
-namespace BotNexus.Gateway.Api.Hubs;
+namespace BotNexus.Gateway.Api.Triggers;
 
 /// <summary>
 /// Internal trigger used for daily soul-session heartbeat execution.

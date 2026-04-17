@@ -12,9 +12,10 @@ using SessionType = BotNexus.Domain.Primitives.SessionType;
 using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace BotNexus.Gateway.Api.Hubs;
+namespace BotNexus.Channels.SignalR;
 
 #pragma warning disable CS1591 // Hub methods are self-documenting SignalR contracts
 

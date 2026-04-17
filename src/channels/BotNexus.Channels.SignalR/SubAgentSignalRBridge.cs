@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace BotNexus.Gateway.Api.Hubs;
+namespace BotNexus.Channels.SignalR;
 
 /// <summary>
 /// Bridges sub-agent lifecycle events from <see cref="IActivityBroadcaster"/> to SignalR

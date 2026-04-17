@@ -3,7 +3,7 @@ using BotNexus.Channels.Telegram;
 using BotNexus.Channels.Tui;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
-using BotNexus.Gateway.Api.Hubs;
+using BotNexus.Channels.SignalR;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging.Abstractions;

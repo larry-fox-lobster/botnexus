@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>BotNexus.Channels.SignalR</RootNamespace>
+    <Description>Real-time web communication channel using SignalR for the BotNexus Gateway.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\gateway\BotNexus.Gateway.Abstractions\BotNexus.Gateway.Abstractions.csproj" />
+    <ProjectReference Include="..\BotNexus.Channels.Core\BotNexus.Channels.Core.csproj" />
+    <ProjectReference Include="..\..\domain\BotNexus.Domain\BotNexus.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="botnexus-extension.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

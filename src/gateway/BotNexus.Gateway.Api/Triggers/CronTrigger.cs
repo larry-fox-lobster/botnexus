@@ -5,7 +5,7 @@ using BotNexus.Gateway.Abstractions.Triggers;
 using BotNexus.Domain.Primitives;
 using Microsoft.Extensions.Logging;
 
-namespace BotNexus.Gateway.Api.Hubs;
+namespace BotNexus.Gateway.Api.Triggers;
 
 /// <summary>
 /// Internal trigger used for cron-triggered sessions.

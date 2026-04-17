@@ -5,7 +5,7 @@ using BotNexus.Domain.Primitives;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 
-namespace BotNexus.Gateway.Api.Hubs;
+namespace BotNexus.Channels.SignalR;
 
 #pragma warning disable CS1591 // Channel adapter methods match base class contracts
 

@@ -1,7 +1,8 @@
+using BotNexus.Channels.SignalR;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Triggers;
-using BotNexus.Gateway.Api.Hubs;
 using BotNexus.Gateway.Api.Logging;
+using BotNexus.Gateway.Api.Triggers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
