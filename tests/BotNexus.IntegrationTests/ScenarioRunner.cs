@@ -67,9 +67,25 @@ public class ScenarioRunner
         var port = GetFreePort();
         var baseUrl = $"http://127.0.0.1:{port}";
         var configDir = PrepareTestConfig();
+        var mcpServers = new List<McpPingServer>();
 
         try
         {
+            // Start MCP test servers
+            var mcpUrls = new Dictionary<string, string>();
+            if (scenario.McpServers is { Count: > 0 })
+            {
+                foreach (var serverDef in scenario.McpServers)
+                {
+                    var mcpPort = GetFreePort();
+                    var server = new McpPingServer(mcpPort);
+                    await server.StartAsync(CancellationToken.None);
+                    mcpServers.Add(server);
+                    mcpUrls[serverDef.Name] = server.Url;
+                    log.Write($"MCP server '{serverDef.Name}' started on port {mcpPort}");
+                }
+            }
+
             // Launch gateway process
             using var gateway = StartGateway(gatewayDll, port, configDir);
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(scenario.TimeoutSeconds));
@@ -78,11 +94,11 @@ public class ScenarioRunner
             await WaitForGatewayReady(baseUrl, cts.Token);
             log.Write("Gateway started on port " + port);
 
-            // Register test agents
+            // Register test agents (with MCP server URLs injected)
             using var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
             foreach (var agent in scenario.Agents)
             {
-                await AgentRegistrar.RegisterAsync(httpClient, agent, cts.Token);
+                await AgentRegistrar.RegisterAsync(httpClient, agent, mcpUrls, cts.Token);
                 log.Write($"Registered agent: {agent.Id}");
             }
 
@@ -120,6 +136,11 @@ public class ScenarioRunner
         }
         finally
         {
+            // Clean up MCP servers
+            foreach (var server in mcpServers)
+            {
+                try { await server.DisposeAsync(); } catch { }
+            }
             // Clean up test config directory
             try { Directory.Delete(configDir, true); } catch { }
         }

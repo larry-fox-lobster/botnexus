@@ -21,6 +21,21 @@ public class ScenarioDefinition
     /// Use this instead of Steps for true multi-agent concurrency testing.
     /// </summary>
     public List<StepTrack>? Tracks { get; set; }
+
+    /// <summary>
+    /// MCP test servers to start before the gateway.
+    /// The gateway config is updated with their URLs before agent registration.
+    /// </summary>
+    [JsonPropertyName("mcp_servers")]
+    public List<McpTestServerDef>? McpServers { get; set; }
+}
+
+/// <summary>
+/// Defines a test MCP server to start alongside the gateway.
+/// </summary>
+public class McpTestServerDef
+{
+    public string Name { get; set; } = "";
 }
 
 /// <summary>
@@ -42,6 +57,8 @@ public class AgentDefinition
     public string Provider { get; set; } = "github-copilot";
     [JsonPropertyName("system_prompt")]
     public string? SystemPrompt { get; set; }
+    /// <summary>Extension config for the agent (e.g., MCP server references).</summary>
+    public JsonElement? Extensions { get; set; }
 }
 
 public class ScenarioStep

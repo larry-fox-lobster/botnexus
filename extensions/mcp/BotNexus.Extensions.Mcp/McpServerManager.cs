@@ -105,6 +105,62 @@ public sealed class McpServerManager : IAsyncDisposable
     }
 
     /// <summary>
+    /// Starts a single MCP server, initializes it, and returns bridged tools.
+    /// Thread-safe — can be called concurrently for multiple servers.
+    /// </summary>
+    public async Task<IReadOnlyList<IAgentTool>> StartSingleServerAsync(
+        string serverId,
+        McpServerConfig serverConfig,
+        bool useToolPrefix = true,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var transport = CreateTransport(serverConfig);
+        if (transport is null)
+            return [];
+
+        var client = new McpClient(transport, serverId);
+
+        using var initCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        initCts.CancelAfter(serverConfig.InitTimeoutMs);
+
+        try
+        {
+            await client.InitializeAsync(initCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            await client.DisposeAsync().ConfigureAwait(false);
+            _logger.LogWarning(
+                "MCP server '{ServerId}' did not initialize within {TimeoutMs}ms. Skipping server.",
+                serverId, serverConfig.InitTimeoutMs);
+            return [];
+        }
+        catch (Exception ex)
+        {
+            await client.DisposeAsync().ConfigureAwait(false);
+            _logger.LogWarning(ex,
+                "MCP server '{ServerId}' failed to initialize: {ErrorMessage}. Skipping server.",
+                serverId, ex.Message);
+            return [];
+        }
+
+        lock (_clients)
+        {
+            _clients.Add(client);
+        }
+
+        var mcpTools = await client.ListToolsAsync(ct).ConfigureAwait(false);
+
+        _logger.LogInformation(
+            "MCP server '{ServerId}' initialized successfully with {ToolCount} tool(s).",
+            serverId, mcpTools.Count);
+
+        return mcpTools.Select(t => (IAgentTool)new McpBridgedTool(client, t, useToolPrefix)).ToList();
+    }
+
+    /// <summary>
     /// Returns all bridged tools across all connected servers.
     /// </summary>
     public IReadOnlyList<McpClient> GetClients()

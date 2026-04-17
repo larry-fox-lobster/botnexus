@@ -350,7 +350,8 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
 
     /// <summary>
     /// Starts MCP servers in the background and appends their tools to the agent
-    /// as each server comes online. The agent can respond immediately with non-MCP tools.
+    /// as each server comes online. Each server connects independently — a slow or
+    /// failed server does not block other servers from providing their tools.
     /// </summary>
     private async Task StartMcpServersInBackgroundAsync(
         Agent agent,
@@ -359,30 +360,44 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
         AgentId agentId,
         SessionId sessionId)
     {
+        _logger.LogInformation(
+            "Starting {Count} MCP server(s) in background for '{AgentId}' session '{SessionId}'",
+            mcpConfig.Servers.Count, agentId, sessionId);
+
+        // Start each server independently so fast servers provide tools immediately
+        // while slow servers continue connecting in the background.
+        var tasks = mcpConfig.Servers.Select(kvp =>
+            StartSingleMcpServerAsync(agent, mcpManager, mcpConfig, kvp.Key, kvp.Value, agentId));
+
+        await Task.WhenAll(tasks).ConfigureAwait(false);
+    }
+
+    private async Task StartSingleMcpServerAsync(
+        Agent agent,
+        McpServerManager mcpManager,
+        McpExtensionConfig mcpConfig,
+        string serverId,
+        McpServerConfig serverConfig,
+        AgentId agentId)
+    {
         try
         {
-            _logger.LogInformation(
-                "Starting {Count} MCP server(s) in background for '{AgentId}' session '{SessionId}'",
-                mcpConfig.Servers.Count, agentId, sessionId);
-
-            var mcpTools = await mcpManager.StartServersAsync(mcpConfig, CancellationToken.None)
+            var tools = await mcpManager.StartSingleServerAsync(serverId, serverConfig, mcpConfig.ToolPrefix, CancellationToken.None)
                 .ConfigureAwait(false);
 
-            if (mcpTools.Count > 0)
+            if (tools.Count > 0)
             {
-                // Append MCP tools to the agent's live tool list
-                agent.State.Tools = [.. agent.State.Tools, .. mcpTools];
-
+                agent.State.Tools = [.. agent.State.Tools, .. tools];
                 _logger.LogInformation(
-                    "MCP tools loaded for '{AgentId}': {ToolCount} tool(s) now available. Agent has {TotalTools} total tools.",
-                    agentId, mcpTools.Count, agent.State.Tools.Count);
+                    "MCP server '{ServerId}' loaded {ToolCount} tool(s) for '{AgentId}'. Agent now has {TotalTools} tools.",
+                    serverId, tools.Count, agentId, agent.State.Tools.Count);
             }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex,
-                "Background MCP server startup failed for '{AgentId}' session '{SessionId}'. Agent continues without MCP tools.",
-                agentId, sessionId);
+                "MCP server '{ServerId}' failed for '{AgentId}'. Agent continues without its tools.",
+                serverId, agentId);
         }
     }
 
