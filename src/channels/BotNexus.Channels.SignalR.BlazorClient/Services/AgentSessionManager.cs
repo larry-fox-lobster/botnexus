@@ -276,12 +276,12 @@ public sealed class AgentSessionManager : IDisposable
         OnStateChanged?.Invoke();
     }
 
-    private void HandleContentDelta(ContentDeltaPayload payload)
+    private void HandleContentDelta(AgentStreamEvent evt)
     {
-        var state = FindStateBySessionId(payload.SessionId);
+        var state = FindStateBySessionId(evt.SessionId);
         if (state is null) return;
 
-        state.CurrentStreamBuffer += payload.ContentDelta ?? "";
+        state.CurrentStreamBuffer += evt.ContentDelta ?? "";
         OnStateChanged?.Invoke();
     }
 

@@ -23,7 +23,7 @@ public sealed class GatewayHubConnection : IAsyncDisposable
     public event Action<AgentStreamEvent>? OnMessageStart;
 
     /// <summary>Raised for each incremental content chunk.</summary>
-    public event Action<ContentDeltaPayload>? OnContentDelta;
+    public event Action<AgentStreamEvent>? OnContentDelta;
 
     /// <summary>Raised for each incremental thinking chunk.</summary>
     public event Action<AgentStreamEvent>? OnThinkingDelta;
@@ -92,7 +92,7 @@ public sealed class GatewayHubConnection : IAsyncDisposable
         _connection.On<ConnectedPayload>("Connected", p => OnConnected?.Invoke(p));
         _connection.On<SessionResetPayload>("SessionReset", p => OnSessionReset?.Invoke(p));
         _connection.On<AgentStreamEvent>("MessageStart", e => OnMessageStart?.Invoke(e));
-        _connection.On<ContentDeltaPayload>("ContentDelta", e => OnContentDelta?.Invoke(e));
+        _connection.On<AgentStreamEvent>("ContentDelta", e => OnContentDelta?.Invoke(e));
         _connection.On<AgentStreamEvent>("ThinkingDelta", e => OnThinkingDelta?.Invoke(e));
         _connection.On<AgentStreamEvent>("ToolStart", e => OnToolStart?.Invoke(e));
         _connection.On<AgentStreamEvent>("ToolEnd", e => OnToolEnd?.Invoke(e));
