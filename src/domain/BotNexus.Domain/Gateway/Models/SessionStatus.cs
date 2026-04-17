@@ -1,8 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace BotNexus.Gateway.Abstractions.Models;
 
 /// <summary>
 /// Represents the lifecycle status of a gateway session.
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum SessionStatus
 {
     /// <summary>The session is active and available for new messages.</summary>
