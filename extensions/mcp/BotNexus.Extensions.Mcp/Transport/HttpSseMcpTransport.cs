@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -235,6 +236,10 @@ public sealed class HttpSseMcpTransport : IMcpTransport
     {
         var request = new HttpRequestMessage(method, _endpoint);
 
+        // Force HTTP/1.1 — many MCP servers don't flush SSE events properly
+        // over HTTP/2, causing .NET's response stream to hang indefinitely.
+        request.Version = HttpVersion.Version11;
+
         if (_sessionId is not null)
         {
             request.Headers.TryAddWithoutValidation("Mcp-Session-Id", _sessionId);
@@ -268,7 +273,55 @@ public sealed class HttpSseMcpTransport : IMcpTransport
         using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
 
-        await ParseSseStreamAsync(reader, ct).ConfigureAwait(false);
+        // For single request/response exchanges, read until we get one complete
+        // SSE event then return. Many MCP servers keep the SSE stream open after
+        // sending the response, so ParseSseStreamAsync would hang forever.
+        string? data = null;
+
+        while (!ct.IsCancellationRequested)
+        {
+            // Per-line timeout prevents hanging if the server keeps the stream open
+            // without sending more data after the response.
+            using var lineCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            lineCts.CancelAfter(TimeSpan.FromSeconds(10));
+
+            string? line;
+            try
+            {
+                line = await reader.ReadLineAsync(lineCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                // Line read timed out — flush any buffered data and return
+                break;
+            }
+
+            if (line is null) break; // EOF
+
+            if (line.Length == 0)
+            {
+                // Blank line = end of SSE event
+                if (data is not null)
+                {
+                    TryEnqueueResponse(data);
+                    return; // Got our response, done
+                }
+                continue;
+            }
+
+            if (line.StartsWith("data:", StringComparison.Ordinal))
+            {
+                var value = line.Length > 5 ? line[5..].Trim() : string.Empty;
+                data = data is null ? value : $"{data}\n{value}";
+            }
+            // Ignore event:, id:, retry:, and comment lines
+        }
+
+        // Flush trailing data without a final blank line
+        if (data is not null)
+        {
+            TryEnqueueResponse(data);
+        }
     }
 
     /// <summary>
