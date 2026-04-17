@@ -39,5 +39,6 @@
       "action": "api_delete",
       "path": "/api/agents/test-lifecycle",
       "expected_status": 204
+    }
   ]
 }

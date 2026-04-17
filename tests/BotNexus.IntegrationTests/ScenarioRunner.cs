@@ -9,7 +9,11 @@ public class ScenarioRunner
 {
     public async Task<int> RunAllAsync(string scenarioDir, string? filter = null)
     {
+        var logPath = Path.Combine(AppContext.BaseDirectory, "integration-test.log");
+        using var log = new TestLogger(logPath);
+
         var scenarios = LoadScenarios(scenarioDir, filter);
+        log.Write($"Found {scenarios.Count} scenario(s)");
         Console.WriteLine($"Found {scenarios.Count} scenario(s)");
 
         // Use existing Release build if available, otherwise build
@@ -33,35 +37,31 @@ public class ScenarioRunner
 
         foreach (var scenario in scenarios)
         {
-            Console.WriteLine();
-            Console.Write($"  ▶ {scenario.Name}... ");
+            log.WriteHeader(scenario.Name);
 
             try
             {
-                await RunScenarioAsync(scenario, gatewayDll);
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("PASS");
-                Console.ResetColor();
+                await RunScenarioAsync(scenario, gatewayDll, log);
+                log.WriteResult(scenario.Name, true);
                 passed++;
             }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("FAIL");
-                Console.ResetColor();
-                Console.WriteLine($"    {ex.Message}");
+                log.WriteResult(scenario.Name, false, ex.Message);
                 if (ex.InnerException is not null)
-                    Console.WriteLine($"    Inner: {ex.InnerException.Message}");
+                    log.Write($"    Inner: {ex.InnerException.Message}");
                 failed++;
             }
         }
 
         Console.WriteLine();
         Console.WriteLine($"Results: {passed} passed, {failed} failed");
+        log.Write($"Results: {passed} passed, {failed} failed");
+        Console.WriteLine($"Log: {logPath}");
         return failed > 0 ? 1 : 0;
     }
 
-    private async Task RunScenarioAsync(ScenarioDefinition scenario, string gatewayDll)
+    private async Task RunScenarioAsync(ScenarioDefinition scenario, string gatewayDll, TestLogger log)
     {
         var port = GetFreePort();
         var baseUrl = $"http://127.0.0.1:{port}";
@@ -75,22 +75,23 @@ public class ScenarioRunner
 
             // Wait for gateway to be ready
             await WaitForGatewayReady(baseUrl, cts.Token);
-            Console.Write("gateway up... ");
+            log.Write("Gateway started on port " + port);
 
             // Register test agents
             using var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
             foreach (var agent in scenario.Agents)
             {
                 await AgentRegistrar.RegisterAsync(httpClient, agent, cts.Token);
+                log.Write($"Registered agent: {agent.Id}");
             }
 
             // Connect SignalR client
-            await using var client = new TestSignalRClient(baseUrl);
+            await using var client = new TestSignalRClient(baseUrl, log);
             await client.ConnectAsync(cts.Token);
             await client.SubscribeAllAsync(cts.Token);
 
             // Execute steps
-            var executor = new StepExecutor(client, httpClient);
+            var executor = new StepExecutor(client, httpClient, log);
             await executor.ExecuteStepsAsync(scenario.Steps, cts.Token);
 
             // Shut down gateway

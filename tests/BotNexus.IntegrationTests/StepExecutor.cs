@@ -7,14 +7,16 @@ public class StepExecutor
 {
     private readonly TestSignalRClient _client;
     private readonly HttpClient _httpClient;
+    private readonly TestLogger _log;
     private readonly Dictionary<string, string> _stepSessions = new();
     private readonly Dictionary<string, Stopwatch> _stepTimers = new();
     private string? _lastApiResponse;
     
-    public StepExecutor(TestSignalRClient client, HttpClient httpClient)
+    public StepExecutor(TestSignalRClient client, HttpClient httpClient, TestLogger log)
     {
         _client = client;
         _httpClient = httpClient;
+        _log = log;
     }
     
     public async Task ExecuteStepsAsync(List<ScenarioStep> steps, CancellationToken ct)
@@ -65,18 +67,18 @@ public class StepExecutor
     private async Task ExecuteSendAsync(ScenarioStep step, CancellationToken ct)
     {
         var timer = Stopwatch.StartNew();
-        var sessionId = await _client.SendMessageAsync(
+        var result = await _client.SendMessageAsync(
             step.Agent ?? throw new InvalidOperationException("send_message requires agent"),
             step.Content ?? "hello",
             ct);
         
         if (step.Label is not null)
         {
-            _stepSessions[step.Label] = sessionId;
+            _stepSessions[step.Label] = result.SessionId;
             _stepTimers[step.Label] = timer;
         }
         
-        Console.WriteLine($"    → Sent to {step.Agent} (session: {sessionId[..8]}...)");
+        _log.Write($"→ Sent to {step.Agent} (session: {result.SessionId[..8]}...)");
     }
     
     private async Task ExecuteWaitForEventAsync(ScenarioStep step, CancellationToken ct)
@@ -88,7 +90,7 @@ public class StepExecutor
         if (step.FromStep is not null && _stepTimers.TryGetValue(step.FromStep, out var timer))
         {
             timer.Stop();
-            Console.WriteLine($"    ← {step.Type} from {step.FromStep} ({timer.ElapsedMilliseconds}ms)");
+            _log.Write($"← {step.Type} from {step.FromStep} ({timer.ElapsedMilliseconds}ms)");
         }
     }
     
@@ -103,7 +105,7 @@ public class StepExecutor
             if (evt.FromStep is not null && _stepTimers.TryGetValue(evt.FromStep, out var timer))
             {
                 timer.Stop();
-                Console.WriteLine($"    ← {evt.Type} from {evt.FromStep} ({timer.ElapsedMilliseconds}ms)");
+                _log.Write($"← {evt.Type} from {evt.FromStep} ({timer.ElapsedMilliseconds}ms)");
             }
         });
         
@@ -118,7 +120,7 @@ public class StepExecutor
             ?? throw new InvalidOperationException("No session to reset");
         
         await _client.ResetSessionAsync(agentId, sessionId, ct);
-        Console.WriteLine($"    ↺ Reset session for {agentId}");
+        _log.Write($"↺ Reset session for {agentId}");
     }
 
     private async Task ExecuteApiGetAsync(ScenarioStep step, CancellationToken ct)
@@ -126,7 +128,7 @@ public class StepExecutor
         var path = step.Path ?? throw new InvalidOperationException("api_get requires path");
         var response = await _httpClient.GetAsync(path, ct);
         _lastApiResponse = await response.Content.ReadAsStringAsync(ct);
-        Console.WriteLine($"    GET {path} → {(int)response.StatusCode}");
+        _log.Write($"GET {path} → {(int)response.StatusCode}");
 
         ValidateStatus(step, response.StatusCode);
         ValidateContains(step, _lastApiResponse);
@@ -139,7 +141,7 @@ public class StepExecutor
         var content = new StringContent(body, Encoding.UTF8, "application/json");
         var response = await _httpClient.PutAsync(path, content, ct);
         _lastApiResponse = await response.Content.ReadAsStringAsync(ct);
-        Console.WriteLine($"    PUT {path} → {(int)response.StatusCode}");
+        _log.Write($"PUT {path} → {(int)response.StatusCode}");
 
         ValidateStatus(step, response.StatusCode);
         ValidateContains(step, _lastApiResponse);
@@ -152,7 +154,7 @@ public class StepExecutor
         var content = new StringContent(body, Encoding.UTF8, "application/json");
         var response = await _httpClient.PostAsync(path, content, ct);
         _lastApiResponse = await response.Content.ReadAsStringAsync(ct);
-        Console.WriteLine($"    POST {path} → {(int)response.StatusCode}");
+        _log.Write($"POST {path} → {(int)response.StatusCode}");
 
         ValidateStatus(step, response.StatusCode);
         ValidateContains(step, _lastApiResponse);
@@ -163,7 +165,7 @@ public class StepExecutor
         var path = step.Path ?? throw new InvalidOperationException("api_delete requires path");
         var response = await _httpClient.DeleteAsync(path, ct);
         _lastApiResponse = await response.Content.ReadAsStringAsync(ct);
-        Console.WriteLine($"    DELETE {path} → {(int)response.StatusCode}");
+        _log.Write($"DELETE {path} → {(int)response.StatusCode}");
 
         ValidateStatus(step, response.StatusCode);
         ValidateContains(step, _lastApiResponse);
@@ -216,3 +218,4 @@ public class StepExecutor
         }
     }
 }
+
