@@ -204,4 +204,37 @@ public sealed class AgentsController : ControllerBase
         await _supervisor.StopAsync(AgentId.From(agentId), SessionId.From(sessionId), cancellationToken);
         return NoContent();
     }
+
+    /// <summary>
+    /// Debug: lists the tools available to a running agent instance.
+    /// </summary>
+    [HttpGet("{agentId}/sessions/{sessionId}/tools")]
+    public ActionResult GetInstanceTools(string agentId, string sessionId,
+        [FromServices] IAgentHandleInspector? inspector = null)
+    {
+        if (inspector is null) return NotFound("No handle inspector registered.");
+        var handle = inspector.GetHandle(AgentId.From(agentId), SessionId.From(sessionId));
+        if (handle is null) return NotFound("No active handle for this agent/session.");
+
+        // Try known tool names to build a list
+        var knownToolNames = new[] {
+            "read", "write", "edit", "bash", "ls", "grep", "glob",
+            "exec", "process", "cron", "session", "delay", "file_watcher",
+            "spawn_subagent", "list_subagents", "manage_subagent",
+            "agent_converse", "skill", "memory_search", "memory_get",
+            "web_fetch", "web_search", "ping"
+        };
+
+        var foundTools = knownToolNames
+            .Where(name => inspector.ResolveTool(AgentId.From(agentId), SessionId.From(sessionId), name) is not null)
+            .ToList();
+
+        return Ok(new
+        {
+            agentId,
+            sessionId,
+            toolCount = foundTools.Count,
+            tools = foundTools
+        });
+    }
 }

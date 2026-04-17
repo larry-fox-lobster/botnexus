@@ -112,6 +112,11 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
             .Concat(extensionTools.Where(tool => !workspaceToolNames.Contains(tool.Name)))
             .ToList();
 
+        _logger.LogInformation(
+            "Tool setup for '{AgentId}': workspace={WorkspaceCount} extension={ExtCount} total={Total} toolIds={ToolIdCount} workspace={WorkspacePath}",
+            descriptor.AgentId, workspaceTools.Count, extensionTools.Count(), tools.Count,
+            descriptor.ToolIds.Count, workspacePath);
+
         if (descriptor.Memory?.Enabled == true)
         {
             var memoryStore = _memoryStoreFactory.Create(descriptor.AgentId);
