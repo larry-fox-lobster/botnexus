@@ -23,8 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\extensions\mcp-invoke\BotNexus.Extensions.McpInvoke\BotNexus.Extensions.McpInvoke.csproj" />
-    <ProjectReference Include="..\..\extensions\mcp\BotNexus.Extensions.Mcp\BotNexus.Extensions.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\extensions\BotNexus.Extensions.McpInvoke\BotNexus.Extensions.McpInvoke.csproj" />
+    <ProjectReference Include="..\..\src\extensions\BotNexus.Extensions.Mcp\BotNexus.Extensions.Mcp.csproj" />
   </ItemGroup>
 
   <ItemGroup>

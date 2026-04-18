@@ -23,8 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\extensions\web\BotNexus.Extensions.WebTools\BotNexus.Extensions.WebTools.csproj" />
-    <ProjectReference Include="..\..\extensions\mcp\BotNexus.Extensions.Mcp\BotNexus.Extensions.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\extensions\BotNexus.Extensions.WebTools\BotNexus.Extensions.WebTools.csproj" />
+    <ProjectReference Include="..\..\src\extensions\BotNexus.Extensions.Mcp\BotNexus.Extensions.Mcp.csproj" />
   </ItemGroup>
 
   <ItemGroup>

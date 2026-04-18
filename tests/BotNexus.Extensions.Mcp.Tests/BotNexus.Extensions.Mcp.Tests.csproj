@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\extensions\mcp\BotNexus.Extensions.Mcp\BotNexus.Extensions.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\extensions\BotNexus.Extensions.Mcp\BotNexus.Extensions.Mcp.csproj" />
     <ProjectReference Include="..\..\src\gateway\BotNexus.Gateway\BotNexus.Gateway.csproj" />
   </ItemGroup>
 

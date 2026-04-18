@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # Deploy ALL extension build outputs to ~/.botnexus/extensions/ for runtime discovery.
-# Extensions are discovered dynamically from the extensions/ folder — no hardcoded list.
+# Extensions are discovered dynamically from the src/extensions/ folder — no hardcoded list.
 # Enable/disable individual extensions via your gateway config.
 
 [CmdletBinding()]
@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$extensionsRoot = Join-Path $repoRoot "extensions"
+$extensionsRoot = Join-Path $repoRoot "src" "extensions"
 $dest = Join-Path $env:USERPROFILE ".botnexus" "extensions"
 
 if (-not (Test-Path $extensionsRoot)) {
@@ -19,7 +19,7 @@ if (-not (Test-Path $extensionsRoot)) {
     return
 }
 
-# Discover all extension projects by finding *.csproj files under extensions/
+# Discover all extension projects by finding *.csproj files under src/extensions/
 $projects = Get-ChildItem -Path $extensionsRoot -Recurse -Filter "*.csproj"
 $deployed = 0
 
