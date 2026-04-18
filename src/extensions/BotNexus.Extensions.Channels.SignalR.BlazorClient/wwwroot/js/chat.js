@@ -27,12 +27,7 @@ window.chatScroll = {
     scrollActiveToBottom: function () {
         setTimeout(function () {
             var active = document.querySelector('.chat-panel-wrapper.active .messages-container');
-            if (active) {
-                console.log('[scroll] scrollActiveToBottom: found container, scrollHeight=' + active.scrollHeight + ' clientHeight=' + active.clientHeight);
-                active.scrollTop = active.scrollHeight;
-            } else {
-                console.warn('[scroll] scrollActiveToBottom: no active .messages-container found');
-            }
+            if (active) active.scrollTop = active.scrollHeight;
         }, 100);
     },
 
