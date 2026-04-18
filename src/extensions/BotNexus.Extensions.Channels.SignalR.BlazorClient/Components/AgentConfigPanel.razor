@@ -1,0 +1,232 @@
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+@if (_showPanel)
+{
+    <div class="config-overlay" @onclick="Close">
+        <div class="config-dialog" @onclick:stopPropagation="true">
+            <div class="config-header">
+                <h3>⚙ Agent Configuration</h3>
+                <button class="config-close-btn" @onclick="Close">✕</button>
+            </div>
+
+            @if (_loading)
+            {
+                <div class="config-loading">
+                    <div class="loading-spinner small"></div>
+                    <span>Loading configuration…</span>
+                </div>
+            }
+            else
+            {
+                <div class="config-body">
+                    <div class="config-field">
+                        <label>Agent ID</label>
+                        <span class="config-value mono">@State.AgentId</span>
+                    </div>
+
+                    <div class="config-field">
+                        <label>Display Name</label>
+                        <span class="config-value">@State.DisplayName</span>
+                    </div>
+
+                    <div class="config-field">
+                        <label>Session ID</label>
+                        <span class="config-value mono">@(State.SessionId ?? "—")</span>
+                    </div>
+
+                    <div class="config-field">
+                        <label>Channel Type</label>
+                        <span class="config-value">@(State.ChannelType ?? "signalr")</span>
+                    </div>
+
+                    @if (_agentConfig is not null)
+                    {
+                        <div class="config-field">
+                            <label>Model</label>
+                            @if (_availableModels.Count > 0)
+                            {
+                                <select class="config-select" @bind="_selectedModel">
+                                    @foreach (var model in _availableModels)
+                                    {
+                                        <option value="@model">@model</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <span class="config-value mono">@(_agentConfig.Model ?? "—")</span>
+                            }
+                        </div>
+
+                        <div class="config-field">
+                            <label>Provider</label>
+                            <span class="config-value">@(_agentConfig.Provider ?? "—")</span>
+                        </div>
+
+                        <div class="config-field">
+                            <label>Tool Count</label>
+                            <span class="config-value">@_agentConfig.ToolCount</span>
+                        </div>
+
+                        <div class="config-field">
+                            <label>System Prompt Size</label>
+                            <span class="config-value">@(_contextSize ?? "—")</span>
+                        </div>
+                    }
+
+                    @if (_error is not null)
+                    {
+                        <div class="config-error">@_error</div>
+                    }
+                </div>
+
+                <div class="config-actions">
+                    @if (_availableModels.Count > 0 && _selectedModel != _agentConfig?.Model)
+                    {
+                        <button class="config-save-btn" @onclick="SaveModel" disabled="@_saving">
+                            @(_saving ? "Saving…" : "Save Model")
+                        </button>
+                    }
+                    <button class="cancel-btn" @onclick="Close">Close</button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public AgentSessionState State { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public AgentSessionManager Manager { get; set; } = default!;
+
+    private bool _showPanel;
+    private bool _loading;
+    private bool _saving;
+    private string? _error;
+    private AgentConfigDto? _agentConfig;
+    private List<string> _availableModels = [];
+    private string _selectedModel = "";
+    private string? _contextSize;
+
+    public async Task Open()
+    {
+        _showPanel = true;
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var apiBase = Manager.ApiBaseUrl;
+            if (apiBase is null) return;
+
+            // Fetch agent config
+            try
+            {
+                _agentConfig = await Http.GetFromJsonAsync<AgentConfigDto>($"{apiBase}agents/{State.AgentId}");
+                _selectedModel = _agentConfig?.Model ?? "";
+            }
+            catch
+            {
+                _agentConfig = null;
+            }
+
+            // Fetch available models
+            try
+            {
+                var models = await Http.GetFromJsonAsync<List<string>>($"{apiBase}agents/{State.AgentId}/models");
+                _availableModels = models ?? [];
+            }
+            catch
+            {
+                _availableModels = [];
+            }
+
+            // Fetch context/system prompt size
+            if (State.SessionId is not null)
+            {
+                try
+                {
+                    var context = await Http.GetFromJsonAsync<ContextInfoDto>(
+                        $"{apiBase}agents/{State.AgentId}/sessions/{State.SessionId}/context");
+                    _contextSize = context?.SystemPromptTokens is not null
+                        ? $"{context.SystemPromptTokens:N0} tokens"
+                        : "—";
+                }
+                catch
+                {
+                    _contextSize = "unavailable";
+                }
+            }
+            else
+            {
+                _contextSize = "no active session";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load config: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Close()
+    {
+        _showPanel = false;
+    }
+
+    private async Task SaveModel()
+    {
+        if (string.IsNullOrEmpty(_selectedModel) || Manager.ApiBaseUrl is null)
+            return;
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            var payload = new { model = _selectedModel };
+            var response = await Http.PutAsJsonAsync($"{Manager.ApiBaseUrl}agents/{State.AgentId}", payload);
+            if (response.IsSuccessStatusCode)
+            {
+                if (_agentConfig is not null)
+                    _agentConfig = _agentConfig with { Model = _selectedModel };
+            }
+            else
+            {
+                _error = $"Save failed: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Save failed: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    // DTOs for agent config API responses
+    private sealed record AgentConfigDto
+    {
+        public string? AgentId { get; init; }
+        public string? DisplayName { get; init; }
+        public string? Model { get; init; }
+        public string? Provider { get; init; }
+        public int ToolCount { get; init; }
+    }
+
+    private sealed record ContextInfoDto
+    {
+        public int? SystemPromptTokens { get; init; }
+        public int? TotalTokens { get; init; }
+    }
+}

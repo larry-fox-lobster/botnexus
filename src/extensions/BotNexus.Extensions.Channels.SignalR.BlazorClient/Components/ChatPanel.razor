@@ -10,8 +10,32 @@
                 <span class="streaming-badge">Streaming…</span>
             }
         </div>
+        <div class="chat-header-actions">
+            <button class="toggle-btn @(!State.ShowThinking ? "toggled-off" : "")"
+                    @onclick="ToggleThinking" title="Toggle thinking visibility">
+                💭
+            </button>
+            <button class="toggle-btn @(!State.ShowTools ? "toggled-off" : "")"
+                    @onclick="ToggleTools" title="Toggle tool visibility">
+                🔧
+            </button>
+            <button class="config-btn" @onclick="OpenConfig" title="Agent configuration">
+                ⚙
+            </button>
+            <button class="new-chat-btn" @onclick="NewChat" title="New chat (reset session)">
+                ✚
+            </button>
+        </div>
         <SessionControls State="@State" Manager="@Manager" />
     </header>
+
+    @* ── Processing status bar ────────────────────────────────────── *@
+    @if (State.IsStreaming && State.ProcessingStage is not null)
+    {
+        <div class="processing-status-bar">
+            @State.ProcessingStage
+        </div>
+    }
 
     <div class="messages-container" @ref="_messagesContainer">
         @if (State.IsLoadingHistory)
@@ -24,9 +48,14 @@
 
         @foreach (var msg in State.Messages)
         {
-            @if (msg.IsToolCall)
+            @if (msg.Role == "System")
             {
-                <div class="message tool @(msg.ToolIsError == true ? "tool-error" : "")">
+                <div class="system-message">@msg.Content</div>
+            }
+            else if (msg.IsToolCall)
+            {
+                <div class="message tool @(msg.ToolIsError == true ? "tool-error" : "") @(!State.ShowTools ? "visibility-hidden" : "")"
+                     style="@(!State.ShowTools ? "display:none" : "")">
                     <div class="tool-header" @onclick="() => ToggleToolDetails(msg.Id)">
                         <span class="tool-icon">@(msg.ToolResult is null ? "⏳" : (msg.ToolIsError == true ? "❌" : "✅"))</span>
                         <span class="tool-name">@msg.ToolName</span>
@@ -59,6 +88,18 @@
             }
             else
             {
+                @* ── Thinking block (collapsible) above assistant message ─── *@
+                @if (msg.Role == "Assistant" && !string.IsNullOrEmpty(msg.ThinkingContent))
+                {
+                    <div class="thinking-block @(!State.ShowThinking ? "visibility-hidden" : "")"
+                         style="@(!State.ShowThinking ? "display:none" : "")">
+                        <details>
+                            <summary class="thinking-summary">💭 Thinking…</summary>
+                            <div class="thinking-content">@msg.ThinkingContent</div>
+                        </details>
+                    </div>
+                }
+
                 <div class="message @msg.CssClass">
                     <div class="message-header">
                         <span class="message-role">@msg.Role</span>
@@ -76,6 +117,18 @@
             }
         }
 
+        @* ── Live thinking block during streaming ────────────────── *@
+        @if (State.IsStreaming && !string.IsNullOrEmpty(State.ThinkingBuffer))
+        {
+            <div class="thinking-block live @(!State.ShowThinking ? "visibility-hidden" : "")"
+                 style="@(!State.ShowThinking ? "display:none" : "")">
+                <details open>
+                    <summary class="thinking-summary">💭 Thinking… <span class="streaming-indicator">●</span></summary>
+                    <div class="thinking-content">@State.ThinkingBuffer</div>
+                </details>
+            </div>
+        }
+
         @if (State.IsStreaming && !string.IsNullOrEmpty(State.CurrentStreamBuffer))
         {
             <div class="message assistant streaming">
@@ -89,6 +142,21 @@
         }
     </div>
 
+    @* ── Command palette (slash commands) ─────────────────────────── *@
+    @if (_showCommandPalette)
+    {
+        <div class="command-palette">
+            @foreach (var cmd in _filteredCommands)
+            {
+                <button class="command-item @(cmd.Name == _selectedCommand ? "selected" : "")"
+                        @onclick="() => ExecuteCommand(cmd)">
+                    <span class="command-name">@cmd.Name</span>
+                    <span class="command-desc">@cmd.Description</span>
+                </button>
+            }
+        </div>
+    }
+
     <div class="chat-input-area">
         <textarea class="chat-input"
                   @ref="_inputElement"
@@ -97,6 +165,19 @@
                   @onkeydown="HandleKeyDown"
                   placeholder="@InputPlaceholder"
                   disabled="@(!State.IsConnected)" />
+        @if (_isRecording)
+        {
+            <button class="recording-btn" @onclick="StopRecording" title="Stop recording">
+                🔴 Stop
+            </button>
+        }
+        else
+        {
+            <button class="mic-btn" @onclick="StartRecording" title="Record audio message"
+                    disabled="@(!State.IsConnected)">
+                🎤
+            </button>
+        }
         @if (State.IsStreaming)
         {
             <button class="steer-btn"
@@ -122,6 +203,8 @@
     </div>
 </div>
 
+<AgentConfigPanel @ref="_configPanel" State="@State" Manager="@Manager" />
+
 @code {
     /// <summary>Per-agent session state — the panel reads from and displays this.</summary>
     [Parameter, EditorRequired]
@@ -135,6 +218,7 @@
     private ElementReference _messagesContainer;
     private ElementReference _inputElement;
     private bool _enterPreventionBound;
+    private AgentConfigPanel? _configPanel;
 
     // ── Markdown rendering cache ──────────────────────────────────────────
 
@@ -166,10 +250,117 @@
 
     private string InputPlaceholder => State.IsStreaming
         ? "Type to steer the response…"
-        : "Type a message… (Shift+Enter for newline)";
+        : "Type a message… (/ for commands, Shift+Enter for newline)";
 
     private bool _forceScrollNext;
     private bool _wasActive;
+
+    // ── Toggle state ──────────────────────────────────────────────────────
+
+    private void ToggleTools() => State.ShowTools = !State.ShowTools;
+    private void ToggleThinking() => State.ShowThinking = !State.ShowThinking;
+
+    // ── Audio recording ───────────────────────────────────────────────────
+
+    private bool _isRecording;
+
+    private async Task StartRecording()
+    {
+        try
+        {
+            var started = await JS.InvokeAsync<bool>("BotNexusAudio.startRecording");
+            _isRecording = started;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Recording failed: {ex.Message}");
+        }
+    }
+
+    private async Task StopRecording()
+    {
+        try
+        {
+            var base64Audio = await JS.InvokeAsync<string?>("BotNexusAudio.stopRecording");
+            _isRecording = false;
+            if (base64Audio is not null)
+            {
+                // Send as a special message indicating audio content
+                await Manager.SendMessageAsync(State.AgentId, $"[audio:webm;base64,{base64Audio}]");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Stop recording failed: {ex.Message}");
+            _isRecording = false;
+        }
+    }
+
+    // ── Command palette ───────────────────────────────────────────────────
+
+    private bool _showCommandPalette;
+    private string _selectedCommand = "";
+
+    private sealed record SlashCommand(string Name, string Description);
+
+    private static readonly SlashCommand[] s_allCommands =
+    [
+        new("/new", "Reset session and start fresh"),
+        new("/compact", "Compact session to reduce tokens"),
+        new("/clear", "Clear local messages")
+    ];
+
+    private SlashCommand[] _filteredCommands = [];
+
+    private void UpdateCommandPalette()
+    {
+        var text = _inputText?.Trim() ?? "";
+        if (text.StartsWith('/') && !text.Contains(' '))
+        {
+            _showCommandPalette = true;
+            _filteredCommands = text == "/"
+                ? s_allCommands
+                : s_allCommands.Where(c => c.Name.StartsWith(text, StringComparison.OrdinalIgnoreCase)).ToArray();
+            _selectedCommand = _filteredCommands.Length > 0 ? _filteredCommands[0].Name : "";
+        }
+        else
+        {
+            _showCommandPalette = false;
+            _filteredCommands = [];
+        }
+    }
+
+    private async Task ExecuteCommand(SlashCommand cmd)
+    {
+        _showCommandPalette = false;
+        _inputText = "";
+
+        switch (cmd.Name)
+        {
+            case "/new":
+                await Manager.ResetSessionAsync(State.AgentId);
+                break;
+            case "/compact":
+                await Manager.CompactSessionAsync(State.AgentId);
+                break;
+            case "/clear":
+                Manager.ClearLocalMessages(State.AgentId);
+                break;
+        }
+    }
+
+    // ── Config panel ──────────────────────────────────────────────────────
+
+    private async Task OpenConfig()
+    {
+        if (_configPanel is not null)
+            await _configPanel.Open();
+    }
+
+    private async Task NewChat()
+    {
+        await Manager.ResetSessionAsync(State.AgentId);
+    }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
@@ -229,16 +420,41 @@
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
     {
+        // Update command palette on every keystroke
+        UpdateCommandPalette();
+
         if (e is { Key: "Enter", ShiftKey: false })
         {
+            // If command palette is open, execute selected command
+            if (_showCommandPalette && _filteredCommands.Length > 0)
+            {
+                var cmd = _filteredCommands.FirstOrDefault(c => c.Name == _selectedCommand)
+                    ?? _filteredCommands[0];
+                await ExecuteCommand(cmd);
+                return;
+            }
+
             if (State.IsStreaming)
                 await SteerAgent();
             else
                 await SendMessage();
         }
-        else if (e is { Key: "Escape" } && State.IsStreaming)
+        else if (e is { Key: "Escape" })
         {
-            await AbortAgent();
+            if (_showCommandPalette)
+            {
+                _showCommandPalette = false;
+            }
+            else if (State.IsStreaming)
+            {
+                await AbortAgent();
+            }
+        }
+        else if (e is { Key: "Tab" } && _showCommandPalette && _filteredCommands.Length > 0)
+        {
+            // Tab-complete the selected command
+            _inputText = _filteredCommands[0].Name + " ";
+            _showCommandPalette = false;
         }
     }
 
@@ -249,6 +465,7 @@
             return;
 
         _inputText = "";
+        _showCommandPalette = false;
         _forceScrollNext = true;
         await Manager.SendMessageAsync(State.AgentId, text);
     }

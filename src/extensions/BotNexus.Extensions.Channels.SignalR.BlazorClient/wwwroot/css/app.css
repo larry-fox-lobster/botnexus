@@ -395,7 +395,7 @@ html, body, #app {
     border-bottom: 1px solid var(--border);
     background: var(--bg-secondary);
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 0.75rem;
 }
 
@@ -992,10 +992,15 @@ html, body, #app {
         border-right: none;
         border-bottom: 1px solid var(--border);
         max-height: 30vh;
+        overflow-y: auto;
     }
 
     .message {
         max-width: 95%;
+    }
+
+    .chat-header-actions {
+        gap: 0.15rem;
     }
 }
 
@@ -1019,4 +1024,427 @@ html, body, #app {
     .chat-input {
         min-width: 0;
     }
+
+    .chat-header-actions {
+        display: none;
+    }
+}
+
+/* ── Processing status bar ──────────────────────────────────────────── */
+
+.processing-status-bar {
+    padding: 0.35rem 1rem;
+    background: rgba(0, 180, 216, 0.08);
+    border-bottom: 1px solid rgba(0, 180, 216, 0.2);
+    color: var(--accent);
+    font-size: 0.78rem;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ── Thinking blocks ────────────────────────────────────────────────── */
+
+.thinking-block {
+    align-self: flex-start;
+    max-width: 85%;
+    background: rgba(108, 108, 128, 0.08);
+    border: 1px solid rgba(108, 108, 128, 0.2);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.75rem;
+    margin-bottom: -0.25rem;
+}
+
+.thinking-block.live {
+    border-color: rgba(0, 180, 216, 0.3);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.thinking-summary {
+    cursor: pointer;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-style: italic;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.thinking-summary::-webkit-details-marker {
+    display: none;
+}
+
+.thinking-summary::before {
+    content: "▸";
+    font-size: 0.6rem;
+    transition: transform 0.15s;
+}
+
+details[open] > .thinking-summary::before {
+    transform: rotate(90deg);
+}
+
+.thinking-content {
+    margin-top: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-style: italic;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
+/* ── System messages (centered, muted) ──────────────────────────────── */
+
+.system-message {
+    align-self: center;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    padding: 0.3rem 0.75rem;
+    background: rgba(108, 108, 128, 0.08);
+    border-radius: var(--radius);
+    max-width: 80%;
+}
+
+/* ── Chat header actions (toggles, config, new chat) ────────────────── */
+
+.chat-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.toggle-btn,
+.config-btn,
+.new-chat-btn {
+    padding: 0.2rem 0.4rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1;
+}
+
+.toggle-btn:hover,
+.config-btn:hover,
+.new-chat-btn:hover {
+    background: var(--bg-surface);
+    border-color: var(--border);
+    color: var(--text-primary);
+}
+
+.toggle-btn.toggled-off {
+    opacity: 0.35;
+}
+
+.new-chat-btn {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* ── Command palette ────────────────────────────────────────────────── */
+
+.command-palette {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    background: var(--bg-secondary);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.command-item {
+    display: flex;
+    gap: 0.75rem;
+    align-items: baseline;
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+    font-size: 0.85rem;
+    transition: background 0.1s;
+}
+
+.command-item:hover,
+.command-item.selected {
+    background: var(--bg-surface);
+}
+
+.command-name {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--accent);
+    white-space: nowrap;
+}
+
+.command-desc {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+/* ── Audio recording ────────────────────────────────────────────────── */
+
+.mic-btn {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    align-self: flex-end;
+}
+
+.mic-btn:hover:not(:disabled) {
+    background: var(--bg-surface);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.mic-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.recording-btn {
+    padding: 0.6rem 0.85rem;
+    border: 1px solid var(--error);
+    border-radius: var(--radius);
+    background: rgba(231, 76, 60, 0.15);
+    color: var(--error);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s;
+    align-self: flex-end;
+    white-space: nowrap;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+.recording-btn:hover {
+    background: rgba(231, 76, 60, 0.25);
+}
+
+/* ── Agent config panel (modal overlay) ─────────────────────────────── */
+
+.config-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.config-dialog {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0;
+    max-width: 480px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.config-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.config-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.config-close-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    border-radius: var(--radius);
+    transition: all 0.15s;
+}
+
+.config-close-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-surface);
+}
+
+.config-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.config-body {
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.config-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.config-field label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.config-value {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.config-value.mono {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    word-break: break-all;
+}
+
+.config-select {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-family: var(--font-mono);
+    cursor: pointer;
+}
+
+.config-select:focus {
+    border-color: var(--accent);
+    outline: none;
+}
+
+.config-error {
+    padding: 0.5rem 0.75rem;
+    background: rgba(231, 76, 60, 0.15);
+    border: 1px solid var(--error);
+    border-radius: var(--radius);
+    color: var(--error);
+    font-size: 0.8rem;
+}
+
+.config-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--border);
+}
+
+.config-save-btn {
+    padding: 0.4rem 1rem;
+    border: none;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.config-save-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.config-save-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── Copy toast ─────────────────────────────────────────────────────── */
+
+.copy-toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.4rem 1rem;
+    background: var(--success);
+    color: #fff;
+    border-radius: var(--radius);
+    font-size: 0.8rem;
+    font-weight: 600;
+    z-index: 200;
+    animation: fadeInOut 1.5s ease-in-out;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+    15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+}
+
+/* ── Clickable session ID in sidebar ────────────────────────────────── */
+
+.session-id-mini.clickable {
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.session-id-mini.clickable:hover {
+    color: var(--accent);
+    opacity: 1;
+}
+
+.session-id.clickable {
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.session-id.clickable:hover {
+    color: var(--accent);
+}
+
+/* ── Sub-agent items in sidebar ─────────────────────────────────────── */
+
+.sub-agent-name {
+    font-size: 0.73rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.sub-agent-archetype {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    opacity: 0.6;
+    margin-left: auto;
+    white-space: nowrap;
 }

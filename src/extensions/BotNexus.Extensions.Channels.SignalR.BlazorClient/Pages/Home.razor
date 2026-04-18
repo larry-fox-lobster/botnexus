@@ -48,22 +48,26 @@
                             <span>@(state.ChannelType ?? "signalr")</span>
                             @if (state.SessionId is not null)
                             {
-                                <span class="session-id-mini">@state.SessionId[..8]…</span>
+                                <span class="session-id-mini clickable"
+                                      @onclick="() => CopySessionId(state.SessionId)"
+                                      @onclick:stopPropagation="true"
+                                      title="Click to copy session ID">
+                                    @state.SessionId[..Math.Min(8, state.SessionId.Length)]…
+                                </span>
                             }
                         </button>
 
-                        @* Sub-agent sessions (if any) *@
-                        @foreach (var sub in GetSubAgents(agentId))
+                        @* Sub-agents under this agent *@
+                        @foreach (var sub in state.SubAgents.Values)
                         {
-                            <button class="channel-item sub-agent"
-                                    @onclick="() => SelectAgent(sub.AgentId)">
-                                <span class="channel-icon">🤖</span>
-                                <span>@sub.DisplayName</span>
-                                @if (sub.IsStreaming)
+                            <div class="channel-item sub-agent">
+                                <span class="channel-icon">@SubAgentStatusIcon(sub.Status)</span>
+                                <span class="sub-agent-name" title="@sub.Task">@(sub.Name ?? sub.SubAgentId)</span>
+                                @if (sub.Archetype is not null)
                                 {
-                                    <span class="agent-streaming-dot">●</span>
+                                    <span class="sub-agent-archetype">@sub.Archetype</span>
                                 }
-                            </button>
+                            </div>
                         }
                     </div>
                 }
@@ -143,11 +147,25 @@
             _expandedAgents.Add(agentId);
     }
 
-    private IEnumerable<AgentSessionState> GetSubAgents(string parentAgentId)
+    private static string SubAgentStatusIcon(string status) => status switch
     {
-        // Sub-agents have session IDs containing the parent's session ID as a prefix
-        // For now, return empty — sub-agent tracking will be wired when SubAgent events are handled
-        return Enumerable.Empty<AgentSessionState>();
+        "Running" => "🔄",
+        "Completed" => "✅",
+        "Failed" => "❌",
+        "Killed" => "⛔",
+        _ => "🤖"
+    };
+
+    private async Task CopySessionId(string sessionId)
+    {
+        try
+        {
+            await JS.InvokeAsync<bool>("BotNexus.copyToClipboard", sessionId);
+        }
+        catch
+        {
+            // Clipboard API may not be available
+        }
     }
 
     private async Task RestartGateway()

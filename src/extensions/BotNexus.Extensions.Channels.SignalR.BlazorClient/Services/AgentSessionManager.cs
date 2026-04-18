@@ -32,6 +32,9 @@ public sealed class AgentSessionManager : IDisposable
     /// <summary>The currently active/visible agent tab. Used for unread tracking.</summary>
     public string? ActiveAgentId { get; private set; }
 
+    /// <summary>The base URL for REST API calls.</summary>
+    public string? ApiBaseUrl => _apiBaseUrl;
+
     public AgentSessionManager(GatewayHubConnection hub, HttpClient http)
     {
         _hub = hub;
@@ -39,6 +42,7 @@ public sealed class AgentSessionManager : IDisposable
         _hub.OnConnected += HandleConnected;
         _hub.OnMessageStart += HandleMessageStart;
         _hub.OnContentDelta += HandleContentDelta;
+        _hub.OnThinkingDelta += HandleThinkingDelta;
         _hub.OnToolStart += HandleToolStart;
         _hub.OnToolEnd += HandleToolEnd;
         _hub.OnMessageEnd += HandleMessageEnd;
@@ -47,6 +51,10 @@ public sealed class AgentSessionManager : IDisposable
         _hub.OnReconnecting += HandleReconnecting;
         _hub.OnReconnected += HandleReconnected;
         _hub.OnDisconnected += HandleDisconnected;
+        _hub.OnSubAgentSpawned += HandleSubAgentSpawned;
+        _hub.OnSubAgentCompleted += HandleSubAgentCompleted;
+        _hub.OnSubAgentFailed += HandleSubAgentFailed;
+        _hub.OnSubAgentKilled += HandleSubAgentKilled;
     }
 
     /// <summary>
@@ -183,6 +191,41 @@ public sealed class AgentSessionManager : IDisposable
         }
     }
 
+    /// <summary>Compact the agent's current session to reduce token usage.</summary>
+    public async Task<CompactSessionResult?> CompactSessionAsync(string agentId)
+    {
+        if (!_sessions.TryGetValue(agentId, out var state) || state.SessionId is null)
+            return null;
+
+        try
+        {
+            var result = await _hub.CompactSessionAsync(agentId, state.SessionId);
+            state.Messages.Add(new ChatMessage("System",
+                $"Session compacted: {result.Summarized} messages summarized, {result.Preserved} preserved. " +
+                $"Tokens: {result.TokensBefore} → {result.TokensAfter}",
+                DateTimeOffset.UtcNow));
+            OnStateChanged?.Invoke();
+            return result;
+        }
+        catch (Exception ex)
+        {
+            state.Messages.Add(new ChatMessage("Error", $"Compact failed: {ex.Message}", DateTimeOffset.UtcNow));
+            OnStateChanged?.Invoke();
+            return null;
+        }
+    }
+
+    /// <summary>Clear local messages without resetting the server session.</summary>
+    public void ClearLocalMessages(string agentId)
+    {
+        if (_sessions.TryGetValue(agentId, out var state))
+        {
+            state.Messages.Clear();
+            state.Messages.Add(new ChatMessage("System", "Local messages cleared.", DateTimeOffset.UtcNow));
+            OnStateChanged?.Invoke();
+        }
+    }
+
     /// <summary>Load message history from the REST API for the given agent.</summary>
     public async Task LoadHistoryAsync(string agentId)
     {
@@ -273,6 +316,8 @@ public sealed class AgentSessionManager : IDisposable
 
         state.IsStreaming = true;
         state.CurrentStreamBuffer = "";
+        state.ThinkingBuffer = "";
+        state.ProcessingStage = "🤖 Agent is responding…";
         OnStateChanged?.Invoke();
     }
 
@@ -282,6 +327,17 @@ public sealed class AgentSessionManager : IDisposable
         if (state is null) return;
 
         state.CurrentStreamBuffer += evt.ContentDelta ?? "";
+        state.ProcessingStage = "🤖 Agent is responding…";
+        OnStateChanged?.Invoke();
+    }
+
+    private void HandleThinkingDelta(AgentStreamEvent evt)
+    {
+        var state = FindStateBySessionId(evt.SessionId);
+        if (state is null) return;
+
+        state.ThinkingBuffer += evt.ThinkingContent ?? "";
+        state.ProcessingStage = "💭 Thinking…";
         OnStateChanged?.Invoke();
     }
 
@@ -312,6 +368,7 @@ public sealed class AgentSessionManager : IDisposable
             MessageId = msg.Id
         };
 
+        state.ProcessingStage = $"🔧 Using tool: {evt.ToolName}";
         OnStateChanged?.Invoke();
     }
 
@@ -347,6 +404,9 @@ public sealed class AgentSessionManager : IDisposable
                     ToolIsError = evt.ToolIsError,
                     ToolDuration = duration
                 };
+
+                // Update processing stage — back to responding if still streaming
+                state.ProcessingStage = state.IsStreaming ? "🤖 Agent is responding…" : null;
                 OnStateChanged?.Invoke();
                 return;
             }
@@ -364,6 +424,8 @@ public sealed class AgentSessionManager : IDisposable
             ToolIsError = evt.ToolIsError,
             ToolDuration = duration
         });
+
+        state.ProcessingStage = state.IsStreaming ? "🤖 Agent is responding…" : null;
         OnStateChanged?.Invoke();
     }
 
@@ -372,13 +434,29 @@ public sealed class AgentSessionManager : IDisposable
         var state = FindStateBySessionId(evt.SessionId);
         if (state is null) return;
 
+        // Finalize the thinking buffer + stream buffer into a single assistant message
+        var thinkingContent = string.IsNullOrEmpty(state.ThinkingBuffer) ? null : state.ThinkingBuffer;
+
         if (!string.IsNullOrEmpty(state.CurrentStreamBuffer))
         {
-            state.Messages.Add(new ChatMessage("Assistant", state.CurrentStreamBuffer, DateTimeOffset.UtcNow));
+            state.Messages.Add(new ChatMessage("Assistant", state.CurrentStreamBuffer, DateTimeOffset.UtcNow)
+            {
+                ThinkingContent = thinkingContent
+            });
+        }
+        else if (thinkingContent is not null)
+        {
+            // Thinking only, no visible content — still attach it
+            state.Messages.Add(new ChatMessage("Assistant", "", DateTimeOffset.UtcNow)
+            {
+                ThinkingContent = thinkingContent
+            });
         }
 
         state.CurrentStreamBuffer = "";
+        state.ThinkingBuffer = "";
         state.IsStreaming = false;
+        state.ProcessingStage = null;
 
         // Track unread for non-active agents
         if (state.AgentId != ActiveAgentId)
@@ -397,6 +475,8 @@ public sealed class AgentSessionManager : IDisposable
         state.Messages.Add(new ChatMessage("Error", evt.ErrorMessage ?? "An unknown error occurred.", DateTimeOffset.UtcNow));
         state.IsStreaming = false;
         state.CurrentStreamBuffer = "";
+        state.ThinkingBuffer = "";
+        state.ProcessingStage = null;
         OnStateChanged?.Invoke();
     }
 
@@ -411,13 +491,103 @@ public sealed class AgentSessionManager : IDisposable
             state.Messages.Clear();
             state.IsStreaming = false;
             state.CurrentStreamBuffer = "";
+            state.ThinkingBuffer = "";
             state.UnreadCount = 0;
             state.HistoryLoaded = false;
             state.ActiveToolCalls.Clear();
+            state.SubAgents.Clear();
+            state.ProcessingStage = null;
+
+            state.Messages.Add(new ChatMessage("System", "Session reset. Start a new conversation.", DateTimeOffset.UtcNow));
         }
 
         OnStateChanged?.Invoke();
     }
+
+    // ── Sub-agent event handlers ──────────────────────────────────────────
+
+    private void HandleSubAgentSpawned(SubAgentEventPayload payload)
+    {
+        var state = FindStateBySessionId(payload.SessionId);
+        if (state is null) return;
+
+        state.SubAgents[payload.SubAgentId] = new SubAgentInfo
+        {
+            SubAgentId = payload.SubAgentId,
+            Name = payload.Name,
+            Task = payload.Task,
+            Status = "Running",
+            StartedAt = payload.StartedAt,
+            Model = payload.Model,
+            Archetype = payload.Archetype
+        };
+
+        state.Messages.Add(new ChatMessage("System",
+            $"🔄 Sub-agent spawned: {payload.Name ?? payload.SubAgentId} — {payload.Task}",
+            DateTimeOffset.UtcNow));
+
+        OnStateChanged?.Invoke();
+    }
+
+    private void HandleSubAgentCompleted(SubAgentEventPayload payload)
+    {
+        var state = FindStateBySessionId(payload.SessionId);
+        if (state is null) return;
+
+        if (state.SubAgents.TryGetValue(payload.SubAgentId, out var sub))
+        {
+            sub.Status = "Completed";
+            sub.CompletedAt = payload.CompletedAt;
+            sub.ResultSummary = payload.ResultSummary;
+        }
+
+        state.Messages.Add(new ChatMessage("System",
+            $"✅ Sub-agent completed: {payload.Name ?? payload.SubAgentId}" +
+            (payload.ResultSummary is not null ? $" — {payload.ResultSummary}" : ""),
+            DateTimeOffset.UtcNow));
+
+        OnStateChanged?.Invoke();
+    }
+
+    private void HandleSubAgentFailed(SubAgentEventPayload payload)
+    {
+        var state = FindStateBySessionId(payload.SessionId);
+        if (state is null) return;
+
+        if (state.SubAgents.TryGetValue(payload.SubAgentId, out var sub))
+        {
+            sub.Status = "Failed";
+            sub.CompletedAt = payload.CompletedAt;
+            sub.ResultSummary = payload.ResultSummary;
+        }
+
+        state.Messages.Add(new ChatMessage("System",
+            $"❌ Sub-agent failed: {payload.Name ?? payload.SubAgentId}" +
+            (payload.ResultSummary is not null ? $" — {payload.ResultSummary}" : ""),
+            DateTimeOffset.UtcNow));
+
+        OnStateChanged?.Invoke();
+    }
+
+    private void HandleSubAgentKilled(SubAgentEventPayload payload)
+    {
+        var state = FindStateBySessionId(payload.SessionId);
+        if (state is null) return;
+
+        if (state.SubAgents.TryGetValue(payload.SubAgentId, out var sub))
+        {
+            sub.Status = "Killed";
+            sub.CompletedAt = payload.CompletedAt;
+        }
+
+        state.Messages.Add(new ChatMessage("System",
+            $"⛔ Sub-agent killed: {payload.Name ?? payload.SubAgentId}",
+            DateTimeOffset.UtcNow));
+
+        OnStateChanged?.Invoke();
+    }
+
+    // ── Connection lifecycle ──────────────────────────────────────────────
 
     private void HandleReconnecting()
     {
@@ -451,6 +621,8 @@ public sealed class AgentSessionManager : IDisposable
                 {
                     state.IsStreaming = false;
                     state.CurrentStreamBuffer = "";
+                    state.ThinkingBuffer = "";
+                    state.ProcessingStage = null;
                     state.HistoryLoaded = false; // Force reload to pick up missed messages
                     await LoadHistoryAsync(agentId);
                 }
@@ -500,6 +672,7 @@ public sealed class AgentSessionManager : IDisposable
         _hub.OnConnected -= HandleConnected;
         _hub.OnMessageStart -= HandleMessageStart;
         _hub.OnContentDelta -= HandleContentDelta;
+        _hub.OnThinkingDelta -= HandleThinkingDelta;
         _hub.OnToolStart -= HandleToolStart;
         _hub.OnToolEnd -= HandleToolEnd;
         _hub.OnMessageEnd -= HandleMessageEnd;
@@ -508,5 +681,9 @@ public sealed class AgentSessionManager : IDisposable
         _hub.OnReconnecting -= HandleReconnecting;
         _hub.OnReconnected -= HandleReconnected;
         _hub.OnDisconnected -= HandleDisconnected;
+        _hub.OnSubAgentSpawned -= HandleSubAgentSpawned;
+        _hub.OnSubAgentCompleted -= HandleSubAgentCompleted;
+        _hub.OnSubAgentFailed -= HandleSubAgentFailed;
+        _hub.OnSubAgentKilled -= HandleSubAgentKilled;
     }
 }

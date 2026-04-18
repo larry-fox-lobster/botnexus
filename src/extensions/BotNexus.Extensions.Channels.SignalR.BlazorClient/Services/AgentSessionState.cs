@@ -27,6 +27,9 @@ public sealed class AgentSessionState
     /// <summary>Buffer for the in-progress streaming response.</summary>
     public string CurrentStreamBuffer { get; set; } = "";
 
+    /// <summary>Buffer for in-progress thinking content during streaming.</summary>
+    public string ThinkingBuffer { get; set; } = "";
+
     /// <summary>Whether the hub connection is active.</summary>
     public bool IsConnected { get; set; }
 
@@ -41,6 +44,18 @@ public sealed class AgentSessionState
 
     /// <summary>In-progress tool calls keyed by tool-call ID.</summary>
     public Dictionary<string, ActiveToolCall> ActiveToolCalls { get; } = new();
+
+    /// <summary>Sub-agents spawned by this agent, keyed by sub-agent ID.</summary>
+    public Dictionary<string, SubAgentInfo> SubAgents { get; } = new();
+
+    /// <summary>Current processing stage description for the status bar (e.g. "Thinking…", "Using tool: grep").</summary>
+    public string? ProcessingStage { get; set; }
+
+    /// <summary>Whether tool messages are visible in the chat panel.</summary>
+    public bool ShowTools { get; set; } = true;
+
+    /// <summary>Whether thinking blocks are visible in the chat panel.</summary>
+    public bool ShowThinking { get; set; } = true;
 }
 
 /// <summary>
@@ -59,6 +74,39 @@ public sealed class ActiveToolCall
 
     /// <summary>The <see cref="ChatMessage.Id"/> of the ToolStart message so we can update it on ToolEnd.</summary>
     public required string MessageId { get; init; }
+}
+
+/// <summary>
+/// Tracks a sub-agent spawned by a parent agent.
+/// </summary>
+public sealed class SubAgentInfo
+{
+    /// <summary>Unique sub-agent identifier.</summary>
+    public required string SubAgentId { get; init; }
+
+    /// <summary>Human-readable name of the sub-agent.</summary>
+    public string? Name { get; set; }
+
+    /// <summary>The task assigned to this sub-agent.</summary>
+    public string Task { get; set; } = "";
+
+    /// <summary>Current status: Running, Completed, Failed, Killed.</summary>
+    public string Status { get; set; } = "Running";
+
+    /// <summary>When the sub-agent was spawned.</summary>
+    public DateTimeOffset StartedAt { get; set; }
+
+    /// <summary>When the sub-agent finished (if completed/failed/killed).</summary>
+    public DateTimeOffset? CompletedAt { get; set; }
+
+    /// <summary>Summary of the sub-agent's result.</summary>
+    public string? ResultSummary { get; set; }
+
+    /// <summary>Model used by the sub-agent.</summary>
+    public string? Model { get; set; }
+
+    /// <summary>Archetype of the sub-agent.</summary>
+    public string? Archetype { get; set; }
 }
 
 /// <summary>
@@ -89,6 +137,9 @@ public sealed record ChatMessage(string Role, string Content, DateTimeOffset Tim
 
     /// <summary>Elapsed wall-clock time for the tool invocation.</summary>
     public TimeSpan? ToolDuration { get; init; }
+
+    /// <summary>Thinking content attached to this assistant message (from ThinkingDelta events).</summary>
+    public string? ThinkingContent { get; init; }
 
     /// <summary>CSS class derived from the message role.</summary>
     public string CssClass => Role.ToLowerInvariant();

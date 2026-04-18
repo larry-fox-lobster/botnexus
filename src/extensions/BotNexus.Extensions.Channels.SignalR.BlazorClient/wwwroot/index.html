@@ -29,6 +29,17 @@
     <script src="js/purify.min.js"></script>
     <script src="js/markdown.js"></script>
     <script src="js/chat.js"></script>
+    <script src="js/audio.js"></script>
+    <script>
+        // Clipboard helper for copy-to-clipboard via JS interop
+        window.BotNexus = window.BotNexus || {};
+        window.BotNexus.copyToClipboard = function (text) {
+            if (navigator.clipboard) {
+                return navigator.clipboard.writeText(text).then(function () { return true; }, function () { return false; });
+            }
+            return Promise.resolve(false);
+        };
+    </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
 
