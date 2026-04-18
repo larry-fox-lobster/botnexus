@@ -1,4 +1,4 @@
-# BotNexus.Channels.Telegram
+# BotNexus.Extensions.Channels.Telegram
 
 > Telegram Bot channel adapter for the BotNexus Gateway.
 
@@ -83,7 +83,7 @@ builder.Services.AddBotNexusTelegramChannel(options =>
 - **Target framework:** `net10.0`
 - **Project references:**
   - `BotNexus.Gateway.Abstractions` — `IChannelAdapter`, `IChannelDispatcher`, message models
-  - `BotNexus.Channels.Core` — `ChannelAdapterBase`
+  - `BotNexus.Gateway.Channels` — `ChannelAdapterBase`
 - **NuGet packages:**
   - `Microsoft.Extensions.DependencyInjection.Abstractions` — DI registration
   - `Microsoft.Extensions.Options` — `IOptions<TelegramOptions>` binding

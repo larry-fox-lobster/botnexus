@@ -48,7 +48,7 @@ The observability stack is built on **4 ActivitySources** corresponding to the p
 | `BotNexus.Gateway` | `BotNexus.Gateway.Diagnostics` | Gateway dispatch, routing, agent lifecycle, session ops |
 | `BotNexus.Providers` | `BotNexus.Agent.Providers.Core.Diagnostics` | LLM provider calls (stream, stream_simple, completions) |
 | `BotNexus.Agents` | `BotNexus.Agent.Core.Diagnostics` | Agent prompt execution, streaming, cross-agent calls |
-| `BotNexus.Channels` | `BotNexus.Channels.Core.Diagnostics` | Channel lifecycle, message receive/send, streaming |
+| `BotNexus.Channels` | `BotNexus.Gateway.Channels.Diagnostics` | Channel lifecycle, message receive/send, streaming |
 
 Each ActivitySource produces spans tagged with semantic attributes (see [Span Attributes](#span-attributes)) that enable filtering and correlation across the distributed trace.
 

@@ -1,4 +1,4 @@
-# BotNexus.Channels.Tui
+# BotNexus.Extensions.Channels.Tui
 
 > Terminal UI channel adapter for local console interaction.
 
@@ -68,7 +68,7 @@ No configuration options. The adapter writes directly to `Console.Out`.
 - **Target framework:** `net10.0`
 - **Project references:**
   - `BotNexus.Gateway.Abstractions` — `IChannelAdapter`, `IChannelDispatcher`, message models
-  - `BotNexus.Channels.Core` — `ChannelAdapterBase`
+  - `BotNexus.Gateway.Channels` — `ChannelAdapterBase`
 - **NuGet packages:**
   - `Microsoft.Extensions.DependencyInjection.Abstractions` — DI registration
 

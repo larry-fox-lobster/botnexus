@@ -1,4 +1,4 @@
-# BotNexus.Channels.Core
+# BotNexus.Gateway.Channels
 
 > Base channel infrastructure — abstract adapter base class, channel registry, and lifecycle management.
 

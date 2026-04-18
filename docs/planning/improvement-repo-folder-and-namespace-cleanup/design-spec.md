@@ -3,7 +3,7 @@ id: improvement-repo-folder-and-namespace-cleanup
 title: "Repo Folder and Namespace Cleanup"
 type: improvement
 priority: high
-status: in-progress
+status: delivered
 created: 2026-04-17
 tags: [cleanup, namespaces, repo-structure, refactor]
 ---
@@ -58,3 +58,17 @@ The Core project in channels should be moved to the gateway folder and renamed t
 The `src\coding-agent\BotNexus.CodingAgent` project should be moved to `poc\BotNexus.CodingAgent`. This is because the coding agent is a proof of concept and should not be in the main source folder. The namespaces should be updated to match the new location. Nothing should refernce this project, it is just a standalone project for testing and prototyping. Once it is moved and renamed, the old project can be removed and the slnx file should be updated.
 
 Further renames will be done after this work is completed and the base cleanup has happened.
+
+## Delivery Notes
+
+**Delivered: 2026-04-17**
+
+All five phases completed:
+
+1. **Phase 1 — Agent namespace consolidation:** `BotNexus.AgentCore` → `BotNexus.Agent.Core`, `BotNexus.Providers.*` → `BotNexus.Agent.Providers.*`. All source projects moved under `src/agent/`.
+2. **Phase 2 — Extensions folder restructure:** `extensions/` → `src/extensions/` with flattened folder layout (one folder per project, no double-nesting).
+3. **Phase 3 — Consistency check:** Full repo sweep for stale namespaces, paths, and documentation references.
+4. **Phase 4 — Channel renames:** `BotNexus.Channels.Core` → `BotNexus.Gateway.Channels` (moved to gateway), `BotNexus.Channels.*` → `BotNexus.Extensions.Channels.*` (moved to extensions).
+5. **Phase 5 — CodingAgent to POC:** `src/coding-agent/BotNexus.CodingAgent` → `poc/BotNexus.CodingAgent`.
+
+Post-delivery consistency fixes applied: stale namespace references in source READMEs, Blazor CSS bundle link, observability and configuration docs, and README project structure section updated to reflect final layout.

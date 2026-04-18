@@ -978,9 +978,9 @@ extensions/
 │   ├── anthropic/            # BotNexus.Agent.Providers.Anthropic.dll
 │   └── azure-openai/         # Custom provider
 ├── channels/
-│   ├── telegram/             # BotNexus.Channels.Telegram.dll
-│   ├── discord/              # BotNexus.Channels.Discord.dll
-│   └── slack/                # BotNexus.Channels.Slack.dll
+│   ├── telegram/             # BotNexus.Extensions.Channels.Telegram.dll
+│   ├── discord/              # BotNexus.Extensions.Channels.Discord.dll
+│   └── slack/                # BotNexus.Extensions.Channels.Slack.dll
 └── tools/
     ├── github/               # BotNexus.Tools.GitHub.dll
     └── custom-tool/          # Custom tool extension

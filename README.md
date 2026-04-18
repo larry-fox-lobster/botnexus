@@ -272,21 +272,34 @@ See [Architecture Guide](docs/architecture.md#provider-architecture-pi-style) an
 ```
 src/
 ├── domain/
-│   └── BotNexus.Domain       # Domain primitives (value objects, smart enums)
-├── BotNexus.Core          # Abstractions, config, extension loader
-├── BotNexus.Gateway       # Main host, agent router, SignalR routing, hot reload
-├── BotNexus.Cli           # CLI tool (botnexus command)
-├── BotNexus.Diagnostics   # Health checkups (doctor) with auto-fix
-├── BotNexus.Api           # OpenAI-compatible REST API
-├── BotNexus.Agent         # Agent loop, tool registry, MCP
-├── BotNexus.Session       # JSONL session persistence
-├── channels/
-│   └── BotNexus.Channels.*  # Channel implementations (Discord, Slack, Telegram)
-├── BotNexus.Providers.*   # LLM provider implementations
-├── BotNexus.Tools.*       # Tool extensions
-└── BotNexus.WebUI         # Real-time monitoring UI
-extensions/                # Built extension binaries (auto-populated)
-tests/                     # Unit, integration, and E2E tests
+│   └── BotNexus.Domain                      # Domain primitives (value objects, smart enums)
+├── agent/
+│   ├── BotNexus.Agent.Core                  # Agent loop, tool execution, streaming
+│   ├── BotNexus.Agent.Providers.Core        # Provider abstractions, LLM client, model registry
+│   ├── BotNexus.Agent.Providers.Copilot     # GitHub Copilot provider (OAuth, model-aware routing)
+│   ├── BotNexus.Agent.Providers.OpenAI      # OpenAI provider
+│   ├── BotNexus.Agent.Providers.Anthropic   # Anthropic provider
+│   └── BotNexus.Agent.Providers.OpenAICompat # OpenAI-compatible provider
+├── gateway/
+│   ├── BotNexus.Gateway                     # Main host, agent router, hot reload
+│   ├── BotNexus.Gateway.Api                 # REST API, WebUI static files
+│   ├── BotNexus.Gateway.Abstractions        # Gateway contracts and interfaces
+│   ├── BotNexus.Gateway.Contracts           # Shared DTOs
+│   ├── BotNexus.Gateway.Sessions            # Session persistence
+│   ├── BotNexus.Gateway.Channels            # Channel adapter base classes
+│   └── BotNexus.Cli                         # CLI tool (botnexus command)
+├── extensions/
+│   ├── BotNexus.Extensions.Channels.SignalR  # SignalR channel (WebUI real-time)
+│   ├── BotNexus.Extensions.Channels.Telegram # Telegram Bot channel
+│   ├── BotNexus.Extensions.Channels.Tui      # Terminal UI channel
+│   ├── BotNexus.Extensions.Mcp              # MCP server support
+│   ├── BotNexus.Extensions.Skills           # Modular knowledge packages
+│   └── BotNexus.Extensions.*                # Other tool extensions
+├── tools/                                   # Built-in tool implementations
+├── prompts/                                 # Prompt pipeline and templates
+└── BotNexus.WebUI                           # Real-time monitoring UI
+poc/                                         # Proof-of-concept projects
+tests/                                       # Unit, integration, and E2E tests
 ```
 
 ## Configuration
