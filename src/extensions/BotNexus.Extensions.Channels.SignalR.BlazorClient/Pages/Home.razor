@@ -36,6 +36,19 @@
                 </div>
             </button>
         }
+
+        <div class="sidebar-footer">
+            <button class="restart-btn" @onclick="RestartGateway" disabled="@_restarting">
+                @if (_restarting)
+                {
+                    <span>Restarting…</span>
+                }
+                else
+                {
+                    <span>🔄 Restart Gateway</span>
+                }
+            </button>
+        </div>
     </nav>
 
     @* ── Chat area — one panel per agent, show/hide for instant switching ── *@
@@ -78,9 +91,26 @@
         InvokeAsync(StateHasChanged);
     }
 
+    private bool _restarting;
+
     private async Task SelectAgent(string agentId)
     {
         await Manager.SetActiveAgentAsync(agentId);
+    }
+
+    private async Task RestartGateway()
+    {
+        _restarting = true;
+        try
+        {
+            using var http = new HttpClient { BaseAddress = new Uri(Nav.BaseUri) };
+            await http.PostAsync("/api/gateway/shutdown", null);
+        }
+        catch
+        {
+            // Expected — connection drops when gateway shuts down
+        }
+        _restarting = false;
     }
 
     public void Dispose()

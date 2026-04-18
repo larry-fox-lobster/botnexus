@@ -230,6 +230,35 @@ html, body, #app {
     line-height: 1;
 }
 
+.sidebar-footer {
+    margin-top: auto;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+.restart-btn {
+    width: 100%;
+    padding: 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.restart-btn:hover:not(:disabled) {
+    background: rgba(255, 80, 80, 0.1);
+    border-color: #f55;
+    color: #f88;
+}
+
+.restart-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .agent-streaming-dot {
     color: var(--accent);
     font-size: 0.65rem;
