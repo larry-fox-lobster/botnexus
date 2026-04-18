@@ -6,7 +6,7 @@
 <PageTitle>BotNexus</PageTitle>
 
 <div class="main-grid">
-    @* ── Agent sidebar ─────────────────────────────────────── *@
+    @* ── Agent sidebar — collapsible tree ─────────────────── *@
     <nav class="agent-list">
         <h3>Agents</h3>
         <ConnectionStatus Hub="@Manager.Hub" />
@@ -18,23 +18,55 @@
 
         @foreach (var (agentId, state) in Manager.Sessions)
         {
-            <button class="agent-tab @(agentId == Manager.ActiveAgentId ? "selected" : "")"
-                    @onclick="() => SelectAgent(agentId)">
-                <div class="agent-tab-content">
+            var isExpanded = _expandedAgents.Contains(agentId);
+            var isActive = agentId == Manager.ActiveAgentId;
+
+            <div class="agent-node @(isActive ? "active" : "")">
+                <div class="agent-node-header" @onclick="() => ToggleAgent(agentId)">
+                    <span class="agent-expand">@(isExpanded ? "▾" : "▸")</span>
                     <span class="agent-name">@state.DisplayName</span>
-                    <span class="agent-id">@agentId</span>
+                    <div class="agent-node-badges">
+                        @if (state.UnreadCount > 0)
+                        {
+                            <span class="unread-badge">@state.UnreadCount</span>
+                        }
+                        @if (state.IsStreaming)
+                        {
+                            <span class="agent-streaming-dot" title="Streaming…">●</span>
+                        }
+                    </div>
                 </div>
-                <div class="agent-tab-badges">
-                    @if (state.UnreadCount > 0)
-                    {
-                        <span class="unread-badge">@state.UnreadCount</span>
-                    }
-                    @if (state.IsStreaming)
-                    {
-                        <span class="agent-streaming-dot" title="Streaming…">●</span>
-                    }
-                </div>
-            </button>
+
+                @if (isExpanded)
+                {
+                    <div class="agent-children">
+                        @* Primary channel *@
+                        <button class="channel-item @(isActive ? "selected" : "")"
+                                @onclick="() => SelectAgent(agentId)">
+                            <span class="channel-icon">💬</span>
+                            <span>@(state.ChannelType ?? "signalr")</span>
+                            @if (state.SessionId is not null)
+                            {
+                                <span class="session-id-mini">@state.SessionId[..8]…</span>
+                            }
+                        </button>
+
+                        @* Sub-agent sessions (if any) *@
+                        @foreach (var sub in GetSubAgents(agentId))
+                        {
+                            <button class="channel-item sub-agent"
+                                    @onclick="() => SelectAgent(sub.AgentId)">
+                                <span class="channel-icon">🤖</span>
+                                <span>@sub.DisplayName</span>
+                                @if (sub.IsStreaming)
+                                {
+                                    <span class="agent-streaming-dot">●</span>
+                                }
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
         }
 
         <div class="sidebar-footer">
@@ -92,10 +124,26 @@
     }
 
     private bool _restarting;
+    private readonly HashSet<string> _expandedAgents = new();
 
     private async Task SelectAgent(string agentId)
     {
+        // Auto-expand when selected
+        _expandedAgents.Add(agentId);
         await Manager.SetActiveAgentAsync(agentId);
+    }
+
+    private void ToggleAgent(string agentId)
+    {
+        if (!_expandedAgents.Remove(agentId))
+            _expandedAgents.Add(agentId);
+    }
+
+    private IEnumerable<AgentSessionState> GetSubAgents(string parentAgentId)
+    {
+        // Sub-agents have session IDs containing the parent's session ID as a prefix
+        // For now, return empty — sub-agent tracking will be wired when SubAgent events are handled
+        return Enumerable.Empty<AgentSessionState>();
     }
 
     private async Task RestartGateway()

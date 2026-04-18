@@ -176,43 +176,106 @@ html, body, #app {
 
 /* ── Agent tabs (Phase 3 multi-session) ────────────────────────────── */
 
-.agent-tab {
+/* ── Agent tree ─────────────────────────────────────────────────────── */
+
+.agent-node {
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    transition: border-color 0.15s;
+}
+
+.agent-node.active {
+    border-color: var(--accent);
+}
+
+.agent-node-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: 0.6rem 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: transparent;
-    color: var(--text-primary);
+    gap: 0.4rem;
+    padding: 0.5rem 0.6rem;
     cursor: pointer;
-    text-align: left;
-    transition: background 0.15s, border-color 0.15s;
-    gap: 0.5rem;
+    border-radius: var(--radius);
+    transition: background 0.15s;
 }
 
-.agent-tab:hover {
+.agent-node-header:hover {
     background: var(--bg-surface);
-    border-color: var(--accent);
 }
 
-.agent-tab.selected {
-    background: var(--bg-surface);
-    border-color: var(--accent);
+.agent-expand {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    width: 0.8rem;
+    flex-shrink: 0;
 }
 
-.agent-tab-content {
-    display: flex;
-    flex-direction: column;
+.agent-node-header .agent-name {
+    font-weight: 600;
+    font-size: 0.85rem;
+    flex: 1;
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.agent-tab-badges {
+.agent-node-badges {
     display: flex;
     align-items: center;
     gap: 0.35rem;
     flex-shrink: 0;
+}
+
+.agent-children {
+    padding-left: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding-bottom: 0.3rem;
+}
+
+.channel-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    padding: 0.3rem 0.5rem;
+    border: none;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.78rem;
+    text-align: left;
+    transition: background 0.15s;
+}
+
+.channel-item:hover {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+}
+
+.channel-item.selected {
+    background: var(--bg-surface);
+    color: var(--accent);
+}
+
+.channel-item.sub-agent {
+    color: var(--text-muted);
+    font-size: 0.73rem;
+}
+
+.channel-icon {
+    font-size: 0.7rem;
+    flex-shrink: 0;
+}
+
+.session-id-mini {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    opacity: 0.6;
+    margin-left: auto;
 }
 
 .unread-badge {
