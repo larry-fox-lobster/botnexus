@@ -66,4 +66,24 @@ foreach ($proj in $projects) {
     $deployed++
 }
 
+# Scrub stale extension directories that no longer match a deployed manifest ID
+if (Test-Path $dest) {
+    $validIds = $projects | ForEach-Object {
+        $m = Join-Path $_.DirectoryName "botnexus-extension.json"
+        if (Test-Path $m) { (Get-Content $m -Raw | ConvertFrom-Json).id }
+    } | Where-Object { $_ }
+
+    foreach ($dir in (Get-ChildItem -Path $dest -Directory)) {
+        if ($dir.Name -notin $validIds) {
+            try {
+                Remove-Item $dir.FullName -Recurse -Force -ErrorAction Stop
+                Write-Host "🗑 Removed stale: $($dir.Name)"
+            }
+            catch {
+                Write-Host "⚠ Could not remove $($dir.Name) (files locked — will clean on next restart)"
+            }
+        }
+    }
+}
+
 Write-Host "[deploy] $deployed extension(s) deployed to $dest"
