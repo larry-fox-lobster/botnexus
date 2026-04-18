@@ -19,6 +19,6 @@
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\common\BotNexus.Prompts\BotNexus.Prompts.csproj" />
+    <ProjectReference Include="..\..\src\gateway\BotNexus.Gateway.Prompts\BotNexus.Gateway.Prompts.csproj" />
   </ItemGroup>
 </Project>

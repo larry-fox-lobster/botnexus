@@ -1,4 +1,4 @@
-using BotNexus.Prompts;
+using BotNexus.Gateway.Prompts;
 
 namespace BotNexus.Gateway.Agents;
 
@@ -79,7 +79,7 @@ public static class SystemPromptBuilder
         var promptContext = new PromptContext
         {
             WorkspaceDir = @params.WorkspaceDir,
-            ContextFiles = contextFiles.Select(static file => new BotNexus.Prompts.ContextFile(file.Path, file.Content)).ToList(),
+            ContextFiles = contextFiles.Select(static file => new BotNexus.Gateway.Prompts.ContextFile(file.Path, file.Content)).ToList(),
             AvailableTools = normalizedTools,
             IsMinimal = isMinimal,
             Channel = runtimeChannel,
@@ -137,7 +137,7 @@ public static class SystemPromptBuilder
     }
     public static IReadOnlyList<ContextFile> sortContextFilesForPrompt(IReadOnlyList<ContextFile> contextFiles)
     {
-        return ContextFileOrdering.SortForPrompt(contextFiles.Select(static file => new BotNexus.Prompts.ContextFile(file.Path, file.Content)).ToList())
+        return ContextFileOrdering.SortForPrompt(contextFiles.Select(static file => new BotNexus.Gateway.Prompts.ContextFile(file.Path, file.Content)).ToList())
             .Select(static file => new ContextFile(file.Path, file.Content))
             .ToList();
     }

@@ -1,5 +1,5 @@
 using System.Text;
-using BotNexus.Prompts;
+using BotNexus.Gateway.Prompts;
 
 namespace BotNexus.CodingAgent;
 

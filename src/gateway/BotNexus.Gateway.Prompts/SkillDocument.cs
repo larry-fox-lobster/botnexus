@@ -1,4 +1,4 @@
-namespace BotNexus.Prompts;
+namespace BotNexus.Gateway.Prompts;
 
 /// <summary>
 /// Represents skill document.

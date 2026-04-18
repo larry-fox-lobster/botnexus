@@ -1,4 +1,4 @@
-namespace BotNexus.Prompts;
+namespace BotNexus.Gateway.Prompts;
 
 /// <summary>
 /// Specifies supported values for prompt section.

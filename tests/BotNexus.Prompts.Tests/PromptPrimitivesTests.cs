@@ -1,7 +1,7 @@
-using BotNexus.Prompts;
+using BotNexus.Gateway.Prompts;
 using FluentAssertions;
 
-namespace BotNexus.Prompts.Tests;
+namespace BotNexus.Gateway.Prompts.Tests;
 
 public sealed class PromptPrimitivesTests
 {

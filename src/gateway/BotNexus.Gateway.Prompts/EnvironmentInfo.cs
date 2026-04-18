@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace BotNexus.Prompts;
+namespace BotNexus.Gateway.Prompts;
 
 /// <summary>
 /// Represents environment info.

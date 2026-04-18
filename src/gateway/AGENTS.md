@@ -4,7 +4,6 @@
 
 Projects in `src/gateway/` may depend on:
 - `src/agent/` — agent core and provider abstractions
-- `src/common/` — shared infrastructure (Prompts)
 - `src/domain/` — domain primitives and models
 
 **Prohibited dependencies:**
@@ -15,7 +14,7 @@ Projects in `src/gateway/` may depend on:
 
 | Project | Purpose | Allowed deps |
 |---------|---------|-------------|
-| `BotNexus.Gateway` | Core gateway runtime — agent supervision, isolation, session management, extension loading, dispatch | Agent, Common, Domain |
+| `BotNexus.Gateway` | Core gateway runtime — agent supervision, isolation, session management, extension loading, dispatch | Agent, Domain, Gateway.Prompts |
 | `BotNexus.Gateway.Api` | ASP.NET host — controllers, middleware, Program.cs | Gateway, Domain (no direct SignalR references) |
 | `BotNexus.Gateway.Abstractions` | Interfaces for extensions — `IEndpointContributor`, `IApiContributor`, agent/session/channel contracts | Domain only |
 | `BotNexus.Gateway.Contracts` | Lightweight shared types — session summaries, config models | Domain only |
@@ -24,6 +23,7 @@ Projects in `src/gateway/` may depend on:
 | `BotNexus.Cron` | Cron job scheduling and tool contributions | Agent, Gateway.Contracts, Domain |
 | `BotNexus.Memory` | Agent memory store and search tools | Agent, Gateway.Contracts, Domain |
 | `BotNexus.Tools` | Core agent tools (workspace, sub-agent, session management) | Agent, Gateway.Contracts, Domain |
+| `BotNexus.Gateway.Prompts` | System prompt building and context file management | Domain only |
 
 ## Key architectural rules
 
