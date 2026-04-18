@@ -1,6 +1,7 @@
 {
   "id": "botnexus-skills",
-  "name": "Skills Extension",
+  "name": "Skills Manager",
+  "description": "Dynamic skill loading and command contributions for agents",
   "version": "1.0.0",
   "entryAssembly": "BotNexus.Extensions.Skills.dll",
   "extensionTypes": ["tool", "command"]

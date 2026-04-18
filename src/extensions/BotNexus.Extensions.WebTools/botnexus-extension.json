@@ -1,7 +1,8 @@
 {
   "id": "botnexus-web",
   "name": "Web Tools",
-  "version": "0.1.0",
+  "description": "Web search and fetch tools for agents",
+  "version": "1.0.0",
   "entryAssembly": "BotNexus.Extensions.WebTools.dll",
   "extensionTypes": ["tool"]
 }

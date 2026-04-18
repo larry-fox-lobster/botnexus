@@ -1,7 +1,8 @@
 {
   "id": "botnexus-exec",
   "name": "Exec Tool",
-  "version": "0.1.0",
+  "description": "Shell command execution tool for agents",
+  "version": "1.0.0",
   "entryAssembly": "BotNexus.Extensions.ExecTool.dll",
   "extensionTypes": ["tool"]
 }

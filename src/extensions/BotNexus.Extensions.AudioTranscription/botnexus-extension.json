@@ -1,7 +1,8 @@
 {
-    "id": "audio-transcription",
-    "name": "Whisper Audio Transcription",
-    "version": "1.0.0",
-    "entryAssembly": "BotNexus.Extensions.AudioTranscription.dll",
-    "extensionTypes": ["media-handler"]
+  "id": "botnexus-audio-transcription",
+  "name": "Audio Transcription",
+  "description": "Whisper-based audio transcription media handler",
+  "version": "1.0.0",
+  "entryAssembly": "BotNexus.Extensions.AudioTranscription.dll",
+  "extensionTypes": ["media-handler"]
 }
