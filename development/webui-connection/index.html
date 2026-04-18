@@ -2777,10 +2777,10 @@
 <p>Resolves or creates a session for the agent+channel pair, subscribes the caller to the session group, and dispatches the message.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">public</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="n">Task</span><span class="o">&lt;</span><span class="kt">object</span><span class="o">&gt;</span><span class="w"> </span><span class="n">SendMessage</span><span class="p">(</span><span class="n">AgentId</span><span class="w"> </span><span class="n">agentId</span><span class="p">,</span><span class="w"> </span><span class="n">ChannelKey</span><span class="w"> </span><span class="n">channelType</span><span class="p">,</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="n">content</span><span class="p">)</span>
 </code></pre></div>
-<p>See <a href="../../src/gateway/BotNexus.Gateway.Api/Hubs/GatewayHub.cs">GatewayHub.cs</a></p>
+<p>See <a href="../../src/extensions/BotNexus.Extensions.Channels.SignalR/GatewayHub.cs">GatewayHub.cs</a></p>
 <p><strong>Auto-Session Logic:</strong></p>
 <p>Finds an existing active UserAgent session for the agent+channel pair, or creates a new one with auto-generated SessionId and UserAgent type.</p>
-<p>See <a href="../../src/gateway/BotNexus.Gateway.Api/Hubs/GatewayHub.cs">GatewayHub.cs</a></p>
+<p>See <a href="../../src/extensions/BotNexus.Extensions.Channels.SignalR/GatewayHub.cs">GatewayHub.cs</a></p>
 <p><strong>Key Insight:</strong></p>
 <p>Sessions are created <strong>on first message</strong>, not explicit creation. The client doesn't need to know about session creation — it just sends a message to an agent, and the session is created automatically.</p>
 <h2 id="signalr-event-handling">SignalR Event Handling<a class="headerlink" href="#signalr-event-handling" title="Permanent link">&para;</a></h2>
@@ -2827,7 +2827,7 @@
 <p>See <a href="../../src/BotNexus.WebUI/wwwroot/js/events.js">events.js</a></p>
 <h3 id="server-side-broadcasting">Server-Side Broadcasting<a class="headerlink" href="#server-side-broadcasting" title="Permanent link">&para;</a></h3>
 <p>Maps <code>AgentStreamEventType</code> to SignalR method name, enriches the event with <code>SessionId</code>, and broadcasts to the session group via <code>IHubContext</code>.</p>
-<p>See <a href="../../src/gateway/BotNexus.Gateway.Api/Hubs/SignalRChannelAdapter.cs">SignalRChannelAdapter.cs</a></p>
+<p>See <a href="../../src/extensions/BotNexus.Extensions.Channels.SignalR/SignalRChannelAdapter.cs">SignalRChannelAdapter.cs</a></p>
 <h2 id="multi-session-management">Multi-Session Management<a class="headerlink" href="#multi-session-management" title="Permanent link">&para;</a></h2>
 <h3 id="sessionstore-class">SessionStore Class<a class="headerlink" href="#sessionstore-class" title="Permanent link">&para;</a></h3>
 <p>Per-session client state: tracks <code>sessionId</code>, <code>agentId</code>, <code>channelType</code>, streaming state (<code>isStreaming</code>, <code>activeToolCalls</code>, <code>thinkingBuffer</code>), permanent DOM container reference, and unread count.</p>
@@ -2931,7 +2931,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 16, 2026 05:53:49 UTC">April 16, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 18, 2026 01:03:21 UTC">April 18, 2026</span>
   </span>
 
     

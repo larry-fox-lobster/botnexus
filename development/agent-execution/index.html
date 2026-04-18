@@ -3013,7 +3013,7 @@
 <li><strong>Agent Supervisor</strong> (<code>IAgentSupervisor</code>) → Instance lifecycle management</li>
 <li><strong>Isolation Strategy</strong> (<code>IIsolationStrategy</code>) → Agent execution environment</li>
 <li><strong>Agent Handle</strong> (<code>IAgentHandle</code>) → Execution interface</li>
-<li><strong>AgentCore</strong> (<code>BotNexus.AgentCore.Agent</code>) → Core agent loop</li>
+<li><strong>AgentCore</strong> (<code>BotNexus.Agent.Core.Agent</code>) → Core agent loop</li>
 <li><strong>Agent Loop Runner</strong> (<code>AgentLoopRunner</code>) → LLM interaction cycle</li>
 </ol>
 <h2 id="agent-descriptor-loading">Agent Descriptor Loading<a class="headerlink" href="#agent-descriptor-loading" title="Permanent link">&para;</a></h2>
@@ -3150,7 +3150,7 @@
 <h3 id="inprocessisolationstrategy-default">InProcessIsolationStrategy (Default)<a class="headerlink" href="#inprocessisolationstrategy-default" title="Permanent link">&para;</a></h3>
 <p><strong>Characteristics:</strong>
 - Runs agent in Gateway process
-- Direct <code>BotNexus.AgentCore.Agent</code> instantiation
+- Direct <code>BotNexus.Agent.Core.Agent</code> instantiation
 - No process/container boundaries
 - Lowest latency (&lt;10ms startup)
 - Shared memory space (trusted agents only)</p>
@@ -3200,7 +3200,7 @@
 <a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="inprocessagenthandle">InProcessAgentHandle<a class="headerlink" href="#inprocessagenthandle" title="Permanent link">&para;</a></h3>
-<p>Wraps <code>BotNexus.AgentCore.Agent</code> and bridges to Gateway contracts.</p>
+<p>Wraps <code>BotNexus.Agent.Core.Agent</code> and bridges to Gateway contracts.</p>
 <p><strong>PromptAsync Implementation:</strong></p>
 <p><code>PromptAsync</code> subscribes to <code>AgentCore</code> events, converts them to gateway stream events (broadcast via <code>IChannelAdapter</code>), delegates to the underlying <code>Agent.PromptAsync</code>, and returns the accumulated response.</p>
 <p>See <a href="../../src/gateway/BotNexus.Gateway/Isolation/InProcessIsolationStrategy.cs">InProcessAgentHandle</a> for the full implementation.</p>
@@ -3233,10 +3233,10 @@
 <a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>   c. Goto 1
 <a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>6. Return final response
 </code></pre></div>
-<p>See <a href="../../src/agent/BotNexus.AgentCore/Loop/AgentLoopRunner.cs">AgentLoopRunner</a> for the full implementation.</p>
+<p>See <a href="../../src/agent/BotNexus.Agent.Core/Loop/AgentLoopRunner.cs">AgentLoopRunner</a> for the full implementation.</p>
 <h3 id="tool-execution">Tool Execution<a class="headerlink" href="#tool-execution" title="Permanent link">&para;</a></h3>
 <p>The <code>ToolExecutor</code> supports two modes: <strong>sequential</strong> (default), which executes tool calls one at a time, and <strong>parallel</strong>, which executes all tool calls concurrently via <code>Task.WhenAll</code>. The mode is configured per-agent via <code>ToolExecutionMode</code> in the descriptor.</p>
-<p>See <a href="../../src/agent/BotNexus.AgentCore/Loop/ToolExecutor.cs">ToolExecutor</a> for the full implementation.</p>
+<p>See <a href="../../src/agent/BotNexus.Agent.Core/Loop/ToolExecutor.cs">ToolExecutor</a> for the full implementation.</p>
 <p><strong>Hook Execution:</strong></p>
 <p>Before each tool call, registered hooks are evaluated in order — any hook returning <code>HookAction.Block</code> short-circuits execution. After execution, hooks may inspect or modify the result. This enables security policies, audit logging, and result transformation.</p>
 <p>See <a href="../../src/gateway/BotNexus.Gateway/Hooks/HookDispatcher.cs">HookDispatcher</a> for the full implementation.</p>
@@ -3427,7 +3427,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 16, 2026 05:53:49 UTC">April 16, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 18, 2026 00:27:47 UTC">April 18, 2026</span>
   </span>
 
     
