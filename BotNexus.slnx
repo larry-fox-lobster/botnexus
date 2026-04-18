@@ -22,19 +22,19 @@
     <Project Path="src/agent/BotNexus.Agent.Providers.Copilot/BotNexus.Agent.Providers.Copilot.csproj" />
   </Folder>
   <Folder Name="/src/common/">
-    <Project Path="src/common/BotNexus.Cron/BotNexus.Cron.csproj" />
-    <Project Path="src/common/BotNexus.Memory/BotNexus.Memory.csproj" />
     <Project Path="src/common/BotNexus.Prompts/BotNexus.Prompts.csproj" />
-    <Project Path="src/common/BotNexus.Tools/BotNexus.Tools.csproj" />
   </Folder>
   <Folder Name="/src/gateway/">
     <Project Path="src/gateway/BotNexus.Cli/BotNexus.Cli.csproj" />
+    <Project Path="src/gateway/BotNexus.Cron/BotNexus.Cron.csproj" />
     <Project Path="src/gateway/BotNexus.Gateway.Abstractions/BotNexus.Gateway.Abstractions.csproj" />
     <Project Path="src/gateway/BotNexus.Gateway.Contracts/BotNexus.Gateway.Contracts.csproj" />
     <Project Path="src/gateway/BotNexus.Gateway/BotNexus.Gateway.csproj" />
     <Project Path="src/gateway/BotNexus.Gateway.Api/BotNexus.Gateway.Api.csproj" />
     <Project Path="src/gateway/BotNexus.Gateway.Sessions/BotNexus.Gateway.Sessions.csproj" />
     <Project Path="src/gateway/BotNexus.Gateway.Channels/BotNexus.Gateway.Channels.csproj" />
+    <Project Path="src/gateway/BotNexus.Memory/BotNexus.Memory.csproj" />
+    <Project Path="src/gateway/BotNexus.Tools/BotNexus.Tools.csproj" />
   </Folder>
   <Folder Name="/poc/">
     <Project Path="poc/BotNexus.CodingAgent/BotNexus.CodingAgent.csproj" />

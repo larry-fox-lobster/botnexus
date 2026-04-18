@@ -4,7 +4,7 @@
 
 Projects in `src/gateway/` may depend on:
 - `src/agent/` — agent core and provider abstractions
-- `src/common/` — shared infrastructure (Cron, Memory, Prompts, Tools)
+- `src/common/` — shared infrastructure (Prompts)
 - `src/domain/` — domain primitives and models
 
 **Prohibited dependencies:**
@@ -21,6 +21,9 @@ Projects in `src/gateway/` may depend on:
 | `BotNexus.Gateway.Contracts` | Lightweight shared types — session summaries, config models | Domain only |
 | `BotNexus.Gateway.Channels` | Base channel adapter classes (`ChannelAdapterBase`) | Domain, Gateway.Abstractions |
 | `BotNexus.Gateway.Sessions` | Session store implementations (File, SQLite, InMemory) | Domain, Gateway.Contracts |
+| `BotNexus.Cron` | Cron job scheduling and tool contributions | Agent, Gateway.Contracts, Domain |
+| `BotNexus.Memory` | Agent memory store and search tools | Agent, Gateway.Contracts, Domain |
+| `BotNexus.Tools` | Core agent tools (workspace, sub-agent, session management) | Agent, Gateway.Contracts, Domain |
 
 ## Key architectural rules
 
