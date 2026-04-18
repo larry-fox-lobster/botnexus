@@ -1,6 +1,7 @@
 @page "/"
 @inject AgentSessionManager Manager
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>BotNexus</PageTitle>
@@ -131,6 +132,9 @@
         // Auto-expand when selected
         _expandedAgents.Add(agentId);
         await Manager.SetActiveAgentAsync(agentId);
+        // Scroll the newly-visible panel to bottom after DOM updates
+        await Task.Yield();
+        await JS.InvokeVoidAsync("chatScroll.scrollActiveToBottom");
     }
 
     private void ToggleAgent(string agentId)

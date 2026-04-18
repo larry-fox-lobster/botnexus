@@ -22,6 +22,17 @@ window.chatScroll = {
         });
     },
 
+    /** Finds the currently visible chat panel and scrolls it to the bottom.
+     *  Used after session switching — defers to allow DOM visibility. */
+    scrollActiveToBottom: function () {
+        requestAnimationFrame(function () {
+            var active = document.querySelector('.chat-panel-wrapper.active .messages-container');
+            if (active) {
+                active.scrollTop = active.scrollHeight;
+            }
+        });
+    },
+
     /**
      * Prevents the default Enter key behaviour (newline insertion) on a textarea
      * so that Blazor's onkeydown handler can send the message without a stray newline.
