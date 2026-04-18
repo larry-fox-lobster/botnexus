@@ -24,6 +24,7 @@
   <Folder Name="/src/common/">
     <Project Path="src/common/BotNexus.Cron/BotNexus.Cron.csproj" />
     <Project Path="src/common/BotNexus.Memory/BotNexus.Memory.csproj" />
+    <Project Path="src/common/BotNexus.Prompts/BotNexus.Prompts.csproj" />
     <Project Path="src/common/BotNexus.Tools/BotNexus.Tools.csproj" />
   </Folder>
   <Folder Name="/src/gateway/">
@@ -41,9 +42,6 @@
   <Folder Name="/src/domain/">
     <Project Path="src/domain/BotNexus.Domain/BotNexus.Domain.csproj" />
     <Project Path="src/domain/BotNexus.Sessions.Common/BotNexus.Sessions.Common.csproj" />
-  </Folder>
-  <Folder Name="/src/prompts/">
-    <Project Path="src/prompts/BotNexus.Prompts/BotNexus.Prompts.csproj" />
   </Folder>
 
   <Folder Name="/tests/">
