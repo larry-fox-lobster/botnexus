@@ -48,16 +48,18 @@ Three commands from clone to running Gateway:
 # 1. Clone the repository
 git clone https://github.com/sytone/botnexus.git && cd botnexus
 
-# 2. Build the solution
-dotnet build BotNexus.slnx
+# 2. Build the solution (Release)
+dotnet run --project src\gateway\BotNexus.Cli -- build --dev
 
 # 3. Run the Gateway
-.\scripts\start-gateway.ps1
+dotnet run --project src\gateway\BotNexus.Cli -- serve --dev
 ```
 
 The Gateway starts at `http://localhost:5005` with the WebUI served at the root URL.
 
 > **First run?** BotNexus auto-creates `~/.botnexus/` with a default `config.json`. No manual setup needed for development mode.
+
+> **Why Release builds?** The CLI always builds in Release configuration so gateway DLLs don't conflict with Debug builds from your IDE or test runner. This means you can run tests and serve simultaneously without file locks.
 
 ---
 
@@ -116,7 +118,7 @@ All scripts live in the `scripts/` directory.
 
 ### `start-gateway.ps1`
 
-Builds and starts the Gateway API.
+Thin wrapper that builds via the CLI and then delegates to `botnexus serve gateway`.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -124,10 +126,14 @@ Builds and starts the Gateway API.
 | `-SkipBuild` | switch | off | Skip the build step |
 
 **What it does:**
-1. Builds `src/gateway/BotNexus.Gateway.Api/BotNexus.Gateway.Api.csproj`
-2. Sets `ASPNETCORE_ENVIRONMENT=Development`
-3. Sets `ASPNETCORE_URLS=http://localhost:{port}`
-4. Runs the Gateway with `dotnet run --no-build`
+1. Runs `botnexus build` to produce a Release build
+2. Delegates to `botnexus serve gateway` with the repo path and port
+
+> **Tip:** You can skip the script and call the CLI directly:
+> ```powershell
+> dotnet run --project src\gateway\BotNexus.Cli -- build --dev
+> dotnet run --project src\gateway\BotNexus.Cli -- serve --dev
+> ```
 
 **Examples:**
 
@@ -306,6 +312,12 @@ The Gateway watches `config.json` with a `FileSystemWatcher`. Changes are deboun
 ## Running the Gateway
 
 ### Default Startup
+
+```powershell
+dotnet run --project src\gateway\BotNexus.Cli -- serve --dev
+```
+
+Or via the script wrapper:
 
 ```powershell
 .\scripts\start-gateway.ps1
