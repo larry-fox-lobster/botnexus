@@ -92,6 +92,13 @@ public sealed class GatewaySettingsConfig
     public CrossWorldFederationConfig? CrossWorld { get; set; }
     /// <summary>Default file access policy applied to all agents unless overridden per-agent.</summary>
     public FileAccessPolicyConfig? FileAccess { get; set; }
+    /// <summary>
+    /// Preferred shell for command execution on Windows.
+    /// Values: <c>"auto"</c> (default — bash when available, PowerShell fallback),
+    /// <c>"pwsh"</c> (always PowerShell), <c>"bash"</c> (always bash).
+    /// Ignored on non-Windows platforms where bash is always used.
+    /// </summary>
+    public string? ShellPreference { get; set; }
 }
 
 /// <summary>Named location configuration for resource access.</summary>

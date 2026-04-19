@@ -209,6 +209,14 @@
               "$ref": "#/definitions/FileAccessPolicyConfig"
             }
           ]
+        },
+        "shellPreference": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "enum": [null, "auto", "pwsh", "bash"],
+          "description": "Preferred shell for command execution on Windows. 'auto' (default) prefers bash when available; 'pwsh' always uses PowerShell; 'bash' always uses bash. Ignored on non-Windows."
         }
       }
     },

@@ -30,6 +30,11 @@ public sealed class CodingAgentConfig
     /// Null means no timeout (process runs until complete or cancelled).
     /// </summary>
     public int? DefaultShellTimeoutSeconds { get; init; } = 600;
+    /// <summary>
+    /// Preferred shell for command execution on Windows.
+    /// Values: "auto" (default), "pwsh", "bash".
+    /// </summary>
+    public string? ShellPreference { get; init; }
     public List<string> AllowedCommands { get; set; } = [];
     public List<string> BlockedPaths { get; set; } = [];
     public Dictionary<string, object?> Custom { get; set; } = new(StringComparer.OrdinalIgnoreCase);

@@ -264,7 +264,7 @@ public static class CodingAgent
             new ListDirectoryTool(workingDirectory, fileSystem),
             new WriteTool(workingDirectory, fileSystem),
             new EditTool(workingDirectory, fileSystem),
-            new ShellTool(workingDirectory, config.DefaultShellTimeoutSeconds),
+            new ShellTool(workingDirectory, config.DefaultShellTimeoutSeconds, ParseShellPreference(config.ShellPreference)),
             new GlobTool(workingDirectory, fileSystem),
             new GrepTool(workingDirectory, fileSystem)
         };
@@ -380,6 +380,19 @@ public static class CodingAgent
                     .Select(static item => item.GetString())
                     .Where(static item => !string.IsNullOrWhiteSpace(item))),
             _ => null
+        };
+    }
+
+    private static ShellPreference ParseShellPreference(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return ShellPreference.Auto;
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "pwsh" or "powershell" => ShellPreference.Pwsh,
+            "bash" => ShellPreference.Bash,
+            _ => ShellPreference.Auto,
         };
     }
 }

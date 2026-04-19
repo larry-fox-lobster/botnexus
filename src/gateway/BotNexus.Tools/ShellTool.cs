@@ -9,12 +9,34 @@ using BotNexus.Agent.Providers.Core.Models;
 namespace BotNexus.Tools;
 
 /// <summary>
+/// Controls which shell is used for command execution on Windows.
+/// On non-Windows platforms, bash is always used regardless of this setting.
+/// </summary>
+public enum ShellPreference
+{
+    /// <summary>Auto-detect: prefer bash (Git/WSL) when available, fall back to PowerShell.</summary>
+    Auto,
+
+    /// <summary>Always use PowerShell Core (pwsh) or Windows PowerShell.</summary>
+    Pwsh,
+
+    /// <summary>Always use bash (Git Bash, WSL, or /bin/bash).</summary>
+    Bash,
+}
+
+/// <summary>
 /// Executes shell commands and returns normalized process output.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Platform contract: Windows prefers Git Bash when available, falling back to PowerShell;
-/// non-Windows executes through bash. This prioritizes portable command semantics across platforms.
+/// Platform contract controlled by <see cref="ShellPreference"/>:
+/// <list type="bullet">
+///   <item><see cref="ShellPreference.Auto"/> (default) — Windows prefers bash when available,
+///         falling back to PowerShell; non-Windows uses bash.</item>
+///   <item><see cref="ShellPreference.Pwsh"/> — Windows uses pwsh/powershell directly;
+///         non-Windows still uses bash.</item>
+///   <item><see cref="ShellPreference.Bash"/> — Always uses bash on all platforms.</item>
+/// </list>
 /// </para>
 /// <para>
 /// Output is capped at 50 * 1024 (51,200) bytes to protect downstream token budgets and prevent
@@ -28,8 +50,9 @@ public sealed class ShellTool : IAgentTool
     private static readonly Lazy<string?> WindowsBashPath = new(FindBashExecutable);
     private readonly string? _workingDirectory;
     private readonly int? _defaultTimeoutSeconds;
+    private readonly ShellPreference _shellPreference;
 
-    public ShellTool(string? workingDirectory = null, int? defaultTimeoutSeconds = 600)
+    public ShellTool(string? workingDirectory = null, int? defaultTimeoutSeconds = 600, ShellPreference shellPreference = ShellPreference.Auto)
     {
         _workingDirectory = string.IsNullOrWhiteSpace(workingDirectory)
             ? null
@@ -41,18 +64,25 @@ public sealed class ShellTool : IAgentTool
         }
 
         _defaultTimeoutSeconds = defaultTimeoutSeconds;
+        _shellPreference = shellPreference;
     }
 
     /// <inheritdoc />
-    public string Name => "bash";
+    public string Name => _shellPreference == ShellPreference.Pwsh && RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+        ? "shell"
+        : "bash";
 
     /// <inheritdoc />
-    public string Label => "Bash";
+    public string Label => _shellPreference == ShellPreference.Pwsh && RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+        ? "Shell (PowerShell)"
+        : "Bash";
 
     /// <inheritdoc />
     public Tool Definition => new(
         Name,
-        "Execute a bash command in the current working directory and return stdout/stderr.",
+        _shellPreference == ShellPreference.Pwsh && RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? "Execute a PowerShell command in the current working directory and return stdout/stderr."
+            : "Execute a bash command in the current working directory and return stdout/stderr.",
         JsonDocument.Parse("""
             {
               "type": "object",
@@ -115,7 +145,7 @@ public sealed class ShellTool : IAgentTool
             timeoutSeconds = _defaultTimeoutSeconds;
         }
 
-        var invocation = BuildShellInvocation(command);
+        var invocation = BuildShellInvocation(command, _shellPreference);
         var startInfo = new ProcessStartInfo
         {
             FileName = invocation.FileName,
@@ -218,26 +248,93 @@ public sealed class ShellTool : IAgentTool
             new ShellToolDetails(process.ExitCode, TimedOut: false, IsError: process.ExitCode != 0));
     }
 
-    private static ShellInvocation BuildShellInvocation(string command)
+    private static ShellInvocation BuildShellInvocation(string command, ShellPreference preference)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            var bashPath = WindowsBashPath.Value;
-            if (!string.IsNullOrWhiteSpace(bashPath))
+            if (preference == ShellPreference.Pwsh)
             {
-                var bashEscaped = command.Replace("'", "'\"'\"'", StringComparison.Ordinal);
-                return new ShellInvocation(bashPath, $"-lc '{bashEscaped}'", null);
+                return BuildPwshInvocation(command, warningPrefix: null);
             }
 
-            var escaped = command.Replace("\"", "`\"", StringComparison.Ordinal);
-            return new ShellInvocation(
-                "powershell",
-                $"-NoLogo -NoProfile -NonInteractive -Command \"{escaped}\"",
+            if (preference == ShellPreference.Bash)
+            {
+                var bashPath = WindowsBashPath.Value;
+                if (!string.IsNullOrWhiteSpace(bashPath))
+                {
+                    var bashEscaped = command.Replace("'", "'\"'\"'", StringComparison.Ordinal);
+                    return new ShellInvocation(bashPath, $"-lc '{bashEscaped}'", null);
+                }
+
+                // Bash explicitly requested but not found — fall back to pwsh with warning.
+                return BuildPwshInvocation(command,
+                    "[warning: bash not found, using PowerShell — install Git for Windows for bash support]\n");
+            }
+
+            // Auto: try bash first, fall back to pwsh.
+            var autoBashPath = WindowsBashPath.Value;
+            if (!string.IsNullOrWhiteSpace(autoBashPath))
+            {
+                var bashEscaped = command.Replace("'", "'\"'\"'", StringComparison.Ordinal);
+                return new ShellInvocation(autoBashPath, $"-lc '{bashEscaped}'", null);
+            }
+
+            return BuildPwshInvocation(command,
                 "[warning: bash not found, using PowerShell — install Git for Windows for best compatibility]\n");
         }
 
         var unixBashEscaped = command.Replace("'", "'\"'\"'", StringComparison.Ordinal);
         return new ShellInvocation("/bin/bash", $"-lc '{unixBashEscaped}'", null);
+    }
+
+    private static ShellInvocation BuildPwshInvocation(string command, string? warningPrefix)
+    {
+        // Prefer pwsh (PowerShell Core) over legacy powershell.exe when available.
+        var pwshPath = FindPwshExecutable();
+        var escaped = command.Replace("\"", "`\"", StringComparison.Ordinal);
+        return new ShellInvocation(
+            pwshPath,
+            $"-NoLogo -NoProfile -NonInteractive -Command \"{escaped}\"",
+            warningPrefix);
+    }
+
+    private static string FindPwshExecutable()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return "pwsh";
+        }
+
+        try
+        {
+            var whereStartInfo = new ProcessStartInfo
+            {
+                FileName = "where.exe",
+                Arguments = "pwsh",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var process = Process.Start(whereStartInfo);
+            if (process is null)
+            {
+                return "powershell";
+            }
+
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit(2000);
+            if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
+            {
+                return "pwsh";
+            }
+        }
+        catch
+        {
+            // Fall through to legacy PowerShell.
+        }
+
+        return "powershell";
     }
 
     private static string? FindBashExecutable()
