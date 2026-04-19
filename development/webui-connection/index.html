@@ -348,7 +348,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../dev-guide/" class="md-tabs__link">
+        <a href="../../getting-started-dev/" class="md-tabs__link">
           
   
   
@@ -1422,14 +1422,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev-guide/" class="md-nav__link">
+      <a href="../../getting-started-dev/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Developer Guide
+    Developer Setup
   
 
     
@@ -2648,8 +2648,11 @@
   
 
 
-<h1 id="webui-architecture-and-connection-flow">WebUI Architecture and Connection Flow<a class="headerlink" href="#webui-architecture-and-connection-flow" title="Permanent link">&para;</a></h1>
-<p>This document describes the BotNexus WebUI architecture, including the SignalR connection model, per-channel containers, and multi-session management.</p>
+<h1 id="webui-architecture-and-connection-flow">WebUI architecture and connection flow<a class="headerlink" href="#webui-architecture-and-connection-flow" title="Permanent link">&para;</a></h1>
+<p>This document describes the BotNexus WebUI architecture, including the SignalR connection model, multi-session management, and Blazor component structure.</p>
+<blockquote>
+<p><strong>Note:</strong> The WebUI is a Blazor Server application at <code>src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/</code>. The legacy static JS client at <code>src/BotNexus.WebUI/</code> is no longer the primary interface.</p>
+</blockquote>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>The WebUI is a <strong>channel-centric, multi-session interface</strong> that connects to the Gateway via SignalR. Key characteristics:</p>
 <ul>
@@ -2824,41 +2827,41 @@
 </tr>
 </tbody>
 </table>
-<p>See <a href="../../src/BotNexus.WebUI/wwwroot/js/events.js">events.js</a></p>
+<p>See <a href="../../src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/Services/GatewayHubConnection.cs">GatewayHubConnection.cs</a> and <a href="../../src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/Components/ChatPanel.razor">ChatPanel.razor</a></p>
 <h3 id="server-side-broadcasting">Server-Side Broadcasting<a class="headerlink" href="#server-side-broadcasting" title="Permanent link">&para;</a></h3>
 <p>Maps <code>AgentStreamEventType</code> to SignalR method name, enriches the event with <code>SessionId</code>, and broadcasts to the session group via <code>IHubContext</code>.</p>
 <p>See <a href="../../src/extensions/BotNexus.Extensions.Channels.SignalR/SignalRChannelAdapter.cs">SignalRChannelAdapter.cs</a></p>
 <h2 id="multi-session-management">Multi-Session Management<a class="headerlink" href="#multi-session-management" title="Permanent link">&para;</a></h2>
 <h3 id="sessionstore-class">SessionStore Class<a class="headerlink" href="#sessionstore-class" title="Permanent link">&para;</a></h3>
-<p>Per-session client state: tracks <code>sessionId</code>, <code>agentId</code>, <code>channelType</code>, streaming state (<code>isStreaming</code>, <code>activeToolCalls</code>, <code>thinkingBuffer</code>), permanent DOM container reference, and unread count.</p>
-<p>See <a href="../../src/BotNexus.WebUI/wwwroot/js/session-store.js">session-store.js</a></p>
+<p>Per-session client state: tracks <code>sessionId</code>, <code>agentId</code>, <code>channelType</code>, streaming state (<code>isStreaming</code>, <code>activeToolCalls</code>, <code>thinkingBuffer</code>), and unread count.</p>
+<p>See <a href="../../src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/Services/AgentSessionState.cs">AgentSessionState.cs</a></p>
 <h3 id="sessionstoremanager">SessionStoreManager<a class="headerlink" href="#sessionstoremanager" title="Permanent link">&para;</a></h3>
 <p>Key behaviors:</p>
 <ul>
-<li>Manages <code>Map&lt;sessionId, SessionStore&gt;</code> with LRU eviction (max 20 stores)</li>
-<li><code>getOrCreateStore(sessionId)</code> — creates a new <code>SessionStore</code> on first access, evicts the oldest entry when over the limit</li>
-<li><code>switchView(sessionId)</code> — hides the current container, shows the target (no DOM rebuild), resets unread count</li>
+<li>Manages session state per agent/session pair</li>
+<li>Creates new session state on first access</li>
+<li>Switches the active view between sessions</li>
 </ul>
-<p>See <a href="../../src/BotNexus.WebUI/wwwroot/js/session-store.js">session-store.js</a></p>
-<p><strong>Per-Channel Container Strategy:</strong></p>
+<p>See <a href="../../src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/Services/AgentSessionManager.cs">AgentSessionManager.cs</a></p>
+<p><strong>Session Switching:</strong></p>
 <ol>
-<li><strong>Each session</strong> gets a permanent DOM container created on first event</li>
-<li><strong>Switch Away</strong>: Hide the current container (<code>display: none</code>)</li>
-<li><strong>Switch To</strong>: Show the target container — no content rebuild needed</li>
+<li><strong>Each session</strong> maintains its own state via <code>AgentSessionState</code></li>
+<li><strong>Switch Away</strong>: The previous session's content is preserved in memory</li>
+<li><strong>Switch To</strong>: The target session's content renders via Blazor component diffing</li>
 <li><strong>No Server Round-Trip</strong>: Switching is instant, client-side only</li>
-<li><strong>SignalR Events</strong>: Route to the correct container by <code>sessionId</code></li>
+<li><strong>SignalR Events</strong>: Route to the correct session state by <code>sessionId</code></li>
 </ol>
 <p><strong>Benefits:</strong></p>
 <ul>
-<li>Instant session switching (no network latency, no DOM rebuild)</li>
-<li>No content loss — containers persist even when not visible</li>
-<li>Supports multi-session streaming (events always append to the correct container)</li>
-<li>Simpler than DOM fragment caching — no clone/restore logic</li>
+<li>Instant session switching (no network latency)</li>
+<li>No content loss — session state persists in memory</li>
+<li>Supports multi-session streaming (events always update the correct session state)</li>
+<li>Blazor handles DOM updates automatically</li>
 </ul>
 <h2 id="rendering-pipeline">Rendering Pipeline<a class="headerlink" href="#rendering-pipeline" title="Permanent link">&para;</a></h2>
 <h3 id="markdown-rendering">Markdown Rendering<a class="headerlink" href="#markdown-rendering" title="Permanent link">&para;</a></h3>
-<p>Renders messages using <code>marked.parse()</code> for Markdown with <code>DOMPurify.sanitize()</code> for XSS protection. Delta updates re-render the full accumulated text to maintain valid Markdown.</p>
-<p>See <a href="../../src/BotNexus.WebUI/wwwroot/js/chat.js">chat.js</a></p>
+<p>Renders messages using Markdown with sanitization for XSS protection.</p>
+<p>See <a href="../../src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/Components/ChatPanel.razor">ChatPanel.razor</a></p>
 <p><strong>Sanitization:</strong></p>
 <ul>
 <li><code>DOMPurify.sanitize()</code> prevents XSS attacks</li>
@@ -2866,20 +2869,20 @@
 <li>Safe to render LLM-generated content</li>
 </ul>
 <h3 id="tool-call-rendering">Tool Call Rendering<a class="headerlink" href="#tool-call-rendering" title="Permanent link">&para;</a></h3>
-<p>Tool calls rendered as collapsible elements with name, status indicator, arguments (in <code>&lt;details&gt;</code>), and result. Status updates from Running → Success/Failed on ToolEnd.</p>
-<p>See <a href="../../src/BotNexus.WebUI/wwwroot/js/chat.js">chat.js</a></p>
+<p>Tool calls rendered as collapsible elements with name, status indicator, arguments, and result. Status updates from Running → Success/Failed on ToolEnd.</p>
+<p>See <a href="../../src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/Components/ChatPanel.razor">ChatPanel.razor</a></p>
 <h3 id="thinking-display">Thinking Display<a class="headerlink" href="#thinking-display" title="Permanent link">&para;</a></h3>
-<p>Thinking deltas accumulated in a temporary <code>&lt;div&gt;</code> with the thinking buffer. Removed on MessageEnd.</p>
-<p>See <a href="../../src/BotNexus.WebUI/wwwroot/js/events.js">events.js</a></p>
+<p>Thinking deltas accumulated and displayed during streaming. Removed on MessageEnd.</p>
+<p>See <a href="../../src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/Components/ChatPanel.razor">ChatPanel.razor</a></p>
 <h2 id="sidebar-and-session-list">Sidebar and Session List<a class="headerlink" href="#sidebar-and-session-list" title="Permanent link">&para;</a></h2>
 <p>Renders session list sorted by last-viewed time. Each entry shows agent name, channel type, unread badge, and streaming indicator. Clicking switches the active view.</p>
-<p>See <a href="../../src/BotNexus.WebUI/wwwroot/js/sidebar.js">sidebar.js</a></p>
+<p>See <a href="../../src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/Pages/Home.razor">Home.razor</a></p>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
 <p><strong>Key Architectural Decisions:</strong></p>
 <ol>
 <li><strong>Subscribe-All Model</strong>: Single connection subscribes to all sessions upfront</li>
 <li><strong>Auto-Session on Send</strong>: Sessions created implicitly on first message</li>
-<li><strong>Per-Channel Containers</strong>: Each agent+channel gets a permanent DOM container — show/hide, not swap</li>
+<li><strong>Blazor Component Model</strong>: Session state managed in C# services, rendered via Blazor components</li>
 <li><strong>Per-Session Stores</strong>: Independent state management per session</li>
 <li><strong>SignalR Group Broadcast</strong>: Events routed to session groups (<code>session:{sessionId}</code>)</li>
 <li><strong>Persistent Containers</strong>: No content loss when switching — containers persist even when hidden</li>
@@ -2931,7 +2934,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 18, 2026 01:03:21 UTC">April 18, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 19, 2026 21:33:52 UTC">April 19, 2026</span>
   </span>
 
     

@@ -13,10 +13,10 @@
         <link rel="canonical" href="https://sytone.github.io/botnexus/getting-started-dev/">
       
       
-        <link rel="prev" href="../getting-started-release/">
+        <link rel="prev" href="../architecture/system-flows/">
       
       
-        <link rel="next" href="../tutorials/first-agent/">
+        <link rel="next" href="../development/">
       
       
         
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#getting-started-from-source-developer-setup" class="md-skip">
+        <a href="#developer-setup" class="md-skip">
           Skip to content
         </a>
       
@@ -242,12 +242,10 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
+      <li class="md-tabs__item">
         <a href="../getting-started/" class="md-tabs__link">
           
   
@@ -344,11 +342,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../dev-guide/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
           
   
   
@@ -553,31 +553,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
             
   
   
@@ -595,7 +592,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -740,48 +737,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#1-clone-and-build" class="md-nav__link">
+  <a href="#1-clone-build-and-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Clone and Build
+        1. Clone, build, and run
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#2-run-the-gateway" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Run the Gateway
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-initialize-botnexus-home" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Initialize BotNexus Home
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-run-the-gateway-in-dev-mode" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Run the Gateway in Dev Mode
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="4. Run the Gateway in Dev Mode">
+    <nav class="md-nav" aria-label="1. Clone, build, and run">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -801,22 +765,55 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-configure-your-first-provider-copilot" class="md-nav__link">
+  <a href="#2-configure-the-copilot-provider" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Configure Your First Provider (Copilot)
+        2. Configure the Copilot provider
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="5. Configure Your First Provider (Copilot)">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-open-the-webui-and-chat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Open the WebUI and chat
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-development-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Development workflow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Development workflow">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#the-oauth-device-code-flow" class="md-nav__link">
+  <a href="#what-changes-need-a-restart" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The OAuth device code flow
+        What changes need a restart?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running tests
       
     </span>
   </a>
@@ -829,55 +826,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#6-customize-your-agent-optional" class="md-nav__link">
+  <a href="#5-customize-your-agent" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Customize Your Agent (Optional)
+        5. Customize your agent
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#7-open-the-webui" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        7. Open the WebUI
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="7. Open the WebUI">
+    <nav class="md-nav" aria-label="5. Customize your agent">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#send-your-first-message" class="md-nav__link">
+  <a href="#add-more-agents" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Send Your First Message
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#explore-the-interface" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Explore the Interface
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tips-tricks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tips &amp; Tricks
+        Add more agents
       
     </span>
   </a>
@@ -890,22 +854,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#8-dev-workflow-making-changes" class="md-nav__link">
+  <a href="#key-endpoints" class="md-nav__link">
     <span class="md-ellipsis">
       
-        8. Dev Workflow: Making Changes
+        Key endpoints
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="8. Dev Workflow: Making Changes">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provider-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Provider reference">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#a-changing-gateway-code" class="md-nav__link">
+  <a href="#github-copilot-recommended-for-dev" class="md-nav__link">
     <span class="md-ellipsis">
       
-        A. Changing Gateway Code
+        GitHub Copilot (recommended for dev)
       
     </span>
   </a>
@@ -913,10 +888,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#b-changing-agent-personality" class="md-nav__link">
+  <a href="#openai" class="md-nav__link">
     <span class="md-ellipsis">
       
-        B. Changing Agent Personality
+        OpenAI
       
     </span>
   </a>
@@ -924,10 +899,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#c-changing-configuration" class="md-nav__link">
+  <a href="#anthropic" class="md-nav__link">
     <span class="md-ellipsis">
       
-        C. Changing Configuration
+        Anthropic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#openai-compatible-local-models-azure-etc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenAI-compatible (local models, Azure, etc.)
       
     </span>
   </a>
@@ -940,33 +926,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#9-running-tests" class="md-nav__link">
+  <a href="#configuration-reference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        9. Running Tests
+        Configuration reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#home-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Home directory
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#10-validate-configuration" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#configuration-layering" class="md-nav__link">
     <span class="md-ellipsis">
       
-        10. Validate Configuration
+        Configuration layering
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="10. Validate Configuration">
-      <ul class="md-nav__list">
+</li>
         
           <li class="md-nav__item">
-  <a href="#common-configuration-issues" class="md-nav__link">
+  <a href="#environment-variables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Common Configuration Issues
+        Environment variables
       
     </span>
   </a>
@@ -979,71 +976,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#11-common-dev-tasks" class="md-nav__link">
+  <a href="#gateway-auth" class="md-nav__link">
     <span class="md-ellipsis">
       
-        11. Common Dev Tasks
+        Gateway auth
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="11. Common Dev Tasks">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#view-gateway-logs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        View Gateway logs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#list-registered-agents" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        List registered agents
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#check-a-specific-agent" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Check a specific agent
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reset-your-dev-environment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reset your dev environment
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#12-troubleshooting" class="md-nav__link">
+  <a href="#extension-development" class="md-nav__link">
     <span class="md-ellipsis">
       
-        12. Troubleshooting
+        Extension development
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scripts-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scripts reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
       
     </span>
   </a>
@@ -1054,7 +1023,7 @@
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Next Steps
+        Next steps
       
     </span>
   </a>
@@ -1745,28 +1714,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   
@@ -1784,7 +1756,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1799,17 +1771,44 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../dev-guide/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Setup
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
   <span class="md-ellipsis">
     
   
-    Developer Guide
+    Developer Setup
   
 
     
@@ -1818,6 +1817,331 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-clone-build-and-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Clone, build, and run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Clone, build, and run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#verify-its-running" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify it's running
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-configure-the-copilot-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Configure the Copilot provider
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-open-the-webui-and-chat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Open the WebUI and chat
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-development-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Development workflow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Development workflow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-changes-need-a-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What changes need a restart?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-customize-your-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Customize your agent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Customize your agent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#add-more-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add more agents
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key endpoints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provider-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Provider reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#github-copilot-recommended-for-dev" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub Copilot (recommended for dev)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#openai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenAI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anthropic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anthropic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#openai-compatible-local-models-azure-etc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenAI-compatible (local models, Azure, etc.)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#home-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Home directory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-layering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration layering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gateway-auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gateway auth
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extension-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extension development
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scripts-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scripts reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2524,48 +2848,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#1-clone-and-build" class="md-nav__link">
+  <a href="#1-clone-build-and-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Clone and Build
+        1. Clone, build, and run
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#2-run-the-gateway" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Run the Gateway
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-initialize-botnexus-home" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Initialize BotNexus Home
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-run-the-gateway-in-dev-mode" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Run the Gateway in Dev Mode
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="4. Run the Gateway in Dev Mode">
+    <nav class="md-nav" aria-label="1. Clone, build, and run">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2585,22 +2876,55 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-configure-your-first-provider-copilot" class="md-nav__link">
+  <a href="#2-configure-the-copilot-provider" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Configure Your First Provider (Copilot)
+        2. Configure the Copilot provider
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="5. Configure Your First Provider (Copilot)">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-open-the-webui-and-chat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Open the WebUI and chat
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-development-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Development workflow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Development workflow">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#the-oauth-device-code-flow" class="md-nav__link">
+  <a href="#what-changes-need-a-restart" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The OAuth device code flow
+        What changes need a restart?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running tests
       
     </span>
   </a>
@@ -2613,55 +2937,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#6-customize-your-agent-optional" class="md-nav__link">
+  <a href="#5-customize-your-agent" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Customize Your Agent (Optional)
+        5. Customize your agent
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#7-open-the-webui" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        7. Open the WebUI
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="7. Open the WebUI">
+    <nav class="md-nav" aria-label="5. Customize your agent">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#send-your-first-message" class="md-nav__link">
+  <a href="#add-more-agents" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Send Your First Message
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#explore-the-interface" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Explore the Interface
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tips-tricks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tips &amp; Tricks
+        Add more agents
       
     </span>
   </a>
@@ -2674,22 +2965,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#8-dev-workflow-making-changes" class="md-nav__link">
+  <a href="#key-endpoints" class="md-nav__link">
     <span class="md-ellipsis">
       
-        8. Dev Workflow: Making Changes
+        Key endpoints
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="8. Dev Workflow: Making Changes">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provider-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Provider reference">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#a-changing-gateway-code" class="md-nav__link">
+  <a href="#github-copilot-recommended-for-dev" class="md-nav__link">
     <span class="md-ellipsis">
       
-        A. Changing Gateway Code
+        GitHub Copilot (recommended for dev)
       
     </span>
   </a>
@@ -2697,10 +2999,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#b-changing-agent-personality" class="md-nav__link">
+  <a href="#openai" class="md-nav__link">
     <span class="md-ellipsis">
       
-        B. Changing Agent Personality
+        OpenAI
       
     </span>
   </a>
@@ -2708,10 +3010,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#c-changing-configuration" class="md-nav__link">
+  <a href="#anthropic" class="md-nav__link">
     <span class="md-ellipsis">
       
-        C. Changing Configuration
+        Anthropic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#openai-compatible-local-models-azure-etc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenAI-compatible (local models, Azure, etc.)
       
     </span>
   </a>
@@ -2724,33 +3037,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#9-running-tests" class="md-nav__link">
+  <a href="#configuration-reference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        9. Running Tests
+        Configuration reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#home-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Home directory
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#10-validate-configuration" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#configuration-layering" class="md-nav__link">
     <span class="md-ellipsis">
       
-        10. Validate Configuration
+        Configuration layering
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="10. Validate Configuration">
-      <ul class="md-nav__list">
+</li>
         
           <li class="md-nav__item">
-  <a href="#common-configuration-issues" class="md-nav__link">
+  <a href="#environment-variables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Common Configuration Issues
+        Environment variables
       
     </span>
   </a>
@@ -2763,71 +3087,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#11-common-dev-tasks" class="md-nav__link">
+  <a href="#gateway-auth" class="md-nav__link">
     <span class="md-ellipsis">
       
-        11. Common Dev Tasks
+        Gateway auth
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="11. Common Dev Tasks">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#view-gateway-logs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        View Gateway logs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#list-registered-agents" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        List registered agents
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#check-a-specific-agent" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Check a specific agent
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reset-your-dev-environment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reset your dev environment
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#12-troubleshooting" class="md-nav__link">
+  <a href="#extension-development" class="md-nav__link">
     <span class="md-ellipsis">
       
-        12. Troubleshooting
+        Extension development
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scripts-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scripts reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
       
     </span>
   </a>
@@ -2838,7 +3134,7 @@
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Next Steps
+        Next steps
       
     </span>
   </a>
@@ -2870,381 +3166,467 @@
   
 
 
-<h1 id="getting-started-from-source-developer-setup">Getting Started from Source — Developer Setup<a class="headerlink" href="#getting-started-from-source-developer-setup" title="Permanent link">&para;</a></h1>
-<blockquote>
-<p>For developers building BotNexus from the cloned repository. If you're installing a released version, see <a href="../getting-started-release/">Install from Release</a> instead.</p>
-</blockquote>
+<h1 id="developer-setup">Developer setup<a class="headerlink" href="#developer-setup" title="Permanent link">&para;</a></h1>
+<p>The single guide for building, running, and developing BotNexus from source. If you're installing a released version, see <a href="../getting-started-release/">Install from release</a>.</p>
 <hr />
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
 <th>Requirement</th>
-<th>Details</th>
+<th>Version</th>
+<th>Notes</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>.NET 10+ SDK</strong></td>
-<td><a href="https://dotnet.microsoft.com/download">Download</a>. Verify with <code>dotnet --version</code>. You need the SDK, not just the runtime.</td>
+<td><strong>.NET SDK</strong></td>
+<td>10.0+</td>
+<td>Run <code>dotnet --version</code> to verify. You need the SDK, not just the runtime.</td>
+</tr>
+<tr>
+<td><strong>PowerShell</strong></td>
+<td>7.0+</td>
+<td>Windows ships with it. Linux/macOS: <code>brew install powershell</code> or your package manager.</td>
 </tr>
 <tr>
 <td><strong>Git</strong></td>
-<td>Any recent version. Verify with <code>git --version</code>.</td>
+<td>2.x+</td>
+<td>Any recent version.</td>
 </tr>
 <tr>
-<td><strong>GitHub account</strong></td>
-<td>Required for the Copilot provider's OAuth flow. You need an active GitHub Copilot subscription.</td>
+<td><strong>GitHub Copilot subscription</strong></td>
+<td>—</td>
+<td>Required for the default Copilot provider's OAuth flow.</td>
 </tr>
 </tbody>
 </table>
-<p>Optional but recommended:</p>
-<ul>
-<li><strong>curl</strong> — for testing API endpoints (built into modern Windows and macOS)</li>
-<li>A modern browser — for the built-in WebUI (SignalR client)</li>
-</ul>
 <hr />
-<h2 id="1-clone-and-build">1. Clone and Build<a class="headerlink" href="#1-clone-and-build" title="Permanent link">&para;</a></h2>
-<p>Clone the BotNexus repository:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/sytone/botnexus.git
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>botnexus
+<h2 id="1-clone-build-and-run">1. Clone, build, and run<a class="headerlink" href="#1-clone-build-and-run" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">://</span><span class="n">github</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">sytone</span><span class="p">/</span><span class="n">botnexus</span><span class="p">.</span><span class="n">git</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd </span><span class="n">botnexus</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span>
 </code></pre></div>
-<p>Restore dependencies and build the entire solution in Release configuration:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>dotnet<span class="w"> </span>build<span class="w"> </span>BotNexus.slnx<span class="w"> </span>-c<span class="w"> </span>Release
-</code></pre></div>
-<p>Or use the CLI to build (once you have a working build):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">dotnet</span> <span class="n">run</span> <span class="p">-</span><span class="n">-project</span> <span class="n">src</span><span class="p">\</span><span class="n">gateway</span><span class="p">\</span><span class="n">BotNexus</span><span class="p">.</span><span class="nb">Cli </span><span class="p">--</span> <span class="n">build</span> <span class="p">-</span><span class="n">-dev</span>
-</code></pre></div>
-<p>Expected output (last lines):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Build succeeded.
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    0 Warning(s)
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    0 Error(s)
-</code></pre></div>
-<p><strong>Troubleshooting:</strong></p>
-<ul>
-<li>If you see "SDK version not found", run <code>dotnet --list-sdks</code> to verify .NET 10+ is installed</li>
-<li>If the build fails with "project not found", ensure you're in the repo root directory</li>
-</ul>
-<hr />
-<h2 id="2-run-the-gateway">2. Run the Gateway<a class="headerlink" href="#2-run-the-gateway" title="Permanent link">&para;</a></h2>
-<p>The quickest way to get started is to run the Gateway using the CLI:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">dotnet</span> <span class="n">run</span> <span class="p">-</span><span class="n">-project</span> <span class="n">src</span><span class="p">\</span><span class="n">gateway</span><span class="p">\</span><span class="n">BotNexus</span><span class="p">.</span><span class="nb">Cli </span><span class="p">--</span> <span class="n">serve</span> <span class="p">-</span><span class="n">-dev</span>
-</code></pre></div>
-<p>This starts the Gateway from your dev clone at <code>http://localhost:5005</code> using the Release build. If the process exits, it automatically restarts after 5 seconds (press <code>q</code> to quit).</p>
-<p>You can also use the script wrapper:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="nb">start-gateway</span><span class="p">.</span><span class="n">ps1</span>
-</code></pre></div>
-<p><strong>To run tests before starting:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span>
-</code></pre></div>
-<p>This builds the solution, runs all Gateway tests, and then starts the Gateway. If tests fail, the Gateway won't start.</p>
-<p><strong>For watch mode</strong> — auto-rebuilds on source changes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Watch</span>
-</code></pre></div>
-<p>The Gateway will be ready when you see output like:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>🚀 Starting Gateway API
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>   URL:        http://localhost:5005
-</code></pre></div>
-<hr />
-<h2 id="3-initialize-botnexus-home">3. Initialize BotNexus Home<a class="headerlink" href="#3-initialize-botnexus-home" title="Permanent link">&para;</a></h2>
-<p>The Gateway automatically creates <code>~/.botnexus/</code> on first run with default configuration. You can also initialize it manually using the CLI:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c"># If installed as a .NET tool</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">botnexus</span> <span class="n">init</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c"># Or run from source</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">dotnet</span> <span class="n">run</span> <span class="p">-</span><span class="n">-project</span> <span class="n">src</span><span class="p">\</span><span class="n">gateway</span><span class="p">\</span><span class="n">BotNexus</span><span class="p">.</span><span class="nb">Cli </span><span class="p">--</span> <span class="n">init</span>
-</code></pre></div>
-<p>This creates the directory structure:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>~/.botnexus/
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>├── config.json           # Platform configuration
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>├── auth.json             # Provider credentials (OAuth tokens)
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>├── agents/               # Agent workspace directories
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>│   └── assistant/
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>│       ├── SOUL.md       # Core personality
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>│       ├── IDENTITY.md   # Role and constraints
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>│       ├── USER.md       # User preferences
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>│       └── MEMORY.md     # Long-term knowledge
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>├── sessions/             # Conversation history (JSONL)
-<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>├── tokens/               # OAuth tokens
-<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>├── extensions/           # Extension DLLs (if customized)
-<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>└── logs/                 # Daily log files
-</code></pre></div>
-<p>Override the location with an environment variable:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Windows (PowerShell)</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nv">$env</span>:BOTNEXUS_HOME<span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;C:\custom\botnexus&quot;</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># macOS/Linux</span>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">BOTNEXUS_HOME</span><span class="o">=</span>/custom/botnexus
-</code></pre></div>
-<p>For more CLI options, see <a href="../cli-reference/">CLI Reference</a>.</p>
-<hr />
-<h2 id="4-run-the-gateway-in-dev-mode">4. Run the Gateway in Dev Mode<a class="headerlink" href="#4-run-the-gateway-in-dev-mode" title="Permanent link">&para;</a></h2>
-<p>Start the Gateway from the repository using the CLI:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">dotnet</span> <span class="n">run</span> <span class="p">-</span><span class="n">-project</span> <span class="n">src</span><span class="p">\</span><span class="n">gateway</span><span class="p">\</span><span class="n">BotNexus</span><span class="p">.</span><span class="nb">Cli </span><span class="p">--</span> <span class="n">serve</span> <span class="p">-</span><span class="n">-dev</span>
-</code></pre></div>
-<p>Or use the script wrapper:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="nb">start-gateway</span><span class="p">.</span><span class="n">ps1</span>
-</code></pre></div>
-<p>Or use the full dev loop (build + test + run):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span>
-</code></pre></div>
-<p>The Gateway starts at <code>http://localhost:5005</code> by default.</p>
-<p><strong>Custom port:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">dotnet</span> <span class="n">run</span> <span class="p">-</span><span class="n">-project</span> <span class="n">src</span><span class="p">\</span><span class="n">gateway</span><span class="p">\</span><span class="n">BotNexus</span><span class="p">.</span><span class="nb">Cli </span><span class="p">--</span> <span class="n">serve</span> <span class="p">-</span><span class="n">-dev</span> <span class="p">-</span><span class="n">-port</span> <span class="n">8080</span>
-</code></pre></div>
-<p><strong>Watch mode</strong> — auto-recompiles on source changes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Watch</span>
+<p>That's it. <code>dev-loop.ps1</code> builds the full solution, runs Gateway tests, and starts the Gateway — stopping at the first failure.</p>
+<p>The Gateway starts at <code>http://localhost:5005</code> with the WebUI at the root URL.</p>
+<blockquote>
+<p><strong>First run?</strong> BotNexus auto-creates <code>~/.botnexus/</code> with a default <code>config.json</code>. No manual setup needed.</p>
+</blockquote>
+<p>Install the pre-commit hook (once, after cloning):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="nb">install-pre</span><span class="n">-commit-hook</span><span class="p">.</span><span class="n">ps1</span>
 </code></pre></div>
 <h3 id="verify-its-running">Verify it's running<a class="headerlink" href="#verify-its-running" title="Permanent link">&para;</a></h3>
-<p>Check the health endpoint:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nb">curl </span><span class="n">http</span><span class="p">://</span><span class="n">localhost</span><span class="p">:</span><span class="n">5005</span><span class="p">/</span><span class="n">health</span>
-</code></pre></div>
-<p>Expected response:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="p">{</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ok&quot;</span>
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">curl </span><span class="n">http</span><span class="p">://</span><span class="n">localhost</span><span class="p">:</span><span class="n">5005</span><span class="p">/</span><span class="n">health</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c"># Returns: {&quot;status&quot;:&quot;ok&quot;}</span>
 </code></pre></div>
 <hr />
-<h2 id="5-configure-your-first-provider-copilot">5. Configure Your First Provider (Copilot)<a class="headerlink" href="#5-configure-your-first-provider-copilot" title="Permanent link">&para;</a></h2>
-<p>Edit <code>~/.botnexus/config.json</code> to add the Copilot provider:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p">{</span>
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">  </span><span class="nt">&quot;providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">    </span><span class="nt">&quot;copilot&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">      </span><span class="nt">&quot;apiKey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auth:copilot&quot;</span><span class="p">,</span>
-<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">      </span><span class="nt">&quot;baseUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://api.githubcopilot.com&quot;</span>
-<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">  </span><span class="p">},</span>
-<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="w">  </span><span class="nt">&quot;agents&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="w">    </span><span class="nt">&quot;assistant&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="w">      </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;copilot&quot;</span><span class="p">,</span>
-<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="w">      </span><span class="nt">&quot;model&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpt-4.1&quot;</span><span class="p">,</span>
-<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a><span class="w">      </span><span class="nt">&quot;enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a><span class="p">}</span>
+<h2 id="2-configure-the-copilot-provider">2. Configure the Copilot provider<a class="headerlink" href="#2-configure-the-copilot-provider" title="Permanent link">&para;</a></h2>
+<p>Edit <code>~/.botnexus/config.json</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">&quot;gateway&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">&quot;listenUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;http://localhost:5005&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">&quot;defaultAgentId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;assistant&quot;</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">&quot;providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nt">&quot;copilot&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">      </span><span class="nt">&quot;apiKey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auth:copilot&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">      </span><span class="nt">&quot;baseUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://api.githubcopilot.com&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">      </span><span class="nt">&quot;defaultModel&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpt-4.1&quot;</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">  </span><span class="nt">&quot;agents&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">    </span><span class="nt">&quot;assistant&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">      </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;copilot&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">      </span><span class="nt">&quot;model&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpt-4.1&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">      </span><span class="nt">&quot;enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="p">}</span>
 </code></pre></div>
-<h3 id="the-oauth-device-code-flow">The OAuth device code flow<a class="headerlink" href="#the-oauth-device-code-flow" title="Permanent link">&para;</a></h3>
-<p>When you first send a message to the agent, you'll see:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>Go to https://github.com/login/device and enter code: ABCD-1234
+<p>On your first message to the agent, you'll see:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Go to https://github.com/login/device and enter code: ABCD-1234
 </code></pre></div>
-<p><strong>Steps:</strong></p>
-<ol>
-<li>Open <strong>https://github.com/login/device</strong> in your browser</li>
-<li>Enter the code shown (e.g., <code>ABCD-1234</code>)</li>
-<li>Click <strong>Authorize</strong> when prompted</li>
-<li>BotNexus receives the token and saves it to <code>~/.botnexus/auth.json</code></li>
-</ol>
-<p>The token is cached and refreshed automatically.</p>
+<p>Open that URL, enter the code, and authorize. The token is saved to <code>~/.botnexus/auth.json</code> and refreshes automatically.</p>
 <hr />
-<h2 id="6-customize-your-agent-optional">6. Customize Your Agent (Optional)<a class="headerlink" href="#6-customize-your-agent-optional" title="Permanent link">&para;</a></h2>
-<p>BotNexus creates workspace files for each agent in <code>~/.botnexus/agents/{agent-name}/</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>~/.botnexus/agents/assistant/
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>├── SOUL.md           # Core personality and values
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>├── IDENTITY.md       # Role, style, and constraints
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>├── USER.md           # User preferences
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>└── MEMORY.md         # Long-term distilled knowledge
-</code></pre></div>
-<p><strong>Edit <code>~/.botnexus/agents/assistant/SOUL.md</code>:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="gh"># Soul</span>
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>
-<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>You are a helpful, thoughtful assistant. You value clarity and precision.
-<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>You admit when you don&#39;t know something rather than guessing.
-</code></pre></div>
-<p><strong>Edit <code>~/.botnexus/agents/assistant/IDENTITY.md</code>:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="gh"># Identity</span>
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="k">-</span><span class="w"> </span>Name: Assistant
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="k">-</span><span class="w"> </span>Role: General-purpose AI assistant
-<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="k">-</span><span class="w"> </span>Style: Conversational but efficient
-<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="k">-</span><span class="w"> </span>Constraints: Never execute destructive operations without confirmation
-</code></pre></div>
-<p>Changes take effect on your <strong>next message</strong> — no restart required.</p>
-<hr />
-<h2 id="7-open-the-webui">7. Open the WebUI<a class="headerlink" href="#7-open-the-webui" title="Permanent link">&para;</a></h2>
-<p>Open your browser to:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>http://localhost:5005/
-</code></pre></div>
-<p>Or directly to the WebUI:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>http://localhost:5005
-</code></pre></div>
-<p>You should see the BotNexus web interface.</p>
-<h3 id="send-your-first-message">Send Your First Message<a class="headerlink" href="#send-your-first-message" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>Type your message</strong> in the input box (e.g., "Hello! What can you do?")</li>
-<li><strong>Press <code>Enter</code> or click Send</strong></li>
-<li><strong>Watch the agent respond</strong> — responses stream in real-time</li>
-</ol>
-<p>The session is created automatically and persists across Gateway restarts.</p>
-<h3 id="explore-the-interface">Explore the Interface<a class="headerlink" href="#explore-the-interface" title="Permanent link">&para;</a></h3>
+<h2 id="3-open-the-webui-and-chat">3. Open the WebUI and chat<a class="headerlink" href="#3-open-the-webui-and-chat" title="Permanent link">&para;</a></h2>
+<p>Open <code>http://localhost:5005</code> in your browser. Type a message and press Enter.</p>
+<p>Key features:</p>
 <ul>
-<li><strong>Sessions</strong> — Browse past conversations</li>
-<li><strong>API Docs</strong> — View REST API at <code>/swagger</code></li>
-<li><strong>Health Check</strong> — Test the gateway at <code>/health</code></li>
-</ul>
-<h3 id="tips-tricks">Tips &amp; Tricks<a class="headerlink" href="#tips-tricks" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Multiple tabs supported</strong> — open multiple browser tabs for parallel conversations</li>
-<li><strong>Shift+Enter</strong> to add line breaks without sending</li>
-<li><strong>Copy session ID</strong> — URL-safe session identifiers for sharing</li>
+<li><strong>Real-time streaming</strong> — responses appear as they generate</li>
+<li><strong>Model selector</strong> — switch models per session</li>
+<li><strong>Command palette</strong> — type <code>/help</code>, <code>/reset</code>, <code>/status</code>, or <code>/models</code></li>
+<li><strong>Session management</strong> — view, switch, and delete past conversations</li>
 </ul>
 <hr />
-<h2 id="8-dev-workflow-making-changes">8. Dev Workflow: Making Changes<a class="headerlink" href="#8-dev-workflow-making-changes" title="Permanent link">&para;</a></h2>
-<p>When developing BotNexus, you'll iterate through this cycle:</p>
-<h3 id="a-changing-gateway-code">A. Changing Gateway Code<a class="headerlink" href="#a-changing-gateway-code" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>Edit your code</strong> in <code>src/gateway/BotNexus.Gateway.Api/</code> or <code>src/gateway/BotNexus.Gateway/</code></li>
-<li><strong>Stop the running Gateway</strong> (Ctrl+C)</li>
-<li><strong>Rebuild and run:</strong></li>
-</ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>.<span class="se">\s</span>cripts<span class="se">\s</span>tart-gateway.ps1
+<h2 id="4-development-workflow">4. Development workflow<a class="headerlink" href="#4-development-workflow" title="Permanent link">&para;</a></h2>
+<p>Use <code>dev-loop.ps1</code> for the edit → build → test → run cycle:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c"># Build + test + run (the standard workflow)</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c"># Watch mode — auto-rebuild on source changes</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Watch</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c"># Custom port</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Port</span> <span class="n">9090</span>
 </code></pre></div>
-<p>Or with watch mode for continuous rebuilds:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>.<span class="se">\s</span>cripts<span class="se">\d</span>ev-loop.ps1<span class="w"> </span>-Watch
-</code></pre></div>
-<h3 id="b-changing-agent-personality">B. Changing Agent Personality<a class="headerlink" href="#b-changing-agent-personality" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>Edit workspace file</strong> (e.g., <code>~/.botnexus/agents/assistant/SOUL.md</code>)</li>
-<li><strong>No restart required</strong> — changes take effect on the next message</li>
-<li><strong>Send a new message</strong> to see the updated behavior</li>
-</ol>
-<h3 id="c-changing-configuration">C. Changing Configuration<a class="headerlink" href="#c-changing-configuration" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>Edit <code>~/.botnexus/config.json</code></strong></li>
-<li><strong>Changes hot-reload automatically</strong> within 500ms (except <code>gateway.listenUrl</code>, which requires restart)</li>
-<li><strong>Refresh the WebUI</strong> to see the changes</li>
-</ol>
-<hr />
-<h2 id="9-running-tests">9. Running Tests<a class="headerlink" href="#9-running-tests" title="Permanent link">&para;</a></h2>
-<p>Run the full test suite:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>dotnet<span class="w"> </span><span class="nb">test</span>
-</code></pre></div>
-<p>Run Gateway tests only:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>dotnet<span class="w"> </span><span class="nb">test</span><span class="w"> </span>tests/BotNexus.Gateway.Tests
-</code></pre></div>
-<p>Verbose output:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>dotnet<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--verbosity<span class="w"> </span>detailed
-</code></pre></div>
-<p>Tests use an isolated <code>BOTNEXUS_HOME</code> so they don't interfere with your development environment.</p>
-<hr />
-<h2 id="10-validate-configuration">10. Validate Configuration<a class="headerlink" href="#10-validate-configuration" title="Permanent link">&para;</a></h2>
-<p>Validate your <code>config.json</code> against the current schema:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="nb">curl </span><span class="n">http</span><span class="p">://</span><span class="n">localhost</span><span class="p">:</span><span class="n">5005</span><span class="p">/</span><span class="n">api</span><span class="p">/</span><span class="n">config</span><span class="p">/</span><span class="n">validate</span>
-</code></pre></div>
-<p>This checks for syntax errors, missing required fields, and invalid provider configurations.</p>
-<h3 id="common-configuration-issues">Common Configuration Issues<a class="headerlink" href="#common-configuration-issues" title="Permanent link">&para;</a></h3>
+<h3 id="what-changes-need-a-restart">What changes need a restart?<a class="headerlink" href="#what-changes-need-a-restart" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
-<th>Symptom</th>
-<th>Fix</th>
+<th>Change type</th>
+<th>Restart needed?</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>"No agents configured"</td>
-<td>Add an <code>agents</code> section to <code>config.json</code></td>
+<td>Agent definitions, models, enabled/disabled</td>
+<td>No — hot-reloads in ~500ms</td>
 </tr>
 <tr>
-<td>"Unknown provider"</td>
-<td>Ensure the provider name exists in <code>providers</code> section</td>
+<td>Provider settings (API keys, base URLs)</td>
+<td>No — hot-reloads</td>
 </tr>
 <tr>
-<td>"Invalid JSON"</td>
-<td>Check JSON syntax in <code>~/.botnexus/config.json</code></td>
+<td>Agent workspace files (<code>SOUL.md</code>, <code>IDENTITY.md</code>, etc.)</td>
+<td>No — takes effect on next message</td>
 </tr>
 <tr>
-<td>"Port in use"</td>
-<td>Use <code>--port</code> flag or change <code>gateway.listenUrl</code></td>
+<td><code>gateway.listenUrl</code> (port binding)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Extension DLL additions</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="running-tests">Running tests<a class="headerlink" href="#running-tests" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c"># Full test suite (required before committing)</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">dotnet</span> <span class="n">test</span> <span class="n">BotNexus</span><span class="p">.</span><span class="n">slnx</span> <span class="p">-</span><span class="n">-nologo</span> <span class="p">-</span><span class="n">-tl</span><span class="p">:</span><span class="n">off</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c"># Specific test project</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">dotnet</span> <span class="n">test</span> <span class="n">tests</span><span class="p">\</span><span class="n">BotNexus</span><span class="p">.</span><span class="n">Gateway</span><span class="p">.</span><span class="n">Tests</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c"># Specific test by name</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">dotnet</span> <span class="n">test</span> <span class="n">BotNexus</span><span class="p">.</span><span class="n">slnx</span> <span class="p">-</span><span class="n">-filter</span> <span class="s2">&quot;FullyQualifiedName~MyTestName&quot;</span>
+</code></pre></div>
+<p>All tests must pass before committing. The pre-commit hook enforces this.</p>
+<hr />
+<h2 id="5-customize-your-agent">5. Customize your agent<a class="headerlink" href="#5-customize-your-agent" title="Permanent link">&para;</a></h2>
+<p>Each agent gets a workspace at <code>~/.botnexus/agents/{agent-name}/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SOUL.md</code></td>
+<td>Core personality and values</td>
+</tr>
+<tr>
+<td><code>IDENTITY.md</code></td>
+<td>Role, style, and behavioral constraints</td>
+</tr>
+<tr>
+<td><code>USER.md</code></td>
+<td>User preferences</td>
+</tr>
+<tr>
+<td><code>MEMORY.md</code></td>
+<td>Long-term distilled knowledge</td>
+</tr>
+</tbody>
+</table>
+<p>Edit these files to shape agent behavior. Changes take effect on the next message — no restart needed.</p>
+<h3 id="add-more-agents">Add more agents<a class="headerlink" href="#add-more-agents" title="Permanent link">&para;</a></h3>
+<p>Add entries under the <code>agents</code> key in <code>config.json</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">&quot;agents&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">&quot;assistant&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">      </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;copilot&quot;</span><span class="p">,</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">      </span><span class="nt">&quot;model&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpt-4.1&quot;</span><span class="p">,</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">      </span><span class="nt">&quot;enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">    </span><span class="p">},</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">    </span><span class="nt">&quot;researcher&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">      </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;copilot&quot;</span><span class="p">,</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">      </span><span class="nt">&quot;model&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;claude-opus-4.6&quot;</span><span class="p">,</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">      </span><span class="nt">&quot;enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="p">}</span>
+</code></pre></div>
+<p>Set the default agent with <code>gateway.defaultAgentId</code>.</p>
+<hr />
+<h2 id="key-endpoints">Key endpoints<a class="headerlink" href="#key-endpoints" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/</code></td>
+<td>Blazor WebUI (chat, configuration, agent management)</td>
+</tr>
+<tr>
+<td><code>/health</code></td>
+<td>Health check (no auth)</td>
+</tr>
+<tr>
+<td><code>/api/agents</code></td>
+<td>Agent management</td>
+</tr>
+<tr>
+<td><code>/api/chat</code></td>
+<td>Send messages (REST)</td>
+</tr>
+<tr>
+<td><code>/api/sessions</code></td>
+<td>Session management</td>
+</tr>
+<tr>
+<td><code>/api/config/validate</code></td>
+<td>Config validation</td>
+</tr>
+<tr>
+<td><code>/hub/gateway</code></td>
+<td>SignalR streaming hub</td>
+</tr>
+<tr>
+<td><code>/swagger</code></td>
+<td>API documentation browser</td>
 </tr>
 </tbody>
 </table>
 <hr />
-<h2 id="11-common-dev-tasks">11. Common Dev Tasks<a class="headerlink" href="#11-common-dev-tasks" title="Permanent link">&para;</a></h2>
-<h3 id="view-gateway-logs">View Gateway logs<a class="headerlink" href="#view-gateway-logs" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="c1"># Windows (PowerShell)</span>
-<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>Get-Content<span class="w"> </span><span class="nv">$env</span>:USERPROFILE<span class="se">\.</span>botnexus<span class="se">\l</span>ogs<span class="se">\b</span>otnexus-*.log<span class="w"> </span>-Tail<span class="w"> </span><span class="m">50</span>
-<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>
-<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="c1"># macOS/Linux</span>
-<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>tail<span class="w"> </span>~/.botnexus/logs/botnexus-*.log
+<h2 id="provider-reference">Provider reference<a class="headerlink" href="#provider-reference" title="Permanent link">&para;</a></h2>
+<h3 id="github-copilot-recommended-for-dev">GitHub Copilot (recommended for dev)<a class="headerlink" href="#github-copilot-recommended-for-dev" title="Permanent link">&para;</a></h3>
+<p>Uses OAuth device code flow. 26+ models across Claude, GPT, and Gemini families with automatic API format routing.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">&quot;providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">&quot;copilot&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">      </span><span class="nt">&quot;apiKey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auth:copilot&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">      </span><span class="nt">&quot;baseUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://api.githubcopilot.com&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="nt">&quot;defaultModel&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpt-4.1&quot;</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="p">}</span>
 </code></pre></div>
-<h3 id="list-registered-agents">List registered agents<a class="headerlink" href="#list-registered-agents" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>curl<span class="w"> </span>http://localhost:5005/api/agents
+<h3 id="openai">OpenAI<a class="headerlink" href="#openai" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">&quot;providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">&quot;openai&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">      </span><span class="nt">&quot;apiKey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sk-...&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">      </span><span class="nt">&quot;baseUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://api.openai.com/v1&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">      </span><span class="nt">&quot;defaultModel&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpt-4o&quot;</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="p">}</span>
 </code></pre></div>
-<h3 id="check-a-specific-agent">Check a specific agent<a class="headerlink" href="#check-a-specific-agent" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>curl<span class="w"> </span>http://localhost:5005/api/agents/assistant
+<h3 id="anthropic">Anthropic<a class="headerlink" href="#anthropic" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="p">{</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">&quot;providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">&quot;anthropic&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">      </span><span class="nt">&quot;apiKey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sk-ant-...&quot;</span><span class="p">,</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">      </span><span class="nt">&quot;baseUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://api.anthropic.com&quot;</span><span class="p">,</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">      </span><span class="nt">&quot;defaultModel&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;claude-sonnet-4-20250514&quot;</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="p">}</span>
 </code></pre></div>
-<h3 id="reset-your-dev-environment">Reset your dev environment<a class="headerlink" href="#reset-your-dev-environment" title="Permanent link">&para;</a></h3>
-<p>To start fresh (warning: deletes config, agents, and sessions):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="c1"># Windows (PowerShell)</span>
-<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>Remove-Item<span class="w"> </span><span class="nv">$env</span>:USERPROFILE<span class="se">\.</span>botnexus<span class="w"> </span>-Recurse<span class="w"> </span>-Force
-<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>
-<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="c1"># macOS/Linux</span>
-<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a>rm<span class="w"> </span>-rf<span class="w"> </span>~/.botnexus
+<h3 id="openai-compatible-local-models-azure-etc">OpenAI-compatible (local models, Azure, etc.)<a class="headerlink" href="#openai-compatible-local-models-azure-etc" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="p">{</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">&quot;providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="nt">&quot;local&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">      </span><span class="nt">&quot;apiKey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;not-needed&quot;</span><span class="p">,</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">      </span><span class="nt">&quot;baseUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;http://localhost:11434/v1&quot;</span><span class="p">,</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">      </span><span class="nt">&quot;defaultModel&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;llama3&quot;</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="p">}</span>
 </code></pre></div>
-<p>Then reinitialize by running the Gateway again.</p>
 <hr />
-<h2 id="12-troubleshooting">12. Troubleshooting<a class="headerlink" href="#12-troubleshooting" title="Permanent link">&para;</a></h2>
+<h2 id="configuration-reference">Configuration reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h2>
+<h3 id="home-directory">Home directory<a class="headerlink" href="#home-directory" title="Permanent link">&para;</a></h3>
+<p>BotNexus stores all user data at <code>~/.botnexus/</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>~/.botnexus/
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>├── config.json          # Platform configuration
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>├── auth.json            # Provider credentials (OAuth tokens)
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>├── extensions/          # Dynamic extension assemblies
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>├── tokens/              # OAuth token storage
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>├── sessions/            # Conversation history (JSONL)
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>├── logs/                # Application logs
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>└── agents/              # Per-agent workspace directories
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>    └── {agent-name}/
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>        ├── SOUL.md
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>        ├── IDENTITY.md
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>        ├── USER.md
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>        └── MEMORY.md
+</code></pre></div>
+<p>Override with <code>$env:BOTNEXUS_HOME = "C:\custom\path"</code>.</p>
+<h3 id="configuration-layering">Configuration layering<a class="headerlink" href="#configuration-layering" title="Permanent link">&para;</a></h3>
+<p>Settings resolve in priority order (highest first):</p>
+<ol>
+<li><strong>Environment variables</strong> — <code>BotNexus__Gateway__ListenUrl</code>, etc.</li>
+<li><strong><code>~/.botnexus/config.json</code></strong> — User configuration</li>
+<li><strong><code>appsettings.json</code></strong> — Project defaults</li>
+<li><strong>Code defaults</strong> — Built-in constants</li>
+</ol>
+<h3 id="environment-variables">Environment variables<a class="headerlink" href="#environment-variables" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Purpose</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BOTNEXUS_HOME</code></td>
+<td>Home directory</td>
+<td><code>~/.botnexus</code></td>
+</tr>
+<tr>
+<td><code>ASPNETCORE_ENVIRONMENT</code></td>
+<td>ASP.NET Core environment</td>
+<td><code>Development</code> (set by scripts)</td>
+</tr>
+<tr>
+<td><code>ASPNETCORE_URLS</code></td>
+<td>HTTP listen URL</td>
+<td><code>http://localhost:5005</code></td>
+</tr>
+<tr>
+<td><code>BotNexus__ConfigPath</code></td>
+<td>Explicit config file path</td>
+<td><code>~/.botnexus/config.json</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="gateway-auth">Gateway auth<a class="headerlink" href="#gateway-auth" title="Permanent link">&para;</a></h2>
+<p><strong>Development mode:</strong> When no API keys are configured, all requests are allowed without authentication.</p>
+<p><strong>Production mode:</strong> Add API keys under <code>gateway.apiKeys</code> to enable enforcement:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">&quot;gateway&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="nt">&quot;apiKeys&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">      </span><span class="nt">&quot;my-key&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">        </span><span class="nt">&quot;apiKey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sk-my-secret-key&quot;</span><span class="p">,</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">        </span><span class="nt">&quot;tenantId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;dev&quot;</span><span class="p">,</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">        </span><span class="nt">&quot;callerId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;developer&quot;</span><span class="p">,</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">        </span><span class="nt">&quot;displayName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Dev API Key&quot;</span><span class="p">,</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">        </span><span class="nt">&quot;allowedAgents&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">        </span><span class="nt">&quot;permissions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;chat:send&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sessions:read&quot;</span><span class="p">],</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="w">        </span><span class="nt">&quot;isAdmin&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="w">      </span><span class="p">}</span>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="p">}</span>
+</code></pre></div>
+<p>Pass the key via <code>X-Api-Key</code> header or <code>?apiKey=</code> query parameter. The <code>/health</code> and <code>/swagger</code> endpoints are exempt from auth.</p>
+<hr />
+<h2 id="extension-development">Extension development<a class="headerlink" href="#extension-development" title="Permanent link">&para;</a></h2>
+<p>BotNexus loads dynamic extensions from <code>~/.botnexus/extensions/</code>.</p>
+<ol>
+<li>Create a class library targeting <code>net10.0</code></li>
+<li>Reference <code>BotNexus.Gateway.Abstractions</code></li>
+<li>Build and copy the DLL to <code>~/.botnexus/extensions/{providers|channels|tools}/</code></li>
+<li>Restart the Gateway</li>
+</ol>
+<p>For the full guide with code examples, see <a href="../extension-development/">Extension development</a>.</p>
+<hr />
+<h2 id="scripts-reference">Scripts reference<a class="headerlink" href="#scripts-reference" title="Permanent link">&para;</a></h2>
+<p>All scripts live in <code>scripts/</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Script</th>
+<th>Purpose</th>
+<th>Key flags</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dev-loop.ps1</code></td>
+<td>Build + test + run cycle</td>
+<td><code>-Watch</code>, <code>-Port</code>, <code>-SkipBuild</code>, <code>-SkipTests</code></td>
+</tr>
+<tr>
+<td><code>start-gateway.ps1</code></td>
+<td>Build and start the Gateway</td>
+<td><code>-Port</code>, <code>-SkipBuild</code></td>
+</tr>
+<tr>
+<td><code>export-openapi.ps1</code></td>
+<td>Export OpenAPI spec to <code>docs/api/openapi.json</code></td>
+<td><code>-Port</code>, <code>-OutputPath</code>, <code>-SkipBuild</code></td>
+</tr>
+<tr>
+<td><code>install-pre-commit-hook.ps1</code></td>
+<td>Install Git pre-commit hook (run once)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
 <th>Symptom</th>
-<th>Cause</th>
 <th>Fix</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>dotnet: command not found</code></td>
-<td>.NET SDK not installed</td>
-<td>Install .NET 10+ from https://dotnet.microsoft.com/download</td>
+<td>Install .NET 10+ SDK from https://dotnet.microsoft.com/download</td>
 </tr>
 <tr>
 <td>Build fails</td>
-<td>Stale artifacts</td>
-<td><code>dotnet clean &amp;&amp; dotnet build BotNexus.slnx</code></td>
+<td><code>dotnet clean BotNexus.slnx; dotnet build BotNexus.slnx</code></td>
 </tr>
 <tr>
 <td>Port 5005 already in use</td>
-<td>Another process on the port</td>
-<td>Use <code>-Port 8080</code> or stop the other process</td>
+<td><code>.\scripts\dev-loop.ps1 -Port 8080</code></td>
 </tr>
 <tr>
-<td>Gateway won't start</td>
-<td>Invalid config JSON</td>
-<td>Check <code>~/.botnexus/config.json</code> syntax; validate via <code>curl http://localhost:5005/api/config/validate</code></td>
-</tr>
-<tr>
-<td>WebUI shows "Disconnected"</td>
-<td>Gateway crashed or not running</td>
-<td>Restart: <code>.\scripts\start-gateway.ps1</code></td>
+<td>Config file not found</td>
+<td>Run the Gateway once — it auto-creates <code>~/.botnexus/</code></td>
 </tr>
 <tr>
 <td>OAuth code expired</td>
-<td>Took too long to authorize</td>
-<td>Send another message to trigger a fresh code</td>
+<td>Send another message to trigger a fresh device code</td>
 </tr>
 <tr>
-<td>Tests fail</td>
-<td>Stale build or test isolation</td>
-<td><code>dotnet clean &amp;&amp; dotnet build &amp;&amp; dotnet test</code></td>
+<td>WebUI shows "Disconnected"</td>
+<td>Restart: <code>.\scripts\dev-loop.ps1</code></td>
 </tr>
 <tr>
 <td>Config changes ignored</td>
-<td>Watching limitation</td>
-<td>Changes to <code>gateway.listenUrl</code> require a restart</td>
+<td>Most settings hot-reload. <code>listenUrl</code> changes require restart.</td>
+</tr>
+<tr>
+<td>Tests fail</td>
+<td><code>dotnet clean BotNexus.slnx; dotnet build BotNexus.slnx --nologo --tl:off; dotnet test BotNexus.slnx --nologo --tl:off</code></td>
 </tr>
 </tbody>
 </table>
 <hr />
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong><a href="../dev-guide/">Developer Guide</a></strong> — Quick reference for build, test, and run commands</li>
-<li><strong><a href="../configuration/">Configuration Guide</a></strong> — Full reference for config.json options</li>
-<li><strong><a href="../architecture/overview/">Architecture Overview</a></strong> — Understand how BotNexus works</li>
-<li><strong><a href="../extension-development/">Extension Development</a></strong> — Build custom channels and tools</li>
+<li><strong><a href="../configuration/">Configuration guide</a></strong> — Full reference for every config option</li>
+<li><strong><a href="../architecture/overview/">Architecture overview</a></strong> — How BotNexus works internally</li>
+<li><strong><a href="../extension-development/">Extension development</a></strong> — Build custom channels and tools</li>
+<li><strong><a href="../cli-reference/">CLI reference</a></strong> — All CLI commands</li>
+<li><strong><a href="../api-reference/">API reference</a></strong> — REST API documentation</li>
 </ul>
-<hr />
-<p><em>For released versions, see <a href="../getting-started-release/">Getting Started (Release)</a>. For more information, see <a href="https://github.com/sytone/botnexus/blob/main/README.md">README</a>.</em></p>
 
 
 
@@ -3267,7 +3649,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 19, 2026 20:59:16 UTC">April 19, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 19, 2026 21:33:52 UTC">April 19, 2026</span>
   </span>
 
     
