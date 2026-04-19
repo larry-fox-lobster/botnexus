@@ -2909,13 +2909,16 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/sytone/botnexus.git
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>botnexus
 </code></pre></div>
-<p>Restore dependencies and build the entire solution:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>dotnet<span class="w"> </span>build<span class="w"> </span>BotNexus.slnx
+<p>Restore dependencies and build the entire solution in Release configuration:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>dotnet<span class="w"> </span>build<span class="w"> </span>BotNexus.slnx<span class="w"> </span>-c<span class="w"> </span>Release
+</code></pre></div>
+<p>Or use the CLI to build (once you have a working build):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">dotnet</span> <span class="n">run</span> <span class="p">-</span><span class="n">-project</span> <span class="n">src</span><span class="p">\</span><span class="n">gateway</span><span class="p">\</span><span class="n">BotNexus</span><span class="p">.</span><span class="nb">Cli </span><span class="p">--</span> <span class="n">build</span> <span class="p">-</span><span class="n">-dev</span>
 </code></pre></div>
 <p>Expected output (last lines):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Build succeeded.
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    0 Warning(s)
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    0 Error(s)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Build succeeded.
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    0 Warning(s)
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    0 Error(s)
 </code></pre></div>
 <p><strong>Troubleshooting:</strong></p>
 <ul>
@@ -2924,99 +2927,105 @@
 </ul>
 <hr />
 <h2 id="2-run-the-gateway">2. Run the Gateway<a class="headerlink" href="#2-run-the-gateway" title="Permanent link">&para;</a></h2>
-<p>The quickest way to get started is to run the Gateway directly from the repository:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="nb">start-gateway</span><span class="p">.</span><span class="n">ps1</span>
+<p>The quickest way to get started is to run the Gateway using the CLI:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">dotnet</span> <span class="n">run</span> <span class="p">-</span><span class="n">-project</span> <span class="n">src</span><span class="p">\</span><span class="n">gateway</span><span class="p">\</span><span class="n">BotNexus</span><span class="p">.</span><span class="nb">Cli </span><span class="p">--</span> <span class="n">serve</span> <span class="p">-</span><span class="n">-dev</span>
 </code></pre></div>
-<p>This builds and starts the Gateway at <code>http://localhost:5005</code>.</p>
+<p>This starts the Gateway from your dev clone at <code>http://localhost:5005</code> using the Release build. If the process exits, it automatically restarts after 5 seconds (press <code>q</code> to quit).</p>
+<p>You can also use the script wrapper:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="nb">start-gateway</span><span class="p">.</span><span class="n">ps1</span>
+</code></pre></div>
 <p><strong>To run tests before starting:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span>
 </code></pre></div>
 <p>This builds the solution, runs all Gateway tests, and then starts the Gateway. If tests fail, the Gateway won't start.</p>
 <p><strong>For watch mode</strong> — auto-rebuilds on source changes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Watch</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Watch</span>
 </code></pre></div>
 <p>The Gateway will be ready when you see output like:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>🚀 Starting Gateway API
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>   URL:        http://localhost:5005
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>🚀 Starting Gateway API
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>   URL:        http://localhost:5005
 </code></pre></div>
 <hr />
 <h2 id="3-initialize-botnexus-home">3. Initialize BotNexus Home<a class="headerlink" href="#3-initialize-botnexus-home" title="Permanent link">&para;</a></h2>
 <p>The Gateway automatically creates <code>~/.botnexus/</code> on first run with default configuration. You can also initialize it manually using the CLI:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c"># If installed as a .NET tool</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">botnexus</span> <span class="n">init</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c"># Or run from source</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">dotnet</span> <span class="n">run</span> <span class="p">-</span><span class="n">-project</span> <span class="n">src</span><span class="p">\</span><span class="n">gateway</span><span class="p">\</span><span class="n">BotNexus</span><span class="p">.</span><span class="nb">Cli </span><span class="p">--</span> <span class="n">init</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c"># If installed as a .NET tool</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">botnexus</span> <span class="n">init</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c"># Or run from source</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">dotnet</span> <span class="n">run</span> <span class="p">-</span><span class="n">-project</span> <span class="n">src</span><span class="p">\</span><span class="n">gateway</span><span class="p">\</span><span class="n">BotNexus</span><span class="p">.</span><span class="nb">Cli </span><span class="p">--</span> <span class="n">init</span>
 </code></pre></div>
 <p>This creates the directory structure:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>~/.botnexus/
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>├── config.json           # Platform configuration
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>├── auth.json             # Provider credentials (OAuth tokens)
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>├── agents/               # Agent workspace directories
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>│   └── assistant/
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>│       ├── SOUL.md       # Core personality
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>│       ├── IDENTITY.md   # Role and constraints
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>│       ├── USER.md       # User preferences
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>│       └── MEMORY.md     # Long-term knowledge
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>├── sessions/             # Conversation history (JSONL)
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>├── tokens/               # OAuth tokens
-<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>├── extensions/           # Extension DLLs (if customized)
-<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>└── logs/                 # Daily log files
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>~/.botnexus/
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>├── config.json           # Platform configuration
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>├── auth.json             # Provider credentials (OAuth tokens)
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>├── agents/               # Agent workspace directories
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>│   └── assistant/
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>│       ├── SOUL.md       # Core personality
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>│       ├── IDENTITY.md   # Role and constraints
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>│       ├── USER.md       # User preferences
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>│       └── MEMORY.md     # Long-term knowledge
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>├── sessions/             # Conversation history (JSONL)
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>├── tokens/               # OAuth tokens
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>├── extensions/           # Extension DLLs (if customized)
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>└── logs/                 # Daily log files
 </code></pre></div>
 <p>Override the location with an environment variable:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Windows (PowerShell)</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nv">$env</span>:BOTNEXUS_HOME<span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;C:\custom\botnexus&quot;</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># macOS/Linux</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">BOTNEXUS_HOME</span><span class="o">=</span>/custom/botnexus
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Windows (PowerShell)</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nv">$env</span>:BOTNEXUS_HOME<span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;C:\custom\botnexus&quot;</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># macOS/Linux</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">BOTNEXUS_HOME</span><span class="o">=</span>/custom/botnexus
 </code></pre></div>
 <p>For more CLI options, see <a href="../cli-reference/">CLI Reference</a>.</p>
 <hr />
 <h2 id="4-run-the-gateway-in-dev-mode">4. Run the Gateway in Dev Mode<a class="headerlink" href="#4-run-the-gateway-in-dev-mode" title="Permanent link">&para;</a></h2>
-<p>Start the Gateway directly from the repository:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="nb">start-gateway</span><span class="p">.</span><span class="n">ps1</span>
+<p>Start the Gateway from the repository using the CLI:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">dotnet</span> <span class="n">run</span> <span class="p">-</span><span class="n">-project</span> <span class="n">src</span><span class="p">\</span><span class="n">gateway</span><span class="p">\</span><span class="n">BotNexus</span><span class="p">.</span><span class="nb">Cli </span><span class="p">--</span> <span class="n">serve</span> <span class="p">-</span><span class="n">-dev</span>
+</code></pre></div>
+<p>Or use the script wrapper:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="nb">start-gateway</span><span class="p">.</span><span class="n">ps1</span>
 </code></pre></div>
 <p>Or use the full dev loop (build + test + run):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span>
 </code></pre></div>
 <p>The Gateway starts at <code>http://localhost:5005</code> by default.</p>
 <p><strong>Custom port:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="nb">start-gateway</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Port</span> <span class="n">8080</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">dotnet</span> <span class="n">run</span> <span class="p">-</span><span class="n">-project</span> <span class="n">src</span><span class="p">\</span><span class="n">gateway</span><span class="p">\</span><span class="n">BotNexus</span><span class="p">.</span><span class="nb">Cli </span><span class="p">--</span> <span class="n">serve</span> <span class="p">-</span><span class="n">-dev</span> <span class="p">-</span><span class="n">-port</span> <span class="n">8080</span>
 </code></pre></div>
 <p><strong>Watch mode</strong> — auto-recompiles on source changes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Watch</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">dev-loop</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Watch</span>
 </code></pre></div>
 <h3 id="verify-its-running">Verify it's running<a class="headerlink" href="#verify-its-running" title="Permanent link">&para;</a></h3>
 <p>Check the health endpoint:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nb">curl </span><span class="n">http</span><span class="p">://</span><span class="n">localhost</span><span class="p">:</span><span class="n">5005</span><span class="p">/</span><span class="n">health</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nb">curl </span><span class="n">http</span><span class="p">://</span><span class="n">localhost</span><span class="p">:</span><span class="n">5005</span><span class="p">/</span><span class="n">health</span>
 </code></pre></div>
 <p>Expected response:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ok&quot;</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="p">{</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ok&quot;</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="p">}</span>
 </code></pre></div>
 <hr />
 <h2 id="5-configure-your-first-provider-copilot">5. Configure Your First Provider (Copilot)<a class="headerlink" href="#5-configure-your-first-provider-copilot" title="Permanent link">&para;</a></h2>
 <p>Edit <code>~/.botnexus/config.json</code> to add the Copilot provider:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="p">{</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="nt">&quot;providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">    </span><span class="nt">&quot;copilot&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">      </span><span class="nt">&quot;apiKey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auth:copilot&quot;</span><span class="p">,</span>
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">      </span><span class="nt">&quot;baseUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://api.githubcopilot.com&quot;</span>
-<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">  </span><span class="p">},</span>
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">  </span><span class="nt">&quot;agents&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="w">    </span><span class="nt">&quot;assistant&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="w">      </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;copilot&quot;</span><span class="p">,</span>
-<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="w">      </span><span class="nt">&quot;model&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpt-4.1&quot;</span><span class="p">,</span>
-<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="w">      </span><span class="nt">&quot;enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p">{</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">  </span><span class="nt">&quot;providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">    </span><span class="nt">&quot;copilot&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">      </span><span class="nt">&quot;apiKey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auth:copilot&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">      </span><span class="nt">&quot;baseUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://api.githubcopilot.com&quot;</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="w">  </span><span class="nt">&quot;agents&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="w">    </span><span class="nt">&quot;assistant&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="w">      </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;copilot&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="w">      </span><span class="nt">&quot;model&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpt-4.1&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a><span class="w">      </span><span class="nt">&quot;enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="the-oauth-device-code-flow">The OAuth device code flow<a class="headerlink" href="#the-oauth-device-code-flow" title="Permanent link">&para;</a></h3>
 <p>When you first send a message to the agent, you'll see:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>Go to https://github.com/login/device and enter code: ABCD-1234
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>Go to https://github.com/login/device and enter code: ABCD-1234
 </code></pre></div>
 <p><strong>Steps:</strong></p>
 <ol>
@@ -3029,34 +3038,34 @@
 <hr />
 <h2 id="6-customize-your-agent-optional">6. Customize Your Agent (Optional)<a class="headerlink" href="#6-customize-your-agent-optional" title="Permanent link">&para;</a></h2>
 <p>BotNexus creates workspace files for each agent in <code>~/.botnexus/agents/{agent-name}/</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>~/.botnexus/agents/assistant/
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>├── SOUL.md           # Core personality and values
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>├── IDENTITY.md       # Role, style, and constraints
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>├── USER.md           # User preferences
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>└── MEMORY.md         # Long-term distilled knowledge
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>~/.botnexus/agents/assistant/
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>├── SOUL.md           # Core personality and values
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>├── IDENTITY.md       # Role, style, and constraints
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>├── USER.md           # User preferences
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>└── MEMORY.md         # Long-term distilled knowledge
 </code></pre></div>
 <p><strong>Edit <code>~/.botnexus/agents/assistant/SOUL.md</code>:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="gh"># Soul</span>
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>You are a helpful, thoughtful assistant. You value clarity and precision.
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>You admit when you don&#39;t know something rather than guessing.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="gh"># Soul</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>You are a helpful, thoughtful assistant. You value clarity and precision.
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>You admit when you don&#39;t know something rather than guessing.
 </code></pre></div>
 <p><strong>Edit <code>~/.botnexus/agents/assistant/IDENTITY.md</code>:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="gh"># Identity</span>
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="k">-</span><span class="w"> </span>Name: Assistant
-<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="k">-</span><span class="w"> </span>Role: General-purpose AI assistant
-<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="k">-</span><span class="w"> </span>Style: Conversational but efficient
-<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="k">-</span><span class="w"> </span>Constraints: Never execute destructive operations without confirmation
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="gh"># Identity</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="k">-</span><span class="w"> </span>Name: Assistant
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="k">-</span><span class="w"> </span>Role: General-purpose AI assistant
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="k">-</span><span class="w"> </span>Style: Conversational but efficient
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="k">-</span><span class="w"> </span>Constraints: Never execute destructive operations without confirmation
 </code></pre></div>
 <p>Changes take effect on your <strong>next message</strong> — no restart required.</p>
 <hr />
 <h2 id="7-open-the-webui">7. Open the WebUI<a class="headerlink" href="#7-open-the-webui" title="Permanent link">&para;</a></h2>
 <p>Open your browser to:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>http://localhost:5005/
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>http://localhost:5005/
 </code></pre></div>
 <p>Or directly to the WebUI:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>http://localhost:5005
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>http://localhost:5005
 </code></pre></div>
 <p>You should see the BotNexus web interface.</p>
 <h3 id="send-your-first-message">Send Your First Message<a class="headerlink" href="#send-your-first-message" title="Permanent link">&para;</a></h3>
@@ -3087,10 +3096,10 @@
 <li><strong>Stop the running Gateway</strong> (Ctrl+C)</li>
 <li><strong>Rebuild and run:</strong></li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>.<span class="se">\s</span>cripts<span class="se">\s</span>tart-gateway.ps1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>.<span class="se">\s</span>cripts<span class="se">\s</span>tart-gateway.ps1
 </code></pre></div>
 <p>Or with watch mode for continuous rebuilds:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>.<span class="se">\s</span>cripts<span class="se">\d</span>ev-loop.ps1<span class="w"> </span>-Watch
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>.<span class="se">\s</span>cripts<span class="se">\d</span>ev-loop.ps1<span class="w"> </span>-Watch
 </code></pre></div>
 <h3 id="b-changing-agent-personality">B. Changing Agent Personality<a class="headerlink" href="#b-changing-agent-personality" title="Permanent link">&para;</a></h3>
 <ol>
@@ -3107,19 +3116,19 @@
 <hr />
 <h2 id="9-running-tests">9. Running Tests<a class="headerlink" href="#9-running-tests" title="Permanent link">&para;</a></h2>
 <p>Run the full test suite:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>dotnet<span class="w"> </span><span class="nb">test</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>dotnet<span class="w"> </span><span class="nb">test</span>
 </code></pre></div>
 <p>Run Gateway tests only:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>dotnet<span class="w"> </span><span class="nb">test</span><span class="w"> </span>tests/BotNexus.Gateway.Tests
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>dotnet<span class="w"> </span><span class="nb">test</span><span class="w"> </span>tests/BotNexus.Gateway.Tests
 </code></pre></div>
 <p>Verbose output:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>dotnet<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--verbosity<span class="w"> </span>detailed
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>dotnet<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--verbosity<span class="w"> </span>detailed
 </code></pre></div>
 <p>Tests use an isolated <code>BOTNEXUS_HOME</code> so they don't interfere with your development environment.</p>
 <hr />
 <h2 id="10-validate-configuration">10. Validate Configuration<a class="headerlink" href="#10-validate-configuration" title="Permanent link">&para;</a></h2>
 <p>Validate your <code>config.json</code> against the current schema:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="nb">curl </span><span class="n">http</span><span class="p">://</span><span class="n">localhost</span><span class="p">:</span><span class="n">5005</span><span class="p">/</span><span class="n">api</span><span class="p">/</span><span class="n">config</span><span class="p">/</span><span class="n">validate</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="nb">curl </span><span class="n">http</span><span class="p">://</span><span class="n">localhost</span><span class="p">:</span><span class="n">5005</span><span class="p">/</span><span class="n">api</span><span class="p">/</span><span class="n">config</span><span class="p">/</span><span class="n">validate</span>
 </code></pre></div>
 <p>This checks for syntax errors, missing required fields, and invalid provider configurations.</p>
 <h3 id="common-configuration-issues">Common Configuration Issues<a class="headerlink" href="#common-configuration-issues" title="Permanent link">&para;</a></h3>
@@ -3152,25 +3161,25 @@
 <hr />
 <h2 id="11-common-dev-tasks">11. Common Dev Tasks<a class="headerlink" href="#11-common-dev-tasks" title="Permanent link">&para;</a></h2>
 <h3 id="view-gateway-logs">View Gateway logs<a class="headerlink" href="#view-gateway-logs" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="c1"># Windows (PowerShell)</span>
-<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>Get-Content<span class="w"> </span><span class="nv">$env</span>:USERPROFILE<span class="se">\.</span>botnexus<span class="se">\l</span>ogs<span class="se">\b</span>otnexus-*.log<span class="w"> </span>-Tail<span class="w"> </span><span class="m">50</span>
-<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>
-<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="c1"># macOS/Linux</span>
-<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>tail<span class="w"> </span>~/.botnexus/logs/botnexus-*.log
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="c1"># Windows (PowerShell)</span>
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>Get-Content<span class="w"> </span><span class="nv">$env</span>:USERPROFILE<span class="se">\.</span>botnexus<span class="se">\l</span>ogs<span class="se">\b</span>otnexus-*.log<span class="w"> </span>-Tail<span class="w"> </span><span class="m">50</span>
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="c1"># macOS/Linux</span>
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>tail<span class="w"> </span>~/.botnexus/logs/botnexus-*.log
 </code></pre></div>
 <h3 id="list-registered-agents">List registered agents<a class="headerlink" href="#list-registered-agents" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>curl<span class="w"> </span>http://localhost:5005/api/agents
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>curl<span class="w"> </span>http://localhost:5005/api/agents
 </code></pre></div>
 <h3 id="check-a-specific-agent">Check a specific agent<a class="headerlink" href="#check-a-specific-agent" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>curl<span class="w"> </span>http://localhost:5005/api/agents/assistant
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>curl<span class="w"> </span>http://localhost:5005/api/agents/assistant
 </code></pre></div>
 <h3 id="reset-your-dev-environment">Reset your dev environment<a class="headerlink" href="#reset-your-dev-environment" title="Permanent link">&para;</a></h3>
 <p>To start fresh (warning: deletes config, agents, and sessions):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="c1"># Windows (PowerShell)</span>
-<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>Remove-Item<span class="w"> </span><span class="nv">$env</span>:USERPROFILE<span class="se">\.</span>botnexus<span class="w"> </span>-Recurse<span class="w"> </span>-Force
-<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>
-<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="c1"># macOS/Linux</span>
-<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>rm<span class="w"> </span>-rf<span class="w"> </span>~/.botnexus
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="c1"># Windows (PowerShell)</span>
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>Remove-Item<span class="w"> </span><span class="nv">$env</span>:USERPROFILE<span class="se">\.</span>botnexus<span class="w"> </span>-Recurse<span class="w"> </span>-Force
+<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>
+<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="c1"># macOS/Linux</span>
+<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a>rm<span class="w"> </span>-rf<span class="w"> </span>~/.botnexus
 </code></pre></div>
 <p>Then reinitialize by running the Gateway again.</p>
 <hr />
@@ -3258,7 +3267,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 16, 2026 06:12:30 UTC">April 16, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 19, 2026 20:59:16 UTC">April 19, 2026</span>
   </span>
 
     
