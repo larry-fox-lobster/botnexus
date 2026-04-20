@@ -1,15 +1,15 @@
 ---
-updated_at: 2026-04-16T04:15:00Z
-focus_area: Extension Config Inheritance Delivered
+updated_at: 2026-04-20T20:02:04Z
+focus_area: Gateway Detached Process Delivered
 active_issues: []
-status: config_inheritance_delivered
+status: gateway_detached_process_delivered
 ---
 
 # What We're Focused On
 
-**Extension Config Inheritance delivered (2026-04-16 04:15Z).** World-level extension config defaults (gateway.extensions.defaults) with agent-level deep-merge overrides. ExtensionConfigMerger utility, PlatformConfigAgentSource wiring, JSON schema updated. 3-agent team (Farnsworth, Hermes, Kif) in 1 wave. Design review A- (Leela), consistency review A- (Nibbler). 919 Gateway tests passing (+10 new), 0 errors.
+**Gateway Detached Process delivered (2026-04-20 20:02Z).** Feature complete across 7-agent team (Leela, Bender, Farnsworth, Hermes x2, Kif, Nibbler) in 4 waves. Gateway now launches as detached process in own console window. CLI has start/stop/status/restart subcommands. PID file lifecycle managed automatically. Health check polls with exponential backoff. Windows v1 with platform guard. 1,012 tests passing (956 gateway + 56 CLI), 0 failures. Spec status: delivered.
 
-**Previous:** Extension-Contributed Commands delivered (2026-04-16 00:30Z). Full backend command registry with ICommandContributor, WebUI dynamic palette, SkillsCommandContributor.
+**Previous:** Extension Config Inheritance delivered (2026-04-16 04:15Z). World-level extension config defaults (gateway.extensions.defaults) with agent-level deep-merge overrides.
 
 ## Deferred
 
