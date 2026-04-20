@@ -78,15 +78,15 @@ internal sealed class InstallCommand
         return 0;
     }
 
-    internal static async Task<int> RunProcessAsync(string fileName, string arguments, string? workingDirectory, bool verbose, CancellationToken cancellationToken)
+    internal static async Task<int> RunProcessAsync(string fileName, string arguments, string? workingDirectory, bool showOutput, CancellationToken cancellationToken)
     {
         var psi = new ProcessStartInfo
         {
             FileName = fileName,
             Arguments = arguments,
             UseShellExecute = false,
-            RedirectStandardOutput = !verbose,
-            RedirectStandardError = !verbose
+            RedirectStandardOutput = !showOutput,
+            RedirectStandardError = !showOutput
         };
 
         if (workingDirectory is not null)
@@ -94,6 +94,14 @@ internal sealed class InstallCommand
 
         using var process = Process.Start(psi)
             ?? throw new InvalidOperationException($"Failed to start '{fileName}'.");
+
+        // Drain redirected streams to prevent deadlocks on large output
+        if (!showOutput)
+        {
+            await Task.WhenAll(
+                process.StandardOutput.ReadToEndAsync(cancellationToken),
+                process.StandardError.ReadToEndAsync(cancellationToken));
+        }
 
         await process.WaitForExitAsync(cancellationToken);
         return process.ExitCode;
