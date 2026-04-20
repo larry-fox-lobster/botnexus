@@ -129,3 +129,22 @@
 - Added SessionStore and SessionStoreManager (LRU eviction, cap 20), synchronous DOM re-render switchView(), SubscribeAll() on connect.
 - All 13 SignalR event handlers rewritten: extract sessionId, update store stream state, render only if active.
 
+### 2026-01-21 — Wave 1: Gateway Process Manager Implementation
+- Created core process management infrastructure in `src/gateway/BotNexus.Cli/Services/`:
+  - `IGatewayProcessManager`, `GatewayProcessManager` — lifecycle management (start/stop/status)
+  - `IHealthChecker`, `HttpHealthChecker` — exponential backoff health polling (200ms → 2000ms, 10s timeout)
+  - `GatewayProcessTypes` — supporting types (StartOptions, Results, State, Status)
+- PID file: `~/.botnexus/gateway.pid` (plain text integer)
+- Detached mode: new console window via `UseShellExecute = true`
+- Windows-only for v1: `OperatingSystem.IsWindows()` guard
+- Stale PID cleanup: automatic on read, PID recycling detection via process name check
+- Hard kill: `Process.Kill()` with 5s exit wait
+- Health endpoint discovered: `http://localhost:5005/health` (no auth, 200 OK with `{"status":"ok"}`)
+- **ServeCommand structure learned:**
+  - Gateway DLL: `{repoRoot}/src/gateway/BotNexus.Gateway.Api/bin/Release/net10.0/BotNexus.Gateway.Api.dll`
+  - Foreground loop: build → spawn → wait for exit → 5s restart prompt
+  - Auto-initializes config via `InitCommand` if missing
+  - Deploys extensions to `~/.botnexus/extensions/`
+  - Default port: 5005, env: Development
+- Commit: `e8b81299` (Wave 1 complete, ready for Wave 2 integration by Farnsworth)
+
