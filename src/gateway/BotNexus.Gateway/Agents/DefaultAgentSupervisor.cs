@@ -18,8 +18,8 @@ public sealed class DefaultAgentSupervisor : IAgentSupervisor, IAgentHandleInspe
     private readonly IAgentRegistry _registry;
     private readonly IReadOnlyDictionary<string, IIsolationStrategy> _strategies;
     private readonly ISessionStore _sessionStore;
-    private readonly Dictionary<AgentSessionKey, (AgentInstance Instance, IAgentHandle Handle)> _instances = [];
-    private readonly Dictionary<AgentSessionKey, Task<(AgentInstance Instance, IAgentHandle Handle)>> _pendingCreates = [];
+    private readonly Dictionary<AgentSessionKey, (AgentInstance Instance, IAgentHandle Handle, AgentDescriptor Descriptor)> _instances = [];
+    private readonly Dictionary<AgentSessionKey, Task<(AgentInstance Instance, IAgentHandle Handle, AgentDescriptor Descriptor)>> _pendingCreates = [];
     private readonly Lock _sync = new();
     private readonly ILogger<DefaultAgentSupervisor> _logger;
 
@@ -46,13 +46,23 @@ public sealed class DefaultAgentSupervisor : IAgentSupervisor, IAgentHandleInspe
         var descriptor = _registry.Get(agentId)
             ?? throw new KeyNotFoundException($"Agent '{agentId}' is not registered.");
         var key = AgentSessionKey.From(agentId, sessionId);
-        Task<(AgentInstance Instance, IAgentHandle Handle)> creationTask;
-        TaskCompletionSource<(AgentInstance Instance, IAgentHandle Handle)>? creationCompletion = null;
+        Task<(AgentInstance Instance, IAgentHandle Handle, AgentDescriptor Descriptor)> creationTask;
+        TaskCompletionSource<(AgentInstance Instance, IAgentHandle Handle, AgentDescriptor Descriptor)>? creationCompletion = null;
 
         lock (_sync)
         {
             if (_instances.TryGetValue(key, out var existing) && existing.Instance.Status is AgentInstanceStatus.Idle or AgentInstanceStatus.Running)
-                return existing.Handle;
+            {
+                // Invalidate if the agent descriptor changed (e.g., provider, model, tools)
+                if (existing.Descriptor == descriptor)
+                    return existing.Handle;
+
+                _logger.LogInformation(
+                    "Agent descriptor changed for '{AgentId}' session '{SessionId}' — recreating instance",
+                    agentId, sessionId);
+                _instances.Remove(key);
+                _ = DisposeHandleAsync(existing.Handle);
+            }
 
             if (!_pendingCreates.TryGetValue(key, out creationTask!))
             {
@@ -63,7 +73,7 @@ public sealed class DefaultAgentSupervisor : IAgentSupervisor, IAgentHandleInspe
                         throw new AgentConcurrencyLimitExceededException(agentId, descriptor.MaxConcurrentSessions);
                 }
 
-                creationCompletion = new TaskCompletionSource<(AgentInstance Instance, IAgentHandle Handle)>(
+                creationCompletion = new TaskCompletionSource<(AgentInstance Instance, IAgentHandle Handle, AgentDescriptor Descriptor)>(
                     TaskCreationOptions.RunContinuationsAsynchronously);
                 creationTask = creationCompletion.Task;
                 _pendingCreates[key] = creationTask;
@@ -103,7 +113,7 @@ public sealed class DefaultAgentSupervisor : IAgentSupervisor, IAgentHandleInspe
     public async Task StopAsync(AgentId agentId, SessionId sessionId, CancellationToken cancellationToken = default)
     {
         var key = AgentSessionKey.From(agentId, sessionId);
-        (AgentInstance Instance, IAgentHandle Handle) entry;
+        (AgentInstance Instance, IAgentHandle Handle, AgentDescriptor Descriptor) entry;
 
         lock (_sync)
         {
@@ -154,7 +164,7 @@ public sealed class DefaultAgentSupervisor : IAgentSupervisor, IAgentHandleInspe
     /// <inheritdoc />
     public async Task StopAllAsync(CancellationToken cancellationToken = default)
     {
-        List<(AgentInstance Instance, IAgentHandle Handle)> entries;
+        List<(AgentInstance Instance, IAgentHandle Handle, AgentDescriptor Descriptor)> entries;
         lock (_sync)
         {
             entries = [.. _instances.Values];
@@ -162,7 +172,7 @@ public sealed class DefaultAgentSupervisor : IAgentSupervisor, IAgentHandleInspe
             _pendingCreates.Clear();
         }
 
-        foreach (var (instance, handle) in entries)
+        foreach (var (instance, handle, _) in entries)
         {
             instance.Status = AgentInstanceStatus.Stopping;
             try { await handle.DisposeAsync(); }
@@ -188,7 +198,7 @@ public sealed class DefaultAgentSupervisor : IAgentSupervisor, IAgentHandleInspe
             .Count();
     }
 
-    private async Task<(AgentInstance Instance, IAgentHandle Handle)> CreateEntryAsync(
+    private async Task<(AgentInstance Instance, IAgentHandle Handle, AgentDescriptor Descriptor)> CreateEntryAsync(
         AgentDescriptor descriptor,
         SessionId sessionId,
         AgentSessionKey key,
@@ -232,6 +242,12 @@ public sealed class DefaultAgentSupervisor : IAgentSupervisor, IAgentHandleInspe
             Status = AgentInstanceStatus.Idle
         };
 
-        return (instance, handle);
+        return (instance, handle, descriptor);
+    }
+
+    private async Task DisposeHandleAsync(IAgentHandle handle)
+    {
+        try { await handle.DisposeAsync(); }
+        catch (Exception ex) { _logger.LogWarning(ex, "Error disposing stale agent handle during descriptor refresh"); }
     }
 }
