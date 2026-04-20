@@ -11,6 +11,12 @@ public sealed class ModelRegistry
 {
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, LlmModel>> _registry = new();
 
+    // Common aliases so users can write "copilot" instead of "github-copilot" in config
+    private static readonly Dictionary<string, string> ProviderAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["copilot"] = "github-copilot"
+    };
+
     /// <summary>
     /// Executes register.
     /// </summary>
@@ -30,7 +36,8 @@ public sealed class ModelRegistry
     /// <returns>The get model result.</returns>
     public LlmModel? GetModel(string provider, string modelId)
     {
-        if (_registry.TryGetValue(provider, out var models) &&
+        var resolved = ResolveProvider(provider);
+        if (_registry.TryGetValue(resolved, out var models) &&
             models.TryGetValue(modelId, out var model))
             return model;
 
@@ -53,7 +60,8 @@ public sealed class ModelRegistry
     /// <returns>The get models result.</returns>
     public IReadOnlyList<LlmModel> GetModels(string provider)
     {
-        return _registry.TryGetValue(provider, out var models)
+        var resolved = ResolveProvider(provider);
+        return _registry.TryGetValue(resolved, out var models)
             ? models.Values.ToList()
             : [];
     }
@@ -102,4 +110,7 @@ public sealed class ModelRegistry
     {
         _registry.Clear();
     }
+
+    private static string ResolveProvider(string provider) =>
+        ProviderAliases.TryGetValue(provider, out var canonical) ? canonical : provider;
 }

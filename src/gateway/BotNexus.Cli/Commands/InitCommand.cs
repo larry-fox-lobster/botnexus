@@ -51,7 +51,7 @@ internal sealed class InitCommand
             {
                 ["assistant"] = new()
                 {
-                    Provider = "copilot",
+                    Provider = "github-copilot",
                     Model = "gpt-4.1",
                     Enabled = true
                 }
