@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text.Json;
 using BotNexus.Gateway.Configuration;
+using Spectre.Console;
 
 namespace BotNexus.Cli.Commands;
 
@@ -83,12 +84,15 @@ internal sealed class ServeCommand
 
     private static async Task<int> ServeGatewayAsync(string repoRoot, int port, bool verbose, CancellationToken cancellationToken)
     {
+        var buildResult = await BuildCommand.BuildSolutionAsync(repoRoot, verbose, cancellationToken);
+        if (buildResult != 0)
+            return buildResult;
+
         var gatewayDll = Path.Combine(repoRoot, "src", "gateway", "BotNexus.Gateway.Api", "bin", "Release", "net10.0", "BotNexus.Gateway.Api.dll");
 
         if (!File.Exists(gatewayDll))
         {
-            Console.WriteLine($"Release build not found at: {gatewayDll}");
-            Console.WriteLine("Run 'botnexus build' first.");
+            AnsiConsole.MarkupLine($"[red]Error:[/] Release build not found at: [dim]{Markup.Escape(gatewayDll)}[/]");
             return 1;
         }
 
@@ -96,18 +100,18 @@ internal sealed class ServeCommand
         var configPath = PlatformConfigLoader.DefaultConfigPath;
         if (!File.Exists(configPath))
         {
-            Console.WriteLine("[serve] No configuration found — creating default config...");
+            AnsiConsole.MarkupLine("[blue][[serve]][/] No configuration found — creating default config...");
             var init = new InitCommand();
             var initResult = await init.ExecuteAsync(force: false, verbose, cancellationToken);
             if (initResult != 0)
                 return initResult;
-            Console.WriteLine("[serve] Configure your gateway via the WebUI at the root URL.");
-            Console.WriteLine();
+            AnsiConsole.MarkupLine("[blue][[serve]][/] Configure your gateway via the WebUI at the root URL.");
+            AnsiConsole.WriteLine();
         }
 
         if (!IsPortAvailable(port))
         {
-            Console.WriteLine($"Port {port} is already in use.");
+            AnsiConsole.MarkupLine($"[red]Error:[/] Port [green]{port}[/] is already in use.");
             return 1;
         }
 
@@ -118,12 +122,12 @@ internal sealed class ServeCommand
 
         while (true)
         {
-            Console.WriteLine();
-            Console.WriteLine("[serve] Starting Gateway");
-            Console.WriteLine($"   URL:         {gatewayUrl}");
-            Console.WriteLine($"   Environment: Development");
-            Console.WriteLine();
-            Console.WriteLine("Press Ctrl+C to stop the gateway.");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[blue][[serve]][/] Starting Gateway");
+            AnsiConsole.MarkupLine($"   URL:         [green]{Markup.Escape(gatewayUrl)}[/]");
+            AnsiConsole.MarkupLine("   Environment: [dim]Development[/]");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("Press [yellow]Ctrl+C[/] to stop the gateway.");
 
             var psi = new ProcessStartInfo
             {
@@ -140,8 +144,8 @@ internal sealed class ServeCommand
             await process.WaitForExitAsync(cancellationToken);
             lastExitCode = process.ExitCode;
 
-            Console.WriteLine();
-            Console.WriteLine($"[serve] Gateway exited (code {lastExitCode}).");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"[blue][[serve]][/] Gateway exited (code [yellow]{lastExitCode}[/]).");
 
             if (cancellationToken.IsCancellationRequested)
                 break;
@@ -155,28 +159,31 @@ internal sealed class ServeCommand
 
     private static async Task<int> ServeProbeAsync(string repoRoot, int port, string gatewayUrl, bool verbose, CancellationToken cancellationToken)
     {
+        var buildResult = await BuildCommand.BuildSolutionAsync(repoRoot, verbose, cancellationToken);
+        if (buildResult != 0)
+            return buildResult;
+
         var probeDll = Path.Combine(repoRoot, "tools", "BotNexus.Probe", "src", "BotNexus.Probe", "bin", "Release", "net10.0", "BotNexus.Probe.dll");
 
         if (!File.Exists(probeDll))
         {
-            Console.WriteLine($"Release build not found at: {probeDll}");
-            Console.WriteLine("Run 'botnexus build' first.");
+            AnsiConsole.MarkupLine($"[red]Error:[/] Release build not found at: [dim]{Markup.Escape(probeDll)}[/]");
             return 1;
         }
 
         if (!IsPortAvailable(port))
         {
-            Console.WriteLine($"Port {port} is already in use.");
+            AnsiConsole.MarkupLine($"[red]Error:[/] Port [green]{port}[/] is already in use.");
             return 1;
         }
 
         var probeUrl = $"http://localhost:{port}";
 
-        Console.WriteLine();
-        Console.WriteLine("[serve] Starting Probe");
-        Console.WriteLine($"   URL:         {probeUrl}");
-        Console.WriteLine($"   Gateway:     {gatewayUrl}");
-        Console.WriteLine();
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[blue][[serve]][/] Starting Probe");
+        AnsiConsole.MarkupLine($"   URL:         [green]{Markup.Escape(probeUrl)}[/]");
+        AnsiConsole.MarkupLine($"   Gateway:     [dim]{Markup.Escape(gatewayUrl)}[/]");
+        AnsiConsole.WriteLine();
 
         var psi = new ProcessStartInfo
         {
@@ -191,7 +198,7 @@ internal sealed class ServeCommand
             ?? throw new InvalidOperationException("Failed to start Probe process.");
 
         await process.WaitForExitAsync(cancellationToken);
-        Console.WriteLine($"[serve] Probe exited (code {process.ExitCode}).");
+        AnsiConsole.MarkupLine($"[blue][[serve]][/] Probe exited (code [yellow]{process.ExitCode}[/]).");
         return process.ExitCode;
     }
 
@@ -201,7 +208,7 @@ internal sealed class ServeCommand
         if (!Directory.Exists(extensionsRoot))
         {
             if (verbose)
-                Console.WriteLine("[deploy] No extensions directory found — skipping.");
+                AnsiConsole.MarkupLine("[blue][[deploy]][/] [dim]No extensions directory found \u2014 skipping.[/]");
             return;
         }
 
@@ -222,7 +229,7 @@ internal sealed class ServeCommand
             if (!File.Exists(manifestPath))
             {
                 if (verbose)
-                    Console.WriteLine($"[deploy] Skipped {projectName} (no manifest)");
+                    AnsiConsole.MarkupLine($"[blue][[deploy]][/] [dim]Skipped {Markup.Escape(projectName)} (no manifest)[/]");
                 continue;
             }
 
@@ -234,7 +241,7 @@ internal sealed class ServeCommand
             }
             catch
             {
-                Console.WriteLine($"[deploy] WARNING: Could not read manifest for {projectName}");
+                AnsiConsole.MarkupLine($"[yellow][[deploy]] WARNING:[/] Could not read manifest for {Markup.Escape(projectName)}");
                 continue;
             }
 
@@ -247,7 +254,7 @@ internal sealed class ServeCommand
             if (!Directory.Exists(srcDir))
             {
                 if (verbose)
-                    Console.WriteLine($"[deploy] No Release build for {projectName} — skipping.");
+                    AnsiConsole.MarkupLine($"[blue][[deploy]][/] [dim]No Release build for {Markup.Escape(projectName)} \u2014 skipping.[/]");
                 continue;
             }
 
@@ -260,7 +267,7 @@ internal sealed class ServeCommand
             if (tfmDir is null)
             {
                 if (verbose)
-                    Console.WriteLine($"[deploy] No TFM folder in {srcDir} — skipping {projectName}.");
+                    AnsiConsole.MarkupLine($"[blue][[deploy]][/] [dim]No TFM folder in {Markup.Escape(srcDir)} \u2014 skipping {Markup.Escape(projectName)}.[/]");
                 continue;
             }
 
@@ -276,7 +283,7 @@ internal sealed class ServeCommand
             }
 
             File.Copy(manifestPath, Path.Combine(extDest, "botnexus-extension.json"), overwrite: true);
-            Console.WriteLine($"[deploy] Deployed {extId}");
+            AnsiConsole.MarkupLine($"[blue][[deploy]][/] Deployed [green]{Markup.Escape(extId)}[/]");
             deployed++;
         }
 
@@ -291,23 +298,23 @@ internal sealed class ServeCommand
                     try
                     {
                         Directory.Delete(dir, recursive: true);
-                        Console.WriteLine($"[deploy] Removed stale: {dirName}");
+                        AnsiConsole.MarkupLine($"[blue][[deploy]][/] Removed stale: [dim]{Markup.Escape(dirName)}[/]");
                     }
                     catch
                     {
-                        Console.WriteLine($"[deploy] Could not remove {dirName} (files locked)");
+                        AnsiConsole.MarkupLine($"[yellow][[deploy]][/] Could not remove {Markup.Escape(dirName)} (files locked)");
                     }
                 }
             }
         }
 
-        Console.WriteLine($"[deploy] {deployed} extension(s) deployed to {destRoot}");
+        AnsiConsole.MarkupLine($"[blue][[deploy]][/] [green]{deployed}[/] extension(s) deployed to [dim]{Markup.Escape(destRoot)}[/]");
     }
 
     private static async Task<bool> WaitForRestartOrQuitAsync(int seconds, CancellationToken cancellationToken)
     {
-        Console.WriteLine();
-        Console.WriteLine($"[restart] Gateway will restart in {seconds} seconds. Press 'q' to quit.");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[blue][[restart]][/] Gateway will restart in [yellow]{seconds}[/] seconds. Press [yellow]q[/] to quit.");
 
         for (var i = seconds; i > 0; i--)
         {

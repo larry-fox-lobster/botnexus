@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Spectre.Console;
 
 namespace BotNexus.Cli.Commands;
 
@@ -38,25 +39,25 @@ internal sealed class BuildCommand
         var solution = Path.Combine(repoRoot, "BotNexus.slnx");
         if (!File.Exists(solution))
         {
-            Console.WriteLine($"Solution file not found: {solution}");
+            AnsiConsole.MarkupLine($"[red]Error:[/] Solution file not found: {Markup.Escape(solution)}");
             return 1;
         }
 
-        Console.WriteLine("[build] Building solution (Release)...");
+        AnsiConsole.MarkupLine("[blue][[build]][/] Building solution (Release, skipping test projects)...");
         var exitCode = await InstallCommand.RunProcessAsync(
             "dotnet",
-            $"build \"{solution}\" -c Release --nologo --tl:off",
+            $"build \"{solution}\" -c Release --nologo --tl:off /p:SkipTests=true",
             repoRoot,
             verbose,
             cancellationToken);
 
         if (exitCode != 0)
         {
-            Console.WriteLine("[build] Build failed.");
+            AnsiConsole.MarkupLine("[red][[build]] Build failed.[/]");
             return exitCode;
         }
 
-        Console.WriteLine("[build] Build succeeded.");
+        AnsiConsole.MarkupLine("[green][[build]] Build succeeded.[/]");
         return 0;
     }
 
