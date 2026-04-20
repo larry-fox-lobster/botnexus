@@ -2105,3 +2105,158 @@ details[open] > .thinking-summary::before {
         width: 100%;
     }
 }
+
+/* =====================================================
+   Agents page
+   ===================================================== */
+.agents-page {
+    padding: 1.5rem;
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+.agents-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    gap: 1rem;
+}
+
+.agents-toolbar h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.agents-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.agents-status {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: var(--radius);
+}
+
+.agents-status.success { background: rgba(57, 197, 114, 0.15); color: var(--accent); }
+.agents-status.error   { background: rgba(255, 90, 90, 0.15);  color: #ff5a5a; }
+
+.agents-error,
+.agents-empty {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--text-muted);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+}
+
+.agents-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    font-size: 0.875rem;
+}
+
+.agents-table th,
+.agents-table td {
+    padding: 0.65rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.agents-table th {
+    background: var(--bg-tertiary, #1e2027);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.agents-table tbody tr:last-child td { border-bottom: none; }
+.agents-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+.agents-id { font-family: monospace; font-size: 0.8rem; color: var(--text-muted); }
+
+.agents-badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-enabled  { background: rgba(57, 197, 114, 0.15); color: var(--accent); }
+.badge-disabled { background: rgba(120,120,120,0.15);   color: var(--text-muted); }
+
+.agents-actions { text-align: right; white-space: nowrap; }
+.agents-btn-edit,
+.agents-btn-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem 0.4rem;
+    border-radius: var(--radius);
+    font-size: 1rem;
+    transition: background 0.15s;
+}
+.agents-btn-edit:hover   { background: rgba(255,255,255,0.08); }
+.agents-btn-delete:hover { background: rgba(255, 90, 90, 0.15); }
+
+.agents-form-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.agents-form-card h3 {
+    margin: 0 0 1rem;
+    font-size: 1rem;
+}
+
+.agents-form-grid {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 0.65rem 1rem;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.agents-form-grid label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.required { color: #ff5a5a; }
+
+.agents-form-grid .cfg-input,
+.agents-form-grid .cfg-textarea {
+    width: 100%;
+}
+
+.agents-form-error {
+    color: #ff5a5a;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+}
+
+.agents-form-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.agents-field-loading {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+    align-self: center;
+}

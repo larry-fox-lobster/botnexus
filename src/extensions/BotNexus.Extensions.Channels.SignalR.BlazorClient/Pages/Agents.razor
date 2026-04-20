@@ -1,0 +1,369 @@
+@page "/agents"
+@inject NavigationManager Nav
+@inject HttpClient Http
+
+<PageTitle>BotNexus — Agents</PageTitle>
+
+<div class="agents-page">
+    <header class="agents-toolbar">
+        <h2>🤖 Agents</h2>
+        <div class="agents-toolbar-actions">
+            @if (!string.IsNullOrEmpty(_statusMessage))
+            {
+                <span class="agents-status @_statusClass">@_statusMessage</span>
+            }
+            <button class="toolbar-btn" @onclick="LoadAgentsAsync" disabled="@_loading">↻ Reload</button>
+            <button class="toolbar-btn primary" @onclick="ShowAddForm">+ Add Agent</button>
+        </div>
+    </header>
+
+    @if (_loading)
+    {
+        <div class="config-loading">
+            <div class="loading-spinner small"></div>
+            <span>Loading agents…</span>
+        </div>
+    }
+    else if (_error is not null)
+    {
+        <div class="agents-error">⚠️ @_error</div>
+    }
+    else
+    {
+        @* Add / Edit form *@
+        @if (_showForm)
+        {
+            <div class="agents-form-card">
+                <h3>@(_editingId is not null ? $"Edit Agent: {_editingId}" : "Add Agent")</h3>
+                <div class="agents-form-grid">
+                    <label>Agent ID <span class="required">*</span></label>
+                    <input class="cfg-input" value="@_form.AgentId" disabled="@(_editingId is not null)"
+                           @oninput="OnAgentIdInput" />
+
+                    <label>Display Name <span class="required">*</span></label>
+                    <input class="cfg-input" value="@_form.DisplayName"
+                           @oninput="OnDisplayNameInput" />
+
+                    <label>Description</label>
+                    <input class="cfg-input" value="@_form.Description"
+                           @oninput="OnDescriptionInput" />
+
+                    <label>Provider <span class="required">*</span></label>
+                    @if (_providers.Count > 0)
+                    {
+                        <select class="cfg-input" value="@_form.ApiProvider" @onchange="OnProviderChange">
+                            <option value="">— select provider —</option>
+                            @foreach (var p in _providers)
+                            {
+                                <option value="@p.Id">@p.Name</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input class="cfg-input" value="@_form.ApiProvider" @oninput="OnProviderInput" placeholder="e.g. copilot" />
+                    }
+
+                    <label>Model ID <span class="required">*</span></label>
+                    @if (_models.Count > 0)
+                    {
+                        <select class="cfg-input" value="@_form.ModelId" @onchange="OnModelChange">
+                            <option value="">— select model —</option>
+                            @foreach (var m in _models)
+                            {
+                                <option value="@m.ModelId">@m.Name</option>
+                            }
+                        </select>
+                    }
+                    else if (!string.IsNullOrEmpty(_form.ApiProvider) && !_loadingModels)
+                    {
+                        <input class="cfg-input" value="@_form.ModelId" @oninput="OnModelIdInput" placeholder="e.g. gpt-4.1" />
+                    }
+                    else if (_loadingModels)
+                    {
+                        <span class="agents-field-loading">Loading models…</span>
+                    }
+                    else
+                    {
+                        <input class="cfg-input" value="@_form.ModelId" @oninput="OnModelIdInput" placeholder="Select a provider first" disabled />
+                    }
+
+                    <label>System Prompt</label>
+                    <textarea class="cfg-textarea" rows="4"
+                              @oninput="OnSystemPromptInput">@_form.SystemPrompt</textarea>
+                </div>
+                @if (!string.IsNullOrEmpty(_formError))
+                {
+                    <div class="agents-form-error">⚠️ @_formError</div>
+                }
+                <div class="agents-form-actions">
+                    <button class="toolbar-btn primary" @onclick="SaveFormAsync" disabled="@_saving">
+                        @(_saving ? "Saving…" : (_editingId is not null ? "💾 Save Changes" : "✓ Add Agent"))
+                    </button>
+                    <button class="toolbar-btn" @onclick="CancelForm" disabled="@_saving">Cancel</button>
+                </div>
+            </div>
+        }
+
+        @* Agent list *@
+        @if (_agents.Count == 0 && !_showForm)
+        {
+            <div class="agents-empty">
+                <p>No agents configured. Click <strong>+ Add Agent</strong> to create one.</p>
+            </div>
+        }
+        else if (_agents.Count > 0)
+        {
+            <table class="agents-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Display Name</th>
+                        <th>Provider</th>
+                        <th>Model</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var agent in _agents)
+                    {
+                        <tr>
+                            <td class="agents-id">@agent.AgentId</td>
+                            <td>@agent.DisplayName</td>
+                            <td>@agent.ApiProvider</td>
+                            <td>@agent.ModelId</td>
+                            <td class="agents-actions">
+                                <button class="agents-btn-edit" @onclick="() => EditAgent(agent)" title="Edit">✏️</button>
+                                <button class="agents-btn-delete" @onclick="() => DeleteAgentAsync(agent.AgentId!)" title="Delete">🗑️</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+</div>
+
+@code {
+    private record ProviderItem(string Id, string Name);
+    private record ModelItem(string ModelId, string Name);
+
+    private record AgentFormModel(
+        string AgentId = "",
+        string DisplayName = "",
+        string Description = "",
+        string ApiProvider = "",
+        string ModelId = "",
+        string? SystemPrompt = null);
+
+    private record AgentRow(
+        string? AgentId,
+        string DisplayName,
+        string? Description,
+        string ApiProvider,
+        string ModelId,
+        string? SystemPrompt);
+
+    private List<AgentRow> _agents = [];
+    private List<ProviderItem> _providers = [];
+    private List<ModelItem> _models = [];
+    private bool _loading = true;
+    private bool _loadingModels;
+    private bool _saving;
+    private string? _error;
+    private string? _statusMessage;
+    private string _statusClass = "";
+    private bool _showForm;
+    private string? _editingId;
+    private AgentFormModel _form = new();
+    private string? _formError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadAgentsAsync(), LoadProvidersAsync());
+    }
+
+    private void OnAgentIdInput(ChangeEventArgs e)       => _form = _form with { AgentId = e.Value?.ToString() ?? "" };
+    private void OnDisplayNameInput(ChangeEventArgs e)  => _form = _form with { DisplayName = e.Value?.ToString() ?? "" };
+    private void OnDescriptionInput(ChangeEventArgs e)  => _form = _form with { Description = e.Value?.ToString() ?? "" };
+    private void OnProviderInput(ChangeEventArgs e)     => _form = _form with { ApiProvider = e.Value?.ToString() ?? "" };
+    private void OnModelIdInput(ChangeEventArgs e)      => _form = _form with { ModelId = e.Value?.ToString() ?? "" };
+    private void OnSystemPromptInput(ChangeEventArgs e) => _form = _form with { SystemPrompt = e.Value?.ToString() };
+    private void OnModelChange(ChangeEventArgs e)       => _form = _form with { ModelId = e.Value?.ToString() ?? "" };
+
+    private async Task OnProviderChange(ChangeEventArgs e)
+    {
+        var provider = e.Value?.ToString() ?? "";
+        _form = _form with { ApiProvider = provider, ModelId = "" };
+        _models = [];
+        if (!string.IsNullOrEmpty(provider))
+            await LoadModelsAsync(provider);
+    }
+
+    private async Task LoadProvidersAsync()
+    {
+        try
+        {
+            var url = Nav.BaseUri.TrimEnd('/') + "/api/providers";
+            var opts = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var items = await Http.GetFromJsonAsync<List<ProviderItem>>(url, opts);
+            _providers = items ?? [];
+        }
+        catch
+        {
+            _providers = [];
+        }
+    }
+
+    private async Task LoadModelsAsync(string provider)
+    {
+        _loadingModels = true;
+        StateHasChanged();
+        try
+        {
+            var url = Nav.BaseUri.TrimEnd('/') + $"/api/models?provider={Uri.EscapeDataString(provider)}";
+            var opts = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var items = await Http.GetFromJsonAsync<List<ModelItem>>(url, opts);
+            _models = items ?? [];
+        }
+        catch
+        {
+            _models = [];
+        }
+        finally
+        {
+            _loadingModels = false;
+        }
+    }
+
+    private async Task LoadAgentsAsync()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var apiUrl = Nav.BaseUri.TrimEnd('/') + "/api/agents";
+            var rows = await Http.GetFromJsonAsync<List<AgentRow>>(apiUrl,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            _agents = rows ?? [];
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load agents: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ShowAddForm()
+    {
+        _editingId = null;
+        _form = new AgentFormModel();
+        _formError = null;
+        _showForm = true;
+    }
+
+    private async Task EditAgent(AgentRow agent)
+    {
+        _editingId = agent.AgentId;
+        _form = new AgentFormModel(
+            agent.AgentId ?? "",
+            agent.DisplayName,
+            agent.Description ?? "",
+            agent.ApiProvider,
+            agent.ModelId,
+            agent.SystemPrompt);
+        _formError = null;
+        _models = [];
+        if (!string.IsNullOrEmpty(agent.ApiProvider))
+            await LoadModelsAsync(agent.ApiProvider);
+        _showForm = true;
+    }
+
+    private void CancelForm()
+    {
+        _showForm = false;
+        _editingId = null;
+        _formError = null;
+    }
+
+    private async Task SaveFormAsync()
+    {
+        _formError = null;
+        if (string.IsNullOrWhiteSpace(_form.AgentId))   { _formError = "Agent ID is required."; return; }
+        if (string.IsNullOrWhiteSpace(_form.DisplayName)) { _formError = "Display Name is required."; return; }
+        if (string.IsNullOrWhiteSpace(_form.ApiProvider)) { _formError = "Provider is required."; return; }
+        if (string.IsNullOrWhiteSpace(_form.ModelId))   { _formError = "Model ID is required."; return; }
+
+        _saving = true;
+        try
+        {
+            var apiUrl = Nav.BaseUri.TrimEnd('/') + "/api/agents";
+            var payload = new
+            {
+                agentId = _form.AgentId,
+                displayName = _form.DisplayName,
+                description = string.IsNullOrWhiteSpace(_form.Description) ? null : _form.Description,
+                apiProvider = _form.ApiProvider,
+                modelId = _form.ModelId,
+                systemPrompt = _form.SystemPrompt
+            };
+
+            HttpResponseMessage response;
+            if (_editingId is not null)
+                response = await Http.PutAsJsonAsync($"{apiUrl}/{_editingId}", payload);
+            else
+                response = await Http.PostAsJsonAsync(apiUrl, payload);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _formError = $"Error {(int)response.StatusCode}: {body}";
+                return;
+            }
+
+            _showForm = false;
+            _editingId = null;
+            SetStatus("Saved.", "success");
+            await LoadAgentsAsync();
+        }
+        catch (Exception ex)
+        {
+            _formError = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteAgentAsync(string agentId)
+    {
+        var apiUrl = Nav.BaseUri.TrimEnd('/') + $"/api/agents/{agentId}";
+        try
+        {
+            var response = await Http.DeleteAsync(apiUrl);
+            if (!response.IsSuccessStatusCode)
+            {
+                SetStatus($"Delete failed: {(int)response.StatusCode}", "error");
+                return;
+            }
+            SetStatus($"Agent '{agentId}' removed.", "success");
+            await LoadAgentsAsync();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Delete error: {ex.Message}", "error");
+        }
+    }
+
+    private void SetStatus(string msg, string cssClass)
+    {
+        _statusMessage = msg;
+        _statusClass = cssClass;
+    }
+}

@@ -1,9 +1,11 @@
 using System.CommandLine;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BotNexus.Cli.Wizard;
 using BotNexus.Gateway.Abstractions.Configuration;
 using BotNexus.Gateway.Configuration;
 using Spectre.Console;
+using ValidationResult = Spectre.Console.ValidationResult;
 
 namespace BotNexus.Cli.Commands;
 
@@ -53,9 +55,17 @@ internal sealed class AgentCommands
             context.ExitCode = await ExecuteRemoveAsync(id, verbose, CancellationToken.None);
         });
 
+        var wizardCommand = new Command("wizard", "Interactively create a new agent using a step-by-step wizard.");
+        wizardCommand.SetHandler(async context =>
+        {
+            var verbose = context.ParseResult.GetValueForOption(verboseOption);
+            context.ExitCode = await ExecuteWizardAsync(verbose, CancellationToken.None);
+        });
+
         command.AddCommand(listCommand);
         command.AddCommand(addCommand);
         command.AddCommand(removeCommand);
+        command.AddCommand(wizardCommand);
         return command;
     }
 
@@ -91,6 +101,81 @@ internal sealed class AgentCommands
         if (verbose)
             AnsiConsole.MarkupLine($"[dim]Loaded from: {Markup.Escape(PlatformConfigLoader.DefaultConfigPath)}[/]");
 
+        return 0;
+    }
+
+    public async Task<int> ExecuteWizardAsync(bool verbose, CancellationToken cancellationToken)
+    {
+        var config = await LoadConfigRequiredAsync(cancellationToken);
+        if (config is null)
+            return 1;
+
+        AnsiConsole.MarkupLine("[bold cyan]BotNexus — Add Agent Wizard[/]");
+        AnsiConsole.WriteLine();
+
+        var providerChoices = config.Providers is { Count: > 0 }
+            ? config.Providers.Keys.OrderBy(k => k).ToList()
+            : ["copilot"];
+
+        var existingIds = (config.Agents?.Keys ?? Enumerable.Empty<string>())
+            .Select(k => k.ToLowerInvariant())
+            .ToHashSet();
+
+        var wizard = new WizardBuilder()
+            .AskText(
+                "AgentId",
+                "Agent ID [dim](lowercase, letters/digits/hyphens)[/]",
+                "id",
+                validator: input =>
+                {
+                    if (string.IsNullOrWhiteSpace(input))
+                        return ValidationResult.Error("Agent ID is required.");
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(input, @"^[a-z0-9][a-z0-9\-_]*$"))
+                        return ValidationResult.Error("Agent ID must start with a lowercase letter/digit and contain only a-z, 0-9, hyphens, or underscores.");
+                    if (existingIds.Contains(input.ToLowerInvariant()))
+                        return ValidationResult.Error($"Agent '{input}' already exists.");
+                    return ValidationResult.Success();
+                })
+            .AskText("DisplayName", "Display name", "displayName")
+            .AskText("Description", "Description [dim](optional, press Enter to skip)[/]", "description", defaultValue: "")
+            .AskSelection("Provider", "Select provider", "provider", providerChoices)
+            .AskText("Model", "Model ID", "model", defaultValue: "gpt-4.1")
+            .AskConfirm("Enabled", "Enable agent?", "enabled", defaultValue: true)
+            .Build();
+
+        var result = await wizard.RunAsync(cancellationToken: cancellationToken);
+        if (result.Outcome != WizardOutcome.Completed)
+        {
+            AnsiConsole.MarkupLine("[yellow]Wizard cancelled.[/]");
+            return 1;
+        }
+
+        var ctx = result.Context;
+        var id = ctx.Get<string>("id");
+        var displayName = ctx.Get<string>("displayName");
+        var description = ctx.Get<string>("description");
+        var provider = ctx.Get<string>("provider");
+        var model = ctx.Get<string>("model");
+        var enabled = ctx.Get<bool>("enabled");
+
+        if (string.IsNullOrWhiteSpace(displayName))
+            displayName = id;
+
+        config.Agents ??= new Dictionary<string, AgentDefinitionConfig>(StringComparer.OrdinalIgnoreCase);
+        config.Agents[id] = new AgentDefinitionConfig
+        {
+            DisplayName = displayName,
+            Description = string.IsNullOrWhiteSpace(description) ? null : description,
+            Provider = provider,
+            Model = model,
+            Enabled = enabled
+        };
+
+        var saveCode = await SaveAndValidateAsync(config, verbose, cancellationToken);
+        if (saveCode != 0)
+            return saveCode;
+
+        AnsiConsole.MarkupLine($"[green]✓[/] Agent [green]{Markup.Escape(id)}[/] added successfully.");
         return 0;
     }
 
