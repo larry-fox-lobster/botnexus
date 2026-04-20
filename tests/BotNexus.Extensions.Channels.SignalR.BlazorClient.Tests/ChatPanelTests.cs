@@ -52,6 +52,28 @@ public sealed class ChatPanelTests : IDisposable
     }
 
     [Fact]
+    public void Renders_markdown_before_autoscroll_invocation()
+    {
+        var state = TestSessionFactory.CreateAgentStateWithMessages(
+            messages: [("Assistant", "Rendered as markdown")]);
+
+        var cut = RenderChatPanel(state);
+        cut.WaitForAssertion(() =>
+        {
+            var identifiers = _ctx.JSInterop.Invocations
+                .Select(i => i.Identifier)
+                .ToList();
+
+            identifiers.ShouldContain("BotNexus.renderMarkdown");
+            identifiers.ShouldContain("chatScroll.scrollToBottom");
+
+            var markdownIndex = identifiers.IndexOf("BotNexus.renderMarkdown");
+            var scrollIndex = identifiers.IndexOf("chatScroll.scrollToBottom");
+            markdownIndex.ShouldBeLessThan(scrollIndex);
+        });
+    }
+
+    [Fact]
     public void Shows_message_roles()
     {
         var state = TestSessionFactory.CreateAgentStateWithMessages(
