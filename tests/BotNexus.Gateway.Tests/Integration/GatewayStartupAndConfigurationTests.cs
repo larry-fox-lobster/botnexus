@@ -9,7 +9,6 @@ using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Registry;
 using BotNexus.Agent.Providers.OpenAI;
 using BotNexus.Agent.Providers.OpenAICompat;
-using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -27,7 +26,7 @@ public sealed class GatewayStartupAndConfigurationTests
     private static readonly SemaphoreSlim EnvLock = new(1, 1);
 
     [Fact]
-    public async Task GatewayStartup_WithValidDefaultConfig_StartsAndServesHealthWebUiAndSwagger()
+    public async Task GatewayStartup_WithValidDefaultConfig_StartsAndServesHealthAndSwagger()
     {
         using var fixture = new GatewayStartupFixture();
         fixture.WriteDefaultConfig("""
@@ -49,15 +48,12 @@ public sealed class GatewayStartupAndConfigurationTests
             using var client = factory.CreateClient();
 
             var health = await client.GetFromJsonAsync<JsonElement>("/health");
-            var root = await client.GetAsync("/");
             var swagger = await client.GetAsync("/swagger");
             var swaggerJson = await client.GetAsync("/swagger/v1/swagger.json");
 
-            health.GetProperty("status").GetString().Should().Be("ok");
-            root.StatusCode.Should().Be(HttpStatusCode.OK);
-            (await root.Content.ReadAsStringAsync()).Should().Contain("<html");
-            swagger.StatusCode.Should().Be(HttpStatusCode.OK);
-            swaggerJson.StatusCode.Should().Be(HttpStatusCode.OK);
+            health.GetProperty("status").GetString().ShouldBe("ok");
+            swagger.StatusCode.ShouldBe(HttpStatusCode.OK);
+            swaggerJson.StatusCode.ShouldBe(HttpStatusCode.OK);
         });
     }
 
@@ -74,9 +70,9 @@ public sealed class GatewayStartupAndConfigurationTests
             var health = await client.GetFromJsonAsync<JsonElement>("/health");
             var validationResponse = await client.GetFromJsonAsync<JsonElement>("/api/config/validate");
 
-            health.GetProperty("status").GetString().Should().Be("ok");
-            validationResponse.GetProperty("isValid").GetBoolean().Should().BeFalse();
-            validationResponse.GetProperty("errors")[0].GetString().Should().Contain("Config file not found");
+            health.GetProperty("status").GetString().ShouldBe("ok");
+            validationResponse.GetProperty("isValid").GetBoolean().ShouldBeFalse();
+            validationResponse.GetProperty("errors")[0].GetString().ShouldContain("Config file not found");
         });
     }
 
@@ -100,9 +96,9 @@ public sealed class GatewayStartupAndConfigurationTests
         {
             var config = PlatformConfigLoader.Load(configPath, validateOnLoad: false);
 
-            config.Providers.Should().ContainKey("github-copilot");
-            config.Providers!["github-copilot"].ApiKey.Should().Be("auth:copilot");
-            config.Providers["github-copilot"].BaseUrl.Should().Be("https://api.githubcopilot.com");
+            config.Providers.ShouldContainKey("github-copilot");
+            config.Providers!["github-copilot"].ApiKey.ShouldBe("auth:copilot");
+            config.Providers["github-copilot"].BaseUrl.ShouldBe("https://api.githubcopilot.com");
             return Task.CompletedTask;
         });
     }
@@ -129,7 +125,7 @@ public sealed class GatewayStartupAndConfigurationTests
 
                 var resolvedConfigPath = configuration["BotNexus:ConfigPath"];
                 var config = PlatformConfigLoader.Load(resolvedConfigPath, validateOnLoad: false);
-                config.Gateway?.DefaultAgentId.Should().Be("from-env");
+                config.Gateway?.DefaultAgentId.ShouldBe("from-env");
                 return Task.CompletedTask;
             }
             finally
@@ -158,7 +154,7 @@ public sealed class GatewayStartupAndConfigurationTests
 
             var resolvedConfigPath = configuration["BotNexus:ConfigPath"];
             var config = PlatformConfigLoader.Load(resolvedConfigPath, validateOnLoad: false);
-            config.Gateway?.DefaultAgentId.Should().Be("from-appsettings");
+            config.Gateway?.DefaultAgentId.ShouldBe("from-appsettings");
             return Task.CompletedTask;
         });
     }
@@ -187,14 +183,14 @@ public sealed class GatewayStartupAndConfigurationTests
 
             var world = await client.GetFromJsonAsync<JsonElement>("/api/world");
 
-            world.GetProperty("identity").GetProperty("id").GetString().Should().Be("local-dev");
-            world.GetProperty("identity").GetProperty("name").GetString().Should().Be("Local Development");
-            world.GetProperty("identity").GetProperty("description").GetString().Should().Be("Local development gateway");
-            world.GetProperty("identity").GetProperty("emoji").GetString().Should().Be("🏠");
-            world.GetProperty("hostedAgents").ValueKind.Should().Be(JsonValueKind.Array);
-            world.GetProperty("locations").ValueKind.Should().Be(JsonValueKind.Array);
-            world.GetProperty("availableStrategies").ValueKind.Should().Be(JsonValueKind.Array);
-            world.GetProperty("crossWorldPermissions").ValueKind.Should().Be(JsonValueKind.Array);
+            world.GetProperty("identity").GetProperty("id").GetString().ShouldBe("local-dev");
+            world.GetProperty("identity").GetProperty("name").GetString().ShouldBe("Local Development");
+            world.GetProperty("identity").GetProperty("description").GetString().ShouldBe("Local development gateway");
+            world.GetProperty("identity").GetProperty("emoji").GetString().ShouldBe("🏠");
+            world.GetProperty("hostedAgents").ValueKind.ShouldBe(JsonValueKind.Array);
+            world.GetProperty("locations").ValueKind.ShouldBe(JsonValueKind.Array);
+            world.GetProperty("availableStrategies").ValueKind.ShouldBe(JsonValueKind.Array);
+            world.GetProperty("crossWorldPermissions").ValueKind.ShouldBe(JsonValueKind.Array);
         });
     }
 
@@ -210,8 +206,8 @@ public sealed class GatewayStartupAndConfigurationTests
 
             var world = await client.GetFromJsonAsync<JsonElement>("/api/world");
 
-            world.GetProperty("identity").GetProperty("id").GetString().Should().Be(Environment.MachineName);
-            world.GetProperty("identity").GetProperty("name").GetString().Should().Be("BotNexus Gateway");
+            world.GetProperty("identity").GetProperty("id").GetString().ShouldBe(Environment.MachineName);
+            world.GetProperty("identity").GetProperty("name").GetString().ShouldBe("BotNexus Gateway");
         });
     }
 
@@ -225,7 +221,7 @@ public sealed class GatewayStartupAndConfigurationTests
         {
             Environment.SetEnvironmentVariable(ConfigPathKey, null);
             var config = PlatformConfigLoader.Load(validateOnLoad: false);
-            config.Gateway?.DefaultAgentId.Should().Be("from-default");
+            config.Gateway?.DefaultAgentId.ShouldBe("from-default");
             return Task.CompletedTask;
         });
     }
@@ -248,12 +244,15 @@ public sealed class GatewayStartupAndConfigurationTests
         var llmClient = new LlmClient(apiProviders, models);
         var registeredApis = llmClient.ApiProviders.GetAll().Select(provider => provider.Api).ToArray();
 
-        registeredApis.Should().Contain(["anthropic-messages", "openai-completions", "openai-responses", "openai-compat"]);
-        registeredApis.Should().NotContain("github-copilot");
+        registeredApis.ShouldContain("anthropic-messages");
+        registeredApis.ShouldContain("openai-completions");
+        registeredApis.ShouldContain("openai-responses");
+        registeredApis.ShouldContain("openai-compat");
+        registeredApis.ShouldNotContain("github-copilot");
 
         var copilotModel = llmClient.Models.GetModel("github-copilot", "gpt-4.1");
-        copilotModel.Should().NotBeNull();
-        registeredApis.Should().Contain(copilotModel!.Api);
+        copilotModel.ShouldNotBeNull();
+        registeredApis.ShouldContain(copilotModel!.Api);
     }
 
     private static WebApplicationFactory<Program> CreateTestFactory(string? appSettingsConfigPath = null)

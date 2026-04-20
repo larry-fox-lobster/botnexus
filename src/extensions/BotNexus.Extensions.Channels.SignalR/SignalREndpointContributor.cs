@@ -25,24 +25,28 @@ public class SignalREndpointContributor : IEndpointContributor
         var blazorFileProvider = new PhysicalFileProvider(blazorPath);
         var indexBytes = File.ReadAllBytes(Path.Combine(blazorPath, "index.html"));
 
-        // Single middleware handles both static files and SPA fallback for /blazor/
+        // Serve Blazor WASM client at the root URL.
+        // API, hub, health, and swagger paths are excluded so they reach their own handlers.
         app.Use(async (context, next) =>
         {
             var path = context.Request.Path.Value ?? "";
-            if (!path.StartsWith("/blazor/", StringComparison.OrdinalIgnoreCase) &&
-                !path.Equals("/blazor", StringComparison.OrdinalIgnoreCase))
+
+            // Let API, hub, health, and swagger requests pass through
+            if (path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("/hub/", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase) ||
+                path.Equals("/health", StringComparison.OrdinalIgnoreCase))
             {
                 await next();
                 return;
             }
 
-            // Strip /blazor prefix to resolve the file
-            var subPath = path.Length > 7 ? path[7..] : "/";
+            // Try to serve a static file from the Blazor output
+            var subPath = path == "/" ? "/index.html" : path;
             var fileInfo = blazorFileProvider.GetFileInfo(subPath);
 
             if (fileInfo.Exists && !fileInfo.IsDirectory)
             {
-                // Serve the actual file
                 var contentType = GetContentType(subPath);
                 context.Response.ContentType = contentType;
                 context.Response.ContentLength = fileInfo.Length;
@@ -59,8 +63,8 @@ public class SignalREndpointContributor : IEndpointContributor
                 return;
             }
 
-            // File with extension that doesn't exist — 404
-            context.Response.StatusCode = 404;
+            // Fall through for non-Blazor requests or missing files
+            await next();
         });
     }
 

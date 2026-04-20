@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text.Json;
+using BotNexus.Gateway.Configuration;
 
 namespace BotNexus.Cli.Commands;
 
@@ -89,6 +90,19 @@ internal sealed class ServeCommand
             Console.WriteLine($"Release build not found at: {gatewayDll}");
             Console.WriteLine("Run 'botnexus build' first.");
             return 1;
+        }
+
+        // Auto-initialize ~/.botnexus/ with a default config if none exists
+        var configPath = PlatformConfigLoader.DefaultConfigPath;
+        if (!File.Exists(configPath))
+        {
+            Console.WriteLine("[serve] No configuration found — creating default config...");
+            var init = new InitCommand();
+            var initResult = await init.ExecuteAsync(force: false, verbose, cancellationToken);
+            if (initResult != 0)
+                return initResult;
+            Console.WriteLine("[serve] Configure your gateway via the WebUI at the root URL.");
+            Console.WriteLine();
         }
 
         if (!IsPortAvailable(port))

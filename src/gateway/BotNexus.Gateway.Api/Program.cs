@@ -30,8 +30,7 @@ Log.Logger = new LoggerConfiguration()
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
-    Args = args,
-    WebRootPath = Path.Combine(AppContext.BaseDirectory, "wwwroot")
+    Args = args
 });
 
 builder.Host.UseSerilog((context, services, configuration) => configuration
@@ -198,12 +197,8 @@ if (!string.IsNullOrWhiteSpace(listenUrl))
     app.Urls.Add(listenUrl);
 }
 
-app.UseDefaultFiles();
-app.UseStaticFiles();
-
 // Extension post-build: endpoint + API contributors
-// Must run early so extension static file middleware (e.g., Blazor WASM at /blazor/)
-// is registered before routing catches requests as fallbacks.
+// Extensions serve their own static content (e.g., Blazor WASM at /).
 AssemblyLoadContextExtensionLoader.MapExtensionEndpoints(app);
 
 app.UseCors(GatewayCorsPolicy);
@@ -230,7 +225,6 @@ app.MapGet("/api/version", () =>
 var gatewayStartedAtUtc = DateTimeOffset.UtcNow;
 app.MapGet("/api/uptime", () => Results.Ok(new { startedAt = gatewayStartedAtUtc }));
 app.MapGet("/api/world", () => Results.Ok(worldDescriptor));
-app.MapFallbackToFile("index.html");
 
 LogGatewayStartup(app, builder.Environment, startupPlatformConfig, worldDescriptor, listenUrl);
 
