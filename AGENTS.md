@@ -73,6 +73,33 @@ Build the full solution before running tests to avoid stale assembly issues (e.g
 
 Remove unused methods, classes, and parameters rather than commenting them out or leaving them for "future use." If something isn't called, it shouldn't exist.
 
+### XML Documentation on Public API
+
+All public methods and properties must have XML doc comments (`<summary>`). Focus on **why** the member exists and the **context** a caller needs — not a restatement of what the code does.
+
+```csharp
+// GOOD — explains why and when to use it
+/// <summary>
+/// Resolves the agent workspace directory, creating it if this is the
+/// agent's first activation. Called during session startup to ensure
+/// personality files (SOUL.md, IDENTITY.md) are available before the
+/// prompt pipeline runs.
+/// </summary>
+public string EnsureWorkspace(AgentId agentId) { ... }
+
+// BAD — restates the code
+/// <summary>
+/// Gets the workspace path for the given agent ID.
+/// </summary>
+public string EnsureWorkspace(AgentId agentId) { ... }
+```
+
+**Rules:**
+- Describe **intent and context**, not implementation details visible in the signature.
+- Mention non-obvious side effects (e.g., creates directories, writes files, triggers events).
+- Document when `null` is a valid return and what it means.
+- For interfaces, document the **contract** — what implementers must guarantee.
+
 ## Commits
 
 Use [Conventional Commits](https://www.conventionalcommits.org/) for all commit messages.
