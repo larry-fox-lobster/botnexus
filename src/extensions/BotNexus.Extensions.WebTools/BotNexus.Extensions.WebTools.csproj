@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <RootNamespace>BotNexus.Extensions.WebTools</RootNamespace>
     <Description>Web search and fetch tools for BotNexus agents. Multi-provider search (Brave, Tavily, Bing) and URL content retrieval.</Description>
   </PropertyGroup>

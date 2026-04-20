@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <RootNamespace>BotNexus.Cron</RootNamespace>
     <Description>Cron scheduling infrastructure for BotNexus.</Description>
@@ -32,12 +29,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Cronos" Version="0.11.1" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0-preview.3.25171.6" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0-preview.3.25171.5" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0-preview.3.25171.5" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0-preview.3.25171.5" />
-    <PackageReference Include="TestableIO.System.IO.Abstractions.Wrappers" Version="*" />
+    <PackageReference Include="Cronos" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="TestableIO.System.IO.Abstractions.Wrappers" />
   </ItemGroup>
 
 </Project>

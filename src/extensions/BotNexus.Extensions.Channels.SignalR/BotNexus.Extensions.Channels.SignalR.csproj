@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <RootNamespace>BotNexus.Extensions.Channels.SignalR</RootNamespace>
     <Description>Real-time web communication channel using SignalR for the BotNexus Gateway.</Description>
   </PropertyGroup>

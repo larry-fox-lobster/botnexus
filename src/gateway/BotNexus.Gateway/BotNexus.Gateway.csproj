@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <RootNamespace>BotNexus.Gateway</RootNamespace>
     <Description>Gateway runtime — agent orchestration, routing, isolation, and lifecycle management.</Description>
   </PropertyGroup>
@@ -32,9 +29,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NJsonSchema" Version="11.4.0" />
-    <PackageReference Include="OpenTelemetry.Api" Version="1.15.1" />
-    <PackageReference Include="TestableIO.System.IO.Abstractions.Wrappers" Version="*" />
+    <PackageReference Include="NJsonSchema" />
+    <PackageReference Include="OpenTelemetry.Api" />
+    <PackageReference Include="TestableIO.System.IO.Abstractions.Wrappers" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <RootNamespace>BotNexus.Gateway.Contracts</RootNamespace>
     <Description>Gateway-specific contracts and extension point interfaces for BotNexus.</Description>
   </PropertyGroup>

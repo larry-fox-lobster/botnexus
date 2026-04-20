@@ -32,7 +32,7 @@ public sealed class InitCommandTests
         var config = await fixture.LoadConfigAsync();
 
         result.ExitCode.ShouldBe(0);
-        result.CombinedOutput.ShouldContain("Use --force to overwrite");
+        result.CombinedOutput.ShouldContain("Config already exists");
         config.Gateway?.ListenUrl.ShouldBe("http://localhost:5999");
     }
 
