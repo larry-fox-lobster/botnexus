@@ -38,57 +38,55 @@
             @* Nav links *@
             <nav class="sidebar-nav">
                 <a href="" class="sidebar-nav-item @NavClass("")">💬 Chat</a>
+
+                @* Agent dropdown + session list nested under Chat *@
+                @if (Manager.Sessions.Count > 0)
+                {
+                    <div class="agent-dropdown-container">
+                        <select class="agent-dropdown-select"
+                                value="@Manager.ActiveAgentId"
+                                @onchange="OnAgentSelected">
+                            <option value="">— select agent —</option>
+                            @foreach (var (agentId, state) in Manager.Sessions)
+                            {
+                                <option value="@agentId">
+                                    @state.DisplayName
+                                    @if (state.IsStreaming) { <text> ●</text> }
+                                    @if (state.UnreadCount > 0) { <text> (@state.UnreadCount)</text> }
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    @if (Manager.ActiveAgentId is not null &&
+                         Manager.Sessions.TryGetValue(Manager.ActiveAgentId, out var activeState))
+                    {
+                        <div class="agent-session-list">
+                            @if (activeState.SessionId is not null)
+                            {
+                                <div class="agent-session-item active">
+                                    <span>💬</span>
+                                    <span>@(activeState.ChannelType ?? "signalr")</span>
+                                </div>
+                            }
+                            @foreach (var sub in activeState.SubAgents.Values
+                                .Where(s => s.Status is "Running" or "Completed"))
+                            {
+                                <div class="agent-session-item">
+                                    <span>@SubAgentIcon(sub.Status)</span>
+                                    <span title="@sub.Task">@(sub.Name ?? sub.SubAgentId[..Math.Min(8, sub.SubAgentId.Length)])</span>
+                                    @if (sub.Archetype is not null)
+                                    {
+                                        <span class="sub-agent-archetype">@sub.Archetype</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+
                 <a href="configuration" class="sidebar-nav-item @NavClass("configuration")">⚙️ Configuration</a>
             </nav>
-
-            @* Agent dropdown + session list *@
-            @if (Manager.Sessions.Count > 0)
-            {
-                <div class="agent-dropdown-container">
-                    <label class="agent-dropdown-label">Agent</label>
-                    <select class="agent-dropdown-select"
-                            value="@Manager.ActiveAgentId"
-                            @onchange="OnAgentSelected">
-                        <option value="">— select agent —</option>
-                        @foreach (var (agentId, state) in Manager.Sessions)
-                        {
-                            <option value="@agentId">
-                                @state.DisplayName
-                                @if (state.IsStreaming) { <text> ●</text> }
-                                @if (state.UnreadCount > 0) { <text> (@state.UnreadCount)</text> }
-                            </option>
-                        }
-                    </select>
-                </div>
-
-                @if (Manager.ActiveAgentId is not null &&
-                     Manager.Sessions.TryGetValue(Manager.ActiveAgentId, out var activeState))
-                {
-                    <div class="agent-session-list">
-                        @* Primary session *@
-                        @if (activeState.SessionId is not null)
-                        {
-                            <div class="agent-session-item active">
-                                <span>💬</span>
-                                <span>@(activeState.ChannelType ?? "signalr")</span>
-                            </div>
-                        }
-                        @* Sub-agents (exclude Killed/Failed as "expired") *@
-                        @foreach (var sub in activeState.SubAgents.Values
-                            .Where(s => s.Status is "Running" or "Completed"))
-                        {
-                            <div class="agent-session-item">
-                                <span>@SubAgentIcon(sub.Status)</span>
-                                <span title="@sub.Task">@(sub.Name ?? sub.SubAgentId[..Math.Min(8, sub.SubAgentId.Length)])</span>
-                                @if (sub.Archetype is not null)
-                                {
-                                    <span class="sub-agent-archetype">@sub.Archetype</span>
-                                }
-                            </div>
-                        }
-                    </div>
-                }
-            }
 
             @* Restart button at bottom *@
             <div class="sidebar-footer">

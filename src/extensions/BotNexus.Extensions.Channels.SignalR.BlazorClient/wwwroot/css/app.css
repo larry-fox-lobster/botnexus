@@ -171,7 +171,7 @@ html, body, #app {
 
 .main-canvas {
     flex: 1;
-    overflow: hidden;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -180,18 +180,8 @@ html, body, #app {
 /* ── Agent dropdown ─────────────────────────────────────────────────── */
 
 .agent-dropdown-container {
-    padding: 10px 12px 8px;
-    border-bottom: 1px solid var(--border);
+    padding: 4px 12px 8px;
     flex-shrink: 0;
-}
-
-.agent-dropdown-label {
-    display: block;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-    margin-bottom: 5px;
 }
 
 .agent-dropdown-select {
@@ -495,7 +485,8 @@ html, body, #app {
 .chat-panel-wrapper {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
 }
 
 .chat-panel-wrapper.hidden {
