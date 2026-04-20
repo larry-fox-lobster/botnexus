@@ -15412,3 +15412,276 @@ If the team decides to implement distinct icons for Failed/Killed states (P1 fro
 - CSS and component integration clean
 
 The feature is ready for production. Documentation now accurately reflects implementation.
+
+---
+
+# Design Review: bug-subagent-completion-wakeup (2026-04-20)
+
+**Decision Date:** 2026-04-20  
+**Decided By:** Leela (Lead/Architect)  
+**Status:** Approved for delivery  
+**Bug Spec:** docs/planning/bug-subagent-completion-wakeup/design-spec.md
+
+## Infrastructure Audit
+
+### What Exists (Working)
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| DefaultSubAgentManager.OnCompletedAsync | src/gateway/BotNexus.Gateway/Agents/DefaultSubAgentManager.cs:218 | ✅ Dual-path logic: FollowUpAsync (running) vs DispatchAsync (idle) |
+| InternalChannelAdapter | src/gateway/BotNexus.Gateway/Channels/InternalChannelAdapter.cs | ⚠️ Registered, resolves session's original channel, but incomplete |
+| IAgentHandle.FollowUpAsync | src/gateway/BotNexus.Gateway.Contracts/Agents/IAgentHandle.cs:72 | ✅ Two overloads (string, AgentMessage) |
+| PendingMessageQueue | src/agent/BotNexus.Agent.Core/PendingMessageQueue.cs | ✅ Thread-safe, drain modes |
+| AgentLoopRunner follow-up drain | src/agent/BotNexus.Agent.Core/Loop/AgentLoopRunner.cs:224 | ✅ Drains after inner loop exits |
+| GatewayHost.DispatchAsync | src/gateway/BotNexus.Gateway/GatewayHost.cs:122 | ✅ Session queue, single-reader worker |
+| DefaultMessageRouter | src/gateway/BotNexus.Gateway/Routing/DefaultMessageRouter.cs | ✅ Handles TargetAgentId priority routing |
+| SignalRChannelAdapter | src/extensions/.../SignalR/SignalRChannelAdapter.cs | ✅ Implements IStreamEventChannelAdapter, pushes to session groups |
+| SubAgentCompletionWakeUpTests | 	ests/BotNexus.Gateway.Tests/Agents/SubAgentCompletionWakeUpTests.cs | ✅ 5 tests verify mock-level paths |
+| GatewayTelemetry.SubAgentParentWakeups | src/gateway/BotNexus.Gateway/Diagnostics/GatewayTelemetry.cs:51 | ✅ Counter for wake events |
+
+### Root Causes Identified
+
+**Two interacting failures:**
+1. **InternalChannelAdapter does not implement IStreamEventChannelAdapter** — GatewayHost's streaming callback silently drops MessageStart, MessageEnd, ThinkingDelta, ToolStart, ToolEnd events. Only ContentDelta (with type mismatch) is forwarded.
+2. **Race condition in IsRunning check** — Between loop exit and status transition to Idle, FollowUpAsync may enqueue message but loop has already exited, stranding message in queue.
+
+### Fix Contracts
+
+**Contract 1: InternalChannelAdapter implements IStreamEventChannelAdapter**
+- Implement SendStreamEventAsync method
+- Resolve target adapter and delegate full event
+- Preserve fallback to SendStreamDeltaAsync for non-streaming targets
+
+**Contract 2: Eliminate race condition — always dispatch for idle sessions**
+- Remove IsRunning check and FollowUpAsync branch
+- Always use _dispatcher.DispatchAsync path
+- Simplifies reasoning about message ordering
+
+**Contract 3: Telemetry for wake outcomes**
+- Add counters: SubAgentWakeDispatched, SubAgentWakeDelivered, SubAgentWakeDeliveryFailed
+
+## Wave Plan
+
+| Wave | Agent | Focus | Deliverable |
+|------|-------|-------|-------------|
+| 1 | Hermes | Tests | 3 red tests reproducing both failures |
+| 2 | Farnsworth | InternalChannelAdapter | Implement IStreamEventChannelAdapter |
+| 3 | Bender | Race elimination | Remove IsRunning branch, always dispatch |
+| 4 | Hermes + Kif | Verification | Full test pass + documentation |
+| 5 | Nibbler | Review | Consistency check |
+
+**Decision:** Approved. Both root causes identified, fixes are bounded, waves properly sequenced.
+
+---
+
+# Gateway PID Recycling Guard Enhancement
+
+**Date:** 2026-04-20  
+**Agent:** Hermes (Tester)  
+**Type:** Enhancement  
+**Status:** Implemented  
+
+## Enhancement Summary
+
+Added **MainModule path validation** as a secondary check for gateway PID recycling guard.
+
+### Why This Matters
+
+Windows can recycle PIDs — when a process exits, the OS may assign its PID to a completely different process. The original implementation checked process name only, which failed for:
+- ❌ dotnet SomeOtherApp.dll running under PID 1234 → incorrectly reported as our gateway
+
+The enhancement adds MainModule validation:
+1. **Primary check:** Process name contains "BotNexus" → ✅ definitely our gateway
+2. **Secondary check (if primary fails):**
+   - Try to read process.MainModule.FileName
+   - Accept if: Process name is "dotnet" AND MainModule path contains "BotNexus"
+3. **Fallback:** If MainModule is inaccessible (permissions), trust process name "dotnet"
+
+### Testing
+
+- **Build:** ✅ 0 errors, 0 warnings
+- **Tests:** ✅ All 56 CLI tests pass, including real dotnet process verification
+- **Commit:** 89ecc6b2
+
+---
+
+# Wave 3 Test Suite Complete
+
+**Author:** Hermes (Tester)  
+**Date:** 2026-04-20  
+**Status:** ✅ Complete  
+**Commit:** 540ae659
+
+## Test Coverage
+
+**GatewayProcessManagerTests (18 tests):** Platform enforcement, PID verification, stale cleanup, stop operations, status queries, consistency
+
+**HttpHealthCheckerTests (7 tests):** Health checks, failed responses, connection refused, cancellation, exponential backoff (200ms→400ms→800ms→1600ms→2000ms cap), timeout enforcement
+
+**GatewayProcessTypesTests (8 tests):** Default values, record initialization, null properties, enum coverage, record equality
+
+## Test Results
+
+- **New tests:** 33  
+- **Pass rate:** 100% (33/33)  
+- **Full suite:** 2578 tests passing  
+- **Build:** Clean, 0 errors, 0 warnings  
+
+---
+
+# Wave 1: Gateway Process Manager — Complete
+
+**Author:** Bender  
+**Date:** 2026-01-21  
+**Status:** Complete  
+**Commit:** 8b81299
+
+## Deliverables
+
+Created 5 files in src/gateway/BotNexus.Cli/Services/:
+- GatewayProcessTypes.cs — GatewayStartOptions, GatewayStartResult, GatewayStopResult, GatewayState, GatewayStatus
+- IGatewayProcessManager.cs — StartAsync(), StopAsync(), GetStatusAsync(), IsRunning
+- GatewayProcessManager.cs — Full implementation with PID file, detached mode, stale cleanup, hard kill
+- IHealthChecker.cs — Health polling contract
+- HttpHealthChecker.cs — HTTP polling implementation (exponential backoff, 10s timeout, http://localhost:5005/health)
+
+## Build Verification
+
+- ✅ Build: Clean (0 errors, 0 warnings)
+- ✅ Compilation: All 5 files compile successfully
+
+---
+
+# Wave 2 Completion — CLI Command Refactor
+
+**Date:** 2026-04-15  
+**Agent:** Farnsworth (Platform Dev)  
+**Status:** ✅ Complete  
+**Commit:** 62030e7b
+
+## Implementation Decisions
+
+Created GatewayCommand with full lifecycle management:
+- otnexus gateway start — detached mode (new console window) by default
+- otnexus gateway start --attached — foreground mode for debugging
+- otnexus gateway stop — kills process, cleans PID file
+- otnexus gateway status — shows state, PID, uptime
+- otnexus gateway restart — stop then start
+
+### DI Registration
+
+- **IHealthChecker → HttpHealthChecker** (singleton) — contains HttpClient, needs singleton for connection reuse
+- **IGatewayProcessManager → GatewayProcessManager** (singleton) — maintains PID file state
+- **GatewayCommand** (singleton) — lightweight, stateless
+
+### Shared Helper Methods
+
+Made three ServeCommand methods public static to avoid duplication:
+- DeployExtensions(string repoRoot, bool verbose)
+- IsPortAvailable(int port)
+- WaitForRestartOrQuitAsync(int seconds, CancellationToken)
+
+## Build & Test
+
+- **Build:** ✅ 0 errors, 0 warnings
+- **Tests:** ✅ All 956 gateway tests passing
+- **Files Modified:** GatewayCommand.cs (new), ServeCommand.cs (refactored), Program.cs (DI registration)
+
+---
+
+# Wave 4 Documentation Complete — Gateway Detached Process Feature
+
+**Status:** ✅ Complete  
+**Date:** 2026-04-20  
+**Commit:** 5221d933
+
+## Deliverables
+
+### Files Updated
+
+1. **src/gateway/README.md** — New "Gateway Lifecycle Management" section
+   - Command reference (start, stop, status, restart)
+   - Real-world examples for all use cases
+   - Explanation of --attached flag
+   - Platform support notes (Windows v1)
+
+2. **docs/planning/improvement-gateway-detached-process/design-spec.md**
+   - Status: in-progress → delivered
+   - Marked 6 of 7 success criteria as complete ✅
+
+3. **docs/planning/INDEX.md**
+   - Updated status from draft → delivered
+
+## Technical Verification
+
+- Commands: start, stop, status, restart ✅
+- Options: --attached, --port, --path, --dev ✅
+- PID file: ~/.botnexus/gateway.pid ✅
+- Log location: ~/.botnexus/logs/ (Serilog) ✅
+- Windows-only for v1 ✅
+
+---
+
+# Leela Design Review: Gateway Detached Process (2026-07-28)
+
+**Decision Date:** 2026-07-28  
+**Decided By:** Leela (Lead/Architect)  
+**Status:** Approved — Ready for Implementation
+
+## Architectural Decisions
+
+1. **IGatewayProcessManager Interface Location:** Lives in src/gateway/BotNexus.Cli/Services/ (CLI concern, not gateway runtime)
+2. **PID File Format:** Plain text at ~/.botnexus/gateway.pid containing only the integer PID
+3. **Default Mode:** Detached is default; --attached flag for foreground debugging
+4. **Windows-Only for v1:** Guard with OperatingSystem.IsWindows(), helpful error on other platforms
+5. **Hard Kill for Stop:** Use Process.Kill() without graceful shutdown (console apps don't respond to CloseMainWindow())
+6. **Health Check Timeout:** 10 seconds, exponential backoff starting at 200ms
+7. **Stale PID Cleanup:** Automatic on any PID file read
+
+## Wave Plan
+
+| Wave | Agent | Deliverable |
+|------|-------|-------------|
+| 1 | Bender | Core process manager + health checker |
+| 2 | Farnsworth | CLI command refactor + DI registration |
+| 3 | Hermes | 18-24 unit + integration tests |
+| 4 | Kif | Documentation + spec archive |
+
+---
+
+# Gateway Detached Process - Consistency Review
+
+**Reviewer:** Nibbler  
+**Date:** 2026-07-28  
+**Commit:** c98559ee  
+
+## Issues Found & Fixed
+
+### P1 - Design spec success criterion incomplete
+**Location:** docs/planning/improvement-gateway-detached-process/design-spec.md  
+**Fix:** Changed - [ ] to - [x] for logging criterion. Feature IS implemented (Serilog writes to ~/.botnexus/logs/).
+
+### P2 - Code comments needed explanatory context
+**Location:** src/gateway/BotNexus.Cli/Services/GatewayProcessManager.cs  
+**Fixes:**
+- Enhanced stale PID cleanup comment with context (crash, reboot scenarios)
+- Expanded PID recycling comment explaining why process name check prevents false positives
+
+## What Was Already Correct ✅
+
+- ✅ XML docs on all public API surface (IGatewayProcessManager, all type definitions)
+- ✅ README accuracy (paths, flags, behavior)
+- ✅ DI registrations correct (singletons for state-bearing services)
+- ✅ Design spec vs implementation alignment
+- ✅ Test completeness (33 new tests, all passing)
+- ✅ Serilog file sink verified (logs persist in detached mode)
+- ✅ Code structure clean (no dead code, no [Obsolete] attributes)
+
+## Summary
+
+**Found:** 2 issues (1 P1, 1 P2)  
+**Fixed:** All 2 issues  
+**Grade:** Excellent  
+**Build:** 0 errors, 46 warnings (pre-existing)  
+
+Feature is **highly consistent** and **ready for use**.

@@ -563,3 +563,14 @@ Comprehensive DDD refactoring spec proposing 9 phases to align codebase with dom
 - Complete design review document with interface contracts
 - Decision file written to `.squad/decisions/inbox/leela-gateway-detached-process.md`
 - 4-wave implementation plan with agent assignments and parallelization notes
+
+
+## Learnings — Sub-Agent Completion Wake Bug (2026-07-22)
+
+1. **InternalChannelAdapter lacks IStreamEventChannelAdapter** — `InternalChannelAdapter.cs` has `SupportsStreaming => true` but doesn't implement `IStreamEventChannelAdapter`. GatewayHost's streaming callback only forwards ContentDelta via `SendStreamDeltaAsync` (which sends `ContentDeltaPayload`), dropping MessageStart/MessageEnd/ToolStart/ToolEnd. The Blazor client expects `AgentStreamEvent` — type mismatch causes silent data loss.
+2. **Race window between follow-up drain and status transition** — Between `AgentLoopRunner:224` (last follow-up drain) and `Agent.RunAsync:535` (status → Idle), IsRunning returns true but the loop won't drain again. FollowUpAsync enqueued during this window is stranded until next user message.
+3. **DispatchAsync is the correct wake mechanism** — `GatewayHost.DispatchAsync` queues messages for serial processing via session-keyed channels. The session queue worker processes them through `ProcessInboundMessageAsync` which handles routing, agent execution, and session persistence. This is the same path user messages take.
+4. **InternalChannelAdapter resolves session's original channel** — Uses `ResolveTargetAdapterAsync` to look up the session's ChannelType and delegate delivery to the actual adapter (SignalR, Telegram, etc.). Falls back to SignalR if session lookup fails. Design is correct; just missing the IStreamEventChannelAdapter interface.
+5. **CronTrigger creates new sessions, not waking existing ones** — Despite the spec suggesting cron "wakes idle sessions," CronTrigger actually creates new ephemeral sessions per run. The only mechanism for waking existing sessions is DispatchAsync.
+6. **Key file paths for sub-agent completion flow:** `DefaultSubAgentManager.OnCompletedAsync:218`, `InternalChannelAdapter.cs`, `GatewayHost.ProcessInboundMessageAsync:199`, `AgentLoopRunner.RunLoopAsync:224`, `Agent.RunAsync:420`.
+7. **Decision: Always use DispatchAsync for completions** — Removing the IsRunning branch simplifies reasoning, eliminates the race, and produces cleaner UX (separate completion turns). Filed to `.squad/decisions/inbox/leela-subagent-completion-wakeup.md`.
