@@ -5,6 +5,7 @@ type: improvement
 priority: high
 status: draft
 created: 2026-04-16
+updated: 2026-07-28
 tags: [configuration, hot-reload, options-pattern, dotnet, platform]
 ---
 
@@ -34,8 +35,8 @@ Configuration changes to `config.json` require a full gateway restart. The .NET 
 | AgentConversationService | `IOptions<GatewayOptions>` | ❌ |
 | DefaultSubAgentManager | `IOptions<GatewayOptions>` | ❌ |
 | DefaultAgentCommunicator | `IOptions<GatewayOptions>` | ❌ |
-| GatewayHost | `IOptions<CompactionOptions>` | ❌ |
-| GatewayHub | `IOptions<CompactionOptions>` | ❌ |
+| GatewayHost | `IOptionsMonitor<CompactionOptions>` | ✅ (fixed) |
+| GatewayHub | Needs verification | ❓ |
 | SessionCleanupService | `IOptions<SessionCleanupOptions>` | ❌ |
 | ApiKeyGatewayAuthHandler | Direct `PlatformConfig` injection | ❌ |
 | Extension loader | Startup-only discovery | ❌ |
