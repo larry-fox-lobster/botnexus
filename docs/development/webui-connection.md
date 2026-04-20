@@ -2,7 +2,7 @@
 
 This document describes the BotNexus WebUI architecture, including the SignalR connection model, multi-session management, and Blazor component structure.
 
-> **Note:** The WebUI is a Blazor Server application at `src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/`. The legacy static JS client at `src/BotNexus.WebUI/` is no longer the primary interface.
+> **Note:** The WebUI is a Blazor Server application at `src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/`.
 
 ## Overview
 

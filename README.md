@@ -297,7 +297,7 @@ src/
 │   └── BotNexus.Extensions.*                # Other tool extensions
 ├── tools/                                   # Built-in tool implementations
 ├── prompts/                                 # Prompt pipeline and templates
-└── BotNexus.WebUI                           # Real-time monitoring UI
+
 poc/                                         # Proof-of-concept projects
 tests/                                       # Unit, integration, and E2E tests
 ```
