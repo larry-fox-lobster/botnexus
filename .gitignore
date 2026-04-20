@@ -60,3 +60,8 @@ auth.json
 # Local config overrides that may contain secrets
 botnexus.local.json
 config.local.json
+*.log
+*.txt
+# Keep tracked .txt files despite the *.txt rule above
+!requirements.txt
+!tests/**/Snapshots/*.txt
