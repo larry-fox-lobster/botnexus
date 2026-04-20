@@ -8,6 +8,8 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <EnableDefaultItems>false</EnableDefaultItems>
     <OutputType>Library</OutputType>
+    <!-- Suppress 'no source files' warning from empty test assemblies -->
+    <NoWarn>$(NoWarn);CS2008</NoWarn>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(SkipTests)' == 'true'">
