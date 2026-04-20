@@ -1,4 +1,3 @@
-using FluentAssertions;
 using BotNexus.Agent.Providers.Core.Compatibility;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Utilities;
@@ -29,7 +28,7 @@ public class MessageConversionWithCompatTests
 
         // When SupportsDeveloperRole is false, the role should be "system"
         var role = compat.SupportsDeveloperRole != false ? "developer" : "system";
-        role.Should().Be("system");
+        role.ShouldBe("system");
     }
 
     [Fact]
@@ -39,7 +38,7 @@ public class MessageConversionWithCompatTests
         var model = MakeModel(compat, reasoning: true);
 
         var role = compat.SupportsDeveloperRole != false ? "developer" : "system";
-        role.Should().Be("developer");
+        role.ShouldBe("developer");
     }
 
     [Fact]
@@ -47,7 +46,7 @@ public class MessageConversionWithCompatTests
     {
         var compat = new OpenAICompletionsCompat { MaxTokensField = "max_tokens" };
 
-        compat.MaxTokensField.Should().Be("max_tokens");
+        compat.MaxTokensField.ShouldBe("max_tokens");
     }
 
     [Fact]
@@ -55,7 +54,7 @@ public class MessageConversionWithCompatTests
     {
         var compat = new OpenAICompletionsCompat();
 
-        compat.MaxTokensField.Should().Be("max_completion_tokens");
+        compat.MaxTokensField.ShouldBe("max_completion_tokens");
     }
 
     [Fact]
@@ -63,7 +62,7 @@ public class MessageConversionWithCompatTests
     {
         var compat = new OpenAICompletionsCompat { RequiresAssistantAfterToolResult = true };
 
-        compat.RequiresAssistantAfterToolResult.Should().BeTrue();
+        compat.RequiresAssistantAfterToolResult.ShouldBeTrue();
 
         // Verify the message transformer preserves tool results correctly
         var toolCall = new ToolCallContent("call_1", "test_tool", new Dictionary<string, object?> { ["arg"] = "val" });
@@ -94,9 +93,9 @@ public class MessageConversionWithCompatTests
         var transformed = MessageTransformer.TransformMessages(messages, model);
 
         // MessageTransformer should preserve the assistant and tool result
-        transformed.OfType<AssistantMessage>().Should().NotBeEmpty();
-        transformed.OfType<ToolResultMessage>().Should().Contain(tr => tr.ToolCallId == "call_1");
-        transformed.OfType<UserMessage>().Should().NotBeEmpty();
+        transformed.OfType<AssistantMessage>().ShouldNotBeEmpty();
+        transformed.OfType<ToolResultMessage>().ShouldContain(tr => tr.ToolCallId == "call_1");
+        transformed.OfType<UserMessage>().ShouldNotBeEmpty();
     }
 
     [Fact]
@@ -104,7 +103,7 @@ public class MessageConversionWithCompatTests
     {
         var compat = new OpenAICompletionsCompat { SupportsStrictMode = false };
 
-        compat.SupportsStrictMode.Should().BeFalse();
+        compat.SupportsStrictMode.ShouldBeFalse();
 
         // When SupportsStrictMode is false, the provider should NOT add strict=true to tool definitions
         // This is verified by checking the compat setting; the provider uses this flag in BuildRequestBody
@@ -115,6 +114,6 @@ public class MessageConversionWithCompatTests
     {
         var compat = new OpenAICompletionsCompat { SupportsStrictMode = true };
 
-        compat.SupportsStrictMode.Should().BeTrue();
+        compat.SupportsStrictMode.ShouldBeTrue();
     }
 }

@@ -40,15 +40,15 @@ public sealed class ChatPanelTests : IDisposable
 
         // Both User and Assistant messages should be rendered
         var messages = cut.FindAll(".message:not(.tool)");
-        messages.Should().HaveCountGreaterThanOrEqualTo(2);
+        messages.Count().ShouldBeGreaterThanOrEqualTo(2);
 
         // User message content is rendered directly (no markdown)
-        cut.Markup.Should().Contain("Hello there!");
+        cut.Markup.ShouldContain("Hello there!");
 
         // Assistant message exists — content goes through JS markdown rendering
         // which returns empty in test (bUnit loose JS mock), but the element exists
         var assistantMsgs = cut.FindAll(".message.assistant");
-        assistantMsgs.Should().NotBeEmpty();
+        assistantMsgs.ShouldNotBeEmpty();
     }
 
     [Fact]
@@ -63,8 +63,8 @@ public sealed class ChatPanelTests : IDisposable
         var cut = RenderChatPanel(state);
 
         var roles = cut.FindAll(".message-role");
-        roles.Should().Contain(r => r.TextContent == "User");
-        roles.Should().Contain(r => r.TextContent == "Assistant");
+        roles.ShouldContain(r => r.TextContent == "User");
+        roles.ShouldContain(r => r.TextContent == "Assistant");
     }
 
     [Fact]
@@ -76,9 +76,9 @@ public sealed class ChatPanelTests : IDisposable
         var cut = RenderChatPanel(state);
 
         var timeElements = cut.FindAll(".message-time");
-        timeElements.Should().NotBeEmpty();
+        timeElements.ShouldNotBeEmpty();
         // Timestamp should not be empty
-        timeElements[0].TextContent.Should().NotBeNullOrWhiteSpace();
+        timeElements[0].TextContent.ShouldNotBeNullOrWhiteSpace();
     }
 
     // ── Streaming indicator ──────────────────────────────────────────────
@@ -91,7 +91,7 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.Find(".streaming-badge").TextContent.Should().Contain("Streaming");
+        cut.Find(".streaming-badge").TextContent.ShouldContain("Streaming");
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.Find(".streaming-indicator").TextContent.Should().Contain("●");
+        cut.Find(".streaming-indicator").TextContent.ShouldContain("●");
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public sealed class ChatPanelTests : IDisposable
         var cut = RenderChatPanel(state);
 
         cut.Find(".message.assistant.streaming .message-content")
-            .TextContent.Should().Contain("The answer is 42");
+            .TextContent.ShouldContain("The answer is 42");
     }
 
     [Fact]
@@ -124,8 +124,8 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.FindAll(".streaming-badge").Should().BeEmpty();
-        cut.FindAll(".streaming-indicator").Should().BeEmpty();
+        cut.FindAll(".streaming-badge").ShouldBeEmpty();
+        cut.FindAll(".streaming-indicator").ShouldBeEmpty();
     }
 
     // ── Tool calls ───────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.Find(".tool-name").TextContent.Should().Contain("search_code");
+        cut.Find(".tool-name").TextContent.ShouldContain("search_code");
     }
 
     [Fact]
@@ -149,8 +149,8 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.FindAll(".tool-details").Should().BeEmpty();
-        cut.Find(".tool-expand").TextContent.Should().Contain("▸");
+        cut.FindAll(".tool-details").ShouldBeEmpty();
+        cut.Find(".tool-expand").TextContent.ShouldContain("▸");
     }
 
     [Fact]
@@ -166,10 +166,10 @@ public sealed class ChatPanelTests : IDisposable
         // Click to expand
         cut.Find(".tool-header").Click();
 
-        cut.Find(".tool-details").Should().NotBeNull();
-        cut.Find(".tool-expand").TextContent.Should().Contain("▾");
-        cut.Markup.Should().Contain("Arguments");
-        cut.Markup.Should().Contain("Result");
+        cut.Find(".tool-details").ShouldNotBeNull();
+        cut.Find(".tool-expand").TextContent.ShouldContain("▾");
+        cut.Markup.ShouldContain("Arguments");
+        cut.Markup.ShouldContain("Result");
     }
 
     [Fact]
@@ -182,11 +182,11 @@ public sealed class ChatPanelTests : IDisposable
 
         // Expand
         cut.Find(".tool-header").Click();
-        cut.FindAll(".tool-details").Should().NotBeEmpty();
+        cut.FindAll(".tool-details").ShouldNotBeEmpty();
 
         // Collapse
         cut.Find(".tool-header").Click();
-        cut.FindAll(".tool-details").Should().BeEmpty();
+        cut.FindAll(".tool-details").ShouldBeEmpty();
     }
 
     [Fact]
@@ -197,7 +197,7 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.Find(".tool-duration").TextContent.Should().Contain("1.5s");
+        cut.Find(".tool-duration").TextContent.ShouldContain("1.5s");
     }
 
     [Fact]
@@ -208,7 +208,7 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.Find(".tool-duration").TextContent.Should().Contain("350ms");
+        cut.Find(".tool-duration").TextContent.ShouldContain("350ms");
     }
 
     [Fact]
@@ -219,7 +219,7 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.Find(".tool-icon").TextContent.Should().Contain("⏳");
+        cut.Find(".tool-icon").TextContent.ShouldContain("⏳");
     }
 
     [Fact]
@@ -230,8 +230,8 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.Find(".message.tool.tool-error").Should().NotBeNull();
-        cut.Find(".tool-icon").TextContent.Should().Contain("❌");
+        cut.Find(".message.tool.tool-error").ShouldNotBeNull();
+        cut.Find(".tool-icon").TextContent.ShouldContain("❌");
     }
 
     // ── Send button ──────────────────────────────────────────────────────
@@ -244,7 +244,7 @@ public sealed class ChatPanelTests : IDisposable
         var cut = RenderChatPanel(state);
 
         var sendBtn = cut.Find(".send-btn");
-        sendBtn.HasAttribute("disabled").Should().BeTrue();
+        sendBtn.HasAttribute("disabled").ShouldBeTrue();
     }
 
     [Fact]
@@ -255,7 +255,7 @@ public sealed class ChatPanelTests : IDisposable
         var cut = RenderChatPanel(state);
 
         var sendBtn = cut.Find(".send-btn");
-        sendBtn.HasAttribute("disabled").Should().BeTrue();
+        sendBtn.HasAttribute("disabled").ShouldBeTrue();
     }
 
     [Fact]
@@ -266,7 +266,7 @@ public sealed class ChatPanelTests : IDisposable
         var cut = RenderChatPanel(state);
 
         var textarea = cut.Find(".chat-input");
-        textarea.HasAttribute("disabled").Should().BeTrue();
+        textarea.HasAttribute("disabled").ShouldBeTrue();
     }
 
     // ── Streaming mode buttons ───────────────────────────────────────────
@@ -278,9 +278,9 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.FindAll(".steer-btn").Should().NotBeEmpty();
-        cut.FindAll(".abort-btn").Should().NotBeEmpty();
-        cut.FindAll(".send-btn").Should().BeEmpty();
+        cut.FindAll(".steer-btn").ShouldNotBeEmpty();
+        cut.FindAll(".abort-btn").ShouldNotBeEmpty();
+        cut.FindAll(".send-btn").ShouldBeEmpty();
     }
 
     [Fact]
@@ -290,9 +290,9 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.FindAll(".send-btn").Should().NotBeEmpty();
-        cut.FindAll(".steer-btn").Should().BeEmpty();
-        cut.FindAll(".abort-btn").Should().BeEmpty();
+        cut.FindAll(".send-btn").ShouldNotBeEmpty();
+        cut.FindAll(".steer-btn").ShouldBeEmpty();
+        cut.FindAll(".abort-btn").ShouldBeEmpty();
     }
 
     // ── Header ───────────────────────────────────────────────────────────
@@ -304,7 +304,7 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.Find(".chat-header h3").TextContent.Should().Contain("Nova Assistant");
+        cut.Find(".chat-header h3").TextContent.ShouldContain("Nova Assistant");
     }
 
     [Fact]
@@ -314,7 +314,7 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.Find(".agent-id-label").TextContent.Should().Contain("nova-v2");
+        cut.Find(".agent-id-label").TextContent.ShouldContain("nova-v2");
     }
 
     // ── Loading history ──────────────────────────────────────────────────
@@ -327,8 +327,8 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.Find(".history-loading").Should().NotBeNull();
-        cut.Markup.Should().Contain("Loading history");
+        cut.Find(".history-loading").ShouldNotBeNull();
+        cut.Markup.ShouldContain("Loading history");
     }
 
     [Fact]
@@ -339,7 +339,7 @@ public sealed class ChatPanelTests : IDisposable
 
         var cut = RenderChatPanel(state);
 
-        cut.FindAll(".history-loading").Should().BeEmpty();
+        cut.FindAll(".history-loading").ShouldBeEmpty();
     }
 
     // ── Placeholder text ─────────────────────────────────────────────────
@@ -352,7 +352,7 @@ public sealed class ChatPanelTests : IDisposable
         var cut = RenderChatPanel(state);
 
         var textarea = cut.Find(".chat-input");
-        textarea.GetAttribute("placeholder").Should().Contain("steer");
+        textarea.GetAttribute("placeholder").ShouldContain("steer");
     }
 
     [Fact]
@@ -363,7 +363,7 @@ public sealed class ChatPanelTests : IDisposable
         var cut = RenderChatPanel(state);
 
         var textarea = cut.Find(".chat-input");
-        textarea.GetAttribute("placeholder").Should().Contain("Type a message");
+        textarea.GetAttribute("placeholder").ShouldContain("Type a message");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

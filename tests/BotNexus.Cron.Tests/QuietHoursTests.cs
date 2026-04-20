@@ -3,7 +3,6 @@ using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Triggers;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 
@@ -37,7 +36,7 @@ public sealed class QuietHoursTests
         await action.ExecuteAsync(context);
 
         trigger.Verify(value => value.CreateSessionAsync(It.IsAny<AgentId>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-        context.SessionId.Should().BeNull();
+        context.SessionId.ShouldBeNull();
     }
 
     [Fact]
@@ -69,7 +68,7 @@ public sealed class QuietHoursTests
         await action.ExecuteAsync(context);
 
         trigger.Verify(value => value.CreateSessionAsync(AgentId.From("agent-a"), "Ping from heartbeat", It.IsAny<CancellationToken>()), Times.Once);
-        context.SessionId.Should().Be(sessionId.Value);
+        context.SessionId.ShouldBe(sessionId.Value);
     }
 
     private static CronExecutionContext CreateHeartbeatContext(IServiceProvider services)

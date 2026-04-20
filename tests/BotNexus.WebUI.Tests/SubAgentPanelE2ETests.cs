@@ -1,5 +1,4 @@
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 using Microsoft.Playwright;
 using System.Net.Http.Json;
 

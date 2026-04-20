@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Abstractions.Extensions;
 using BotNexus.Gateway.Api.Controllers;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 
@@ -19,8 +18,8 @@ public sealed class ExtensionsControllerTests
         var result = controller.List();
 
         var payload = (result.Result as OkObjectResult)?.Value as IReadOnlyList<ExtensionResponse>;
-        payload.Should().NotBeNull();
-        payload.Should().BeEmpty();
+        payload.ShouldNotBeNull();
+        payload.ShouldBeEmpty();
     }
 
     [Fact]
@@ -42,9 +41,9 @@ public sealed class ExtensionsControllerTests
         var result = controller.List();
 
         var payload = (result.Result as OkObjectResult)?.Value as IReadOnlyList<ExtensionResponse>;
-        payload.Should().NotBeNull();
-        payload!.Should().ContainSingle();
-        payload[0].Should().BeEquivalentTo(
+        payload.ShouldNotBeNull();
+        payload!.ShouldHaveSingleItem();
+        payload[0].ShouldBe(
             new ExtensionResponse("Extension A", "1.2.3", "channel", "ExtensionA.dll"));
     }
 
@@ -67,13 +66,13 @@ public sealed class ExtensionsControllerTests
         var result = controller.List();
 
         var payload = (result.Result as OkObjectResult)?.Value as IReadOnlyList<ExtensionResponse>;
-        payload.Should().NotBeNull();
-        payload!.Should().HaveCount(2);
-        payload.Should().BeEquivalentTo(
-        [
+        payload.ShouldNotBeNull();
+        payload!.Count().ShouldBe(2);
+        payload.ShouldBe(new[]
+        {
             new ExtensionResponse("Extension A", "1.2.3", "channel", "ExtensionA.dll"),
             new ExtensionResponse("Extension A", "1.2.3", "router", "ExtensionA.dll")
-        ]);
+        });
     }
 
     [Fact]
@@ -101,9 +100,9 @@ public sealed class ExtensionsControllerTests
         var result = controller.List();
 
         var payload = (result.Result as OkObjectResult)?.Value as IReadOnlyList<ExtensionResponse>;
-        payload.Should().NotBeNull();
-        payload!.Should().HaveCount(2);
-        payload.Select(item => item.Name).Should().ContainInOrder("Extension A", "Extension B");
+        payload.ShouldNotBeNull();
+        payload!.Count().ShouldBe(2);
+        payload.Select(item => item.Name).ToList().ShouldBe(new[] { "Extension A", "Extension B" });
     }
 
     [Fact]
@@ -125,9 +124,9 @@ public sealed class ExtensionsControllerTests
         var result = controller.List();
 
         var payload = (result.Result as OkObjectResult)?.Value as IReadOnlyList<ExtensionResponse>;
-        payload.Should().NotBeNull();
-        payload!.Should().ContainSingle();
-        payload[0].Type.Should().Be("unknown");
+        payload.ShouldNotBeNull();
+        payload!.ShouldHaveSingleItem();
+        payload[0].Type.ShouldBe("unknown");
     }
 
     [Fact]
@@ -148,10 +147,10 @@ public sealed class ExtensionsControllerTests
 
         var result = controller.List();
 
-        result.Result.Should().BeOfType<OkObjectResult>();
+        result.Result.ShouldBeOfType<OkObjectResult>();
         var ok = (OkObjectResult)result.Result!;
-        ok.Value.Should().BeAssignableTo<IReadOnlyList<ExtensionResponse>>();
-        ((IReadOnlyList<ExtensionResponse>)ok.Value!).Should().OnlyContain(item => item is ExtensionResponse);
+        ok.Value.ShouldBeAssignableTo<IReadOnlyList<ExtensionResponse>>();
+        ((IReadOnlyList<ExtensionResponse>)ok.Value!).ShouldAllBe(item => item is ExtensionResponse);
     }
 
     private static LoadedExtension CreateLoadedExtension(

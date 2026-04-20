@@ -1,6 +1,5 @@
 using System.Text;
 using BotNexus.CodingAgent.Utils;
-using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.CodingAgent.Tests.Utils;
@@ -22,7 +21,7 @@ public sealed class ContextFileDiscoveryTests
 
         var discovered = await ContextFileDiscovery.DiscoverAsync(_fileSystem, workingDirectory, CancellationToken.None);
 
-        discovered.Should().Contain(file => file.Content.Contains("parent instructions", StringComparison.Ordinal));
+        discovered.ShouldContain(file => file.Content.Contains("parent instructions", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -36,7 +35,7 @@ public sealed class ContextFileDiscoveryTests
 
         var discovered = await ContextFileDiscovery.DiscoverAsync(_fileSystem, workingDirectory, CancellationToken.None);
 
-        discovered.Should().Contain(file => file.Content.Contains("runtime instructions", StringComparison.Ordinal));
+        discovered.ShouldContain(file => file.Content.Contains("runtime instructions", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -54,8 +53,8 @@ public sealed class ContextFileDiscoveryTests
 
         var discovered = await ContextFileDiscovery.DiscoverAsync(_fileSystem, workingDirectory, CancellationToken.None);
 
-        discovered.Should().Contain(file => file.Content.Contains("repo instructions", StringComparison.Ordinal));
-        discovered.Should().NotContain(file => file.Content.Contains("outside instructions", StringComparison.Ordinal));
+        discovered.ShouldContain(file => file.Content.Contains("repo instructions", StringComparison.Ordinal));
+        discovered.ShouldNotContain(file => file.Content.Contains("outside instructions", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -71,8 +70,8 @@ public sealed class ContextFileDiscoveryTests
         var discovered = await ContextFileDiscovery.DiscoverAsync(_fileSystem, child, CancellationToken.None);
         var agentsFiles = discovered.Where(file => file.Path.EndsWith("AGENTS.md", StringComparison.OrdinalIgnoreCase)).ToList();
 
-        agentsFiles.Should().ContainSingle();
-        agentsFiles[0].Content.Should().Be("child");
+        agentsFiles.ShouldHaveSingleItem();
+        agentsFiles[0].Content.ShouldBe("child");
     }
 
     [Fact]
@@ -87,7 +86,7 @@ public sealed class ContextFileDiscoveryTests
 
         var discovered = await ContextFileDiscovery.DiscoverAsync(_fileSystem, workingDirectory, CancellationToken.None, ".custom-agent");
 
-        discovered.Should().Contain(file => file.Content.Contains("custom agent instructions", StringComparison.Ordinal));
+        discovered.ShouldContain(file => file.Content.Contains("custom agent instructions", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -104,6 +103,6 @@ public sealed class ContextFileDiscoveryTests
         var discovered = await ContextFileDiscovery.DiscoverAsync(_fileSystem, workingDirectory, CancellationToken.None);
         var totalBytes = discovered.Sum(file => Encoding.UTF8.GetByteCount(file.Content));
 
-        totalBytes.Should().BeLessThanOrEqualTo(16 * 1024);
+        totalBytes.ShouldBeLessThanOrEqualTo(16 * 1024);
     }
 }

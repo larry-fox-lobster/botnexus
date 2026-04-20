@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -19,9 +18,9 @@ public sealed class SqliteSessionStoreTests
         await store.SaveAsync(session);
         var reloaded = await fixture.CreateStore().GetAsync("s1");
 
-        reloaded.Should().NotBeNull();
-        reloaded!.SessionId.Should().Be("s1");
-        reloaded.AgentId.Should().Be("agent-a");
+        reloaded.ShouldNotBeNull();
+        reloaded!.SessionId.Value.ShouldBe("s1");
+        reloaded.AgentId.Value.ShouldBe("agent-a");
     }
 
     [Fact]
@@ -31,7 +30,7 @@ public sealed class SqliteSessionStoreTests
 
         var missing = await fixture.CreateStore().GetAsync("missing");
 
-        missing.Should().BeNull();
+        missing.ShouldBeNull();
     }
 
     [Fact]
@@ -46,9 +45,9 @@ public sealed class SqliteSessionStoreTests
         await store.SaveAsync(session);
         var reloaded = await fixture.CreateStore().GetAsync("s1");
 
-        reloaded.Should().NotBeNull();
-        reloaded!.History.Should().ContainSingle(e => e.Content == "hello");
-        reloaded.Metadata.Should().ContainKey("tenant");
+        reloaded.ShouldNotBeNull();
+        reloaded!.History.Where(e => e.Content == "hello").ShouldHaveSingleItem();
+        reloaded.Metadata.ShouldContainKey("tenant");
     }
 
     [Fact]
@@ -68,14 +67,14 @@ public sealed class SqliteSessionStoreTests
         await store.SaveAsync(session);
 
         var reloaded = await fixture.CreateStore().GetAsync("s1");
-        reloaded.Should().NotBeNull();
-        reloaded!.Status.Should().Be(SessionStatus.Suspended);
-        reloaded.ChannelType.Should().Be(ChannelKey.From("signalr"));
-        reloaded.CallerId.Should().Be("caller-a");
-        reloaded.Metadata.Should().ContainKey("version");
-        reloaded.Metadata["version"]!.ToString().Should().Be("2");
-        reloaded.Metadata.Should().ContainKey("theme");
-        reloaded.Metadata["theme"]!.ToString().Should().Be("dark");
+        reloaded.ShouldNotBeNull();
+        reloaded!.Status.ShouldBe(SessionStatus.Suspended);
+        reloaded.ChannelType.ShouldBe(ChannelKey.From("signalr"));
+        reloaded.CallerId.ShouldBe("caller-a");
+        reloaded.Metadata.ShouldContainKey("version");
+        reloaded.Metadata["version"]!.ToString().ShouldBe("2");
+        reloaded.Metadata.ShouldContainKey("theme");
+        reloaded.Metadata["theme"]!.ToString().ShouldBe("dark");
     }
 
     [Fact]
@@ -94,9 +93,9 @@ public sealed class SqliteSessionStoreTests
         await store.SaveAsync(session);
 
         var reloaded = await fixture.CreateStore().GetAsync("s1");
-        reloaded.Should().NotBeNull();
+        reloaded.ShouldNotBeNull();
         reloaded!.GetHistorySnapshot().Select(entry => entry.Content)
-            .Should().ContainInOrder("boot", "hello", "world");
+            .ToList().ShouldBe(new[] { "boot", "hello", "world" });
     }
 
     [Fact]
@@ -109,7 +108,7 @@ public sealed class SqliteSessionStoreTests
 
         await store.DeleteAsync("s1");
 
-        (await fixture.CreateStore().GetAsync("s1")).Should().BeNull();
+        (await fixture.CreateStore().GetAsync("s1")).ShouldBeNull();
     }
 
     [Fact]
@@ -128,7 +127,7 @@ public sealed class SqliteSessionStoreTests
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT COUNT(*) FROM session_history WHERE session_id = 's1'";
         var count = (long)(await command.ExecuteScalarAsync() ?? 0L);
-        count.Should().Be(0);
+        count.ShouldBe(0);
     }
 
     [Fact]
@@ -146,7 +145,7 @@ public sealed class SqliteSessionStoreTests
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT status FROM sessions WHERE id = 's1'";
         var status = (string?)await command.ExecuteScalarAsync();
-        status.Should().Be(SessionStatus.Sealed.ToString());
+        status.ShouldBe(SessionStatus.Sealed.ToString());
     }
 
     [Fact]
@@ -160,7 +159,7 @@ public sealed class SqliteSessionStoreTests
 
         var sessions = await store.ListAsync();
 
-        sessions.Select(s => s.SessionId.Value).Should().BeEquivalentTo("s1", "s2", "s3");
+        sessions.Select(s => s.SessionId.Value).OrderBy(id => id).ShouldBe(new[] { "s1", "s2", "s3" });
     }
 
     [Fact]
@@ -175,8 +174,8 @@ public sealed class SqliteSessionStoreTests
         var allSessions = await store.ListAsync();
         var filtered = await store.ListAsync("agent-a");
 
-        allSessions.Should().HaveCount(3);
-        filtered.Should().OnlyContain(s => s.AgentId == "agent-a");
+        allSessions.Count().ShouldBe(3);
+        filtered.ShouldAllBe(s => s.AgentId == "agent-a");
     }
 
     [Fact]
@@ -212,7 +211,7 @@ public sealed class SqliteSessionStoreTests
 
         var sessions = await store.ListByChannelAsync("agent-a", ChannelKey.From("web chat"));
 
-        sessions.Select(s => s.SessionId).Should().Equal("s-new", "s-old");
+        sessions.Select(s => s.SessionId.Value).ShouldBe(new[] { "s-new", "s-old" }, ignoreOrder: false);
     }
 
     [Fact]
@@ -234,9 +233,9 @@ public sealed class SqliteSessionStoreTests
 
         var reloaded = await Task.WhenAll(operations);
 
-        reloaded.Should().OnlyContain(session => session != null);
-        reloaded.Select(session => session!.SessionId).Should().OnlyHaveUniqueItems();
-        reloaded.Should().OnlyContain(session => session!.History.Count == 1);
+        reloaded.ShouldAllBe(session => session != null);
+        reloaded.Select(session => session!.SessionId).ShouldBeUnique();
+        reloaded.ShouldAllBe(session => session!.History.Count == 1);
     }
 
     [Fact]
@@ -245,12 +244,12 @@ public sealed class SqliteSessionStoreTests
         using var fixture = new StoreFixture();
         var store = fixture.CreateStore();
 
-        File.Exists(fixture.DatabasePath).Should().BeFalse();
+        File.Exists(fixture.DatabasePath).ShouldBeFalse();
 
         var session = await store.GetOrCreateAsync("s1", "agent-a");
         await store.SaveAsync(session);
 
-        File.Exists(fixture.DatabasePath).Should().BeTrue();
+        File.Exists(fixture.DatabasePath).ShouldBeTrue();
 
         await using var connection = new SqliteConnection(fixture.ConnectionString);
         await connection.OpenAsync();
@@ -267,7 +266,7 @@ public sealed class SqliteSessionStoreTests
         while (await reader.ReadAsync())
             tables.Add(reader.GetString(0));
 
-        tables.Should().Equal("session_history", "sessions");
+        tables.ShouldBe(new[] { "session_history", "sessions" }, ignoreOrder: false);
 
         await using var columnCommand = connection.CreateCommand();
         columnCommand.CommandText = "PRAGMA table_info(session_history)";
@@ -276,7 +275,7 @@ public sealed class SqliteSessionStoreTests
         while (await columnReader.ReadAsync())
             columns.Add(columnReader.GetString(1));
 
-        columns.Should().Contain("is_compaction_summary");
+        columns.ShouldContain("is_compaction_summary");
     }
 
     [Fact]
@@ -326,7 +325,7 @@ public sealed class SqliteSessionStoreTests
         while (await columnReader.ReadAsync())
             columns.Add(columnReader.GetString(1));
 
-        columns.Should().Contain("is_compaction_summary");
+        columns.ShouldContain("is_compaction_summary");
     }
 
     [Fact]
@@ -363,7 +362,7 @@ public sealed class SqliteSessionStoreTests
                 Limit = 10
             });
 
-        sessions.Select(session => session.SessionId.Value).Should().Equal("participant");
+        sessions.Select(session => session.SessionId.Value).ShouldHaveSingleItem().ShouldBe("participant");
     }
 
     private static async Task CreateAndSaveAsync(SqliteSessionStore store, string sessionId, string agentId)

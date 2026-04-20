@@ -1,6 +1,5 @@
 using System.Text;
 using BotNexus.Memory.Tests.TestInfrastructure;
-using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using System.IO.Abstractions;
 
@@ -32,8 +31,19 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
         await context.Store.InsertAsync(expected);
         var actual = await context.Store.GetByIdAsync("full-1");
 
-        actual.Should().NotBeNull();
-        actual!.Should().BeEquivalentTo(expected);
+        actual.ShouldNotBeNull();
+        actual!.Id.ShouldBe(expected.Id);
+        actual.AgentId.ShouldBe(expected.AgentId);
+        actual.SessionId.ShouldBe(expected.SessionId);
+        actual.TurnIndex.ShouldBe(expected.TurnIndex);
+        actual.SourceType.ShouldBe(expected.SourceType);
+        actual.Content.ShouldBe(expected.Content);
+        actual.MetadataJson.ShouldBe(expected.MetadataJson);
+        actual.Embedding.ShouldBe(expected.Embedding);
+        actual.CreatedAt.ShouldBe(expected.CreatedAt);
+        actual.UpdatedAt.ShouldBe(expected.UpdatedAt);
+        actual.ExpiresAt.ShouldBe(expected.ExpiresAt);
+        actual.IsArchived.ShouldBe(expected.IsArchived);
     }
 
     [Fact]
@@ -48,8 +58,8 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
             "filtertoken",
             filter: new MemorySearchFilter { SessionId = "session-1", Tags = ["billing", "prod"] });
 
-        results.Should().ContainSingle();
-        results[0].Id.Should().Be("entry-1");
+        results.ShouldHaveSingleItem();
+        results[0].Id.ShouldBe("entry-1");
     }
 
     [Fact]
@@ -70,7 +80,7 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
                 BeforeDate = now.AddHours(-1)
             });
 
-        results.Should().ContainSingle(entry => entry.Id == "middle");
+        results.ShouldHaveSingleItem().Id.ShouldBe("middle");
     }
 
     [Fact]
@@ -81,7 +91,7 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
 
         await context.Store.DeleteAsync("delete-me");
 
-        (await context.Store.GetByIdAsync("delete-me")).Should().BeNull();
+        (await context.Store.GetByIdAsync("delete-me")).ShouldBeNull();
     }
 
     [Fact]
@@ -91,7 +101,7 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
 
         var act = () => context.Store.DeleteAsync("missing-id");
 
-        await act.Should().NotThrowAsync();
+        await act.ShouldNotThrowAsync();
     }
 
     [Fact]
@@ -103,10 +113,10 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
         var stats = await context.Store.GetStatsAsync();
         var get = await context.Store.GetByIdAsync("none");
 
-        search.Should().BeEmpty();
-        stats.EntryCount.Should().Be(0);
-        stats.LastIndexedAt.Should().BeNull();
-        get.Should().BeNull();
+        search.ShouldBeEmpty();
+        stats.EntryCount.ShouldBe(0);
+        stats.LastIndexedAt.ShouldBeNull();
+        get.ShouldBeNull();
     }
 
     [Fact]
@@ -118,7 +128,7 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
 
         var results = await context.Store.SearchAsync("special token sql quote double paren plus minus");
 
-        results.Should().ContainSingle(entry => entry.Id == "special");
+        results.ShouldHaveSingleItem().Id.ShouldBe("special");
     }
 
     [Fact]
@@ -131,8 +141,8 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
         var results = await context.Store.SearchAsync("""token' OR 1=1; DROP TABLE memories; --""");
         var stats = await context.Store.GetStatsAsync();
 
-        results.Should().BeEmpty();
-        stats.EntryCount.Should().Be(1);
+        results.ShouldBeEmpty();
+        stats.EntryCount.ShouldBe(1);
     }
 
     [Fact]
@@ -146,7 +156,7 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
             "tagged-token",
             filter: new MemorySearchFilter { Tags = ["safe' OR 1=1 --"] });
 
-        results.Should().BeEmpty();
+        results.ShouldBeEmpty();
     }
 
     [Fact]
@@ -158,7 +168,7 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
 
         var results = await context.Store.SearchAsync("long token");
 
-        results.Should().Contain(entry => entry.Id == "long-content");
+        results.ShouldContain(entry => entry.Id == "long-content");
     }
 
     [Fact]
@@ -174,7 +184,7 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
             .Select(_ => context.Store.SearchAsync("batch token", topK: 10));
         var results = await Task.WhenAll(readTasks);
 
-        results.Should().OnlyContain(set => set.Count > 0);
+        results.ShouldAllBe(set => set.Count > 0);
     }
 
     [Fact]
@@ -192,7 +202,7 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
         {
             await reopened.InitializeAsync();
             var loaded = await reopened.GetByIdAsync("persisted-1");
-            loaded.Should().NotBeNull();
+            loaded.ShouldNotBeNull();
         }
 
         SqliteConnection.ClearAllPools();
@@ -209,8 +219,8 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
 
         var loaded = await context.Store.GetByIdAsync("unicode-1");
 
-        loaded.Should().NotBeNull();
-        loaded!.Content.Should().Be(unicode);
+        loaded.ShouldNotBeNull();
+        loaded!.Content.ShouldBe(unicode);
     }
 
     [Fact]
@@ -223,7 +233,7 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
             await context.Store.InsertAsync(MemoryStoreTestContext.CreateEntry($"bulk-{i}", "agent-a", $"bulk token {i}"));
 
         var stats = await context.Store.GetStatsAsync();
-        stats.EntryCount.Should().Be(200);
+        stats.EntryCount.ShouldBe(200);
     }
 
     [Fact]
@@ -235,7 +245,7 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
 
         var results = await context.Store.SearchAsync("topk clamp token", topK: 500);
 
-        results.Count.Should().BeLessThanOrEqualTo(100);
+        results.Count.ShouldBeLessThanOrEqualTo(100);
     }
 
     [Fact]
@@ -247,7 +257,7 @@ public sealed class SqliteMemoryStoreExtendedTests : IDisposable
 
         var results = await context.Store.SearchAsync("archive token", topK: 10);
 
-        results.Should().ContainSingle(entry => entry.Id == "live");
+        results.ShouldHaveSingleItem().Id.ShouldBe("live");
     }
 
     public void Dispose()

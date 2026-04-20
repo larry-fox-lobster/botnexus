@@ -15,7 +15,6 @@ using BotNexus.Tools;
 using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Abstractions;
@@ -35,7 +34,7 @@ public sealed class InProcessIsolationStrategyTests
             CreateDescriptor(),
             new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1") });
 
-        handle.Should().NotBeNull();
+        handle.ShouldNotBeNull();
     }
 
     [Fact]
@@ -53,11 +52,11 @@ public sealed class InProcessIsolationStrategyTests
             new ServiceCollection().BuildServiceProvider(),
             NullLogger<InProcessIsolationStrategy>.Instance);
 
-        var act = () => strategy.CreateAsync(
+        Func<Task> act = () => strategy.CreateAsync(
             CreateDescriptor(modelId: "missing-model"),
             new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1") });
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.ShouldThrowAsync<InvalidOperationException>();
     }
 
     [Fact]
@@ -69,8 +68,8 @@ public sealed class InProcessIsolationStrategyTests
             CreateDescriptor(),
             new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-123") });
 
-        handle.AgentId.Should().Be("agent-a");
-        handle.SessionId.Should().Be("session-123");
+        handle.AgentId.Value.ShouldBe("agent-a");
+        handle.SessionId.Value.ShouldBe("session-123");
     }
 
     [Fact]
@@ -78,7 +77,7 @@ public sealed class InProcessIsolationStrategyTests
     {
         var strategy = CreateStrategyWithRegisteredModel();
 
-        strategy.Name.Should().Be("in-process");
+        strategy.Name.ShouldBe("in-process");
     }
 
     [Fact]
@@ -108,9 +107,9 @@ public sealed class InProcessIsolationStrategyTests
 
         // Tool and system entries are filtered out to prevent orphaned tool results
         // from causing LLM provider rejection.
-        messages.Should().HaveCount(2);
-        messages[0].Should().BeEquivalentTo(new AgentCoreUserMessage("hi"));
-        messages[1].Should().BeEquivalentTo(new AssistantAgentMessage("hello"));
+        messages.Count().ShouldBe(2);
+        messages[0].ShouldBe(new AgentCoreUserMessage("hi"));
+        messages[1].ShouldBe(new AssistantAgentMessage("hello"));
     }
 
     [Fact]
@@ -148,12 +147,12 @@ public sealed class InProcessIsolationStrategyTests
         var handle = await strategy.CreateAsync(CreateDescriptor(), context);
         var messages = GetMessages(handle);
 
-        messages.Should().HaveCount(5);
-        messages[0].Should().BeEquivalentTo(new AgentCoreUserMessage("search for cats"));
-        messages[1].Should().BeEquivalentTo(new AssistantAgentMessage("I'll search for that."));
-        messages[2].Should().BeEquivalentTo(new AssistantAgentMessage("Here are the results."));
-        messages[3].Should().BeEquivalentTo(new AgentCoreUserMessage("thanks"));
-        messages[4].Should().BeEquivalentTo(new AssistantAgentMessage("You're welcome!"));
+        messages.Count().ShouldBe(5);
+        messages[0].ShouldBe(new AgentCoreUserMessage("search for cats"));
+        messages[1].ShouldBe(new AssistantAgentMessage("I'll search for that."));
+        messages[2].ShouldBe(new AssistantAgentMessage("Here are the results."));
+        messages[3].ShouldBe(new AgentCoreUserMessage("thanks"));
+        messages[4].ShouldBe(new AssistantAgentMessage("You're welcome!"));
     }
 
     private static InProcessIsolationStrategy CreateStrategyWithRegisteredModel()
@@ -197,9 +196,9 @@ public sealed class InProcessIsolationStrategyTests
     private static IReadOnlyList<AgentMessage> GetMessages(IAgentHandle handle)
     {
         var agentField = handle.GetType().GetField("_agent", BindingFlags.Instance | BindingFlags.NonPublic);
-        agentField.Should().NotBeNull();
+        agentField.ShouldNotBeNull();
         var agent = agentField!.GetValue(handle) as BotNexus.Agent.Core.Agent;
-        agent.Should().NotBeNull();
+        agent.ShouldNotBeNull();
         return agent!.State.Messages;
     }
 

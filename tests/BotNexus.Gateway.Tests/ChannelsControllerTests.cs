@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Api.Controllers;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 
@@ -16,8 +15,8 @@ public sealed class ChannelsControllerTests
         var result = controller.List();
 
         var payload = (result.Result as OkObjectResult)?.Value as IReadOnlyList<ChannelAdapterResponse>;
-        payload.Should().NotBeNull();
-        payload.Should().BeEmpty();
+        payload.ShouldNotBeNull();
+        payload.ShouldBeEmpty();
     }
 
     [Fact]
@@ -36,9 +35,9 @@ public sealed class ChannelsControllerTests
         var result = controller.List();
 
         var payload = (result.Result as OkObjectResult)?.Value as IReadOnlyList<ChannelAdapterResponse>;
-        payload.Should().NotBeNull();
-        payload!.Should().ContainSingle();
-        payload[0].Should().BeEquivalentTo(new ChannelAdapterResponse(
+        payload.ShouldNotBeNull();
+        payload!.ShouldHaveSingleItem();
+        payload[0].ShouldBe(new ChannelAdapterResponse(
             Name: "signalr",
             DisplayName: "SignalR",
             IsRunning: true,
@@ -59,9 +58,9 @@ public sealed class ChannelsControllerTests
         var result = controller.List();
 
         var payload = (result.Result as OkObjectResult)?.Value as IReadOnlyList<ChannelAdapterResponse>;
-        payload.Should().NotBeNull();
-        payload!.Should().HaveCount(2);
-        payload.Select(item => item.Name).Should().ContainInOrder("signalr", "telegram");
+        payload.ShouldNotBeNull();
+        payload!.Count().ShouldBe(2);
+        payload.Select(item => item.Name).ToList().ShouldBe(new[] { "signalr", "telegram" });
     }
 
     [Theory]
@@ -89,8 +88,8 @@ public sealed class ChannelsControllerTests
         var result = controller.List();
 
         var payload = (result.Result as OkObjectResult)?.Value as IReadOnlyList<ChannelAdapterResponse>;
-        payload.Should().NotBeNull();
-        payload![0].Should().BeEquivalentTo(new ChannelAdapterResponse(
+        payload.ShouldNotBeNull();
+        payload![0].ShouldBe(new ChannelAdapterResponse(
             Name: "adapter",
             DisplayName: "Adapter",
             IsRunning: true,
@@ -116,10 +115,10 @@ public sealed class ChannelsControllerTests
 
         var result = controller.List();
 
-        result.Result.Should().BeOfType<OkObjectResult>();
+        result.Result.ShouldBeOfType<OkObjectResult>();
         var ok = (OkObjectResult)result.Result!;
-        ok.Value.Should().BeAssignableTo<IReadOnlyList<ChannelAdapterResponse>>();
-        ((IReadOnlyList<ChannelAdapterResponse>)ok.Value!).Should().OnlyContain(item => item is ChannelAdapterResponse);
+        ok.Value.ShouldBeAssignableTo<IReadOnlyList<ChannelAdapterResponse>>();
+        ((IReadOnlyList<ChannelAdapterResponse>)ok.Value!).ShouldAllBe(item => item is ChannelAdapterResponse);
     }
 
     private static ChannelsController CreateController(params IChannelAdapter[] adapters)

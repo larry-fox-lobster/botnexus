@@ -6,7 +6,6 @@ using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
 using BotNexus.Agent.Providers.Core.Streaming;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -33,7 +32,7 @@ public sealed class LlmSessionCompactorTests
         var compactor = CreateCompactor("summary");
         var options = new CompactionOptions { ContextWindowTokens = 100, TokenThresholdRatio = 0.5 };
 
-        compactor.ShouldCompact(session.Session, options).Should().BeFalse();
+        compactor.ShouldCompact(session.Session, options).ShouldBeFalse();
     }
 
     [Fact]
@@ -43,7 +42,7 @@ public sealed class LlmSessionCompactorTests
         var compactor = CreateCompactor("summary");
         var options = new CompactionOptions { ContextWindowTokens = 100, TokenThresholdRatio = 0.5 };
 
-        compactor.ShouldCompact(session.Session, options).Should().BeTrue();
+        compactor.ShouldCompact(session.Session, options).ShouldBeTrue();
     }
 
     [Fact]
@@ -66,13 +65,8 @@ public sealed class LlmSessionCompactorTests
             SummarizationModel = TestModel.Id
         });
 
-        session.GetHistorySnapshot().Select(entry => entry.Content).Should().ContainInOrder(
-            "summary-u1",
-            "u2",
-            "a2",
-            "t2",
-            "u3",
-            "a3");
+        session.GetHistorySnapshot().Select(entry => entry.Content).ToList().ShouldBe(
+            new[] { "summary-u1", "u2", "a2", "t2", "u3", "a3" }, ignoreOrder: false);
     }
 
     [Fact]
@@ -91,10 +85,10 @@ public sealed class LlmSessionCompactorTests
             SummarizationModel = TestModel.Id
         });
 
-        result.EntriesSummarized.Should().Be(2);
-        result.EntriesPreserved.Should().Be(2);
+        result.EntriesSummarized.ShouldBe(2);
+        result.EntriesPreserved.ShouldBe(2);
         session.GetHistorySnapshot().Select(entry => entry.Content)
-            .Should().ContainInOrder("structured summary", "recent", "recent-response");
+            .ToList().ShouldBe(new[] { "structured summary", "recent", "recent-response" }, ignoreOrder: false);
     }
 
     [Fact]
@@ -105,10 +99,10 @@ public sealed class LlmSessionCompactorTests
 
         var result = await compactor.CompactAsync(session.Session, new CompactionOptions());
 
-        result.Summary.Should().BeEmpty();
-        result.EntriesSummarized.Should().Be(0);
-        result.EntriesPreserved.Should().Be(0);
-        session.GetHistorySnapshot().Should().BeEmpty();
+        result.Summary.ShouldBeEmpty();
+        result.EntriesSummarized.ShouldBe(0);
+        result.EntriesPreserved.ShouldBe(0);
+        session.GetHistorySnapshot().ShouldBeEmpty();
     }
 
     [Fact]
@@ -128,10 +122,10 @@ public sealed class LlmSessionCompactorTests
             SummarizationModel = TestModel.Id
         });
 
-        result.Summary.Should().BeEmpty();
-        result.EntriesSummarized.Should().Be(0);
-        result.EntriesPreserved.Should().Be(4);
-        session.GetHistorySnapshot().Should().BeEquivalentTo(originalHistory, options => options.WithStrictOrdering());
+        result.Summary.ShouldBeEmpty();
+        result.EntriesSummarized.ShouldBe(0);
+        result.EntriesPreserved.ShouldBe(4);
+        session.GetHistorySnapshot().ShouldBe(originalHistory);
     }
 
     [Fact]
@@ -150,8 +144,8 @@ public sealed class LlmSessionCompactorTests
         });
 
         var summaryEntry = session.GetHistorySnapshot().First();
-        summaryEntry.Role.Should().Be(MessageRole.System);
-        summaryEntry.IsCompactionSummary.Should().BeTrue();
+        summaryEntry.Role.ShouldBe(MessageRole.System);
+        summaryEntry.IsCompactionSummary.ShouldBeTrue();
     }
 
     [Fact]
@@ -171,8 +165,8 @@ public sealed class LlmSessionCompactorTests
             SummarizationModel = TestModel.Id
         });
 
-        result.Summary.Length.Should().Be(40);
-        session.GetHistorySnapshot().First().Content.Length.Should().Be(40);
+        result.Summary.Length.ShouldBe(40);
+        session.GetHistorySnapshot().First().Content.Length.ShouldBe(40);
     }
 
     [Fact]
@@ -193,13 +187,13 @@ public sealed class LlmSessionCompactorTests
         var splitHistory = typeof(LlmSessionCompactor).GetMethod(
             "SplitHistory",
             BindingFlags.NonPublic | BindingFlags.Static);
-        splitHistory.Should().NotBeNull();
+        splitHistory.ShouldNotBeNull();
 
         var result = ((List<SessionEntry> toSummarize, List<SessionEntry> toPreserve))splitHistory!
             .Invoke(null, [history, 2])!;
 
-        result.toSummarize.Select(entry => entry.Content).Should().ContainInOrder("u1", "a1", "t1");
-        result.toPreserve.Select(entry => entry.Content).Should().ContainInOrder("u2", "a2", "t2", "u3", "a3");
+        result.toSummarize.Select(entry => entry.Content).ToList().ShouldBe(new[] { "u1", "a1", "t1" });
+        result.toPreserve.Select(entry => entry.Content).ToList().ShouldBe(new[] { "u2", "a2", "t2", "u3", "a3" });
     }
 
     private static GatewaySession CreateSession(params (string role, string content)[] entries)

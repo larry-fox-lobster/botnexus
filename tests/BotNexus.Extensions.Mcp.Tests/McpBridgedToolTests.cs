@@ -1,7 +1,6 @@
 using System.Text.Json;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Extensions.Mcp.Protocol;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Mcp.Tests;
 
@@ -34,8 +33,8 @@ public class McpBridgedToolTests
 
         var tool = new McpBridgedTool(client, definition, usePrefix: true);
 
-        tool.Name.Should().Be("github_search_repositories");
-        tool.Label.Should().Be("search_repositories");
+        tool.Name.ShouldBe("github_search_repositories");
+        tool.Label.ShouldBe("search_repositories");
     }
 
     [Fact]
@@ -51,7 +50,7 @@ public class McpBridgedToolTests
 
         var tool = new McpBridgedTool(client, definition, usePrefix: false);
 
-        tool.Name.Should().Be("search_repositories");
+        tool.Name.ShouldBe("search_repositories");
     }
 
     [Fact]
@@ -77,9 +76,9 @@ public class McpBridgedToolTests
 
         var tool = new McpBridgedTool(client, definition);
 
-        tool.Definition.Name.Should().Be("test_search");
-        tool.Definition.Description.Should().Be("Search for things");
-        tool.Definition.Parameters.GetProperty("type").GetString().Should().Be("object");
+        tool.Definition.Name.ShouldBe("test_search");
+        tool.Definition.Description.ShouldBe("Search for things");
+        tool.Definition.Parameters.GetProperty("type").GetString().ShouldBe("object");
     }
 
     [Fact]
@@ -102,9 +101,9 @@ public class McpBridgedToolTests
         var args = new Dictionary<string, object?> { ["query"] = "test" };
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[0].Value.Should().Be("Found 42 results");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[0].Value.ShouldBe("Found 42 results");
     }
 
     [Fact]
@@ -127,8 +126,9 @@ public class McpBridgedToolTests
 
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?>());
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Value.Should().Contain("MCP error").And.Contain("Server error");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Value.ShouldContain("MCP error");
+        result.Content[0].Value.ShouldContain("Server error");
     }
 
     [Fact]
@@ -147,8 +147,8 @@ public class McpBridgedToolTests
 
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?>());
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Value.Should().Be("[no content]");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Value.ShouldBe("[no content]");
     }
 
     [Fact]
@@ -165,7 +165,7 @@ public class McpBridgedToolTests
         var args = new Dictionary<string, object?> { ["query"] = "test" };
         var prepared = await tool.PrepareArgumentsAsync(args);
 
-        prepared.Should().BeSameAs(args);
+        prepared.ShouldBeSameAs(args);
     }
 
     [Fact]
@@ -181,9 +181,9 @@ public class McpBridgedToolTests
 
         var tool = new McpBridgedTool(client, definition);
 
-        tool.Definition.Name.Should().Be("test_no_params");
-        tool.Definition.Description.Should().Be("A tool with no parameters");
-        tool.Definition.Parameters.GetProperty("type").GetString().Should().Be("object");
+        tool.Definition.Name.ShouldBe("test_no_params");
+        tool.Definition.Description.ShouldBe("A tool with no parameters");
+        tool.Definition.Parameters.GetProperty("type").GetString().ShouldBe("object");
     }
 
     [Fact]
@@ -224,12 +224,12 @@ public class McpBridgedToolTests
 
         tool.Definition.Parameters.GetProperty("properties")
             .GetProperty("config")
-            .GetProperty("type").GetString().Should().Be("object");
+            .GetProperty("type").GetString().ShouldBe("object");
         tool.Definition.Parameters.GetProperty("properties")
             .GetProperty("config")
             .GetProperty("properties")
             .GetProperty("options")
-            .GetProperty("type").GetString().Should().Be("array");
+            .GetProperty("type").GetString().ShouldBe("array");
     }
 
     [Fact]
@@ -256,10 +256,10 @@ public class McpBridgedToolTests
 
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?>());
 
-        result.Content.Should().HaveCount(3);
-        result.Content[0].Value.Should().Be("First result");
-        result.Content[1].Value.Should().Be("Second result");
-        result.Content[2].Value.Should().Be("Third result");
+        result.Content.Count().ShouldBe(3);
+        result.Content[0].Value.ShouldBe("First result");
+        result.Content[1].Value.ShouldBe("Second result");
+        result.Content[2].Value.ShouldBe("Third result");
     }
 
     [Fact]
@@ -284,9 +284,9 @@ public class McpBridgedToolTests
 
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?>());
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Image);
-        result.Content[0].Value.Should().StartWith("data:image/png;base64,");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Image);
+        result.Content[0].Value.ShouldStartWith("data:image/png;base64,");
     }
 
     [Fact]
@@ -312,9 +312,9 @@ public class McpBridgedToolTests
 
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?>());
 
-        result.Content.Should().HaveCount(2);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[1].Type.Should().Be(AgentToolContentType.Image);
+        result.Content.Count().ShouldBe(2);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[1].Type.ShouldBe(AgentToolContentType.Image);
     }
 
     [Fact]
@@ -340,8 +340,8 @@ public class McpBridgedToolTests
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?>());
 
         // Unknown type is skipped; fallback to [no content]
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Value.Should().Be("[no content]");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Value.ShouldBe("[no content]");
     }
 
     [Fact]
@@ -367,8 +367,8 @@ public class McpBridgedToolTests
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?>());
 
         // Null text content is skipped; fallback to [no content]
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Value.Should().Be("[no content]");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Value.ShouldBe("[no content]");
     }
 
     [Fact]
@@ -391,10 +391,10 @@ public class McpBridgedToolTests
 
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?>());
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[0].Value.Should().Contain("MCP error");
-        result.Content[0].Value.Should().Contain("-32602");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[0].Value.ShouldContain("MCP error");
+        result.Content[0].Value.ShouldContain("-32602");
     }
 
     [Fact]
@@ -410,7 +410,7 @@ public class McpBridgedToolTests
         // Default usePrefix is true
         var tool = new McpBridgedTool(client, definition);
 
-        tool.Name.Should().Be("srv_my_tool");
+        tool.Name.ShouldBe("srv_my_tool");
     }
 
     [Fact]
@@ -426,6 +426,6 @@ public class McpBridgedToolTests
 
         var tool = new McpBridgedTool(client, definition);
 
-        tool.Definition.Description.Should().BeEmpty();
+        tool.Definition.Description.ShouldBeEmpty();
     }
 }

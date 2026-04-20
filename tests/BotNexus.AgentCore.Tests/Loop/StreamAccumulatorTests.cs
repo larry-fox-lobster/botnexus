@@ -2,7 +2,6 @@ using BotNexus.Agent.Core.Loop;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Streaming;
-using FluentAssertions;
 
 namespace BotNexus.AgentCore.Tests.Loop;
 
@@ -36,7 +35,7 @@ public class StreamAccumulatorTests
             },
             CancellationToken.None);
 
-        eventTypes.Should().Equal(AgentEventType.MessageStart, AgentEventType.MessageEnd);
+        eventTypes.ShouldBe(new[] { AgentEventType.MessageStart, AgentEventType.MessageEnd });
     }
 
     [Fact]
@@ -58,7 +57,7 @@ public class StreamAccumulatorTests
         stream.End(errorMessage);
 
         var result = await StreamAccumulator.AccumulateAsync(stream, _ => Task.CompletedTask, CancellationToken.None);
-        result.FinishReason.Should().Be(StopReason.Aborted);
+        result.FinishReason.ShouldBe(StopReason.Aborted);
     }
 
     [Fact]
@@ -81,9 +80,9 @@ public class StreamAccumulatorTests
             CancellationToken.None,
             contextMessages);
 
-        contextMessages.Should().HaveCount(2);
-        contextMessages[^1].Should().BeOfType<AssistantAgentMessage>()
-            .Which.Content.Should().Be("hello world");
+        contextMessages.Count().ShouldBe(2);
+        contextMessages[^1].ShouldBeOfType<AssistantAgentMessage>()
+            .Content.ShouldBe("hello world");
     }
 
     private static AssistantMessage CreateAssistantMessage(string content)
@@ -137,13 +136,13 @@ public class StreamAccumulatorTests
             contextMessages);
 
         // Error should be the final state, not partial content
-        result.FinishReason.Should().Be(StopReason.Error);
-        result.ErrorMessage.Should().Be("connection lost");
+        result.FinishReason.ShouldBe(StopReason.Error);
+        result.ErrorMessage.ShouldBe("connection lost");
 
         // Context should have exactly 2 messages (user + final assistant), not partial + final
-        contextMessages.Should().HaveCount(2);
-        var lastMessage = contextMessages[^1].Should().BeOfType<AssistantAgentMessage>().Subject;
-        lastMessage.FinishReason.Should().Be(StopReason.Error);
+        contextMessages.Count().ShouldBe(2);
+        var lastMessage = contextMessages[^1].ShouldBeOfType<AssistantAgentMessage>();
+        lastMessage.FinishReason.ShouldBe(StopReason.Error);
     }
 
     [Fact]
@@ -157,8 +156,8 @@ public class StreamAccumulatorTests
 
         var result = await StreamAccumulator.AccumulateAsync(stream, _ => Task.CompletedTask, CancellationToken.None);
 
-        result.Content.Should().BeEmpty();
-        result.FinishReason.Should().Be(StopReason.Stop);
+        result.Content.ShouldBeEmpty();
+        result.FinishReason.ShouldBe(StopReason.Stop);
     }
 
     [Fact]
@@ -179,7 +178,7 @@ public class StreamAccumulatorTests
 
         var result = await StreamAccumulator.AccumulateAsync(stream, _ => Task.CompletedTask, CancellationToken.None);
 
-        result.Content.Should().Be("Hello World!");
+        result.Content.ShouldBe("Hello World!");
     }
 
     [Fact]
@@ -200,9 +199,9 @@ public class StreamAccumulatorTests
             evt => { events.Add(evt.Type); return Task.CompletedTask; },
             CancellationToken.None);
 
-        events.Should().StartWith(AgentEventType.MessageStart);
-        events.Should().Contain(AgentEventType.MessageUpdate);
-        events.Should().EndWith(AgentEventType.MessageEnd);
+        events.First().ShouldBe(AgentEventType.MessageStart);
+        events.ShouldContain(AgentEventType.MessageUpdate);
+        events.Last().ShouldBe(AgentEventType.MessageEnd);
     }
 
     [Fact]
@@ -229,7 +228,7 @@ public class StreamAccumulatorTests
             contextMessages);
 
         // Should add exactly 1 assistant message, not duplicate
-        contextMessages.Should().HaveCount(3);
-        contextMessages.OfType<AssistantAgentMessage>().Should().ContainSingle();
+        contextMessages.Count().ShouldBe(3);
+        contextMessages.OfType<AssistantAgentMessage>().ShouldHaveSingleItem();
     }
 }

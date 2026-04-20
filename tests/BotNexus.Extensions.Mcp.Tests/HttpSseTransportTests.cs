@@ -2,7 +2,6 @@ using System.Text;
 using System.Text.Json;
 using BotNexus.Extensions.Mcp.Protocol;
 using BotNexus.Extensions.Mcp.Transport;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Mcp.Tests;
 
@@ -24,7 +23,7 @@ public class HttpSseTransportTests
         await transport.ParseSseStreamAsync(reader, CancellationToken.None);
 
         var received = await ReadOneResponse(transport);
-        received.Id.Should().NotBeNull();
+        received.Id.ShouldNotBeNull();
     }
 
     [Fact]
@@ -45,7 +44,7 @@ public class HttpSseTransportTests
         await transport.ParseSseStreamAsync(reader, CancellationToken.None);
 
         var received = await ReadOneResponse(transport);
-        received.Id.Should().NotBeNull();
+        received.Id.ShouldNotBeNull();
     }
 
     [Fact]
@@ -60,7 +59,7 @@ public class HttpSseTransportTests
 
         // Channel should be empty — no response for non-message events
         var act = () => transport.ReceiveAsync(new CancellationTokenSource(50).Token);
-        await act.Should().ThrowAsync<Exception>();
+        await act.ShouldThrowAsync<Exception>();
     }
 
     [Fact]
@@ -86,9 +85,9 @@ public class HttpSseTransportTests
         var r2 = await ReadOneResponse(transport);
         var r3 = await ReadOneResponse(transport);
 
-        r1.Should().NotBeNull();
-        r2.Should().NotBeNull();
-        r3.Should().NotBeNull();
+        r1.ShouldNotBeNull();
+        r2.ShouldNotBeNull();
+        r3.ShouldNotBeNull();
     }
 
     [Fact]
@@ -110,7 +109,7 @@ public class HttpSseTransportTests
         await transport.ParseSseStreamAsync(reader, CancellationToken.None);
 
         var received = await ReadOneResponse(transport);
-        received.Id.Should().NotBeNull();
+        received.Id.ShouldNotBeNull();
     }
 
     [Fact]
@@ -153,7 +152,7 @@ public class HttpSseTransportTests
         await transport.ParseSseStreamAsync(reader, CancellationToken.None);
 
         var received = await ReadOneResponse(transport);
-        received.Id.Should().NotBeNull();
+        received.Id.ShouldNotBeNull();
     }
 
     [Fact]
@@ -174,14 +173,14 @@ public class HttpSseTransportTests
         await transport.ParseSseStreamAsync(reader, CancellationToken.None);
 
         var received = await ReadOneResponse(transport);
-        received.Id.Should().NotBeNull();
+        received.Id.ShouldNotBeNull();
     }
 
     [Fact]
     public void Constructor_ThrowsOnNullEndpoint()
     {
         var act = () => new HttpSseMcpTransport(null!);
-        act.Should().Throw<ArgumentNullException>();
+        act.ShouldThrow<ArgumentNullException>();
     }
 
     [Fact]
@@ -191,8 +190,8 @@ public class HttpSseTransportTests
         var request = new JsonRpcRequest { Method = "test" };
 
         var act = () => transport.SendAsync(request);
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*not connected*");
+        var ex = await act.ShouldThrowAsync<InvalidOperationException>();
+        ex.Message.ShouldContain("not connected");
     }
 
     [Fact]
@@ -202,8 +201,8 @@ public class HttpSseTransportTests
         var notification = new JsonRpcNotification { Method = "test" };
 
         var act = () => transport.SendNotificationAsync(notification);
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*not connected*");
+        var ex = await act.ShouldThrowAsync<InvalidOperationException>();
+        ex.Message.ShouldContain("not connected");
     }
 
     [Fact]
@@ -222,7 +221,7 @@ public class HttpSseTransportTests
         await transport.DisposeAsync();
 
         var act = () => transport.ReceiveAsync();
-        await act.Should().ThrowAsync<ObjectDisposedException>();
+        await act.ShouldThrowAsync<ObjectDisposedException>();
     }
 
     [Fact]
@@ -240,8 +239,8 @@ public class HttpSseTransportTests
         await transport.ParseSseStreamAsync(new StringReader(sseData), CancellationToken.None);
 
         var received = await ReadOneResponse(transport);
-        received.Error.Should().NotBeNull();
-        received.Error!.Code.Should().Be(-32600);
+        received.Error.ShouldNotBeNull();
+        received.Error!.Code.ShouldBe(-32600);
     }
 
     [Fact]
@@ -255,7 +254,7 @@ public class HttpSseTransportTests
 
         // Should not have enqueued anything (empty string is not valid JSON)
         var act = () => transport.ReceiveAsync(new CancellationTokenSource(50).Token);
-        await act.Should().ThrowAsync<Exception>();
+        await act.ShouldThrowAsync<Exception>();
     }
 
     private static HttpSseMcpTransport CreateTransport()

@@ -1,6 +1,5 @@
 using BotNexus.Memory;
 using BotNexus.Memory.Tests.TestInfrastructure;
-using FluentAssertions;
 using Microsoft.Data.Sqlite;
 
 namespace BotNexus.Memory.Tests;
@@ -27,7 +26,12 @@ public sealed class MemoryStoreTests : IDisposable
         while (await reader.ReadAsync())
             names.Add(reader.GetString(0));
 
-        names.Should().Contain(["memories", "memories_fts", "schema_version", "memories_ai", "memories_ad", "memories_au"]);
+        names.ShouldContain("memories");
+        names.ShouldContain("memories_fts");
+        names.ShouldContain("schema_version");
+        names.ShouldContain("memories_ai");
+        names.ShouldContain("memories_ad");
+        names.ShouldContain("memories_au");
     }
 
     [Fact]
@@ -44,12 +48,12 @@ public sealed class MemoryStoreTests : IDisposable
         var inserted = await context.Store.InsertAsync(expected);
         var loaded = await context.Store.GetByIdAsync(inserted.Id);
 
-        loaded.Should().NotBeNull();
-        loaded!.Id.Should().Be("entry-1");
-        loaded.AgentId.Should().Be("agent-a");
-        loaded.SessionId.Should().Be("session-1");
-        loaded.TurnIndex.Should().Be(3);
-        loaded.Content.Should().Be("Remember this message.");
+        loaded.ShouldNotBeNull();
+        loaded!.Id.ShouldBe("entry-1");
+        loaded.AgentId.ShouldBe("agent-a");
+        loaded.SessionId.ShouldBe("session-1");
+        loaded.TurnIndex.ShouldBe(3);
+        loaded.Content.ShouldBe("Remember this message.");
     }
 
     [Fact]
@@ -63,7 +67,7 @@ public sealed class MemoryStoreTests : IDisposable
 
         var results = await context.Store.GetBySessionAsync("session-1", 10);
 
-        results.Select(entry => entry.Id).Should().Equal("entry-2", "entry-1");
+        results.Select(entry => entry.Id).ShouldBe(new[] { "entry-2", "entry-1" });
     }
 
     [Fact]
@@ -75,8 +79,8 @@ public sealed class MemoryStoreTests : IDisposable
 
         var results = await context.Store.SearchAsync("copilotmemorywaveonetesting");
 
-        results.Should().ContainSingle();
-        results[0].Id.Should().Be("entry-1");
+        results.ShouldHaveSingleItem();
+        results[0].Id.ShouldBe("entry-1");
     }
 
     [Fact]
@@ -87,7 +91,7 @@ public sealed class MemoryStoreTests : IDisposable
 
         var results = await context.Store.SearchAsync("nonexistent-term");
 
-        results.Should().BeEmpty();
+        results.ShouldBeEmpty();
     }
 
     [Fact]
@@ -100,7 +104,7 @@ public sealed class MemoryStoreTests : IDisposable
 
         var results = await context.Store.SearchAsync("rankingkeyword", 2);
 
-        results.Select(entry => entry.Id).Should().Equal("entry-recent", "entry-old");
+        results.Select(entry => entry.Id).ShouldBe(new[] { "entry-recent", "entry-old" });
     }
 
     [Fact]
@@ -112,8 +116,8 @@ public sealed class MemoryStoreTests : IDisposable
 
         var results = await context.Store.SearchAsync("sharedkeyword", 10, new MemorySearchFilter { SourceType = "manual" });
 
-        results.Should().ContainSingle();
-        results[0].SourceType.Should().Be("manual");
+        results.ShouldHaveSingleItem();
+        results[0].SourceType.ShouldBe("manual");
     }
 
     [Fact]
@@ -134,8 +138,8 @@ public sealed class MemoryStoreTests : IDisposable
                 BeforeDate = now.AddHours(-1)
             });
 
-        results.Should().ContainSingle();
-        results[0].Id.Should().Be("entry-mid");
+        results.ShouldHaveSingleItem();
+        results[0].Id.ShouldBe("entry-mid");
     }
 
     [Fact]
@@ -147,7 +151,7 @@ public sealed class MemoryStoreTests : IDisposable
         await context.Store.DeleteAsync("entry-1");
         var loaded = await context.Store.GetByIdAsync("entry-1");
 
-        loaded.Should().BeNull();
+        loaded.ShouldBeNull();
     }
 
     [Fact]
@@ -160,7 +164,7 @@ public sealed class MemoryStoreTests : IDisposable
         await context.Store.ClearAsync();
         var stats = await context.Store.GetStatsAsync();
 
-        stats.EntryCount.Should().Be(0);
+        stats.EntryCount.ShouldBe(0);
     }
 
     [Fact]
@@ -172,9 +176,9 @@ public sealed class MemoryStoreTests : IDisposable
 
         var stats = await context.Store.GetStatsAsync();
 
-        stats.EntryCount.Should().Be(2);
-        stats.DatabaseSizeBytes.Should().BeGreaterThan(0);
-        stats.LastIndexedAt.Should().NotBeNull();
+        stats.EntryCount.ShouldBe(2);
+        stats.DatabaseSizeBytes.ShouldBeGreaterThan(0);
+        stats.LastIndexedAt.ShouldNotBeNull();
     }
 
     [Fact]
@@ -185,9 +189,9 @@ public sealed class MemoryStoreTests : IDisposable
 
         var act = () => context.Store.InsertAsync(MemoryStoreTestContext.CreateEntry("entry-1", "agent-a", "duplicate"));
 
-        await act.Should().ThrowAsync<SqliteException>();
+        await act.ShouldThrowAsync<SqliteException>();
         var loaded = await context.Store.GetByIdAsync("entry-1");
-        loaded!.Content.Should().Be("first");
+        loaded!.Content.ShouldBe("first");
     }
 
     public void Dispose()

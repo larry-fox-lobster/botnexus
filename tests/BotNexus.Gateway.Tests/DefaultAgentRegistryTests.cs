@@ -2,7 +2,6 @@ using BotNexus.Gateway.Abstractions.Activity;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Activity;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Runtime.CompilerServices;
 
@@ -18,7 +17,7 @@ public sealed class DefaultAgentRegistryTests
 
         registry.Register(descriptor);
 
-        registry.Get("agent-a").Should().Be(descriptor);
+        registry.Get("agent-a").ShouldBe(descriptor);
     }
 
     [Fact]
@@ -29,7 +28,7 @@ public sealed class DefaultAgentRegistryTests
 
         registry.Unregister("agent-a");
 
-        registry.Contains("agent-a").Should().BeFalse();
+        registry.Contains("agent-a").ShouldBeFalse();
     }
 
     [Fact]
@@ -39,9 +38,9 @@ public sealed class DefaultAgentRegistryTests
         var descriptor = CreateDescriptor("agent-a");
         registry.Register(descriptor);
 
-        var act = () => registry.Register(CreateDescriptor("agent-a"));
+        Action act = () => registry.Register(CreateDescriptor("agent-a"));
 
-        act.Should().Throw<InvalidOperationException>();
+        act.ShouldThrow<InvalidOperationException>();
     }
 
     [Fact]
@@ -51,7 +50,7 @@ public sealed class DefaultAgentRegistryTests
 
         var agent = registry.Get("unknown");
 
-        agent.Should().BeNull();
+        agent.ShouldBeNull();
     }
 
     [Fact]
@@ -63,7 +62,7 @@ public sealed class DefaultAgentRegistryTests
 
         var agents = registry.GetAll();
 
-        agents.Should().HaveCount(2);
+        agents.Count().ShouldBe(2);
     }
 
     [Fact]
@@ -74,7 +73,7 @@ public sealed class DefaultAgentRegistryTests
 
         var contains = registry.Contains("agent-a") && !registry.Contains("unknown");
 
-        contains.Should().BeTrue();
+        contains.ShouldBeTrue();
     }
 
     [Fact]
@@ -94,7 +93,7 @@ public sealed class DefaultAgentRegistryTests
 
         await Task.WhenAll(tasks);
 
-        registry.GetAll().Should().HaveCount(agentCount);
+        registry.GetAll().Count().ShouldBe(agentCount);
     }
 
     [Fact]
@@ -105,9 +104,9 @@ public sealed class DefaultAgentRegistryTests
 
         registry.Register(CreateDescriptor("agent-a"));
 
-        broadcaster.Activities.Should().ContainSingle(activity =>
+        broadcaster.Activities.Where(activity =>
             activity.Type == GatewayActivityType.AgentRegistered &&
-            activity.AgentId == "agent-a");
+            activity.AgentId == "agent-a").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -120,9 +119,9 @@ public sealed class DefaultAgentRegistryTests
 
         registry.Unregister("agent-a");
 
-        broadcaster.Activities.Should().ContainSingle(activity =>
+        broadcaster.Activities.Where(activity =>
             activity.Type == GatewayActivityType.AgentUnregistered &&
-            activity.AgentId == "agent-a");
+            activity.AgentId == "agent-a").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -135,10 +134,10 @@ public sealed class DefaultAgentRegistryTests
 
         var updated = registry.Update("agent-a", CreateDescriptor("agent-a") with { DisplayName = "updated" });
 
-        updated.Should().BeTrue();
-        broadcaster.Activities.Should().ContainSingle(activity =>
+        updated.ShouldBeTrue();
+        broadcaster.Activities.Where(activity =>
             activity.Type == GatewayActivityType.AgentConfigChanged &&
-            activity.AgentId == "agent-a");
+            activity.AgentId == "agent-a").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -153,9 +152,9 @@ public sealed class DefaultAgentRegistryTests
 
         registry.Register(CreateDescriptor("agent-a"));
 
-        (await readTask).Should().BeTrue();
-        subscription.Current.Type.Should().Be(GatewayActivityType.AgentRegistered);
-        subscription.Current.AgentId.Should().Be("agent-a");
+        (await readTask).ShouldBeTrue();
+        subscription.Current.Type.ShouldBe(GatewayActivityType.AgentRegistered);
+        subscription.Current.AgentId.ShouldBe("agent-a");
     }
 
     [Fact]
@@ -172,9 +171,9 @@ public sealed class DefaultAgentRegistryTests
 
         registry.Unregister("agent-a");
 
-        (await readTask).Should().BeTrue();
-        subscription.Current.Type.Should().Be(GatewayActivityType.AgentUnregistered);
-        subscription.Current.AgentId.Should().Be("agent-a");
+        (await readTask).ShouldBeTrue();
+        subscription.Current.Type.ShouldBe(GatewayActivityType.AgentUnregistered);
+        subscription.Current.AgentId.ShouldBe("agent-a");
     }
 
     private static DefaultAgentRegistry CreateRegistry()

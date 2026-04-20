@@ -2,7 +2,6 @@ using System.Reflection;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Extensions.WebTools.Search;
 using BotNexus.Extensions.WebTools.Tests.Helpers;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.WebTools.Tests;
 
@@ -31,9 +30,9 @@ public class WebSearchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Contain("## Search Results for \"botnexus\"");
-        result.Content[0].Value.Should().Contain("**[Result A](https://example.com/a)**");
-        result.Content[0].Value.Should().Contain("Snippet B");
+        result.Content[0].Value.ShouldContain("## Search Results for \"botnexus\"");
+        result.Content[0].Value.ShouldContain("**[Result A](https://example.com/a)**");
+        result.Content[0].Value.ShouldContain("Snippet B");
     }
 
     [Theory]
@@ -58,8 +57,8 @@ public class WebSearchToolTests
         _ = await tool.ExecuteAsync("call-1", args);
         var provider = GetProvider(tool);
 
-        provider.Should().NotBeNull();
-        provider!.GetType().Name.ToLowerInvariant().Should().Contain(providerName);
+        provider.ShouldNotBeNull();
+        provider!.GetType().Name.ToLowerInvariant().ShouldContain(providerName);
     }
 
     [Fact]
@@ -75,8 +74,8 @@ public class WebSearchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Contain("Title");
-        result.Content[0].Value.Should().NotContain("requires an API key");
+        result.Content[0].Value.ShouldContain("Title");
+        result.Content[0].Value.ShouldNotContain("requires an API key");
     }
 
     [Fact]
@@ -90,9 +89,9 @@ public class WebSearchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content.Should().ContainSingle().Which.Type.Should().Be(AgentToolContentType.Text);
-        result.Content[0].Value.Should().Contain("[Doc](https://example.com/doc)");
-        result.Content[0].Value.Should().Contain("Doc snippet");
+        result.Content.ShouldHaveSingleItem().Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[0].Value.ShouldContain("[Doc](https://example.com/doc)");
+        result.Content[0].Value.ShouldContain("Doc snippet");
     }
 
     [Theory]
@@ -105,7 +104,7 @@ public class WebSearchToolTests
 
         var act = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?> { ["query"] = query });
 
-        await act.Should().ThrowAsync<ArgumentException>().WithMessage("*query is required*");
+        (await act.ShouldThrowAsync<ArgumentException>()).Message.ShouldContain("query is required");
     }
 
     [Fact]
@@ -116,7 +115,7 @@ public class WebSearchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Contain("Unknown search provider");
+        result.Content[0].Value.ShouldContain("Unknown search provider");
     }
 
     [Fact]
@@ -128,7 +127,7 @@ public class WebSearchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Contain("Search API error: network boom");
+        result.Content[0].Value.ShouldContain("Search API error: network boom");
     }
 
     [Fact]
@@ -140,7 +139,7 @@ public class WebSearchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Contain("No results found");
+        result.Content[0].Value.ShouldContain("No results found");
     }
 
     [Fact]
@@ -157,8 +156,8 @@ public class WebSearchToolTests
 
         _ = await tool.ExecuteAsync("call-1", args);
 
-        handler.Requests.Should().ContainSingle();
-        handler.Requests[0].RequestUri!.Query.Should().Contain(Uri.EscapeDataString(query));
+        handler.Requests.ShouldHaveSingleItem();
+        handler.Requests[0].RequestUri!.Query.ShouldContain(Uri.EscapeDataString(query));
     }
 
     [Fact]
@@ -175,7 +174,7 @@ public class WebSearchToolTests
 
         _ = await tool.ExecuteAsync("call-1", args);
 
-        handler.Requests[0].RequestUri!.Query.Should().Contain(Uri.EscapeDataString(query));
+        handler.Requests[0].RequestUri!.Query.ShouldContain(Uri.EscapeDataString(query));
     }
 
     [Fact]
@@ -189,7 +188,7 @@ public class WebSearchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Contain("Error performing search");
+        result.Content[0].Value.ShouldContain("Error performing search");
     }
 
     [Fact]
@@ -206,8 +205,8 @@ public class WebSearchToolTests
 
         var results = await Task.WhenAll(tasks);
 
-        results.Should().OnlyContain(r => r.Content[0].Value.Contains("parallel"));
-        provider.CallCount.Should().Be(20);
+        results.ShouldAllBe(r => r.Content[0].Value.Contains("parallel"));
+        provider.CallCount.ShouldBe(20);
     }
 
     private static ISearchProvider? GetProvider(WebSearchTool tool)

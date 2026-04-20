@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Anthropic.Tests;
 
@@ -17,7 +16,7 @@ public class StopReasonMappingTests
         var json = $"\"{jsonValue}\"";
         var result = JsonSerializer.Deserialize<StopReason>(json);
 
-        result.Should().Be(expected);
+        result.ShouldBe(expected);
     }
 
     [Fact]
@@ -25,7 +24,7 @@ public class StopReasonMappingTests
     {
         var json = JsonSerializer.Serialize(StopReason.Stop);
 
-        json.Should().Be("\"stop\"");
+        json.ShouldBe("\"stop\"");
     }
 
     [Fact]
@@ -33,7 +32,7 @@ public class StopReasonMappingTests
     {
         var json = JsonSerializer.Serialize(StopReason.Length);
 
-        json.Should().Be("\"length\"");
+        json.ShouldBe("\"length\"");
     }
 
     [Fact]
@@ -41,6 +40,6 @@ public class StopReasonMappingTests
     {
         var json = JsonSerializer.Serialize(StopReason.ToolUse);
 
-        json.Should().Be("\"toolUse\"");
+        json.ShouldBe("\"toolUse\"");
     }
 }

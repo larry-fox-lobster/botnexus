@@ -1,6 +1,5 @@
 using System.Text;
 using BotNexus.CodingAgent;
-using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests;
 
@@ -57,9 +56,9 @@ public sealed class SystemPromptBuilderSnapshotTests
             File.WriteAllText(expectedPath, normalized + "\n", Encoding.UTF8);
         }
 
-        File.Exists(expectedPath).Should().BeTrue($"snapshot file '{expectedPath}' must exist");
+        File.Exists(expectedPath).ShouldBeTrue($"snapshot file '{expectedPath}' must exist");
         var expected = Normalize(File.ReadAllText(expectedPath)).TrimEnd('\n');
-        normalized.Should().Be(expected);
+        normalized.ShouldBe(expected);
     }
 
     private static string Normalize(string value) => value.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd('\n');

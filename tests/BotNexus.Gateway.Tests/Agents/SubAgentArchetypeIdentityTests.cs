@@ -5,7 +5,6 @@ using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -69,13 +68,13 @@ public sealed class SubAgentArchetypeIdentityTests
             Archetype = SubAgentArchetype.Reviewer
         });
 
-        capturedChildAgentId.Should().NotBeNull();
-        capturedChildSessionId.Should().NotBeNull();
-        capturedChildAgentId!.Value.Should().NotBe(parentAgentId.Value);
-        capturedChildAgentId.Value.Value.Should().StartWith($"{parentAgentId.Value}--subagent--reviewer--");
-        capturedChildAgentId.Value.Value.Should().Contain($"{parentAgentId.Value}--subagent--");
-        capturedChildSessionId!.Value.Value.Should().Contain("::subagent::");
-        info.Archetype.Should().Be(SubAgentArchetype.Reviewer);
+        capturedChildAgentId.ShouldNotBeNull();
+        capturedChildSessionId.ShouldNotBeNull();
+        capturedChildAgentId!.Value.Value.ShouldNotBe(parentAgentId.Value);
+        capturedChildAgentId.Value.Value.ShouldStartWith($"{parentAgentId.Value}--subagent--reviewer--");
+        capturedChildAgentId.Value.Value.ShouldContain($"{parentAgentId.Value}--subagent--");
+        capturedChildSessionId!.Value.Value.ShouldContain("::subagent::");
+        info.Archetype.ShouldBe(SubAgentArchetype.Reviewer);
     }
 
     [Fact]
@@ -127,9 +126,9 @@ public sealed class SubAgentArchetypeIdentityTests
             Task = "Investigate issue"
         });
 
-        info.Archetype.Should().Be(SubAgentArchetype.General);
-        capturedChildAgentId.Should().NotBeNull();
-        capturedChildAgentId!.Value.Value.Should().Contain("--subagent--");
-        info.ChildSessionId.Value.Should().Contain("::subagent::");
+        info.Archetype.ShouldBe(SubAgentArchetype.General);
+        capturedChildAgentId.ShouldNotBeNull();
+        capturedChildAgentId!.Value.Value.ShouldContain("--subagent--");
+        info.ChildSessionId.Value.ShouldContain("::subagent::");
     }
 }

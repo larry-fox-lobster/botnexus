@@ -6,7 +6,6 @@ using BotNexus.AgentCore.Tests.TestUtils;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Streaming;
-using FluentAssertions;
 
 namespace BotNexus.AgentCore.Tests.Loop;
 
@@ -28,7 +27,7 @@ public sealed class AgentLoopSafetyTests
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
 
         var act = () => AgentLoopRunner.RunAsync([new AgentUserMessage("go")], context, config, _ => Task.CompletedTask, cts.Token);
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -51,8 +50,8 @@ public sealed class AgentLoopSafetyTests
 
         var produced = await AgentLoopRunner.RunAsync([new AgentUserMessage("go")], context, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        counterTool.Count.Should().Be(1000);
-        produced.OfType<ToolResultAgentMessage>().Should().HaveCount(1000);
+        counterTool.Count.ShouldBe(1000);
+        produced.OfType<ToolResultAgentMessage>().Count().ShouldBe(1000);
     }
 
     [Fact]
@@ -76,7 +75,7 @@ public sealed class AgentLoopSafetyTests
         var context = new AgentContext(null, [], []);
 
         var messages = await AgentLoopRunner.RunAsync([new AgentUserMessage("hello")], context, config, _ => Task.CompletedTask, CancellationToken.None);
-        messages.OfType<AssistantAgentMessage>().Last().Content.Should().Be("recovered");
+        messages.OfType<AssistantAgentMessage>().Last().Content.ShouldBe("recovered");
     }
 
     [Fact]
@@ -91,7 +90,7 @@ public sealed class AgentLoopSafetyTests
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
         var act = () => AgentLoopRunner.RunAsync([new AgentUserMessage("go")], context, config, _ => Task.CompletedTask, cts.Token);
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -117,7 +116,7 @@ public sealed class AgentLoopSafetyTests
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
         var act = () => AgentLoopRunner.RunAsync([new AgentUserMessage("go")], context, config, _ => Task.CompletedTask, cts.Token);
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -138,8 +137,8 @@ public sealed class AgentLoopSafetyTests
 
         var produced = await AgentLoopRunner.RunAsync([new AgentUserMessage("go")], context, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        sideEffectTool.Count.Should().Be(2);
-        produced.OfType<ToolResultAgentMessage>().Should().HaveCount(2);
+        sideEffectTool.Count.ShouldBe(2);
+        produced.OfType<ToolResultAgentMessage>().Count().ShouldBe(2);
     }
 
     private static AgentLoopConfig CreateConfig(string api)

@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Domain.Primitives;
-using FluentAssertions;
 
 namespace BotNexus.Domain.Tests;
 
@@ -10,7 +9,7 @@ public sealed class ConversationIdTests
     public void ConversationId_From_WhenValueIsValid_ShouldCreateInstance()
     {
         var result = ConversationId.From(" conversation-1 ");
-        result.Value.Should().Be("conversation-1");
+        result.Value.ShouldBe("conversation-1");
     }
 
     [Theory]
@@ -19,8 +18,8 @@ public sealed class ConversationIdTests
     [InlineData(" ")]
     public void ConversationId_From_WhenValueIsEmpty_ShouldThrowArgumentException(string? value)
     {
-        var action = () => ConversationId.From(value!);
-        action.Should().Throw<ArgumentException>();
+        Action action = () => ConversationId.From(value!);
+        action.ShouldThrow<ArgumentException>();
     }
 
     [Fact]
@@ -28,7 +27,7 @@ public sealed class ConversationIdTests
     {
         var left = ConversationId.From("conversation-1");
         var right = ConversationId.From("conversation-1");
-        left.Should().Be(right);
+        left.ShouldBe(right);
     }
 
     [Fact]
@@ -36,7 +35,7 @@ public sealed class ConversationIdTests
     {
         var left = ConversationId.From("conversation-1");
         var right = ConversationId.From("conversation-2");
-        left.Should().NotBe(right);
+        left.ShouldNotBe(right);
     }
 
     [Fact]
@@ -44,21 +43,21 @@ public sealed class ConversationIdTests
     {
         var id = ConversationId.From("conversation-1");
         string value = id;
-        value.Should().Be("conversation-1");
+        value.ShouldBe("conversation-1");
     }
 
     [Fact]
     public void ConversationId_ExplicitConversion_WhenConvertedFromString_ShouldCreateInstance()
     {
         var id = (ConversationId)"conversation-1";
-        id.Value.Should().Be("conversation-1");
+        id.Value.ShouldBe("conversation-1");
     }
 
     [Fact]
     public void ConversationId_ToString_WhenCalled_ShouldReturnValue()
     {
         var id = ConversationId.From("conversation-1");
-        id.ToString().Should().Be("conversation-1");
+        id.ToString().ShouldBe("conversation-1");
     }
 
     [Fact]
@@ -66,6 +65,6 @@ public sealed class ConversationIdTests
     {
         var original = ConversationId.From("conversation-1");
         var roundTrip = JsonSerializer.Deserialize<ConversationId>(JsonSerializer.Serialize(original));
-        roundTrip.Should().Be(original);
+        roundTrip.ShouldBe(original);
     }
 }

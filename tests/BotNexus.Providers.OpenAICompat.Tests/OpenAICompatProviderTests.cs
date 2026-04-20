@@ -1,4 +1,3 @@
-using FluentAssertions;
 using BotNexus.Agent.Providers.OpenAICompat;
 using System.Reflection;
 using System.Text.Json.Nodes;
@@ -14,7 +13,7 @@ public class OpenAICompatProviderTests
     {
         var provider = new OpenAICompatProvider(new HttpClient());
 
-        provider.Api.Should().Be("openai-compat");
+        provider.Api.ShouldBe("openai-compat");
     }
 
     [Fact]
@@ -22,8 +21,8 @@ public class OpenAICompatProviderTests
     {
         var provider = new OpenAICompatProvider(new HttpClient());
 
-        provider.Should().NotBeNull();
-        provider.Should().BeAssignableTo<Core.Registry.IApiProvider>();
+        provider.ShouldNotBeNull();
+        provider.ShouldBeAssignableTo<Core.Registry.IApiProvider>();
     }
 
     [Theory]
@@ -36,12 +35,12 @@ public class OpenAICompatProviderTests
         var method = typeof(OpenAICompatProvider).GetMethod(
             "MapStopReason",
             BindingFlags.NonPublic | BindingFlags.Static);
-        method.Should().NotBeNull();
+        method.ShouldNotBeNull();
 
         var mapped = ((StopReason StopReason, string? ErrorMessage))method!.Invoke(null, [finishReason, false])!;
 
-        mapped.StopReason.Should().Be(expectedReason);
-        mapped.ErrorMessage.Should().Be(expectedError);
+        mapped.StopReason.ShouldBe(expectedReason);
+        mapped.ErrorMessage.ShouldBe(expectedError);
     }
 
     [Fact]
@@ -50,7 +49,7 @@ public class OpenAICompatProviderTests
         var method = typeof(OpenAICompatProvider).GetMethod(
             "BuildRequestBody",
             BindingFlags.NonPublic | BindingFlags.Static);
-        method.Should().NotBeNull();
+        method.ShouldNotBeNull();
 
         var model = new LlmModel(
             Id: "gpt-4o-mini",
@@ -85,8 +84,8 @@ public class OpenAICompatProviderTests
             null,
             [model, context, null, new OpenAICompletionsCompat()]) as JsonObject;
 
-        body.Should().NotBeNull();
-        body!["tools"].Should().NotBeNull();
-        body["tools"]!.AsArray().Should().BeEmpty();
+        body.ShouldNotBeNull();
+        body!["tools"].ShouldNotBeNull();
+        body["tools"]!.AsArray().ShouldBeEmpty();
     }
 }

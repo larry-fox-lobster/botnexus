@@ -3,7 +3,6 @@ using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
 using BotNexus.Agent.Providers.Core.Streaming;
-using FluentAssertions;
 using Moq;
 using AgentMessage = BotNexus.Agent.Core.Types.AgentMessage;
 using AgentUserMessage = BotNexus.Agent.Core.Types.UserMessage;
@@ -73,7 +72,7 @@ public sealed class SessionCompactorTests
         var compactor = new SessionCompactor();
         var compacted = compactor.Compact(messages, keepRecentCount: 5);
 
-        compacted.Should().BeEquivalentTo(messages, options => options.WithStrictOrdering());
+        compacted.ShouldBe(messages);
     }
 
     [Fact]
@@ -91,12 +90,12 @@ public sealed class SessionCompactorTests
         var compactor = new SessionCompactor();
         var compacted = compactor.Compact(messages, keepRecentCount: 2);
 
-        compacted.Should().HaveCount(3);
-        compacted[0].Should().BeOfType<SystemAgentMessage>();
-        compacted[0].As<SystemAgentMessage>().Content.Should().Contain("3 earlier messages compacted");
-        compacted[0].As<SystemAgentMessage>().Content.Should().Contain("GrepTool.cs");
-        compacted[1].Should().Be(messages[3]);
-        compacted[2].Should().Be(messages[4]);
+        compacted.Count().ShouldBe(3);
+        var first = compacted[0].ShouldBeOfType<SystemAgentMessage>();
+        first.Content.ShouldContain("3 earlier messages compacted");
+        first.Content.ShouldContain("GrepTool.cs");
+        compacted[1].ShouldBe(messages[3]);
+        compacted[2].ShouldBe(messages[4]);
     }
 
     [Fact]
@@ -111,11 +110,11 @@ public sealed class SessionCompactorTests
 
         var compactor = new SessionCompactor();
         var compacted = compactor.Compact(messages, keepRecentCount: 1);
-        var summary = compacted[0].As<SystemAgentMessage>().Content;
+        var summary = compacted[0].ShouldBeOfType<SystemAgentMessage>().Content;
 
-        summary.Should().Contain("Key topics discussed:");
-        summary.Should().Contain("Files modified:");
-        summary.Should().Contain("Decisions made:");
+        summary.ShouldContain("Key topics discussed:");
+        summary.ShouldContain("Files modified:");
+        summary.ShouldContain("Decisions made:");
     }
 
     [Fact]
@@ -138,7 +137,7 @@ public sealed class SessionCompactorTests
 
         var compacted = await compactor.CompactAsync(messages, options);
 
-        compacted[0].Should().BeOfType<SystemAgentMessage>();
+        compacted[0].ShouldBeOfType<SystemAgentMessage>();
     }
 
     [Fact]
@@ -162,7 +161,7 @@ public sealed class SessionCompactorTests
 
         var compacted = await compactor.CompactAsync(messages, options);
 
-        compacted[^1].Should().BeSameAs(lastMessage);
+        compacted[^1].ShouldBeSameAs(lastMessage);
     }
 
     [Fact]
@@ -193,7 +192,7 @@ public sealed class SessionCompactorTests
 
         var compacted = await compactor.CompactAsync(messages, options);
 
-        compacted[0].As<SystemAgentMessage>().Content.Should().Contain("<modified-files>");
+        compacted[0].ShouldBeOfType<SystemAgentMessage>().Content.ShouldContain("<modified-files>");
     }
 
     [Fact]
@@ -216,7 +215,7 @@ public sealed class SessionCompactorTests
 
         var compacted = await compactor.CompactAsync(messages, options);
 
-        compacted[0].As<SystemAgentMessage>().Content.Should().Contain("## Goal");
+        compacted[0].ShouldBeOfType<SystemAgentMessage>().Content.ShouldContain("## Goal");
     }
 
     [Fact]
@@ -244,11 +243,11 @@ public sealed class SessionCompactorTests
             Model: MakeModel());
 
         var compacted = await compactor.CompactAsync(messages, options);
-        var summary = compacted[0].As<SystemAgentMessage>().Content;
+        var summary = compacted[0].ShouldBeOfType<SystemAgentMessage>().Content;
 
-        summary.Should().NotContain("Turn Context (split turn)");
+        summary.ShouldNotContain("Turn Context (split turn)");
         compacted.Skip(1).OfType<AgentUserMessage>().Select(message => message.Content)
-            .Should().ContainSingle().Which.Should().Be("keep this recent");
+            .ShouldHaveSingleItem().ShouldBe("keep this recent");
     }
 
     [Fact]
@@ -288,7 +287,7 @@ public sealed class SessionCompactorTests
             .ToHashSet(StringComparer.Ordinal);
 
         compacted.OfType<ToolResultAgentMessage>()
-            .Should().OnlyContain(toolResult => remainingToolCallIds.Contains(toolResult.ToolCallId));
+            .ShouldAllBe(toolResult => remainingToolCallIds.Contains(toolResult.ToolCallId));
     }
 
     [Fact]
@@ -302,6 +301,6 @@ public sealed class SessionCompactorTests
                 Usage: new BotNexus.Agent.Core.Types.AgentUsage(InputTokens: 7, OutputTokens: 11))
         };
 
-        compactor.EstimateTokens(messages).Should().Be(18);
+        compactor.EstimateTokens(messages).ShouldBe(18);
     }
 }

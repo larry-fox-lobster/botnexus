@@ -3,7 +3,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Api.Controllers;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -21,7 +20,7 @@ public sealed class AgentsControllerTests
 
         var result = controller.List();
 
-        ((result.Result as OkObjectResult)?.Value as IReadOnlyList<AgentDescriptor>).Should().HaveCount(1);
+        ((result.Result as OkObjectResult)?.Value as IReadOnlyList<AgentDescriptor>).Count().ShouldBe(1);
     }
 
     [Fact]
@@ -31,7 +30,7 @@ public sealed class AgentsControllerTests
 
         var result = controller.Get("missing");
 
-        result.Result.Should().BeOfType<NotFoundResult>();
+        result.Result.ShouldBeOfType<NotFoundResult>();
     }
 
     [Fact]
@@ -41,7 +40,7 @@ public sealed class AgentsControllerTests
 
         var result = await controller.Register(CreateDescriptor("agent-a"), CancellationToken.None);
 
-        result.Should().BeOfType<CreatedAtActionResult>();
+        result.ShouldBeOfType<CreatedAtActionResult>();
     }
 
     [Fact]
@@ -52,7 +51,7 @@ public sealed class AgentsControllerTests
 
         var result = await controller.Register(CreateDescriptor("agent-a"), CancellationToken.None);
 
-        result.Should().BeOfType<ConflictObjectResult>();
+        result.ShouldBeOfType<ConflictObjectResult>();
     }
 
     [Fact]
@@ -64,7 +63,7 @@ public sealed class AgentsControllerTests
 
         var result = await controller.Update("agent-a", CreateDescriptor("agent-b"), CancellationToken.None);
 
-        result.Result.Should().BeOfType<BadRequestObjectResult>();
+        result.Result.ShouldBeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
@@ -78,8 +77,8 @@ public sealed class AgentsControllerTests
         var result = await controller.Update("agent-a", payload, CancellationToken.None);
         var updated = (result.Result as OkObjectResult)?.Value as AgentDescriptor;
 
-        updated.Should().NotBeNull();
-        updated!.AgentId.Should().Be("agent-a");
+        updated.ShouldNotBeNull();
+        updated!.AgentId.Value.ShouldBe("agent-a");
     }
 
     [Fact]
@@ -109,7 +108,7 @@ public sealed class AgentsControllerTests
 
         var result = await controller.Update("agent-a", CreateDescriptor("agent-a") with { DisplayName = "updated" }, CancellationToken.None);
 
-        result.Result.Should().BeOfType<OkObjectResult>();
+        result.Result.ShouldBeOfType<OkObjectResult>();
         writer.Verify(w => w.SaveAsync(
             It.Is<AgentDescriptor>(d => d.AgentId == "agent-a" && d.DisplayName == "updated"),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -139,9 +138,9 @@ public sealed class AgentsControllerTests
         var result = await controller.GetHealth("agent-a", CancellationToken.None);
 
         var response = (result.Result as OkObjectResult)?.Value as AgentHealthResponse;
-        response.Should().NotBeNull();
-        response!.Status.Should().Be("unknown");
-        response.InstanceCount.Should().Be(0);
+        response.ShouldNotBeNull();
+        response!.Status.ShouldBe("unknown");
+        response.InstanceCount.ShouldBe(0);
     }
 
     [Fact]
@@ -151,7 +150,7 @@ public sealed class AgentsControllerTests
 
         var result = await controller.GetHealth("missing", CancellationToken.None);
 
-        result.Result.Should().BeOfType<NotFoundResult>();
+        result.Result.ShouldBeOfType<NotFoundResult>();
     }
 
     [Fact]
@@ -184,9 +183,9 @@ public sealed class AgentsControllerTests
         var result = await controller.GetHealth("agent-a", CancellationToken.None);
 
         var response = (result.Result as OkObjectResult)?.Value as AgentHealthResponse;
-        response.Should().NotBeNull();
-        response!.Status.Should().Be("unknown");
-        response.InstanceCount.Should().Be(1);
+        response.ShouldNotBeNull();
+        response!.Status.ShouldBe("unknown");
+        response.InstanceCount.ShouldBe(1);
     }
 
     [Fact]
@@ -222,9 +221,9 @@ public sealed class AgentsControllerTests
         var result = await controller.GetHealth("agent-a", CancellationToken.None);
 
         var response = (result.Result as OkObjectResult)?.Value as AgentHealthResponse;
-        response.Should().NotBeNull();
-        response!.Status.Should().Be("healthy");
-        response.InstanceCount.Should().Be(1);
+        response.ShouldNotBeNull();
+        response!.Status.ShouldBe("healthy");
+        response.InstanceCount.ShouldBe(1);
     }
 
     [Fact]
@@ -260,9 +259,9 @@ public sealed class AgentsControllerTests
         var result = await controller.GetHealth("agent-a", CancellationToken.None);
 
         var response = (result.Result as OkObjectResult)?.Value as AgentHealthResponse;
-        response.Should().NotBeNull();
-        response!.Status.Should().Be("unhealthy");
-        response.InstanceCount.Should().Be(1);
+        response.ShouldNotBeNull();
+        response!.Status.ShouldBe("unhealthy");
+        response.InstanceCount.ShouldBe(1);
     }
 
     private static AgentDescriptor CreateDescriptor(string agentId)

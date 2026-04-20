@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
-using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.Gateway.Tests;
@@ -32,11 +31,11 @@ public sealed class WorkspaceContextBuilderTests
                 SystemPromptFiles = ["AGENTS.md", "BOOTSTRAP.md", "TOOLS.md"]
             });
 
-            result.Should().Contain("AGENTS");
-            result.Should().Contain("BOOTSTRAP");
-            result.Should().Contain("TOOLS");
-            result.Should().NotContain("SOUL", "SOUL.md was not in the explicit prompt files list");
-            _fileSystem.File.Exists(Path.Combine(workspacePath, "BOOTSTRAP.md")).Should().BeFalse();
+            result.ShouldContain("AGENTS");
+            result.ShouldContain("BOOTSTRAP");
+            result.ShouldContain("TOOLS");
+            result.ShouldNotContain("SOUL");
+            _fileSystem.File.Exists(Path.Combine(workspacePath, "BOOTSTRAP.md")).ShouldBeFalse();
         }
         finally
         {
@@ -68,13 +67,13 @@ public sealed class WorkspaceContextBuilderTests
                 SystemPrompt = "INLINE"
             });
 
-            result.Should().Contain("AGENTS");
-            result.Should().Contain("SOUL");
-            result.Should().Contain("TOOLS");
-            result.Should().Contain("BOOTSTRAP");
-            result.Should().Contain("IDENTITY");
-            result.Should().Contain("USER");
-            _fileSystem.File.Exists(Path.Combine(workspacePath, "BOOTSTRAP.md")).Should().BeFalse();
+            result.ShouldContain("AGENTS");
+            result.ShouldContain("SOUL");
+            result.ShouldContain("TOOLS");
+            result.ShouldContain("BOOTSTRAP");
+            result.ShouldContain("IDENTITY");
+            result.ShouldContain("USER");
+            _fileSystem.File.Exists(Path.Combine(workspacePath, "BOOTSTRAP.md")).ShouldBeFalse();
         }
         finally
         {
@@ -100,8 +99,8 @@ public sealed class WorkspaceContextBuilderTests
                 ApiProvider = "test-provider"
             });
 
-            result.Should().Contain("AGENTS");
-            result.Should().Contain("BotNexus", "SystemPromptBuilder adds the BotNexus identity line");
+            result.ShouldContain("AGENTS");
+            result.ShouldContain("BotNexus");
         }
         finally
         {

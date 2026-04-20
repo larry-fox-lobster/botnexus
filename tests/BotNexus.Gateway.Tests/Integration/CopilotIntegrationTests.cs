@@ -10,7 +10,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Routing;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -39,8 +38,8 @@ public sealed class CopilotIntegrationTests
         if (ShouldSkipForLiveIssue(harness.Activity))
             return;
 
-        harness.Channel.SentMessages.Should().ContainSingle();
-        harness.Channel.SentMessages.Single().Content.Should().NotBeNullOrWhiteSpace();
+        harness.Channel.SentMessages.ShouldHaveSingleItem();
+        harness.Channel.SentMessages.Single().Content.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -59,8 +58,8 @@ public sealed class CopilotIntegrationTests
         if (ShouldSkipForLiveIssue(harness.Activity))
             return;
 
-        harness.Channel.StreamDeltas.Should().NotBeEmpty();
-        string.Concat(harness.Channel.StreamDeltas).Should().NotBeNullOrWhiteSpace();
+        harness.Channel.StreamDeltas.ShouldNotBeEmpty();
+        string.Concat(harness.Channel.StreamDeltas).ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -81,12 +80,12 @@ public sealed class CopilotIntegrationTests
             return;
 
         var session = await harness.Sessions.GetAsync("integration-session");
-        session.Should().NotBeNull();
-        session!.History.Select(entry => entry.Role).Should().ContainInOrder(
+        session.ShouldNotBeNull();
+        session!.History.Select(entry => entry.Role).ToList().ShouldBe(new[] {
             MessageRole.User,
             MessageRole.Assistant,
             MessageRole.User,
-            MessageRole.Assistant);
+            MessageRole.Assistant });
     }
 
     [Fact]
@@ -107,8 +106,8 @@ public sealed class CopilotIntegrationTests
 
         var session = await harness.Sessions.GetAsync("integration-session");
         var assistantContent = session?.History.LastOrDefault(entry => entry.Role == MessageRole.Assistant)?.Content;
-        assistantContent.Should().NotBeNullOrWhiteSpace();
-        assistantContent.Should().Be(string.Concat(harness.Channel.StreamDeltas));
+        assistantContent.ShouldNotBeNullOrWhiteSpace();
+        assistantContent.ShouldBe(string.Concat(harness.Channel.StreamDeltas));
     }
 
     [Fact]
@@ -125,8 +124,8 @@ public sealed class CopilotIntegrationTests
         await using var harness = CreateHarness(invalidAuth, supportsStreaming: false);
         await harness.Host.DispatchAsync(CreateMessage("This should fail auth."));
 
-        harness.Channel.SentMessages.Should().BeEmpty();
-        harness.Activity.Activities.Should().Contain(activity => activity.Type == GatewayActivityType.Error);
+        harness.Channel.SentMessages.ShouldBeEmpty();
+        harness.Activity.Activities.ShouldContain(activity => activity.Type == GatewayActivityType.Error);
     }
 
     [Fact]
@@ -147,11 +146,11 @@ public sealed class CopilotIntegrationTests
 
         harness.Router.Verify(r => r.ResolveAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()), Times.Once);
         harness.Supervisor.Verify(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("copilot-agent"), BotNexus.Domain.Primitives.SessionId.From("integration-session"), It.IsAny<CancellationToken>()), Times.Once);
-        harness.Channel.SentMessages.Should().ContainSingle();
-        harness.Activity.Activities.Select(a => a.Type).Should().ContainInOrder(
+        harness.Channel.SentMessages.ShouldHaveSingleItem();
+        harness.Activity.Activities.Select(a => a.Type).ToList().ShouldBe(new[] {
             GatewayActivityType.MessageReceived,
             GatewayActivityType.AgentProcessing,
-            GatewayActivityType.AgentCompleted);
+            GatewayActivityType.AgentCompleted });
     }
 
     [Fact]
@@ -171,8 +170,8 @@ public sealed class CopilotIntegrationTests
         if (ShouldSkipForLiveIssue(harness.Activity))
             return;
 
-        webUiChannel.SentMessages.Should().ContainSingle();
-        webUiChannel.SentMessages.Single().ChannelType.Should().Be(ChannelKey.From("web"));
+        webUiChannel.SentMessages.ShouldHaveSingleItem();
+        webUiChannel.SentMessages.Single().ChannelType.ShouldBe(ChannelKey.From("web"));
     }
 
     private static Harness CreateHarness(CopilotAuth auth, bool supportsStreaming, RecordingChannelAdapter? channel = null)

@@ -3,7 +3,6 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Extensions;
 using BotNexus.Gateway.Commands;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,7 +20,7 @@ public sealed class CommandsControllerTests
 
         var actionResult = await InvokeAsActionResultAsync(method!, controller, null);
 
-        actionResult.Should().BeOfType<OkObjectResult>();
+        actionResult.ShouldBeOfType<OkObjectResult>();
     }
 
     [Fact]
@@ -33,7 +32,7 @@ public sealed class CommandsControllerTests
 
         var actionResult = await InvokeAsActionResultAsync(method!, controller, [request, CancellationToken.None]);
 
-        actionResult.Should().BeOfType<OkObjectResult>();
+        actionResult.ShouldBeOfType<OkObjectResult>();
     }
 
     [Fact]
@@ -45,7 +44,7 @@ public sealed class CommandsControllerTests
 
         var actionResult = await InvokeAsActionResultAsync(method!, controller, [request, CancellationToken.None]);
 
-        actionResult.Should().BeOfType<BadRequestObjectResult>();
+        actionResult.ShouldBeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
@@ -58,7 +57,7 @@ public sealed class CommandsControllerTests
         var actionResult = await InvokeAsActionResultAsync(method!, controller, [request, CancellationToken.None]);
 
         var notFound = actionResult is NotFoundObjectResult or NotFoundResult;
-        notFound.Should().BeTrue();
+        notFound.ShouldBeTrue();
     }
 
     [Fact]
@@ -70,7 +69,7 @@ public sealed class CommandsControllerTests
 
         var actionResult = await InvokeAsActionResultAsync(method!, controller, [request, CancellationToken.None]);
 
-        actionResult.Should().BeOfType<BadRequestObjectResult>();
+        actionResult.ShouldBeOfType<BadRequestObjectResult>();
     }
 
     private static object CreateController()

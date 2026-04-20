@@ -1,5 +1,4 @@
 using BotNexus.Probe.Otel;
-using FluentAssertions;
 using System.Reflection;
 using System.Text.Json;
 
@@ -45,17 +44,17 @@ public sealed class OtlpTraceReceiverTests
 
         var spans = ParseSpans(document.RootElement).ToList();
 
-        spans.Should().ContainSingle();
+        spans.ShouldHaveSingleItem();
         var span = spans[0];
-        span.TraceId.Should().Be("trace-1");
-        span.SpanId.Should().Be("span-1");
-        span.ParentSpanId.Should().Be("root-0");
-        span.ServiceName.Should().Be("probe-service");
-        span.OperationName.Should().Be("GET /healthz");
-        span.Status.Should().Be("Ok");
-        span.Attributes["session.id"].Should().Be("sess-1");
-        span.Attributes["http.status_code"].Should().Be("200");
-        span.Duration.Should().Be(TimeSpan.FromSeconds(1));
+        span.TraceId.ShouldBe("trace-1");
+        span.SpanId.ShouldBe("span-1");
+        span.ParentSpanId.ShouldBe("root-0");
+        span.ServiceName.ShouldBe("probe-service");
+        span.OperationName.ShouldBe("GET /healthz");
+        span.Status.ShouldBe("Ok");
+        span.Attributes["session.id"].ShouldBe("sess-1");
+        span.Attributes["http.status_code"].ShouldBe("200");
+        span.Duration.ShouldBe(TimeSpan.FromSeconds(1));
     }
 
     [Fact]
@@ -64,8 +63,8 @@ public sealed class OtlpTraceReceiverTests
         using var emptyDoc = JsonDocument.Parse("{}");
         using var malformedShape = JsonDocument.Parse("""{ "resourceSpans": { "bad": true } }""");
 
-        ParseSpans(emptyDoc.RootElement).Should().BeEmpty();
-        ParseSpans(malformedShape.RootElement).Should().BeEmpty();
+        ParseSpans(emptyDoc.RootElement).ShouldBeEmpty();
+        ParseSpans(malformedShape.RootElement).ShouldBeEmpty();
     }
 
     [Fact]
@@ -91,7 +90,7 @@ public sealed class OtlpTraceReceiverTests
 
         store.AddSpans(ParseSpans(document.RootElement));
 
-        store.GetTraces(10).Should().ContainSingle();
+        store.GetTraces(10).ShouldHaveSingleItem();
     }
 
     private static IEnumerable<SpanModel> ParseSpans(JsonElement root)

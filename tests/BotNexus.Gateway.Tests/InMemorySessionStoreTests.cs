@@ -2,7 +2,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -15,7 +14,7 @@ public sealed class InMemorySessionStoreTests
 
         var session = await store.GetOrCreateAsync(SessionId.From("s1"), AgentId.From("agent-a"));
 
-        session.SessionId.Should().Be("s1");
+        session.SessionId.Value.ShouldBe("s1");
     }
 
     [Fact]
@@ -26,7 +25,7 @@ public sealed class InMemorySessionStoreTests
 
         var loaded = await store.GetOrCreateAsync(SessionId.From("s1"), AgentId.From("agent-b"));
 
-        loaded.Should().BeSameAs(created);
+        loaded.ShouldBeSameAs(created);
     }
 
     [Fact]
@@ -39,7 +38,7 @@ public sealed class InMemorySessionStoreTests
         await store.SaveAsync(session);
         var loaded = await store.GetAsync(SessionId.From("s1"));
 
-        loaded!.CallerId.Should().Be("caller-1");
+        loaded!.CallerId.ShouldBe("caller-1");
     }
 
     [Fact]
@@ -50,7 +49,7 @@ public sealed class InMemorySessionStoreTests
 
         await store.DeleteAsync(SessionId.From("s1"));
 
-        (await store.GetAsync(SessionId.From("s1"))).Should().BeNull();
+        (await store.GetAsync(SessionId.From("s1"))).ShouldBeNull();
     }
 
     [Fact]
@@ -61,7 +60,7 @@ public sealed class InMemorySessionStoreTests
 
         await store.ArchiveAsync(SessionId.From("s1"));
 
-        (await store.GetAsync(SessionId.From("s1"))).Should().BeNull();
+        (await store.GetAsync(SessionId.From("s1"))).ShouldBeNull();
     }
 
     [Fact]
@@ -73,7 +72,7 @@ public sealed class InMemorySessionStoreTests
 
         var sessions = await store.ListAsync();
 
-        sessions.Should().HaveCount(2);
+        sessions.Count().ShouldBe(2);
     }
 
     [Fact]
@@ -86,7 +85,7 @@ public sealed class InMemorySessionStoreTests
 
         var sessions = await store.ListAsync(AgentId.From("agent-a"));
 
-        sessions.Should().OnlyContain(s => s.AgentId == "agent-a");
+        sessions.ShouldAllBe(s => s.AgentId == "agent-a");
     }
 
     [Fact]
@@ -121,7 +120,7 @@ public sealed class InMemorySessionStoreTests
 
         var sessions = await store.ListByChannelAsync(AgentId.From("agent-a"), ChannelKey.From("web chat"));
 
-        sessions.Select(s => s.SessionId).Should().Equal("s-new", "s-old");
+        sessions.Select(s => s.SessionId.Value).ShouldBe(new[] { "s-new", "s-old" }, ignoreOrder: false);
     }
 
     [Fact]
@@ -131,7 +130,7 @@ public sealed class InMemorySessionStoreTests
 
         var session = await store.GetAsync(SessionId.From("unknown"));
 
-        session.Should().BeNull();
+        session.ShouldBeNull();
     }
 
     [Fact]
@@ -142,8 +141,8 @@ public sealed class InMemorySessionStoreTests
 
         var session = await store.GetOrCreateAsync(subSessionId, AgentId.From("agent-a"));
 
-        session.SessionType.Should().Be(SessionType.AgentSubAgent);
-        session.SessionId.Value.Should().Contain("::subagent::");
+        session.SessionType.ShouldBe(SessionType.AgentSubAgent);
+        session.SessionId.Value.ShouldContain("::subagent::");
     }
 
     [Fact]
@@ -179,7 +178,7 @@ public sealed class InMemorySessionStoreTests
                 Limit = 10
             });
 
-        sessions.Select(session => session.SessionId.Value).Should().Equal("participant");
+        sessions.Select(session => session.SessionId.Value).ShouldHaveSingleItem().ShouldBe("participant");
     }
 }
 

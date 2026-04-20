@@ -2,7 +2,6 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Api.Controllers;
-using FluentAssertions;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -21,7 +20,7 @@ public sealed class ChatControllerTests
 
         var result = await controller.Steer(new AgentControlRequest("agent-a", "session-1", "adjust"), CancellationToken.None);
 
-        result.Should().BeOfType<NotFoundObjectResult>();
+        result.ShouldBeOfType<NotFoundObjectResult>();
     }
 
     [Fact]
@@ -43,7 +42,7 @@ public sealed class ChatControllerTests
 
         var result = await controller.Steer(new AgentControlRequest("agent-a", "session-1", "adjust"), CancellationToken.None);
 
-        result.Should().BeOfType<AcceptedResult>();
+        result.ShouldBeOfType<AcceptedResult>();
         handle.Verify(h => h.SteerAsync("adjust", It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -66,7 +65,7 @@ public sealed class ChatControllerTests
 
         var result = await controller.FollowUp(new AgentControlRequest("agent-a", "session-1", "after this"), CancellationToken.None);
 
-        result.Should().BeOfType<AcceptedResult>();
+        result.ShouldBeOfType<AcceptedResult>();
         handle.Verify(h => h.FollowUpAsync("after this", It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -89,8 +88,8 @@ public sealed class ChatControllerTests
 
         var result = await controller.Send(new ChatRequest("agent-a", "hello"), CancellationToken.None);
 
-        result.Result.Should().BeOfType<ObjectResult>()
-            .Which.StatusCode.Should().Be(StatusCodes.Status429TooManyRequests);
+        result.Result.ShouldBeOfType<ObjectResult>()
+            .StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
     }
 
     [Fact]
@@ -104,7 +103,7 @@ public sealed class ChatControllerTests
 
         var result = await controller.Send(new ChatRequest("missing-agent", "hello"), CancellationToken.None);
 
-        result.Result.Should().BeOfType<NotFoundObjectResult>();
+        result.Result.ShouldBeOfType<NotFoundObjectResult>();
         sessionStore.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -117,7 +116,7 @@ public sealed class ChatControllerTests
 
         var result = await controller.Send(new ChatRequest("agent-a", ""), CancellationToken.None);
 
-        result.Result.Should().BeOfType<BadRequestObjectResult>();
+        result.Result.ShouldBeOfType<BadRequestObjectResult>();
         supervisor.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()), Times.Never);
         sessionStore.Verify(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<CancellationToken>()), Times.Never);
     }

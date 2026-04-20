@@ -1,5 +1,4 @@
 using BotNexus.Agent.Providers.Core.Utilities;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Utilities;
 
@@ -12,7 +11,7 @@ public class ContextOverflowDetectorTests
     [InlineData("400 status code (no body)")]
     public void IsContextOverflow_MatchingMessage_ReturnsTrue(string message)
     {
-        ContextOverflowDetector.IsContextOverflow(message).Should().BeTrue();
+        ContextOverflowDetector.IsContextOverflow(message).ShouldBeTrue();
     }
 
     [Theory]
@@ -22,7 +21,7 @@ public class ContextOverflowDetectorTests
     [InlineData("internal server error")]
     public void IsContextOverflow_NonOverflowMessage_ReturnsFalse(string message)
     {
-        ContextOverflowDetector.IsContextOverflow(message).Should().BeFalse();
+        ContextOverflowDetector.IsContextOverflow(message).ShouldBeFalse();
     }
 
     [Fact]
@@ -30,6 +29,6 @@ public class ContextOverflowDetectorTests
     {
         var ex = new Exception("outer", new InvalidOperationException("token limit exceeded"));
 
-        ContextOverflowDetector.IsContextOverflow(ex).Should().BeTrue();
+        ContextOverflowDetector.IsContextOverflow(ex).ShouldBeTrue();
     }
 }

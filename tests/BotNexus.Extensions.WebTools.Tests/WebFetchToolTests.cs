@@ -1,5 +1,4 @@
 using BotNexus.Extensions.WebTools.Tests.Helpers;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.WebTools.Tests;
 
@@ -16,7 +15,7 @@ public class WebFetchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Contain("Hello");
+        result.Content[0].Value.ShouldContain("Hello");
     }
 
     [Fact]
@@ -33,8 +32,8 @@ public class WebFetchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().StartWith("abcdefghij");
-        result.Content[0].Value.Should().Contain("Content truncated");
+        result.Content[0].Value.ShouldStartWith("abcdefghij");
+        result.Content[0].Value.ShouldContain("Content truncated");
     }
 
     [Fact]
@@ -52,7 +51,7 @@ public class WebFetchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Be(html);
+        result.Content[0].Value.ShouldBe(html);
     }
 
     [Fact]
@@ -69,7 +68,7 @@ public class WebFetchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Be("Hello [Link](https://example.com)");
+        result.Content[0].Value.ShouldBe("Hello [Link](https://example.com)");
     }
 
     [Fact]
@@ -87,7 +86,7 @@ public class WebFetchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().StartWith("56789A");
+        result.Content[0].Value.ShouldStartWith("56789A");
     }
 
     [Theory]
@@ -100,7 +99,7 @@ public class WebFetchToolTests
 
         var act = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?> { ["url"] = url });
 
-        await act.Should().ThrowAsync<ArgumentException>().WithMessage("*url is required*");
+        (await act.ShouldThrowAsync<ArgumentException>()).Message.ShouldContain("url is required");
     }
 
     [Fact]
@@ -113,7 +112,7 @@ public class WebFetchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Contain("HTTP 404");
+        result.Content[0].Value.ShouldContain("HTTP 404");
     }
 
     [Fact]
@@ -126,7 +125,7 @@ public class WebFetchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Contain("HTTP 500");
+        result.Content[0].Value.ShouldContain("HTTP 500");
     }
 
     [Fact]
@@ -139,7 +138,7 @@ public class WebFetchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Contain("Request timed out");
+        result.Content[0].Value.ShouldContain("Request timed out");
     }
 
     [Fact]
@@ -149,7 +148,7 @@ public class WebFetchToolTests
 
         var act = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?> { ["url"] = "not-a-url" });
 
-        await act.Should().ThrowAsync<ArgumentException>().WithMessage("*valid HTTP or HTTPS URL*");
+        (await act.ShouldThrowAsync<ArgumentException>()).Message.ShouldContain("valid HTTP or HTTPS URL");
     }
 
     [Theory]
@@ -161,7 +160,7 @@ public class WebFetchToolTests
 
         var act = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?> { ["url"] = url });
 
-        await act.Should().ThrowAsync<ArgumentException>().WithMessage("*valid HTTP or HTTPS URL*");
+        (await act.ShouldThrowAsync<ArgumentException>()).Message.ShouldContain("valid HTTP or HTTPS URL");
     }
 
     [Theory]
@@ -183,7 +182,7 @@ public class WebFetchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Contain("internal resource");
+        result.Content[0].Value.ShouldContain("internal resource");
     }
 
     [Fact]
@@ -198,7 +197,7 @@ public class WebFetchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Contain("dns content");
+        result.Content[0].Value.ShouldContain("dns content");
     }
 
     [Fact]
@@ -215,8 +214,10 @@ public class WebFetchToolTests
 
         _ = await tool.ExecuteAsync("call-1", args);
 
-        handler.Requests.Should().ContainSingle();
-        handler.Requests[0].RequestUri!.ToString().Should().NotContain("\r").And.NotContain("\n");
+        handler.Requests.ShouldHaveSingleItem();
+        var uri = handler.Requests[0].RequestUri!.ToString();
+        uri.ShouldNotContain("\r");
+        uri.ShouldNotContain("\n");
     }
 
     [Fact]
@@ -234,7 +235,7 @@ public class WebFetchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Contain("HTTP 302");
+        result.Content[0].Value.ShouldContain("HTTP 302");
     }
 
     [Fact]
@@ -253,8 +254,8 @@ public class WebFetchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Length.Should().BeLessThan(650);
-        result.Content[0].Value.Should().Contain("Content truncated");
+        result.Content[0].Value.Length.ShouldBeLessThan(650);
+        result.Content[0].Value.ShouldContain("Content truncated");
     }
 
     [Fact]
@@ -271,7 +272,7 @@ public class WebFetchToolTests
 
         var result = await tool.ExecuteAsync("call-1", args);
 
-        result.Content[0].Value.Should().Be("[No content at this offset]");
+        result.Content[0].Value.ShouldBe("[No content at this offset]");
     }
 
     private static WebFetchTool CreateTool(MockHttpMessageHandler handler)

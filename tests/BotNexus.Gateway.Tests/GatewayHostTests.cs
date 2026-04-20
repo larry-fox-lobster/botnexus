@@ -5,7 +5,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Routing;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -41,8 +40,10 @@ public sealed class GatewayHostTests
                 It.Is<OutboundMessage>(m => m.Content == "agent-response" && m.SessionId == "session-1"),
                 It.IsAny<CancellationToken>()),
             Times.Once);
-        session.History.Select(e => $"{e.Role}:{e.Content}").Should().ContainInOrder("user:hello", "assistant:agent-response");
-        activity.Activities.Select(a => a.Type).Should().Contain([GatewayActivityType.MessageReceived, GatewayActivityType.AgentProcessing, GatewayActivityType.AgentCompleted]);
+        session.History.Select(e => $"{e.Role}:{e.Content}").ToList().ShouldBe(new[] { "user:hello", "assistant:agent-response" });
+        activity.Activities.Select(a => a.Type).ShouldContain(GatewayActivityType.MessageReceived);
+        activity.Activities.Select(a => a.Type).ShouldContain(GatewayActivityType.AgentProcessing);
+        activity.Activities.Select(a => a.Type).ShouldContain(GatewayActivityType.AgentCompleted);
     }
 
     [Fact]
@@ -75,7 +76,7 @@ public sealed class GatewayHostTests
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
-        session.History.Should().Contain(e => e.Role == MessageRole.Assistant && e.Content == "hello world");
+        session.History.ShouldContain(e => e.Role == MessageRole.Assistant && e.Content == "hello world");
         channel.Verify(c => c.SendStreamDeltaAsync("conv-1", "hello ", It.IsAny<CancellationToken>()), Times.Once);
         channel.Verify(c => c.SendStreamDeltaAsync("conv-1", "world", It.IsAny<CancellationToken>()), Times.Once);
         sessions.Verify(s => s.SaveAsync(session, It.IsAny<CancellationToken>()), Times.Once);
@@ -119,10 +120,10 @@ public sealed class GatewayHostTests
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
-        activity.Activities.Select(a => a.Type).Should().ContainInOrder(
+        activity.Activities.Select(a => a.Type).ToList().ShouldBe(new[] {
             GatewayActivityType.MessageReceived,
             GatewayActivityType.AgentProcessing,
-            GatewayActivityType.AgentCompleted);
+            GatewayActivityType.AgentCompleted });
     }
 
     [Fact]
@@ -150,9 +151,9 @@ public sealed class GatewayHostTests
         await Task.WhenAll(dispatches);
 
         var allSessions = await sessions.ListAsync();
-        allSessions.Should().HaveCount(20);
-        allSessions.Should().OnlyContain(s => s.History.Count == 2);
-        activity.Activities.Count(a => a.Type == GatewayActivityType.Error).Should().Be(0);
+        allSessions.Count().ShouldBe(20);
+        allSessions.ShouldAllBe(s => s.History.Count == 2);
+        activity.Activities.Count(a => a.Type == GatewayActivityType.Error).ShouldBe(0);
     }
 
     [Fact]
@@ -179,7 +180,7 @@ public sealed class GatewayHostTests
 
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
-        activity.Activities.Should().Contain(a => a.Type == GatewayActivityType.Error && a.Message == "boom");
+        activity.Activities.ShouldContain(a => a.Type == GatewayActivityType.Error && a.Message == "boom");
         sessions.Verify(s => s.SaveAsync(It.IsAny<GatewaySession>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -233,7 +234,7 @@ public sealed class GatewayHostTests
 
         await host.DispatchAsync(CreateMessage("run", channelType: "cron", conversationId: "cron:job-1:run-1", sessionId: "cron:job-1:run-1"));
 
-        session.ChannelType.Should().Be(ChannelKey.From("cron"));
+        session.ChannelType.ShouldBe(ChannelKey.From("cron"));
     }
 
     [Fact]
@@ -259,10 +260,10 @@ public sealed class GatewayHostTests
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
         var reloaded = await sessions.GetAsync("session-1");
-        reloaded.Should().NotBeNull();
-        reloaded!.Status.Should().Be(SessionStatus.Active);
-        reloaded.ExpiresAt.Should().BeNull();
-        reloaded.History.Select(e => $"{e.Role}:{e.Content}").Should().ContainInOrder("user:hello", "assistant:agent-response");
+        reloaded.ShouldNotBeNull();
+        reloaded!.Status.ShouldBe(SessionStatus.Active);
+        reloaded.ExpiresAt.ShouldBeNull();
+        reloaded.History.Select(e => $"{e.Role}:{e.Content}").ToList().ShouldBe(new[] { "user:hello", "assistant:agent-response" });
         channel.Verify(c => c.SendAsync(
                 It.Is<OutboundMessage>(m => m.Content == "agent-response" && m.SessionId == "session-1"),
                 It.IsAny<CancellationToken>()),
@@ -289,7 +290,7 @@ public sealed class GatewayHostTests
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
         var reloaded = await sessions.GetAsync("session-1");
-        reloaded!.Status.Should().Be(SessionStatus.Active);
+        reloaded!.Status.ShouldBe(SessionStatus.Active);
         supervisor.Verify(s => s.GetOrCreateAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), BotNexus.Domain.Primitives.SessionId.From("session-1"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -337,8 +338,8 @@ public sealed class GatewayHostTests
         await host.DispatchAsync(CreateMessage("hello", sessionId: "session-1"));
 
         var reloaded = await sessions.GetAsync("session-1");
-        reloaded.Should().NotBeNull();
-        reloaded!.ExpiresAt.Should().BeNull();
+        reloaded.ShouldNotBeNull();
+        reloaded!.ExpiresAt.ShouldBeNull();
     }
 
     [Fact]
@@ -689,7 +690,7 @@ public sealed class GatewayHostTests
         var second = host.DispatchAsync(CreateMessage("two", sessionId: "session-1"));
         await Task.WhenAll(first, second);
 
-        maxInFlight.Should().Be(1);
+        maxInFlight.ShouldBe(1);
         handle.Verify(h => h.PromptAsync("one", It.IsAny<CancellationToken>()), Times.Once);
         handle.Verify(h => h.PromptAsync("two", It.IsAny<CancellationToken>()), Times.Once);
     }

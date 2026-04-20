@@ -3,7 +3,6 @@ using System.Text;
 using System.Text.Json;
 using BotNexus.Agent.Providers.Anthropic;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Anthropic.Tests;
 
@@ -14,7 +13,7 @@ public class AnthropicProviderTests
     {
         var provider = new AnthropicProvider(new HttpClient());
 
-        provider.Api.Should().Be("anthropic-messages");
+        provider.Api.ShouldBe("anthropic-messages");
     }
 
     [Fact]
@@ -31,7 +30,7 @@ public class AnthropicProviderTests
         // StreamSimple returns a stream immediately (HTTP is async in background)
         var stream = provider.StreamSimple(model, context, options);
 
-        stream.Should().NotBeNull();
+        stream.ShouldNotBeNull();
     }
 
     [Fact]
@@ -47,7 +46,7 @@ public class AnthropicProviderTests
 
         var stream = provider.StreamSimple(model, context, options);
 
-        stream.Should().NotBeNull();
+        stream.ShouldNotBeNull();
     }
 
     [Fact]
@@ -59,7 +58,7 @@ public class AnthropicProviderTests
 
         var stream = provider.StreamSimple(model, context);
 
-        stream.Should().NotBeNull();
+        stream.ShouldNotBeNull();
     }
 
     [Fact]
@@ -82,8 +81,7 @@ public class AnthropicProviderTests
             .GetProperty("thinking")
             .GetProperty("budget_tokens")
             .GetInt32()
-            .Should()
-            .Be(1024);
+            .ShouldBe(1024);
     }
 
     [Theory]
@@ -110,7 +108,7 @@ public class AnthropicProviderTests
         if (body.RootElement.TryGetProperty("output_config", out var outputConfig) &&
             outputConfig.TryGetProperty("effort", out var effort))
         {
-            effort.GetString().Should().Be(expectedEffort);
+            effort.GetString().ShouldBe(expectedEffort);
             return;
         }
 
@@ -118,8 +116,7 @@ public class AnthropicProviderTests
             .GetProperty("thinking")
             .GetProperty("budget_tokens")
             .GetInt32()
-            .Should()
-            .Be(16384);
+            .ShouldBe(16384);
     }
 
     private sealed class RecordingHandler : HttpMessageHandler

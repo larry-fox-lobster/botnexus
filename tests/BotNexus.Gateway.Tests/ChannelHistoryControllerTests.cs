@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Api.Controllers;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BotNexus.Gateway.Tests;
@@ -30,11 +29,11 @@ public sealed class ChannelHistoryControllerTests
         var result = await controller.GetHistory("web chat", "agent-a", limit: 4, cancellationToken: CancellationToken.None);
 
         var payload = (result.Result as OkObjectResult)?.Value as ChannelHistoryResponse;
-        payload.Should().NotBeNull();
-        payload!.Messages.Select(message => message.Content).Should().Equal("o1", "n0", "n1", "n2");
-        payload.NextCursor.Should().Be("s-old:1");
-        payload.HasMore.Should().BeTrue();
-        payload.SessionBoundaries.Should().ContainSingle();
+        payload.ShouldNotBeNull();
+        payload!.Messages.Select(message => message.Content).ShouldBe(new[] { "o1", "n0", "n1", "n2" });
+        payload.NextCursor.ShouldBe("s-old:1");
+        payload.HasMore.ShouldBeTrue();
+        payload.SessionBoundaries.ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -59,10 +58,10 @@ public sealed class ChannelHistoryControllerTests
         var result = await controller.GetHistory("web chat", "agent-a", cursor: "s-new:0", limit: 10, cancellationToken: CancellationToken.None);
 
         var payload = (result.Result as OkObjectResult)?.Value as ChannelHistoryResponse;
-        payload.Should().NotBeNull();
-        payload!.Messages.Select(message => message.Content).Should().Equal("o0", "o1");
-        payload.HasMore.Should().BeFalse();
-        payload.NextCursor.Should().BeNull();
+        payload.ShouldNotBeNull();
+        payload!.Messages.Select(message => message.Content).ShouldBe(new[] { "o0", "o1" });
+        payload.HasMore.ShouldBeFalse();
+        payload.NextCursor.ShouldBeNull();
     }
 
     [Fact]
@@ -80,7 +79,7 @@ public sealed class ChannelHistoryControllerTests
 
         var result = await controller.GetHistory("web chat", "agent-a", cursor: "bad-cursor", cancellationToken: CancellationToken.None);
 
-        result.Result.Should().BeOfType<BadRequestObjectResult>();
+        result.Result.ShouldBeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
@@ -99,8 +98,8 @@ public sealed class ChannelHistoryControllerTests
         var result = await controller.GetHistory("web chat", "agent-a", cancellationToken: CancellationToken.None);
 
         var payload = (result.Result as OkObjectResult)?.Value as ChannelHistoryResponse;
-        payload.Should().NotBeNull();
-        payload!.Messages.Select(message => message.Content).Should().Equal("hello");
+        payload.ShouldNotBeNull();
+        payload!.Messages.ShouldHaveSingleItem().Content.ShouldBe("hello");
     }
 
     private static GatewaySession CreateSession(

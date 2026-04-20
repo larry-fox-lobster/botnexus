@@ -6,7 +6,6 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Sessions;
 using BotNexus.Gateway.Tools;
-using FluentAssertions;
 using Moq;
 
 namespace BotNexus.Gateway.Tests.Tools;
@@ -17,8 +16,8 @@ public sealed class AgentConverseToolTests
     public void Tool_HasExpectedNameAndLabel()
     {
         var tool = new AgentConverseTool(Mock.Of<IAgentConversationService>(), new InMemorySessionStore(), "nova", "session-1");
-        tool.Name.Should().Be("agent_converse");
-        tool.Label.Should().Be("Agent Converse");
+        tool.Name.ShouldBe("agent_converse");
+        tool.Label.ShouldBe("Agent Converse");
     }
 
     [Fact]
@@ -26,9 +25,9 @@ public sealed class AgentConverseToolTests
     {
         var tool = new AgentConverseTool(Mock.Of<IAgentConversationService>(), new InMemorySessionStore(), "nova", "session-1");
 
-        var action = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?>());
+        Func<Task> action = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?>());
 
-        await action.Should().ThrowAsync<ArgumentException>();
+        await action.ShouldThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -59,8 +58,8 @@ public sealed class AgentConverseToolTests
             ["message"] = "Review this plan"
         });
 
-        captured.Should().NotBeNull();
-        captured!.CallChain.Select(id => id.Value).Should().Equal("alpha", "nova");
+        captured.ShouldNotBeNull();
+        captured!.CallChain.Select(id => id.Value).ShouldBe(new[] { "alpha", "nova" });
     }
 
     [Fact]
@@ -88,10 +87,10 @@ public sealed class AgentConverseToolTests
             ["maxTurns"] = 3
         });
 
-        captured.Should().NotBeNull();
-        captured!.CallChain.Select(id => id.Value).Should().Equal("nova");
-        captured.MaxTurns.Should().Be(3);
-        ReadText(result).Should().Contain("\"sessionId\"");
+        captured.ShouldNotBeNull();
+        captured!.CallChain.ShouldHaveSingleItem().Value.ShouldBe("nova");
+        captured.MaxTurns.ShouldBe(3);
+        ReadText(result).ShouldContain("\"sessionId\"");
     }
 
     private static string ReadText(AgentToolResult result)

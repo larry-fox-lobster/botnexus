@@ -3,7 +3,6 @@ using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Hooks;
 using BotNexus.Gateway.Security;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -36,7 +35,7 @@ public sealed class ToolPolicyTests
     public void GetRiskLevel_KnownDangerousTools_ReturnsDangerous(string toolName, ToolRiskLevel expected)
     {
         var provider = CreateProvider();
-        provider.GetRiskLevel(toolName).Should().Be(expected);
+        provider.GetRiskLevel(toolName).ShouldBe(expected);
     }
 
     [Theory]
@@ -46,7 +45,7 @@ public sealed class ToolPolicyTests
     public void GetRiskLevel_SafeTools_ReturnsSafe(string toolName)
     {
         var provider = CreateProvider();
-        provider.GetRiskLevel(toolName).Should().Be(ToolRiskLevel.Safe);
+        provider.GetRiskLevel(toolName).ShouldBe(ToolRiskLevel.Safe);
     }
 
     // ── Approval defaults ────────────────────────────────────────────
@@ -58,14 +57,14 @@ public sealed class ToolPolicyTests
     public void RequiresApproval_DangerousTool_ReturnsTrue(string toolName)
     {
         var provider = CreateProvider();
-        provider.RequiresApproval(toolName).Should().BeTrue();
+        provider.RequiresApproval(toolName).ShouldBeTrue();
     }
 
     [Fact]
     public void RequiresApproval_SafeTool_ReturnsFalse()
     {
         var provider = CreateProvider();
-        provider.RequiresApproval("read").Should().BeFalse();
+        provider.RequiresApproval("read").ShouldBeFalse();
     }
 
     // ── Per-agent override: NeverApprove ──────────────────────────────
@@ -88,10 +87,10 @@ public sealed class ToolPolicyTests
         };
 
         var provider = CreateProvider(config);
-        provider.RequiresApproval("exec", "test-agent-1").Should().BeFalse();
-        provider.RequiresApproval("bash", "test-agent-1").Should().BeFalse();
+        provider.RequiresApproval("exec", "test-agent-1").ShouldBeFalse();
+        provider.RequiresApproval("bash", "test-agent-1").ShouldBeFalse();
         // Other agents still require approval
-        provider.RequiresApproval("exec", "test-agent-2").Should().BeTrue();
+        provider.RequiresApproval("exec", "test-agent-2").ShouldBeTrue();
     }
 
     // ── Per-agent override: AlwaysApprove ─────────────────────────────
@@ -115,7 +114,7 @@ public sealed class ToolPolicyTests
 
         var provider = CreateProvider(config);
         // read is normally safe, but this agent requires approval
-        provider.RequiresApproval("read", "test-agent-1").Should().BeTrue();
+        provider.RequiresApproval("read", "test-agent-1").ShouldBeTrue();
     }
 
     // ── HTTP deny list ───────────────────────────────────────────────
@@ -126,11 +125,11 @@ public sealed class ToolPolicyTests
         var provider = CreateProvider();
         var denied = provider.GetDeniedForHttp();
 
-        denied.Should().Contain("sessions_spawn");
-        denied.Should().Contain("sessions_send");
-        denied.Should().Contain("cron");
-        denied.Should().Contain("gateway");
-        denied.Should().Contain("whatsapp_login");
+        denied.ShouldContain("sessions_spawn");
+        denied.ShouldContain("sessions_send");
+        denied.ShouldContain("cron");
+        denied.ShouldContain("gateway");
+        denied.ShouldContain("whatsapp_login");
     }
 
     // ── Per-agent denied tools ───────────────────────────────────────
@@ -153,8 +152,8 @@ public sealed class ToolPolicyTests
         };
 
         var provider = CreateProvider(config);
-        provider.IsDenied("exec", "test-agent-1").Should().BeTrue();
-        provider.IsDenied("read", "test-agent-1").Should().BeFalse();
+        provider.IsDenied("exec", "test-agent-1").ShouldBeTrue();
+        provider.IsDenied("read", "test-agent-1").ShouldBeFalse();
     }
 
     // ── Hook handler: denied tool ────────────────────────────────────
@@ -187,9 +186,9 @@ public sealed class ToolPolicyTests
 
         var result = await handler.HandleAsync(evt);
 
-        result.Should().NotBeNull();
-        result!.Denied.Should().BeTrue();
-        result.DenyReason.Should().Contain("exec");
+        result.ShouldNotBeNull();
+        result!.Denied.ShouldBeTrue();
+        result.DenyReason.ShouldContain("exec");
     }
 
     [Fact]
@@ -205,7 +204,7 @@ public sealed class ToolPolicyTests
             new Dictionary<string, object?> { ["file"] = "readme.md" });
 
         var result = await handler.HandleAsync(evt);
-        result.Should().BeNull();
+        result.ShouldBeNull();
     }
 
     [Fact]
@@ -222,7 +221,7 @@ public sealed class ToolPolicyTests
             new Dictionary<string, object?> { ["cmd"] = "echo hello" });
 
         var result = await handler.HandleAsync(evt);
-        result.Should().BeNull();
+        result.ShouldBeNull();
     }
 
     [Fact]
@@ -233,6 +232,6 @@ public sealed class ToolPolicyTests
             provider,
             NullLogger<ToolPolicyHookHandler>.Instance);
 
-        handler.Priority.Should().BeLessThan(0, "policy handler should run before other handlers");
+        handler.Priority.ShouldBeLessThan(0, "policy handler should run before other handlers");
     }
 }

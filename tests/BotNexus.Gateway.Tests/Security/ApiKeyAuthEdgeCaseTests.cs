@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Security;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BotNexus.Gateway.Tests.Security;
@@ -16,8 +15,8 @@ public sealed class ApiKeyAuthEdgeCaseTests
 
         var result = await handler.AuthenticateAsync(CreateContext([new KeyValuePair<string, string>("X-Api-Key", string.Empty)]));
 
-        result.IsAuthenticated.Should().BeFalse();
-        result.FailureReason.Should().StartWith("Missing API key");
+        result.IsAuthenticated.ShouldBeFalse();
+        result.FailureReason.ShouldStartWith("Missing API key");
     }
 
     [Fact]
@@ -27,8 +26,8 @@ public sealed class ApiKeyAuthEdgeCaseTests
 
         var result = await handler.AuthenticateAsync(CreateContext([new KeyValuePair<string, string>("X-Api-Key", "   ")]));
 
-        result.IsAuthenticated.Should().BeFalse();
-        result.FailureReason.Should().StartWith("Missing API key");
+        result.IsAuthenticated.ShouldBeFalse();
+        result.FailureReason.ShouldStartWith("Missing API key");
     }
 
     [Fact]
@@ -39,8 +38,8 @@ public sealed class ApiKeyAuthEdgeCaseTests
 
         var result = await handler.AuthenticateAsync(CreateContext([new KeyValuePair<string, string>("X-Api-Key", longToken)]));
 
-        result.IsAuthenticated.Should().BeFalse();
-        result.FailureReason.Should().Be("Invalid API key.");
+        result.IsAuthenticated.ShouldBeFalse();
+        result.FailureReason.ShouldBe("Invalid API key.");
     }
 
     [Fact]
@@ -51,8 +50,8 @@ public sealed class ApiKeyAuthEdgeCaseTests
 
         var result = await handler.AuthenticateAsync(CreateContext([new KeyValuePair<string, string>("X-Api-Key", longToken)]));
 
-        result.IsAuthenticated.Should().BeTrue();
-        result.Identity!.CallerId.Should().Be("gateway-api-key");
+        result.IsAuthenticated.ShouldBeTrue();
+        result.Identity!.CallerId.ShouldBe("gateway-api-key");
     }
 
     [Fact]
@@ -62,8 +61,8 @@ public sealed class ApiKeyAuthEdgeCaseTests
 
         var result = await handler.AuthenticateAsync(CreateContext([new KeyValuePair<string, string>("Authorization", "Bearer ")]));
 
-        result.IsAuthenticated.Should().BeFalse();
-        result.FailureReason.Should().StartWith("Missing API key");
+        result.IsAuthenticated.ShouldBeFalse();
+        result.FailureReason.ShouldStartWith("Missing API key");
     }
 
     [Fact]
@@ -73,8 +72,8 @@ public sealed class ApiKeyAuthEdgeCaseTests
 
         var result = await handler.AuthenticateAsync(CreateContext([new KeyValuePair<string, string>("Authorization", "Bearertoken123")]));
 
-        result.IsAuthenticated.Should().BeFalse();
-        result.FailureReason.Should().StartWith("Missing API key");
+        result.IsAuthenticated.ShouldBeFalse();
+        result.FailureReason.ShouldStartWith("Missing API key");
     }
 
     [Fact]
@@ -84,8 +83,8 @@ public sealed class ApiKeyAuthEdgeCaseTests
 
         var result = await handler.AuthenticateAsync(CreateContext([new KeyValuePair<string, string>("X-Api-Key", "secret\0") ]));
 
-        result.IsAuthenticated.Should().BeFalse();
-        result.FailureReason.Should().Be("Invalid API key.");
+        result.IsAuthenticated.ShouldBeFalse();
+        result.FailureReason.ShouldBe("Invalid API key.");
     }
 
     [Fact]
@@ -108,8 +107,8 @@ public sealed class ApiKeyAuthEdgeCaseTests
         var secondAuthTask = handler.AuthenticateAsync(CreateContext([new KeyValuePair<string, string>("Authorization", "Bearer token-b") ]));
         var results = await Task.WhenAll(firstAuthTask, secondAuthTask);
 
-        results.Should().OnlyContain(r => r.IsAuthenticated);
-        results.Select(r => r.Identity!.CallerId).Should().BeEquivalentTo("caller-a", "caller-b");
+        results.ShouldAllBe(r => r.IsAuthenticated);
+        results.Select(r => r.Identity!.CallerId).ShouldBe(["caller-a", "caller-b"]);
     }
 
     private static GatewayAuthContext CreateContext(IEnumerable<KeyValuePair<string, string>> headers)

@@ -14,7 +14,6 @@ using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
 using BotNexus.Tools;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Abstractions;
@@ -49,8 +48,8 @@ public sealed class ToolHookWiringTests
             new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-hook-1") });
 
         // The handle should be created with hook delegates wired.
-        handle.Should().NotBeNull();
-        handle.AgentId.Should().Be("agent-hook");
+        handle.ShouldNotBeNull();
+        handle.AgentId.Value.ShouldBe("agent-hook");
     }
 
     // ── AfterToolCall fires ──────────────────────────────────────────
@@ -64,7 +63,7 @@ public sealed class ToolHookWiringTests
                 priority: 0,
                 evt =>
                 {
-                    evt.AgentId.Value.Should().NotBeNullOrEmpty();
+                    evt.AgentId.Value.ShouldNotBeNullOrEmpty();
                     return new AfterToolCallResult();
                 }));
 
@@ -74,10 +73,10 @@ public sealed class ToolHookWiringTests
             CreateDescriptor(),
             new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-hook-2") });
 
-        handle.Should().NotBeNull();
+        handle.ShouldNotBeNull();
         // AfterToolCall is wired — it fires during actual tool execution,
         // but we validate the dispatcher received the registration.
-        dispatcher.Should().NotBeNull();
+        dispatcher.ShouldNotBeNull();
     }
 
     // ── No dispatcher registered ─────────────────────────────────────
@@ -92,7 +91,7 @@ public sealed class ToolHookWiringTests
             CreateDescriptor(),
             new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-hook-3") });
 
-        handle.Should().NotBeNull();
+        handle.ShouldNotBeNull();
     }
 
     // ── Integration: dispatcher wires both hooks ─────────────────────
@@ -106,7 +105,7 @@ public sealed class ToolHookWiringTests
                 priority: 0,
                 evt =>
                 {
-                    evt.ToolName.Should().NotBeNullOrEmpty();
+                    evt.ToolName.ShouldNotBeNullOrEmpty();
                     return null; // allow
                 }));
 
@@ -121,7 +120,7 @@ public sealed class ToolHookWiringTests
             CreateDescriptor(),
             new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-hook-4") });
 
-        handle.Should().NotBeNull();
+        handle.ShouldNotBeNull();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────

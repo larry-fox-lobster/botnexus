@@ -1,7 +1,6 @@
 using BotNexus.Agent.Core.Types;
 using BotNexus.Memory.Tests.TestInfrastructure;
 using BotNexus.Memory.Tools;
-using FluentAssertions;
 
 namespace BotNexus.Memory.Tests.Tools;
 
@@ -19,8 +18,8 @@ public sealed class MemoryGetToolTests
             new Dictionary<string, object?> { ["id"] = "entry-1" });
 
         var text = GetText(result);
-        text.Should().Contain("ID: entry-1");
-        text.Should().Contain("Content: stored content");
+        text.ShouldContain("ID: entry-1");
+        text.ShouldContain("Content: stored content");
     }
 
     [Fact]
@@ -36,9 +35,9 @@ public sealed class MemoryGetToolTests
             new Dictionary<string, object?> { ["sessionId"] = "session-1" });
 
         var text = GetText(result);
-        text.Should().Contain("Session 'session-1' memories (2):");
-        text.Should().Contain("ID: entry-1");
-        text.Should().Contain("ID: entry-2");
+        text.ShouldContain("Session 'session-1' memories (2):");
+        text.ShouldContain("ID: entry-1");
+        text.ShouldContain("ID: entry-2");
     }
 
     [Fact]
@@ -51,7 +50,7 @@ public sealed class MemoryGetToolTests
             "call-3",
             new Dictionary<string, object?> { ["id"] = "missing-id" });
 
-        GetText(result).Should().Be("Memory entry not found.");
+        GetText(result).ShouldBe("Memory entry not found.");
     }
 
     private static string GetText(AgentToolResult result)

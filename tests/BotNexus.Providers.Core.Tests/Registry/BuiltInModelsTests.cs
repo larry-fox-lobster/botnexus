@@ -1,5 +1,4 @@
 using BotNexus.Agent.Providers.Core.Registry;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Registry;
 
@@ -13,7 +12,7 @@ public sealed class BuiltInModelsTests
         new BuiltInModels().RegisterAll(registry);
         var models = registry.GetModels("github-copilot");
 
-        models.Should().NotBeEmpty();
+        models.ShouldNotBeEmpty();
     }
 
     [Fact]
@@ -24,9 +23,9 @@ public sealed class BuiltInModelsTests
         new BuiltInModels().RegisterAll(registry);
         var models = registry.GetModels("anthropic");
 
-        models.Should().Contain(model => model.Id == "claude-sonnet-4-20250514");
-        models.Should().Contain(model => model.Id == "claude-opus-4-5-20250929");
-        models.Should().Contain(model => model.Id.StartsWith("claude-sonnet-4", StringComparison.Ordinal));
+        models.ShouldContain(model => model.Id == "claude-sonnet-4-20250514");
+        models.ShouldContain(model => model.Id == "claude-opus-4-5-20250929");
+        models.ShouldContain(model => model.Id.StartsWith("claude-sonnet-4", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -37,8 +36,8 @@ public sealed class BuiltInModelsTests
         new BuiltInModels().RegisterAll(registry);
         var models = registry.GetModels("openai");
 
-        models.Should().Contain(model => model.Id == "gpt-4.1");
-        models.Should().Contain(model => model.Id == "gpt-4o");
+        models.ShouldContain(model => model.Id == "gpt-4.1");
+        models.ShouldContain(model => model.Id == "gpt-4o");
     }
 
     [Fact]
@@ -51,7 +50,7 @@ public sealed class BuiltInModelsTests
             .SelectMany(registry.GetModels)
             .ToList();
 
-        models.Should().OnlyContain(model =>
+        models.ShouldAllBe(model =>
             !string.IsNullOrWhiteSpace(model.Id) &&
             model.ContextWindow > 0 &&
             model.MaxTokens > 0);
@@ -64,9 +63,9 @@ public sealed class BuiltInModelsTests
 
         new BuiltInModels().RegisterAll(registry);
 
-        registry.GetModels("github-copilot").Should().NotBeEmpty();
-        registry.GetModels("anthropic").Should().NotBeEmpty();
-        registry.GetModels("openai").Should().NotBeEmpty();
+        registry.GetModels("github-copilot").ShouldNotBeEmpty();
+        registry.GetModels("anthropic").ShouldNotBeEmpty();
+        registry.GetModels("openai").ShouldNotBeEmpty();
     }
 
     [Fact]
@@ -79,8 +78,8 @@ public sealed class BuiltInModelsTests
             .Concat(registry.GetModels("openai"))
             .ToList();
 
-        directModels.Should().NotBeEmpty();
-        directModels.Should().OnlyContain(model =>
+        directModels.ShouldNotBeEmpty();
+        directModels.ShouldAllBe(model =>
             !string.IsNullOrWhiteSpace(model.Id) &&
             model.ContextWindow > 0 &&
             model.MaxTokens > 0);

@@ -1,6 +1,5 @@
 using BotNexus.Extensions.Mcp.Protocol;
 using BotNexus.Extensions.Mcp.Transport;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Mcp.Tests;
 
@@ -13,7 +12,7 @@ public class StdioTransportTests
     [Fact]
     public void ResolveEnvValue_PassesThrough_NonPatternValues()
     {
-        StdioMcpTransport.ResolveEnvValue("plain-value").Should().Be("plain-value");
+        StdioMcpTransport.ResolveEnvValue("plain-value").ShouldBe("plain-value");
     }
 
     [Fact]
@@ -22,7 +21,7 @@ public class StdioTransportTests
         Environment.SetEnvironmentVariable("MCP_TEST_VAR", "resolved-value");
         try
         {
-            StdioMcpTransport.ResolveEnvValue("${env:MCP_TEST_VAR}").Should().Be("resolved-value");
+            StdioMcpTransport.ResolveEnvValue("${env:MCP_TEST_VAR}").ShouldBe("resolved-value");
         }
         finally
         {
@@ -35,7 +34,7 @@ public class StdioTransportTests
     {
         Environment.SetEnvironmentVariable("MCP_MISSING_VAR", null);
         StdioMcpTransport.ResolveEnvValue("${env:MCP_MISSING_VAR:-fallback}")
-            .Should().Be("fallback");
+            .ShouldBe("fallback");
     }
 
     [Fact]
@@ -43,7 +42,7 @@ public class StdioTransportTests
     {
         Environment.SetEnvironmentVariable("MCP_MISSING_VAR2", null);
         StdioMcpTransport.ResolveEnvValue("${env:MCP_MISSING_VAR2}")
-            .Should().BeEmpty();
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -53,7 +52,7 @@ public class StdioTransportTests
         var (fileName, args) = StdioMcpTransport.ResolveCommand("node", ["server.js"]);
 
         // On any OS, we get the command and args back
-        args.Should().Contain("server.js");
+        args.ShouldContain("server.js");
     }
 
     [Fact]
@@ -63,7 +62,7 @@ public class StdioTransportTests
 
         // Should throw because the command doesn't exist
         var act = () => transport.ConnectAsync();
-        await act.Should().ThrowAsync<Exception>();
+        await act.ShouldThrowAsync<Exception>();
 
         await transport.DisposeAsync();
     }
@@ -75,7 +74,7 @@ public class StdioTransportTests
         try
         {
             StdioMcpTransport.ResolveEnvValue("${env:MCP_WITH_DEFAULT_SET:-fallback}")
-                .Should().Be("actual-value");
+                .ShouldBe("actual-value");
         }
         finally
         {
@@ -87,15 +86,15 @@ public class StdioTransportTests
     public void ResolveEnvValue_PartialPattern_IsPassedThrough()
     {
         // Missing closing brace
-        StdioMcpTransport.ResolveEnvValue("${env:INCOMPLETE").Should().Be("${env:INCOMPLETE");
+        StdioMcpTransport.ResolveEnvValue("${env:INCOMPLETE").ShouldBe("${env:INCOMPLETE");
         // Not starting with ${env:
-        StdioMcpTransport.ResolveEnvValue("$env:VAR}").Should().Be("$env:VAR}");
+        StdioMcpTransport.ResolveEnvValue("$env:VAR}").ShouldBe("$env:VAR}");
     }
 
     [Fact]
     public void ResolveEnvValue_EmptyString_IsPassedThrough()
     {
-        StdioMcpTransport.ResolveEnvValue("").Should().BeEmpty();
+        StdioMcpTransport.ResolveEnvValue("").ShouldBeEmpty();
     }
 
     [Fact]
@@ -106,8 +105,8 @@ public class StdioTransportTests
         // Don't call ConnectAsync — should throw
         var request = new JsonRpcRequest { Method = "test" };
         var act = () => transport.SendAsync(request);
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*not connected*");
+        var ex = await act.ShouldThrowAsync<InvalidOperationException>();
+        ex.Message.ShouldContain("not connected");
 
         await transport.DisposeAsync();
     }
@@ -119,8 +118,8 @@ public class StdioTransportTests
 
         var notification = new JsonRpcNotification { Method = "test" };
         var act = () => transport.SendNotificationAsync(notification);
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*not connected*");
+        var ex = await act.ShouldThrowAsync<InvalidOperationException>();
+        ex.Message.ShouldContain("not connected");
 
         await transport.DisposeAsync();
     }
@@ -143,6 +142,6 @@ public class StdioTransportTests
         await transport.DisposeAsync();
 
         var act = () => transport.ConnectAsync();
-        await act.Should().ThrowAsync<ObjectDisposedException>();
+        await act.ShouldThrowAsync<ObjectDisposedException>();
     }
 }

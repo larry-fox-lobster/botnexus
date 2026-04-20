@@ -4,7 +4,6 @@ using BotNexus.Agent.Core.Types;
 using BotNexus.CodingAgent.Extensions;
 using BotNexus.CodingAgent.Session;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 using Moq;
 
 namespace BotNexus.CodingAgent.Tests.Extensions;
@@ -18,7 +17,7 @@ public sealed class ExtensionLifecycleTests
 
         var result = loader.LoadExtensions(AppContext.BaseDirectory);
 
-        result.Extensions.Should().Contain(item => item.Name == DiscoverableExtension.NameValue);
+        result.Extensions.ShouldContain(item => item.Name == DiscoverableExtension.NameValue);
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public sealed class ExtensionLifecycleTests
             "read",
             new Dictionary<string, object?>()));
 
-        calls.Should().Be(2);
+        calls.ShouldBe(2);
     }
 
     [Fact]
@@ -70,7 +69,7 @@ public sealed class ExtensionLifecycleTests
             "read",
             new Dictionary<string, object?>()));
 
-        result.Should().Be(blockResult);
+        result.ShouldBe(blockResult);
     }
 
     [Fact]
@@ -96,7 +95,7 @@ public sealed class ExtensionLifecycleTests
             Result: new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, "done")]),
             IsError: false));
 
-        result!.Details.Should().Be("second");
+        result!.Details.ShouldBe("second");
     }
 
     [Fact]
@@ -122,7 +121,7 @@ public sealed class ExtensionLifecycleTests
         await runner.OnSessionStartAsync(context);
         await runner.OnSessionEndAsync(context);
 
-        order.Should().ContainInOrder("start", "end");
+        order.ToList().ShouldBe(new[] { "start", "end" });
     }
 
     [Fact]
@@ -149,8 +148,8 @@ public sealed class ExtensionLifecycleTests
             "read",
             new Dictionary<string, object?>()));
 
-        await act.Should().NotThrowAsync();
-        calls.Should().Be(1);
+        await act.ShouldNotThrowAsync();
+        calls.ShouldBe(1);
     }
 
     [Fact]
@@ -182,7 +181,7 @@ public sealed class ExtensionLifecycleTests
         var payload = new Dictionary<string, object?>();
         var result = await runner.OnModelRequestAsync(payload, MakeModel());
 
-        ((Dictionary<string, object?>)result).Should().ContainKey("second");
+        ((Dictionary<string, object?>)result).ShouldContainKey("second");
     }
 
     private static LlmModel MakeModel() => new(

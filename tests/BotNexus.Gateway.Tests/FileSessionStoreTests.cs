@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 
@@ -19,8 +18,8 @@ public sealed class FileSessionStoreTests
         await store.SaveAsync(session);
         var reloaded = await fixture.CreateStore().GetAsync("s1");
 
-        reloaded.Should().NotBeNull();
-        reloaded!.SessionId.Should().Be("s1");
+        reloaded.ShouldNotBeNull();
+        reloaded!.SessionId.Value.ShouldBe("s1");
     }
 
     [Fact]
@@ -32,7 +31,7 @@ public sealed class FileSessionStoreTests
 
         var loaded = await store.GetOrCreateAsync("s1", "agent-b");
 
-        loaded.Should().BeSameAs(created);
+        loaded.ShouldBeSameAs(created);
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public sealed class FileSessionStoreTests
         await store.SaveAsync(session);
         var reloaded = await fixture.CreateStore().GetAsync("s1");
 
-        reloaded!.History.Should().ContainSingle(e => e.Content == "hello");
+        reloaded!.History.Where(e => e.Content == "hello").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -57,7 +56,7 @@ public sealed class FileSessionStoreTests
 
         var session = await store.GetAsync("missing");
 
-        session.Should().BeNull();
+        session.ShouldBeNull();
     }
 
     [Fact]
@@ -72,8 +71,8 @@ public sealed class FileSessionStoreTests
 
         await store.DeleteAsync(sessionId);
 
-        fixture.FileSystem.File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.jsonl")).Should().BeFalse();
-        fixture.FileSystem.File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.meta.json")).Should().BeFalse();
+        fixture.FileSystem.File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.jsonl")).ShouldBeFalse();
+        fixture.FileSystem.File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.meta.json")).ShouldBeFalse();
     }
 
     [Fact]
@@ -89,11 +88,11 @@ public sealed class FileSessionStoreTests
 
         await store.ArchiveAsync(sessionId);
 
-        fixture.FileSystem.File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.jsonl")).Should().BeFalse();
-        fixture.FileSystem.File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.meta.json")).Should().BeFalse();
-        fixture.FileSystem.Directory.GetFiles(fixture.StorePath, $"{encodedName}.jsonl.archived.*").Should().ContainSingle();
-        fixture.FileSystem.Directory.GetFiles(fixture.StorePath, $"{encodedName}.meta.json.archived.*").Should().ContainSingle();
-        (await store.GetAsync(sessionId)).Should().BeNull();
+        fixture.FileSystem.File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.jsonl")).ShouldBeFalse();
+        fixture.FileSystem.File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.meta.json")).ShouldBeFalse();
+        fixture.FileSystem.Directory.GetFiles(fixture.StorePath, $"{encodedName}.jsonl.archived.*").ShouldHaveSingleItem();
+        fixture.FileSystem.Directory.GetFiles(fixture.StorePath, $"{encodedName}.meta.json.archived.*").ShouldHaveSingleItem();
+        (await store.GetAsync(sessionId)).ShouldBeNull();
     }
 
     [Fact]
@@ -102,9 +101,9 @@ public sealed class FileSessionStoreTests
         using var fixture = new StoreFixture();
         var store = fixture.CreateStore();
 
-        var act = () => store.ArchiveAsync("missing");
+        Func<Task> act = () => store.ArchiveAsync("missing");
 
-        await act.Should().NotThrowAsync();
+        await act.ShouldNotThrowAsync();
     }
 
     [Fact]
@@ -119,8 +118,8 @@ public sealed class FileSessionStoreTests
         await store.ArchiveAsync("s1");
         var newSession = await store.GetOrCreateAsync("s1", "agent-a");
 
-        newSession.Should().NotBeSameAs(oldSession);
-        newSession.History.Should().BeEmpty();
+        newSession.ShouldNotBeSameAs(oldSession);
+        newSession.History.ShouldBeEmpty();
     }
 
     [Fact]
@@ -135,8 +134,8 @@ public sealed class FileSessionStoreTests
         var allSessions = await store.ListAsync();
         var filtered = await store.ListAsync("agent-a");
 
-        allSessions.Should().HaveCount(3);
-        filtered.Should().OnlyContain(s => s.AgentId == "agent-a");
+        allSessions.Count().ShouldBe(3);
+        filtered.ShouldAllBe(s => s.AgentId == "agent-a");
     }
 
     [Fact]
@@ -172,7 +171,7 @@ public sealed class FileSessionStoreTests
 
         var sessions = await store.ListByChannelAsync("agent-a", ChannelKey.From("web chat"));
 
-        sessions.Select(s => s.SessionId).Should().Equal("s-new", "s-old");
+        sessions.Select(s => s.SessionId.Value).ShouldBe(new[] { "s-new", "s-old" }, ignoreOrder: false);
     }
 
     [Fact]
@@ -192,8 +191,8 @@ public sealed class FileSessionStoreTests
         await Task.WhenAll(tasks);
         var allSessions = await fixture.CreateStore().ListAsync();
 
-        allSessions.Should().HaveCount(25);
-        allSessions.Should().OnlyContain(s => s.History.Count == 1);
+        allSessions.Count().ShouldBe(25);
+        allSessions.ShouldAllBe(s => s.History.Count == 1);
     }
 
     [Fact]
@@ -208,8 +207,8 @@ public sealed class FileSessionStoreTests
         await store.SaveAsync(session);
         var reloaded = await fixture.CreateStore().GetAsync("large");
 
-        reloaded!.History.Should().HaveCount(1000);
-        reloaded.History[999].Content.Should().Be("line-999");
+        reloaded!.History.Count().ShouldBe(1000);
+        reloaded.History[999].Content.ShouldBe("line-999");
     }
 
     [Fact]
@@ -224,9 +223,9 @@ public sealed class FileSessionStoreTests
         await store.SaveAsync(created);
         var reloaded = await fixture.CreateStore().GetAsync(sessionId);
 
-        reloaded.Should().NotBeNull();
-        reloaded!.SessionId.Should().Be(sessionId);
-        reloaded.History.Should().ContainSingle(e => e.Content == "hello");
+        reloaded.ShouldNotBeNull();
+        reloaded!.SessionId.Value.ShouldBe(sessionId);
+        reloaded.History.Where(e => e.Content == "hello").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -254,7 +253,7 @@ public sealed class FileSessionStoreTests
         await Task.WhenAll(writer, reader);
         var reloaded = await fixture.CreateStore().GetAsync("shared");
 
-        reloaded.Should().NotBeNull();
+        reloaded.ShouldNotBeNull();
     }
 
     [Fact]
@@ -291,7 +290,7 @@ public sealed class FileSessionStoreTests
                 Limit = 10
             });
 
-        sessions.Select(session => session.SessionId.Value).Should().Equal("participant");
+        sessions.Select(session => session.SessionId.Value).ShouldHaveSingleItem().ShouldBe("participant");
     }
 
     private static async Task CreateAndSaveAsync(FileSessionStore store, string sessionId, string agentId)

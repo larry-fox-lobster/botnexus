@@ -2,7 +2,6 @@ using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 
@@ -28,7 +27,9 @@ public sealed class SessionStoreExistenceQueryTests
 
         var sessions = await harness.Store.GetExistenceAsync(AgentId.From("agent-a"), new ExistenceQuery());
 
-        sessions.Select(s => s.SessionId.Value).Should().Contain(["owned", "both"]);
+        var ids0 = sessions.Select(s => s.SessionId.Value);
+        ids0.ShouldContain("owned");
+        ids0.ShouldContain("both");
     }
 
     [Theory]
@@ -42,7 +43,9 @@ public sealed class SessionStoreExistenceQueryTests
 
         var sessions = await harness.Store.GetExistenceAsync(AgentId.From("agent-a"), new ExistenceQuery());
 
-        sessions.Select(s => s.SessionId.Value).Should().Contain(["participant", "both"]);
+        var ids1 = sessions.Select(s => s.SessionId.Value);
+        ids1.ShouldContain("participant");
+        ids1.ShouldContain("both");
     }
 
     [Theory]
@@ -57,8 +60,10 @@ public sealed class SessionStoreExistenceQueryTests
         var sessions = await harness.Store.GetExistenceAsync(AgentId.From("agent-a"), new ExistenceQuery());
         var ids = sessions.Select(s => s.SessionId.Value).ToList();
 
-        ids.Should().Contain(["owned", "participant", "both"]);
-        ids.Should().OnlyHaveUniqueItems();
+        ids.ShouldContain("owned");
+        ids.ShouldContain("participant");
+        ids.ShouldContain("both");
+        ids.ShouldBeUnique();
     }
 
     [Theory]
@@ -78,7 +83,7 @@ public sealed class SessionStoreExistenceQueryTests
                 To = now.AddDays(-1.5)
             });
 
-        sessions.Select(s => s.SessionId.Value).Should().Equal("participant");
+        sessions.Select(s => s.SessionId.Value).ShouldHaveSingleItem().ShouldBe("participant");
     }
 
     [Theory]
@@ -97,7 +102,7 @@ public sealed class SessionStoreExistenceQueryTests
                 TypeFilter = SessionType.Cron
             });
 
-        sessions.Select(s => s.SessionId.Value).Should().Equal("participant");
+        sessions.Select(s => s.SessionId.Value).ShouldHaveSingleItem().ShouldBe("participant");
     }
 
     [Theory]
@@ -116,7 +121,7 @@ public sealed class SessionStoreExistenceQueryTests
                 Limit = 2
             });
 
-        sessions.Should().HaveCountLessThanOrEqualTo(2);
+        sessions.Count().ShouldBeLessThanOrEqualTo(2);
     }
 
     [Theory]
@@ -130,7 +135,7 @@ public sealed class SessionStoreExistenceQueryTests
 
         var sessions = await harness.Store.GetExistenceAsync(AgentId.From("agent-unknown"), new ExistenceQuery());
 
-        sessions.Should().BeEmpty();
+        sessions.ShouldBeEmpty();
     }
 
     [Theory]
@@ -144,7 +149,10 @@ public sealed class SessionStoreExistenceQueryTests
 
         var sessions = await harness.Store.GetExistenceAsync(AgentId.From("agent-a"), null!);
 
-        sessions.Select(s => s.SessionId.Value).Should().Contain(["owned", "participant", "both"]);
+        var allIds = sessions.Select(s => s.SessionId.Value);
+        allIds.ShouldContain("owned");
+        allIds.ShouldContain("participant");
+        allIds.ShouldContain("both");
     }
 
     private static async Task<DateTimeOffset> SeedExistenceDataAsync(ISessionStore store)

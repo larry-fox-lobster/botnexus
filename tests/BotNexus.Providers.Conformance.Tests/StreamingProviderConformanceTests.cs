@@ -4,7 +4,6 @@ using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
 using BotNexus.Agent.Providers.Core.Streaming;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Conformance.Tests;
 
@@ -41,9 +40,9 @@ public abstract class StreamingProviderConformanceTests
     {
         var (result, _) = await ExecuteAsync(BuildTextPayload(expectedText, MapCanonicalStopReason("stop")));
 
-        result.Content.Should().ContainSingle();
-        result.Content[0].Should().BeOfType<TextContent>();
-        ((TextContent)result.Content[0]).Text.Should().Be(expectedText);
+        result.Content.ShouldHaveSingleItem();
+        result.Content[0].ShouldBeOfType<TextContent>();
+        ((TextContent)result.Content[0]).Text.ShouldBe(expectedText);
     }
 
     [Theory]
@@ -54,9 +53,9 @@ public abstract class StreamingProviderConformanceTests
             BuildToolCallPayload(toolCallId, toolName, argumentsJson, MapCanonicalStopReason("tool_use")));
 
         var toolCall = result.Content.OfType<ToolCallContent>().Single();
-        toolCall.Id.Should().Be(toolCallId);
-        toolCall.Name.Should().Be(toolName);
-        toolCall.Arguments.Keys.Any(key => key == "query" || key == "id").Should().BeTrue();
+        toolCall.Id.ShouldBe(toolCallId);
+        toolCall.Name.ShouldBe(toolName);
+        toolCall.Arguments.Keys.Any(key => key == "query" || key == "id").ShouldBeTrue();
     }
 
     [Theory]
@@ -65,7 +64,7 @@ public abstract class StreamingProviderConformanceTests
     {
         var (result, _) = await ExecuteAsync(BuildFinishReasonPayload(MapCanonicalStopReason(canonicalReason)));
 
-        result.StopReason.Should().Be(expected);
+        result.StopReason.ShouldBe(expected);
     }
 
     [Theory]
@@ -75,9 +74,9 @@ public abstract class StreamingProviderConformanceTests
         var (result, _) = await ExecuteAsync(
             BuildUsagePayload(inputTokens, outputTokens, MapCanonicalStopReason("stop")));
 
-        result.Usage.Input.Should().Be(inputTokens);
-        result.Usage.Output.Should().Be(outputTokens);
-        result.Usage.TotalTokens.Should().Be(inputTokens + outputTokens);
+        result.Usage.Input.ShouldBe(inputTokens);
+        result.Usage.Output.ShouldBe(outputTokens);
+        result.Usage.TotalTokens.ShouldBe(inputTokens + outputTokens);
     }
 
     [Theory]
@@ -89,7 +88,7 @@ public abstract class StreamingProviderConformanceTests
 
         var (_, events) = await ExecuteAsync(BuildTextPayload(text, MapCanonicalStopReason("stop")));
 
-        events.Select(e => e.Type).Should().Equal(ExpectedTextEventSequence);
+        events.Select(e => e.Type).ShouldBe(ExpectedTextEventSequence);
     }
 
     // --- HTTP error handling tests ---
@@ -113,8 +112,8 @@ public abstract class StreamingProviderConformanceTests
         var stream = provider.Stream(CreateModel(), CreateContext(), CreateOptions());
         var result = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-        result.StopReason.Should().Be(StopReason.Error);
-        result.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+        result.StopReason.ShouldBe(StopReason.Error);
+        result.ErrorMessage.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -130,9 +129,8 @@ public abstract class StreamingProviderConformanceTests
         var result = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         // Empty stream should produce either an error or an empty content result
-        (result.StopReason == StopReason.Error || result.Content.Count == 0).Should().BeTrue(
-            "empty stream should produce error or empty content, got StopReason={0}, Content.Count={1}",
-            result.StopReason, result.Content.Count);
+        (result.StopReason == StopReason.Error || result.Content.Count == 0).ShouldBeTrue(
+            $"empty stream should produce error or empty content, got StopReason={result.StopReason}, Content.Count={result.Content.Count}");
     }
 
     [Fact]
@@ -151,8 +149,8 @@ public abstract class StreamingProviderConformanceTests
         var result = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         // Current behavior: malformed JSON is silently skipped, producing empty result
-        // When fixed, this should assert: result.StopReason.Should().Be(StopReason.Error);
-        result.Content.Should().BeEmpty("malformed JSON should not produce content");
+        // When fixed, this should assert: result.StopReason.ShouldBe(StopReason.Error);
+        result.Content.ShouldBeEmpty("malformed JSON should not produce content");
     }
 
     [Fact]
@@ -186,7 +184,7 @@ public abstract class StreamingProviderConformanceTests
         {
             var result = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
             // If we get here without throwing, any result is acceptable
-            result.Should().NotBeNull();
+            result.ShouldNotBeNull();
         }
         catch (OperationCanceledException)
         {
@@ -225,7 +223,7 @@ public abstract class StreamingProviderConformanceTests
         var events = await ReadAllEventsAsync(stream);
         var result = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-        handler.RequestCount.Should().Be(1);
+        handler.RequestCount.ShouldBe(1);
         return (result, events);
     }
 

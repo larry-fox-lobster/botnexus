@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.Playwright;
 
 namespace BotNexus.WebUI.Tests;
@@ -62,9 +61,9 @@ public sealed class ThinkingDisplayE2ETests
         await host.SendMessageAsync("toggle-thinking-block");
         var block = host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .thinking-block").First;
         await host.Page.ClickAsync($"{WebUiE2ETestHost.ActiveChat} .thinking-block .thinking-toggle");
-        (await block.GetAttributeAsync("class")).Should().NotContain("collapsed");
+        (await block.GetAttributeAsync("class")).ShouldNotContain("collapsed");
         await host.Page.ClickAsync($"{WebUiE2ETestHost.ActiveChat} .thinking-block .thinking-toggle");
-        (await block.GetAttributeAsync("class")).Should().Contain("collapsed");
+        (await block.GetAttributeAsync("class")).ShouldContain("collapsed");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -101,13 +100,13 @@ public sealed class ThinkingDisplayE2ETests
         await host.SendMessageAsync("header-toggle");
         await host.WaitForStreamingCompleteAsync();
         var block = host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .thinking-block").First;
-        (await block.GetAttributeAsync("class")).Should().Contain("collapsed");
+        (await block.GetAttributeAsync("class")).ShouldContain("collapsed");
 
         await SetThinkingVisibilityAsync(host, true);
-        (await block.GetAttributeAsync("class")).Should().NotContain("collapsed");
+        (await block.GetAttributeAsync("class")).ShouldNotContain("collapsed");
 
         await SetThinkingVisibilityAsync(host, false);
-        (await block.GetAttributeAsync("class")).Should().Contain("collapsed");
+        (await block.GetAttributeAsync("class")).ShouldContain("collapsed");
     }
 
     private async Task<WebUiE2ETestHost> OpenChatAsync()

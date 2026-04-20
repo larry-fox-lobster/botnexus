@@ -12,7 +12,6 @@ using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
 using BotNexus.Agent.Providers.Core.Streaming;
-using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests.Cli;
 
@@ -46,7 +45,7 @@ public sealed class InteractiveLoopTests : IDisposable
         var text = await CaptureConsoleAsync(async () =>
             await InvokeHandleCommandAsync("/thinking", agent, session));
 
-        text.Should().Contain("Thinking level: medium");
+        text.ShouldContain("Thinking level: medium");
     }
 
     [Fact]
@@ -57,13 +56,13 @@ public sealed class InteractiveLoopTests : IDisposable
 
         var updated = await InvokeHandleCommandAsync("/thinking high", agent, session);
 
-        agent.State.ThinkingLevel.Should().Be(ThinkingLevel.High);
-        updated.Should().NotBeNull();
+        agent.State.ThinkingLevel.ShouldBe(ThinkingLevel.High);
+        updated.ShouldNotBeNull();
 
         var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{session.Id}.jsonl");
         var fileContent = await File.ReadAllTextAsync(sessionPath);
-        fileContent.Should().Contain("\"key\":\"thinking_level_change\"");
-        fileContent.Should().Contain("\"value\":\"off \\u2192 high\"");
+        fileContent.ShouldContain("\"key\":\"thinking_level_change\"");
+        fileContent.ShouldContain("\"value\":\"off \\u2192 high\"");
     }
 
     [Fact]
@@ -75,8 +74,8 @@ public sealed class InteractiveLoopTests : IDisposable
         var text = await CaptureConsoleAsync(async () =>
             await InvokeHandleCommandAsync("/thinking turbo", agent, session));
 
-        text.Should().Contain("Invalid thinking level");
-        agent.State.ThinkingLevel.Should().BeNull();
+        text.ShouldContain("Invalid thinking level");
+        agent.State.ThinkingLevel.ShouldBeNull();
     }
 
     [Fact]
@@ -88,7 +87,7 @@ public sealed class InteractiveLoopTests : IDisposable
         var text = await CaptureConsoleAsync(async () =>
             await InvokeHandleCommandAsync("/help", agent, session));
 
-        text.Should().Contain("/thinking [level]");
+        text.ShouldContain("/thinking [level]");
     }
 
     [Fact]
@@ -101,8 +100,8 @@ public sealed class InteractiveLoopTests : IDisposable
 
         var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{session.Id}.jsonl");
         var fileContent = await File.ReadAllTextAsync(sessionPath);
-        fileContent.Should().Contain("\"key\":\"model_change\"");
-        fileContent.Should().Contain("\"value\":\"gpt-4.1 \\u2192 custom-model\"");
+        fileContent.ShouldContain("\"key\":\"model_change\"");
+        fileContent.ShouldContain("\"value\":\"gpt-4.1 \\u2192 custom-model\"");
     }
 
     [Fact]
@@ -137,8 +136,8 @@ public sealed class InteractiveLoopTests : IDisposable
 
         var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{session.Id}.jsonl");
         var fileContent = await File.ReadAllTextAsync(sessionPath);
-        fileContent.Should().Contain("\"type\":\"message\"");
-        fileContent.Should().Contain("assistant reply");
+        fileContent.ShouldContain("\"type\":\"message\"");
+        fileContent.ShouldContain("assistant reply");
     }
 
     [Fact]
@@ -176,7 +175,7 @@ public sealed class InteractiveLoopTests : IDisposable
 
         var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{session.Id}.jsonl");
         var lines = await File.ReadAllLinesAsync(sessionPath);
-        lines.Count(line => line.Contains("\"key\":\"leaf\"", StringComparison.Ordinal)).Should().Be(1);
+        lines.Count(line => line.Contains("\"key\":\"leaf\"", StringComparison.Ordinal)).ShouldBe(1);
     }
 
     [Fact]
@@ -220,7 +219,7 @@ public sealed class InteractiveLoopTests : IDisposable
                 _output,
                 CancellationToken.None);
 
-            await action.Should().ThrowAsync<FileNotFoundException>();
+            await action.ShouldThrowAsync<FileNotFoundException>();
         }
         finally
         {
@@ -309,7 +308,7 @@ public sealed class InteractiveLoopTests : IDisposable
     private async Task<SessionInfo?> InvokeHandleCommandAsync(string command, BotNexus.Agent.Core.Agent agent, SessionInfo session)
     {
         var method = typeof(InteractiveLoop).GetMethod("HandleCommandAsync", BindingFlags.NonPublic | BindingFlags.Static);
-        method.Should().NotBeNull();
+        method.ShouldNotBeNull();
 
         var task = (Task<SessionInfo?>)method!.Invoke(
             null,

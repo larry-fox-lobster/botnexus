@@ -1,7 +1,6 @@
 using BotNexus.Agent.Core.Configuration;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.AgentCore.Tests.Configuration;
 
@@ -19,9 +18,9 @@ public class DefaultMessageConverterTests
 
         var result = await converter([new AgentUserMessage("hello")], CancellationToken.None);
 
-        result.Should().ContainSingle();
-        result[0].Should().BeOfType<ProviderUserMessage>()
-            .Which.Content.Text.Should().Be("hello");
+        result.ShouldHaveSingleItem();
+        result[0].ShouldBeOfType<ProviderUserMessage>()
+            .Content.Text.ShouldBe("hello");
     }
 
     [Fact]
@@ -42,14 +41,14 @@ public class DefaultMessageConverterTests
 
         var result = await converter([message], CancellationToken.None);
 
-        result.Should().ContainSingle();
-        var providerMessage = result[0].Should().BeOfType<ProviderAssistantMessage>().Subject;
-        providerMessage.Content.OfType<TextContent>().Should().ContainSingle(content => content.Text == "assistant text");
-        providerMessage.Content.OfType<ThinkingContent>().Should().ContainSingle(content => content.Thinking == "thinking");
-        providerMessage.Content.OfType<ToolCallContent>().Should().ContainSingle(call => call.Id == "tool-1");
-        providerMessage.StopReason.Should().Be(StopReason.ToolUse);
-        providerMessage.Usage.Input.Should().Be(10);
-        providerMessage.Usage.Output.Should().Be(5);
+        result.ShouldHaveSingleItem();
+        var providerMessage = result[0].ShouldBeOfType<ProviderAssistantMessage>();
+        providerMessage.Content.OfType<TextContent>().ShouldHaveSingleItem().Text.ShouldBe("assistant text");
+        providerMessage.Content.OfType<ThinkingContent>().ShouldHaveSingleItem().Thinking.ShouldBe("thinking");
+        providerMessage.Content.OfType<ToolCallContent>().ShouldHaveSingleItem().Id.ShouldBe("tool-1");
+        providerMessage.StopReason.ShouldBe(StopReason.ToolUse);
+        providerMessage.Usage.Input.ShouldBe(10);
+        providerMessage.Usage.Output.ShouldBe(5);
     }
 
     [Fact]
@@ -63,11 +62,12 @@ public class DefaultMessageConverterTests
 
         var result = await converter([message], CancellationToken.None);
 
-        result.Should().ContainSingle();
-        var providerMessage = result[0].Should().BeOfType<ProviderToolResultMessage>().Subject;
-        providerMessage.ToolCallId.Should().Be("call-1");
-        providerMessage.ToolName.Should().Be("calculate");
-        providerMessage.Content.Should().ContainSingle().Which.Should().BeOfType<TextContent>().Which.Text.Should().Be("2");
+        result.ShouldHaveSingleItem();
+        var providerMessage = result[0].ShouldBeOfType<ProviderToolResultMessage>();
+        providerMessage.ToolCallId.ShouldBe("call-1");
+        providerMessage.ToolName.ShouldBe("calculate");
+        providerMessage.Content.ShouldHaveSingleItem().ShouldBeOfType<TextContent>()
+            .Text.ShouldBe("2");
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public class DefaultMessageConverterTests
 
         var result = await converter([new SystemAgentMessage("system context")], CancellationToken.None);
 
-        result.Should().BeEmpty();
+        result.ShouldBeEmpty();
     }
 
     [Fact]
@@ -88,8 +88,8 @@ public class DefaultMessageConverterTests
         var emptyResult = await converter([], CancellationToken.None);
         var nullResult = await converter(null!, CancellationToken.None);
 
-        emptyResult.Should().BeEmpty();
-        nullResult.Should().BeEmpty();
+        emptyResult.ShouldBeEmpty();
+        nullResult.ShouldBeEmpty();
     }
 
     [Fact]
@@ -106,10 +106,10 @@ public class DefaultMessageConverterTests
 
         var result = await converter(messages, CancellationToken.None);
 
-        result.Should().HaveCount(3);
-        result[0].Should().BeOfType<ProviderUserMessage>();
-        result[1].Should().BeOfType<ProviderAssistantMessage>();
-        result[2].Should().BeOfType<ProviderToolResultMessage>();
+        result.Count().ShouldBe(3);
+        result[0].ShouldBeOfType<ProviderUserMessage>();
+        result[1].ShouldBeOfType<ProviderAssistantMessage>();
+        result[2].ShouldBeOfType<ProviderToolResultMessage>();
     }
 
     [Fact]
@@ -120,8 +120,8 @@ public class DefaultMessageConverterTests
 
         var result = await converter(messages, CancellationToken.None);
 
-        result.Should().ContainSingle();
-        result[0].Should().BeOfType<ProviderUserMessage>();
+        result.ShouldHaveSingleItem();
+        result[0].ShouldBeOfType<ProviderUserMessage>();
     }
 
     private sealed record UnknownAgentMessage() : AgentMessage("user");

@@ -1,6 +1,5 @@
 using System.Text;
 using BotNexus.Tools;
-using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.CodingAgent.Tests.Tools;
@@ -27,9 +26,9 @@ public sealed class WriteToolTests
         });
 
         var fullPath = Path.Combine(_tempDirectory, "new.txt");
-        _fileSystem.File.Exists(fullPath).Should().BeTrue();
-        (await _fileSystem.File.ReadAllTextAsync(fullPath)).Should().Be("hello world");
-        result.Content[0].Value.Should().Contain("Wrote 'new.txt'");
+        _fileSystem.File.Exists(fullPath).ShouldBeTrue();
+        (await _fileSystem.File.ReadAllTextAsync(fullPath)).ShouldBe("hello world");
+        result.Content[0].Value.ShouldContain("Wrote 'new.txt'");
     }
 
     [Fact]
@@ -44,7 +43,7 @@ public sealed class WriteToolTests
             ["content"] = "updated"
         });
 
-        (await _fileSystem.File.ReadAllTextAsync(fullPath)).Should().Be("updated");
+        (await _fileSystem.File.ReadAllTextAsync(fullPath)).ShouldBe("updated");
     }
 
     [Fact]
@@ -57,8 +56,8 @@ public sealed class WriteToolTests
         });
 
         var fullPath = Path.Combine(_tempDirectory, "deep", "nested", "file.txt");
-        _fileSystem.File.Exists(fullPath).Should().BeTrue();
-        (await _fileSystem.File.ReadAllTextAsync(fullPath)).Should().Be("data");
+        _fileSystem.File.Exists(fullPath).ShouldBeTrue();
+        (await _fileSystem.File.ReadAllTextAsync(fullPath)).ShouldBe("data");
     }
 
     [Fact]
@@ -73,7 +72,7 @@ public sealed class WriteToolTests
         });
 
         var expectedBytes = Encoding.UTF8.GetByteCount(content);
-        result.Content[0].Value.Should().Contain($"({expectedBytes} bytes)");
+        result.Content[0].Value.ShouldContain($"({expectedBytes} bytes)");
     }
 
     [Fact]
@@ -87,6 +86,6 @@ public sealed class WriteToolTests
         });
 
         var bytes = await _fileSystem.File.ReadAllBytesAsync(fullPath);
-        bytes.Take(3).Should().NotEqual(new byte[] { 0xEF, 0xBB, 0xBF });
+        bytes.Take(3).ShouldNotBe(new byte[] { 0xEF, 0xBB, 0xBF });
     }
 }

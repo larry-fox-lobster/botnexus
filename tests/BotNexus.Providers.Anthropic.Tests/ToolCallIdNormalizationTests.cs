@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Anthropic.Tests;
 
@@ -21,7 +20,7 @@ public class ToolCallIdNormalizationTests
     {
         var result = NormalizeToolCallId("toolu_01!@#$%^&*()");
 
-        result.Should().Be("toolu_01__________");
+        result.ShouldBe("toolu_01__________");
     }
 
     [Fact]
@@ -30,7 +29,7 @@ public class ToolCallIdNormalizationTests
         var longId = new string('a', 100);
         var result = NormalizeToolCallId(longId);
 
-        result.Should().HaveLength(64);
+        result.Length.ShouldBe(64);
     }
 
     [Fact]
@@ -38,7 +37,7 @@ public class ToolCallIdNormalizationTests
     {
         var result = NormalizeToolCallId("toolu_01Abc-def_123");
 
-        result.Should().Be("toolu_01Abc-def_123");
+        result.ShouldBe("toolu_01Abc-def_123");
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public class ToolCallIdNormalizationTests
     {
         var result = NormalizeToolCallId("");
 
-        result.Should().BeEmpty();
+        result.ShouldBeEmpty();
     }
 
     [Fact]
@@ -54,7 +53,7 @@ public class ToolCallIdNormalizationTests
     {
         var result = NormalizeToolCallId("tool.call id:v2");
 
-        result.Should().Be("tool_call_id_v2");
+        result.ShouldBe("tool_call_id_v2");
     }
 
     [Fact]
@@ -62,7 +61,7 @@ public class ToolCallIdNormalizationTests
     {
         var result = NormalizeToolCallId("call_abc|fc_xyz");
 
-        result.Should().Be("call_abc_fc_xyz");
+        result.ShouldBe("call_abc_fc_xyz");
     }
 
     [Fact]
@@ -71,6 +70,6 @@ public class ToolCallIdNormalizationTests
         var id = $"call_{new string('a', 70)}|fc_xyz";
         var expected = id.Replace("|", "_", StringComparison.Ordinal)[..64];
 
-        NormalizeToolCallId(id).Should().Be(expected);
+        NormalizeToolCallId(id).ShouldBe(expected);
     }
 }

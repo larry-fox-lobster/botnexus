@@ -1,4 +1,3 @@
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Cli;
 
@@ -27,14 +26,14 @@ public sealed class ConfigCommandsTests
         var schemaPath = Path.Combine(fixture.RootPath, "schema", "botnexus-config.schema.json");
         var schemaResult = await fixture.RunCliAsync("config", "schema", "--output", schemaPath);
 
-        getResult.ExitCode.Should().Be(0);
-        getResult.StdOut.Trim().Should().Be("http://localhost:5005");
-        setResult.ExitCode.Should().Be(0);
-        schemaResult.ExitCode.Should().Be(0);
-        File.Exists(schemaPath).Should().BeTrue();
+        getResult.ExitCode.ShouldBe(0);
+        getResult.StdOut.Trim().ShouldBe("http://localhost:5005");
+        setResult.ExitCode.ShouldBe(0);
+        schemaResult.ExitCode.ShouldBe(0);
+        File.Exists(schemaPath).ShouldBeTrue();
 
         var config = await fixture.LoadConfigAsync();
-        config.Gateway?.DefaultAgentId.Should().Be("reviewer");
+        config.Gateway?.DefaultAgentId.ShouldBe("reviewer");
     }
 
     [Fact]
@@ -44,8 +43,8 @@ public sealed class ConfigCommandsTests
 
         var result = await fixture.RunCliAsync("config", "get", "gateway.listenUrl");
 
-        result.ExitCode.Should().Be(1);
-        result.CombinedOutput.Should().Contain("config file not found");
+        result.ExitCode.ShouldBe(1);
+        result.CombinedOutput.ShouldContain("config file not found");
     }
 
     [Fact]
@@ -55,8 +54,8 @@ public sealed class ConfigCommandsTests
 
         var result = await fixture.RunCliAsync("config", "set", "gateway.invalidPath", "value");
 
-        result.ExitCode.Should().Be(1);
-        result.CombinedOutput.Should().Contain("Property 'invalidPath' does not exist");
+        result.ExitCode.ShouldBe(1);
+        result.CombinedOutput.ShouldContain("Property 'invalidPath' does not exist");
     }
 }
 

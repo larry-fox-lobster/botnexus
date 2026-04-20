@@ -2,7 +2,6 @@ using System.Text.Json;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.Gateway.Sessions.Tests;
@@ -19,9 +18,9 @@ public sealed class SessionPrimitivesTests
     {
         var sanitized = SessionFileNames.SanitizeSessionId("session/日本語?:*&%20");
 
-        sanitized.Should().Be("session%2F%E6%97%A5%E6%9C%AC%E8%AA%9E%3F%3A%2A%26%2520");
-        SessionFileNames.HistoryFileName("id").Should().Be("id.jsonl");
-        SessionFileNames.MetadataFileName("id").Should().Be("id.meta.json");
+        sanitized.ShouldBe("session%2F%E6%97%A5%E6%9C%AC%E8%AA%9E%3F%3A%2A%26%2520");
+        SessionFileNames.HistoryFileName("id").ShouldBe("id.jsonl");
+        SessionFileNames.MetadataFileName("id").ShouldBe("id.meta.json");
     }
 
     [Fact]
@@ -38,9 +37,9 @@ public sealed class SessionPrimitivesTests
         await SessionJsonl.WriteAllAsync(fileSystem, path, entries, JsonOptions);
         var read = await SessionJsonl.ReadAllAsync<SessionEntry>(fileSystem, path, JsonOptions);
 
-        read.Should().HaveCount(2);
-        read[0].Content.Should().Be("hello");
-        read[1].IsCompactionSummary.Should().BeTrue();
+        read.Count().ShouldBe(2);
+        read[0].Content.ShouldBe("hello");
+        read[1].IsCompactionSummary.ShouldBeTrue();
     }
 
     [Fact]
@@ -53,7 +52,7 @@ public sealed class SessionPrimitivesTests
         await SessionMetadataSidecar.WriteAsync(fileSystem, path, metadata, JsonOptions);
         var read = await SessionMetadataSidecar.ReadAsync<TestMetadata>(fileSystem, path, JsonOptions);
 
-        read.Should().Be(metadata);
+        read.ShouldBe(metadata);
     }
 
     [Fact]
@@ -68,9 +67,9 @@ public sealed class SessionPrimitivesTests
 
         var compacted = SessionCompaction.KeepFromLastCompaction(entries);
 
-        compacted.Should().HaveCount(2);
-        compacted[0].IsCompactionSummary.Should().BeTrue();
-        compacted[1].Content.Should().Be("two");
+        compacted.Count().ShouldBe(2);
+        compacted[0].IsCompactionSummary.ShouldBeTrue();
+        compacted[1].Content.ShouldBe("two");
     }
 
     private sealed record TestMetadata(string SessionId, string AgentId, DateTimeOffset UpdatedAt);

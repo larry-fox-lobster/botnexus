@@ -3,7 +3,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Api.Controllers;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -25,10 +24,10 @@ public sealed class SessionsControllerTests
         var actionResult = await controller.List(null, CancellationToken.None);
 
         var okResult = actionResult as OkObjectResult;
-        okResult.Should().NotBeNull();
+        okResult.ShouldNotBeNull();
         var sessions = okResult!.Value as IEnumerable<object>;
-        sessions.Should().NotBeNull();
-        sessions!.Count().Should().Be(1);
+        sessions.ShouldNotBeNull();
+        sessions!.Count().ShouldBe(1);
     }
 
     [Fact]
@@ -38,7 +37,7 @@ public sealed class SessionsControllerTests
 
         var actionResult = await controller.Get("missing", CancellationToken.None);
 
-        actionResult.Result.Should().BeOfType<NotFoundResult>();
+        actionResult.Result.ShouldBeOfType<NotFoundResult>();
     }
 
     [Fact]
@@ -50,7 +49,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.Delete("s1", CancellationToken.None);
 
-        result.Should().BeOfType<NoContentResult>();
+        result.ShouldBeOfType<NoContentResult>();
     }
 
     [Fact]
@@ -61,7 +60,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.ListSubAgents("missing", CancellationToken.None);
 
-        result.Result.Should().BeOfType<NotFoundResult>();
+        result.Result.ShouldBeOfType<NotFoundResult>();
     }
 
     [Fact]
@@ -91,8 +90,8 @@ public sealed class SessionsControllerTests
         var result = await controller.ListSubAgents("s1", CancellationToken.None);
 
         var payload = (result.Result as OkObjectResult)?.Value as IReadOnlyList<SubAgentInfo>;
-        payload.Should().NotBeNull();
-        payload.Should().ContainSingle(item => item.SubAgentId == "sub-1");
+        payload.ShouldNotBeNull();
+        payload.Where(item => item.SubAgentId == "sub-1").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -116,8 +115,8 @@ public sealed class SessionsControllerTests
         var controller = new SessionsController(store, subAgentManager.Object);
         var result = await controller.KillSubAgent("s1", "sub-1", CancellationToken.None);
 
-        result.Should().BeOfType<ObjectResult>()
-            .Which.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+        result.ShouldBeOfType<ObjectResult>()
+            .StatusCode.ShouldBe(StatusCodes.Status403Forbidden);
     }
 
     [Fact]
@@ -133,7 +132,7 @@ public sealed class SessionsControllerTests
         var controller = new SessionsController(store, subAgentManager.Object);
         var result = await controller.KillSubAgent("s1", "missing-sub", CancellationToken.None);
 
-        result.Should().BeOfType<NotFoundResult>();
+        result.ShouldBeOfType<NotFoundResult>();
     }
 
     [Fact]
@@ -160,7 +159,7 @@ public sealed class SessionsControllerTests
         var controller = new SessionsController(store, subAgentManager.Object);
         var result = await controller.KillSubAgent("s1", "sub-1", CancellationToken.None);
 
-        result.Should().BeOfType<NoContentResult>();
+        result.ShouldBeOfType<NoContentResult>();
     }
 
     [Fact]
@@ -176,12 +175,12 @@ public sealed class SessionsControllerTests
         var result = await controller.GetHistory("s1", cancellationToken: CancellationToken.None);
 
         var response = (result.Result as OkObjectResult)?.Value as SessionHistoryResponse;
-        response.Should().NotBeNull();
-        response!.Offset.Should().Be(0);
-        response.Limit.Should().Be(50);
-        response.TotalCount.Should().Be(60);
-        response.Entries.Should().HaveCount(50);
-        response.Entries[0].Content.Should().Be("m-0");
+        response.ShouldNotBeNull();
+        response!.Offset.ShouldBe(0);
+        response.Limit.ShouldBe(50);
+        response.TotalCount.ShouldBe(60);
+        response.Entries.Count().ShouldBe(50);
+        response.Entries[0].Content.ShouldBe("m-0");
     }
 
     [Fact]
@@ -197,13 +196,13 @@ public sealed class SessionsControllerTests
         var result = await controller.GetHistory("s1", offset: 10, limit: 500, cancellationToken: CancellationToken.None);
 
         var response = (result.Result as OkObjectResult)?.Value as SessionHistoryResponse;
-        response.Should().NotBeNull();
-        response!.Offset.Should().Be(10);
-        response.Limit.Should().Be(200);
-        response.TotalCount.Should().Be(260);
-        response.Entries.Should().HaveCount(200);
-        response.Entries[0].Content.Should().Be("m-10");
-        response.Entries[^1].Content.Should().Be("m-209");
+        response.ShouldNotBeNull();
+        response!.Offset.ShouldBe(10);
+        response.Limit.ShouldBe(200);
+        response.TotalCount.ShouldBe(260);
+        response.Entries.Count().ShouldBe(200);
+        response.Entries[0].Content.ShouldBe("m-10");
+        response.Entries[^1].Content.ShouldBe("m-209");
     }
 
     [Fact]
@@ -219,10 +218,10 @@ public sealed class SessionsControllerTests
         var result = await controller.GetHistory("s1", offset: 10, limit: 10, cancellationToken: CancellationToken.None);
 
         var response = (result.Result as OkObjectResult)?.Value as SessionHistoryResponse;
-        response.Should().NotBeNull();
-        response!.Offset.Should().Be(10);
-        response.TotalCount.Should().Be(3);
-        response.Entries.Should().BeEmpty();
+        response.ShouldNotBeNull();
+        response!.Offset.ShouldBe(10);
+        response.TotalCount.ShouldBe(3);
+        response.Entries.ShouldBeEmpty();
     }
 
     [Fact]
@@ -235,9 +234,9 @@ public sealed class SessionsControllerTests
         var result = await controller.GetHistory("s1", cancellationToken: CancellationToken.None);
 
         var response = (result.Result as OkObjectResult)?.Value as SessionHistoryResponse;
-        response.Should().NotBeNull();
-        response!.TotalCount.Should().Be(0);
-        response.Entries.Should().BeEmpty();
+        response.ShouldNotBeNull();
+        response!.TotalCount.ShouldBe(0);
+        response.Entries.ShouldBeEmpty();
     }
 
     [Fact]
@@ -250,8 +249,8 @@ public sealed class SessionsControllerTests
         var result = await controller.Suspend("s1", CancellationToken.None);
 
         var session = (result.Result as OkObjectResult)?.Value as GatewaySession;
-        session.Should().NotBeNull();
-        session!.Status.Should().Be(SessionStatus.Suspended);
+        session.ShouldNotBeNull();
+        session!.Status.ShouldBe(SessionStatus.Suspended);
     }
 
     [Fact]
@@ -261,7 +260,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.Suspend("missing", CancellationToken.None);
 
-        result.Result.Should().BeOfType<NotFoundResult>();
+        result.Result.ShouldBeOfType<NotFoundResult>();
     }
 
     [Fact]
@@ -274,7 +273,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.Suspend("s1", CancellationToken.None);
 
-        result.Result.Should().BeOfType<ConflictObjectResult>();
+        result.Result.ShouldBeOfType<ConflictObjectResult>();
     }
 
     [Fact]
@@ -288,8 +287,8 @@ public sealed class SessionsControllerTests
         var result = await controller.Resume("s1", CancellationToken.None);
 
         var resumed = (result.Result as OkObjectResult)?.Value as GatewaySession;
-        resumed.Should().NotBeNull();
-        resumed!.Status.Should().Be(SessionStatus.Active);
+        resumed.ShouldNotBeNull();
+        resumed!.Status.ShouldBe(SessionStatus.Active);
     }
 
     [Fact]
@@ -301,7 +300,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.Resume("s1", CancellationToken.None);
 
-        result.Result.Should().BeOfType<ConflictObjectResult>();
+        result.Result.ShouldBeOfType<ConflictObjectResult>();
     }
 
     [Fact]
@@ -311,7 +310,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.Resume("missing", CancellationToken.None);
 
-        result.Result.Should().BeOfType<NotFoundResult>();
+        result.Result.ShouldBeOfType<NotFoundResult>();
     }
 
     [Fact]
@@ -325,9 +324,9 @@ public sealed class SessionsControllerTests
         var result = await controller.GetMetadata("s1", CancellationToken.None);
 
         var payload = (result.Result as OkObjectResult)?.Value as Dictionary<string, object?>;
-        payload.Should().NotBeNull();
-        payload.Should().ContainKey("tenantId");
-        payload!["tenantId"].Should().Be("tenant-a");
+        payload.ShouldNotBeNull();
+        payload.ShouldContainKey("tenantId");
+        payload!["tenantId"].ShouldBe("tenant-a");
     }
 
     [Fact]
@@ -340,8 +339,8 @@ public sealed class SessionsControllerTests
         var result = await controller.GetMetadata("s1", CancellationToken.None);
 
         var payload = (result.Result as OkObjectResult)?.Value as Dictionary<string, object?>;
-        payload.Should().NotBeNull();
-        payload.Should().BeEmpty();
+        payload.ShouldNotBeNull();
+        payload.ShouldBeEmpty();
     }
 
     [Fact]
@@ -351,7 +350,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.GetMetadata("missing", CancellationToken.None);
 
-        result.Result.Should().BeOfType<NotFoundResult>();
+        result.Result.ShouldBeOfType<NotFoundResult>();
     }
 
     [Fact]
@@ -365,8 +364,8 @@ public sealed class SessionsControllerTests
 
         var result = await controller.GetMetadata("s1", CancellationToken.None);
 
-        result.Result.Should().BeOfType<ObjectResult>()
-            .Which.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+        result.Result.ShouldBeOfType<ObjectResult>()
+            .StatusCode.ShouldBe(StatusCodes.Status403Forbidden);
     }
 
     [Fact]
@@ -385,8 +384,8 @@ public sealed class SessionsControllerTests
         var result = await controller.GetMetadata("s1", CancellationToken.None);
 
         var payload = (result.Result as OkObjectResult)?.Value as Dictionary<string, object?>;
-        payload.Should().NotBeNull();
-        payload.Should().Contain("locale", "en-US");
+        payload.ShouldNotBeNull();
+        payload.ShouldContainKeyAndValue("locale", (object?)"en-US");
     }
 
     [Fact]
@@ -401,7 +400,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.GetMetadata("s1", CancellationToken.None);
 
-        result.Result.Should().BeOfType<OkObjectResult>();
+        result.Result.ShouldBeOfType<OkObjectResult>();
     }
 
     [Fact]
@@ -412,7 +411,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.PatchMetadata("missing", patchDocument.RootElement.Clone(), CancellationToken.None);
 
-        result.Result.Should().BeOfType<NotFoundResult>();
+        result.Result.ShouldBeOfType<NotFoundResult>();
     }
 
     [Fact]
@@ -427,8 +426,8 @@ public sealed class SessionsControllerTests
 
         var result = await controller.PatchMetadata("s1", patchDocument.RootElement.Clone(), CancellationToken.None);
 
-        result.Result.Should().BeOfType<ObjectResult>()
-            .Which.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+        result.Result.ShouldBeOfType<ObjectResult>()
+            .StatusCode.ShouldBe(StatusCodes.Status403Forbidden);
     }
 
     [Fact]
@@ -447,7 +446,7 @@ public sealed class SessionsControllerTests
         var result = await controller.PatchMetadata("s1", patchDocument.RootElement.Clone(), CancellationToken.None);
 
         var payload = (result.Result as OkObjectResult)?.Value as Dictionary<string, object?>;
-        payload.Should().Contain("theme", "dark");
+        payload.ShouldContainKeyAndValue("theme", (object?)"dark");
     }
 
     [Fact]
@@ -462,7 +461,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.PatchMetadata("s1", patchDocument.RootElement.Clone(), CancellationToken.None);
 
-        result.Result.Should().BeOfType<OkObjectResult>();
+        result.Result.ShouldBeOfType<OkObjectResult>();
     }
 
     [Fact]
@@ -477,12 +476,12 @@ public sealed class SessionsControllerTests
         var result = await controller.PatchMetadata("s1", patchDocument.RootElement.Clone(), CancellationToken.None);
 
         var payload = (result.Result as OkObjectResult)?.Value as Dictionary<string, object?>;
-        payload.Should().NotBeNull();
-        payload.Should().ContainKey("theme");
-        payload!["theme"].Should().Be("dark");
-        payload.Should().NotContainKey("removeMe");
-        payload.Should().ContainKey("nested");
-        ((Dictionary<string, object?>)payload["nested"]!).Should().Contain("key", "value");
+        payload.ShouldNotBeNull();
+        payload.ShouldContainKey("theme");
+        payload!["theme"].ShouldBe("dark");
+        payload.ShouldNotContainKey("removeMe");
+        payload.ShouldContainKey("nested");
+        ((Dictionary<string, object?>)payload["nested"]!).ShouldContainKeyAndValue("key", (object?)"value");
     }
 
     [Fact]
@@ -495,7 +494,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.PatchMetadata("s1", patchDocument.RootElement.Clone(), CancellationToken.None);
 
-        result.Result.Should().BeOfType<BadRequestObjectResult>();
+        result.Result.ShouldBeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
@@ -510,9 +509,9 @@ public sealed class SessionsControllerTests
         var result = await controller.PatchMetadata("s1", patchDocument.RootElement.Clone(), CancellationToken.None);
 
         var payload = (result.Result as OkObjectResult)?.Value as Dictionary<string, object?>;
-        payload.Should().NotBeNull();
-        payload.Should().Contain("existing", "value");
-        payload.Should().Contain("theme", "dark");
+        payload.ShouldNotBeNull();
+        payload.ShouldContainKeyAndValue("existing", (object?)"value");
+        payload.ShouldContainKeyAndValue("theme", (object?)"dark");
     }
 
     [Fact]
@@ -528,9 +527,9 @@ public sealed class SessionsControllerTests
         var result = await controller.PatchMetadata("s1", patchDocument.RootElement.Clone(), CancellationToken.None);
 
         var payload = (result.Result as OkObjectResult)?.Value as Dictionary<string, object?>;
-        payload.Should().NotBeNull();
-        payload.Should().NotContainKey("removeMe");
-        payload.Should().Contain("keepMe", "value");
+        payload.ShouldNotBeNull();
+        payload.ShouldNotContainKey("removeMe");
+        payload.ShouldContainKeyAndValue("keepMe", (object?)"value");
     }
 
     [Fact]
@@ -544,8 +543,8 @@ public sealed class SessionsControllerTests
         await controller.PatchMetadata("s1", patchDocument.RootElement.Clone(), CancellationToken.None);
 
         var savedSession = await store.GetAsync("s1", CancellationToken.None);
-        savedSession.Should().NotBeNull();
-        savedSession!.Metadata.Should().Contain("locale", "en-US");
+        savedSession.ShouldNotBeNull();
+        savedSession!.Metadata.ShouldContainKeyAndValue("locale", (object?)"en-US");
     }
 
     [Fact]
@@ -559,11 +558,11 @@ public sealed class SessionsControllerTests
         var result = await controller.PatchMetadata("s1", patchDocument.RootElement.Clone(), CancellationToken.None);
 
         var payload = (result.Result as OkObjectResult)?.Value as Dictionary<string, object?>;
-        payload.Should().NotBeNull();
-        payload!["count"].Should().BeOfType<long>().Which.Should().Be(2);
-        payload["enabled"].Should().Be(true);
-        payload["threshold"].Should().BeOfType<decimal>().Which.Should().Be(1.5m);
-        payload["tags"].Should().BeAssignableTo<List<object?>>();
+        payload.ShouldNotBeNull();
+        payload!["count"].ShouldBeOfType<long>().ShouldBe(2L);
+        payload["enabled"].ShouldBe(true);
+        payload["threshold"].ShouldBeOfType<decimal>().ShouldBe(1.5m);
+        payload["tags"].ShouldBeAssignableTo<List<object?>>();
     }
 
     // ── Seal endpoint tests ──────────────────────────────────────────
@@ -579,9 +578,9 @@ public sealed class SessionsControllerTests
 
         var result = await controller.Seal("parent::subagent::child1", CancellationToken.None);
 
-        result.Should().BeOfType<OkObjectResult>();
-        session.Status.Should().Be(SessionStatus.Sealed);
-        session.UpdatedAt.Should().BeOnOrAfter(before);
+        result.ShouldBeOfType<OkObjectResult>();
+        session.Status.ShouldBe(SessionStatus.Sealed);
+        session.UpdatedAt.ShouldBeGreaterThanOrEqualTo(before);
     }
 
     [Fact]
@@ -594,7 +593,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.Seal("parent::subagent::child2", CancellationToken.None);
 
-        result.Should().BeOfType<NoContentResult>();
+        result.ShouldBeOfType<NoContentResult>();
     }
 
     [Fact]
@@ -604,7 +603,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.Seal("parent::subagent::missing", CancellationToken.None);
 
-        result.Should().BeOfType<NotFoundResult>();
+        result.ShouldBeOfType<NotFoundResult>();
     }
 
     [Fact]
@@ -617,7 +616,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.Seal("regular-session-id", CancellationToken.None);
 
-        result.Should().BeOfType<BadRequestObjectResult>();
+        result.ShouldBeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
@@ -629,7 +628,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.Seal("parent::subagent::child3", CancellationToken.None);
 
-        result.Should().BeOfType<ConflictObjectResult>();
+        result.ShouldBeOfType<ConflictObjectResult>();
     }
 
     [Fact]
@@ -642,7 +641,7 @@ public sealed class SessionsControllerTests
 
         var result = await controller.Seal("parent::subagent::child4", CancellationToken.None);
 
-        result.Should().BeOfType<ConflictObjectResult>();
+        result.ShouldBeOfType<ConflictObjectResult>();
     }
 
     [Fact]
@@ -656,8 +655,8 @@ public sealed class SessionsControllerTests
         await controller.Seal("parent::subagent::child5", CancellationToken.None);
 
         var saved = await store.GetAsync("parent::subagent::child5", CancellationToken.None);
-        saved.Should().NotBeNull();
-        saved!.Status.Should().Be(SessionStatus.Sealed);
+        saved.ShouldNotBeNull();
+        saved!.Status.ShouldBe(SessionStatus.Sealed);
     }
 
     [Fact]
@@ -670,16 +669,16 @@ public sealed class SessionsControllerTests
 
         var result = await controller.Seal("parent::subagent::child6", CancellationToken.None);
 
-        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var ok = result.ShouldBeOfType<OkObjectResult>();
         var body = ok.Value;
-        body.Should().NotBeNull();
+        body.ShouldNotBeNull();
         // Verify the anonymous object has expected shape via reflection
         var sessionIdProp = body!.GetType().GetProperty("sessionId");
-        sessionIdProp.Should().NotBeNull();
-        sessionIdProp!.GetValue(body).Should().Be("parent::subagent::child6");
+        sessionIdProp.ShouldNotBeNull();
+        sessionIdProp!.GetValue(body).ShouldBe("parent::subagent::child6");
         var statusProp = body.GetType().GetProperty("status");
-        statusProp.Should().NotBeNull();
-        statusProp!.GetValue(body).Should().Be("Sealed");
+        statusProp.ShouldNotBeNull();
+        statusProp!.GetValue(body).ShouldBe("Sealed");
     }
 
     [Fact]
@@ -693,9 +692,9 @@ public sealed class SessionsControllerTests
         var first = await controller.Seal("parent::subagent::concurrent1", CancellationToken.None);
         var second = await controller.Seal("parent::subagent::concurrent1", CancellationToken.None);
 
-        first.Should().BeOfType<OkObjectResult>();
-        second.Should().BeOfType<NoContentResult>();
-        session.Status.Should().Be(SessionStatus.Sealed);
+        first.ShouldBeOfType<OkObjectResult>();
+        second.ShouldBeOfType<NoContentResult>();
+        session.Status.ShouldBe(SessionStatus.Sealed);
     }
 
     [Fact]
@@ -713,12 +712,12 @@ public sealed class SessionsControllerTests
         await controller.Seal("parent::subagent::preserve1", CancellationToken.None);
 
         var saved = await store.GetAsync("parent::subagent::preserve1", CancellationToken.None);
-        saved.Should().NotBeNull();
-        saved!.Status.Should().Be(SessionStatus.Sealed);
-        saved.CreatedAt.Should().Be(originalCreatedAt);
-        saved.AgentId.Should().Be(originalAgentId);
-        saved.SessionType.Should().Be(originalSessionType);
-        saved.Metadata["key1"].Should().Be("value1");
+        saved.ShouldNotBeNull();
+        saved!.Status.ShouldBe(SessionStatus.Sealed);
+        saved.CreatedAt.ShouldBe(originalCreatedAt);
+        saved.AgentId.ShouldBe(originalAgentId);
+        saved.SessionType.ShouldBe(originalSessionType);
+        saved.Metadata["key1"].ShouldBe("value1");
     }
 
     [Theory]
@@ -733,8 +732,8 @@ public sealed class SessionsControllerTests
 
         var result = await controller.Seal(sessionId, CancellationToken.None);
 
-        result.Should().BeOfType<OkObjectResult>();
-        session.Status.Should().Be(SessionStatus.Sealed);
+        result.ShouldBeOfType<OkObjectResult>();
+        session.Status.ShouldBe(SessionStatus.Sealed);
     }
 
     [Fact]
@@ -749,7 +748,7 @@ public sealed class SessionsControllerTests
 
         await controller.Seal("parent::subagent::timestamp1", CancellationToken.None);
 
-        session.UpdatedAt.Should().BeAfter(pastTimestamp);
+        session.UpdatedAt.ShouldBeGreaterThan(pastTimestamp);
     }
 
     private static ControllerContext CreateControllerContext(string callerId)

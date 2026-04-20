@@ -7,7 +7,6 @@ using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
 using BotNexus.Agent.Providers.Core.Streaming;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BotNexus.Gateway.Tests;
@@ -21,7 +20,7 @@ public sealed class InProcessAgentHandleTests
 
         await handle.SteerAsync("adjust behavior");
 
-        agent.HasQueuedMessages.Should().BeTrue();
+        agent.HasQueuedMessages.ShouldBeTrue();
     }
 
     [Fact]
@@ -31,19 +30,19 @@ public sealed class InProcessAgentHandleTests
 
         await handle.FollowUpAsync("do this next");
 
-        agent.HasQueuedMessages.Should().BeTrue();
+        agent.HasQueuedMessages.ShouldBeTrue();
     }
 
     [Fact]
     public async Task SteerAsync_WhenAgentIsNotRunning_DoesNotThrow()
     {
         var (agent, handle) = CreateHandle();
-        agent.Status.Should().Be(AgentStatus.Idle);
+        agent.Status.ShouldBe(AgentStatus.Idle);
 
-        var act = async () => await handle.SteerAsync("non-blocking steer");
+        Func<Task> act = async () => await handle.SteerAsync("non-blocking steer");
 
-        await act.Should().NotThrowAsync();
-        agent.HasQueuedMessages.Should().BeTrue();
+        await act.ShouldNotThrowAsync();
+        agent.HasQueuedMessages.ShouldBeTrue();
     }
 
     [Fact]
@@ -55,12 +54,11 @@ public sealed class InProcessAgentHandleTests
         await foreach (var evt in handle.StreamAsync("hello"))
             events.Add(evt);
 
-        events.Count(e => e.Type == AgentStreamEventType.MessageStart).Should().Be(1);
-        events.Count(e => e.Type == AgentStreamEventType.MessageEnd).Should().Be(1);
+        events.Count(e => e.Type == AgentStreamEventType.MessageStart).ShouldBe(1);
+        events.Count(e => e.Type == AgentStreamEventType.MessageEnd).ShouldBe(1);
         events.Where(e => e.Type == AgentStreamEventType.ContentDelta)
             .Select(e => e.ContentDelta)
-            .Should()
-            .Contain("hello");
+            .ShouldContain("hello");
     }
 
     private static (BotNexus.Agent.Core.Agent Agent, InProcessAgentHandle Handle) CreateHandle()

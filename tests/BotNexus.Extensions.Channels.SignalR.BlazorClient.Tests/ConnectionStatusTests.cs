@@ -28,9 +28,9 @@ public sealed class ConnectionStatusTests : IDisposable
         var cut = _ctx.Render<ConnectionStatus>(p => p
             .Add(c => c.Hub, hub));
 
-        cut.Find(".connection-label").TextContent.Should().Be("Disconnected");
-        cut.Find(".connection-dot").TextContent.Should().Contain("○");
-        cut.Find(".connection-indicator").ClassList.Should().Contain("status-disconnected");
+        cut.Find(".connection-label").TextContent.ShouldBe("Disconnected");
+        cut.Find(".connection-dot").TextContent.ShouldContain("○");
+        cut.Find(".connection-indicator").ClassList.ShouldContain("status-disconnected");
     }
 
     // ── Structural tests (verify the component renders required elements) ─
@@ -43,9 +43,9 @@ public sealed class ConnectionStatusTests : IDisposable
         var cut = _ctx.Render<ConnectionStatus>(p => p
             .Add(c => c.Hub, hub));
 
-        cut.Find(".connection-indicator").Should().NotBeNull();
-        cut.Find(".connection-dot").Should().NotBeNull();
-        cut.Find(".connection-label").Should().NotBeNull();
+        cut.Find(".connection-indicator").ShouldNotBeNull();
+        cut.Find(".connection-dot").ShouldNotBeNull();
+        cut.Find(".connection-label").ShouldNotBeNull();
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public sealed class ConnectionStatusTests : IDisposable
             .Add(c => c.Hub, hub));
 
         var indicator = cut.Find(".connection-indicator");
-        indicator.GetAttribute("title").Should().Be("Disconnected");
+        indicator.GetAttribute("title").ShouldBe("Disconnected");
     }
 
     // ── Label mapping verification ──────────────────────────────────────
@@ -85,18 +85,18 @@ public sealed class ConnectionStatusTests : IDisposable
             var hub = new GatewayHubConnection();
             var cut = _ctx.Render<ConnectionStatus>(p => p.Add(c => c.Hub, hub));
 
-            cut.Find(".connection-label").TextContent.Should().Be(expectedLabel);
-            cut.Find(".connection-dot").TextContent.Should().Contain(expectedDot);
-            cut.Find(".connection-indicator").ClassList.Should().Contain(expectedCssClass);
+            cut.Find(".connection-label").TextContent.ShouldBe(expectedLabel);
+            cut.Find(".connection-dot").TextContent.ShouldContain(expectedDot);
+            cut.Find(".connection-indicator").ClassList.ShouldContain(expectedCssClass);
         }
         else
         {
             // Document expected values — verified by inspection of the component source
-            expectedLabel.Should().NotBeNullOrEmpty(
+            expectedLabel.ShouldNotBeNullOrEmpty(
                 $"expected label for {state} should be '{expectedLabel}'");
-            expectedDot.Should().NotBeNullOrEmpty(
+            expectedDot.ShouldNotBeNullOrEmpty(
                 $"expected dot for {state} should be '{expectedDot}'");
-            expectedCssClass.Should().NotBeNullOrEmpty(
+            expectedCssClass.ShouldNotBeNullOrEmpty(
                 $"expected CSS class for {state} should be '{expectedCssClass}'");
         }
     }

@@ -1,5 +1,4 @@
 using BotNexus.Extensions.Mcp.Transport;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Mcp.Tests;
 
@@ -11,8 +10,8 @@ public class TransportSelectionTests
         var config = new McpServerConfig { Command = "node", Args = ["server.js"] };
         var transport = McpServerManager.CreateTransport(config);
 
-        transport.Should().NotBeNull();
-        transport.Should().BeOfType<StdioMcpTransport>();
+        transport.ShouldNotBeNull();
+        transport.ShouldBeOfType<StdioMcpTransport>();
     }
 
     [Fact]
@@ -21,8 +20,8 @@ public class TransportSelectionTests
         var config = new McpServerConfig { Url = "http://localhost:3000/mcp" };
         var transport = McpServerManager.CreateTransport(config);
 
-        transport.Should().NotBeNull();
-        transport.Should().BeOfType<HttpSseMcpTransport>();
+        transport.ShouldNotBeNull();
+        transport.ShouldBeOfType<HttpSseMcpTransport>();
     }
 
     [Fact]
@@ -35,7 +34,7 @@ public class TransportSelectionTests
         };
 
         var transport = McpServerManager.CreateTransport(config);
-        transport.Should().BeOfType<HttpSseMcpTransport>();
+        transport.ShouldBeOfType<HttpSseMcpTransport>();
     }
 
     [Fact]
@@ -44,7 +43,7 @@ public class TransportSelectionTests
         var config = new McpServerConfig();
         var transport = McpServerManager.CreateTransport(config);
 
-        transport.Should().BeNull();
+        transport.ShouldBeNull();
     }
 
     [Fact]
@@ -53,7 +52,7 @@ public class TransportSelectionTests
         var config = new McpServerConfig { Command = "  " };
         var transport = McpServerManager.CreateTransport(config);
 
-        transport.Should().BeNull();
+        transport.ShouldBeNull();
     }
 
     [Fact]
@@ -69,7 +68,7 @@ public class TransportSelectionTests
         };
 
         var transport = McpServerManager.CreateTransport(config);
-        transport.Should().BeOfType<HttpSseMcpTransport>();
+        transport.ShouldBeOfType<HttpSseMcpTransport>();
     }
 
     [Fact]
@@ -85,7 +84,7 @@ public class TransportSelectionTests
         };
 
         var tools = await manager.StartServersAsync(config);
-        tools.Should().BeEmpty();
+        tools.ShouldBeEmpty();
 
         await manager.DisposeAsync();
     }

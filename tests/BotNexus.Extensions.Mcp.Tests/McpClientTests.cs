@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Extensions.Mcp.Protocol;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Mcp.Tests;
 
@@ -32,14 +31,14 @@ public class McpClientTests
 
         await client.InitializeAsync();
 
-        transport.SentRequests.Should().HaveCount(1);
-        transport.SentRequests[0].Method.Should().Be("initialize");
+        transport.SentRequests.Count().ShouldBe(1);
+        transport.SentRequests[0].Method.ShouldBe("initialize");
 
-        transport.SentNotifications.Should().HaveCount(1);
-        transport.SentNotifications[0].Method.Should().Be("notifications/initialized");
+        transport.SentNotifications.Count().ShouldBe(1);
+        transport.SentNotifications[0].Method.ShouldBe("notifications/initialized");
 
-        client.Capabilities.Should().NotBeNull();
-        client.Capabilities!.Tools.Should().NotBeNull();
+        client.Capabilities.ShouldNotBeNull();
+        client.Capabilities!.Tools.ShouldNotBeNull();
 
         await client.DisposeAsync();
     }
@@ -57,8 +56,8 @@ public class McpClientTests
         var client = new McpClient(transport, "test");
 
         var act = () => client.InitializeAsync();
-        await act.Should().ThrowAsync<McpException>()
-            .WithMessage("*Invalid request*");
+        var ex = await act.ShouldThrowAsync<McpException>();
+        ex.Message.ShouldContain("Invalid request");
 
         await client.DisposeAsync();
     }
@@ -90,9 +89,9 @@ public class McpClientTests
 
         var tools = await client.ListToolsAsync();
 
-        tools.Should().HaveCount(1);
-        tools[0].Name.Should().Be("search");
-        tools[0].Description.Should().Be("Search things");
+        tools.Count().ShouldBe(1);
+        tools[0].Name.ShouldBe("search");
+        tools[0].Description.ShouldBe("Search things");
 
         await client.DisposeAsync();
     }
@@ -104,8 +103,8 @@ public class McpClientTests
         var client = new McpClient(transport, "test");
 
         var act = () => client.ListToolsAsync();
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*not been initialized*");
+        var ex = await act.ShouldThrowAsync<InvalidOperationException>();
+        ex.Message.ShouldContain("not been initialized");
 
         await client.DisposeAsync();
     }
@@ -128,12 +127,12 @@ public class McpClientTests
         var args = JsonSerializer.SerializeToElement(new { query = "hello" });
         var result = await client.CallToolAsync("search", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Text.Should().Be("Result text");
-        result.IsError.Should().BeFalse();
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Text.ShouldBe("Result text");
+        result.IsError.ShouldBeFalse();
 
-        transport.SentRequests.Should().HaveCount(2);
-        transport.SentRequests[1].Method.Should().Be("tools/call");
+        transport.SentRequests.Count().ShouldBe(2);
+        transport.SentRequests[1].Method.ShouldBe("tools/call");
 
         await client.DisposeAsync();
     }
@@ -152,8 +151,8 @@ public class McpClientTests
         await client.InitializeAsync();
 
         var act = () => client.CallToolAsync("broken_tool");
-        await act.Should().ThrowAsync<McpException>()
-            .WithMessage("*Tool failed*");
+        var ex = await act.ShouldThrowAsync<McpException>();
+        ex.Message.ShouldContain("Tool failed");
 
         await client.DisposeAsync();
     }
@@ -164,7 +163,7 @@ public class McpClientTests
         var transport = new MockMcpTransport();
         var client = new McpClient(transport, "my-server");
 
-        client.ServerId.Should().Be("my-server");
+        client.ServerId.ShouldBe("my-server");
     }
 
     [Fact]
@@ -180,8 +179,8 @@ public class McpClientTests
         var client = new McpClient(transport, "bare");
         await client.InitializeAsync();
 
-        client.Capabilities.Should().NotBeNull();
-        client.Capabilities!.Tools.Should().BeNull();
+        client.Capabilities.ShouldNotBeNull();
+        client.Capabilities!.Tools.ShouldBeNull();
 
         await client.DisposeAsync();
     }
@@ -197,7 +196,7 @@ public class McpClientTests
 
         var tools = await client.ListToolsAsync();
 
-        tools.Should().BeEmpty();
+        tools.ShouldBeEmpty();
 
         await client.DisposeAsync();
     }
@@ -218,7 +217,7 @@ public class McpClientTests
 
         var tools = await client.ListToolsAsync();
 
-        tools.Should().BeEmpty();
+        tools.ShouldBeEmpty();
 
         await client.DisposeAsync();
     }
@@ -230,8 +229,8 @@ public class McpClientTests
         var client = new McpClient(transport, "test");
 
         var act = () => client.CallToolAsync("any_tool");
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*not been initialized*");
+        var ex = await act.ShouldThrowAsync<InvalidOperationException>();
+        ex.Message.ShouldContain("not been initialized");
 
         await client.DisposeAsync();
     }
@@ -248,7 +247,7 @@ public class McpClientTests
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
 
         var act = () => client.CallToolAsync("slow_tool", ct: cts.Token);
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await act.ShouldThrowAsync<OperationCanceledException>();
 
         await client.DisposeAsync();
     }
@@ -281,13 +280,13 @@ public class McpClientTests
 
         var results = await Task.WhenAll(task1, task2, task3);
 
-        results.Should().HaveCount(3);
+        results.Count().ShouldBe(3);
         var texts = results.SelectMany(r => r.Content).Select(c => c.Text).OrderBy(t => t).ToList();
-        texts.Should().Contain("result-1");
-        texts.Should().Contain("result-2");
-        texts.Should().Contain("result-3");
+        texts.ShouldContain("result-1");
+        texts.ShouldContain("result-2");
+        texts.ShouldContain("result-3");
 
-        transport.SentRequests.Should().HaveCount(4); // 1 init + 3 calls
+        transport.SentRequests.Count().ShouldBe(4); // 1 init + 3 calls
 
         await client.DisposeAsync();
     }
@@ -306,8 +305,8 @@ public class McpClientTests
 
         var result = await client.CallToolAsync("no_args_tool");
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Text.Should().Be("ok");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Text.ShouldBe("ok");
 
         await client.DisposeAsync();
     }
@@ -323,8 +322,8 @@ public class McpClientTests
 
         var result = await client.CallToolAsync("void_tool");
 
-        result.Content.Should().BeEmpty();
-        result.IsError.Should().BeFalse();
+        result.Content.ShouldBeEmpty();
+        result.IsError.ShouldBeFalse();
 
         await client.DisposeAsync();
     }
@@ -343,8 +342,8 @@ public class McpClientTests
         await client.InitializeAsync();
 
         var act = () => client.ListToolsAsync();
-        await act.Should().ThrowAsync<McpException>()
-            .WithMessage("*Method not found*");
+        var ex = await act.ShouldThrowAsync<McpException>();
+        ex.Message.ShouldContain("Method not found");
 
         await client.DisposeAsync();
     }
@@ -355,7 +354,7 @@ public class McpClientTests
         var transport = new MockMcpTransport();
         var client = new McpClient(transport, "test");
 
-        client.Capabilities.Should().BeNull();
+        client.Capabilities.ShouldBeNull();
     }
 
     [Fact]
@@ -381,9 +380,9 @@ public class McpClientTests
             caught = ex;
         }
 
-        caught.Should().NotBeNull();
-        caught!.Code.Should().Be(-32001);
-        caught.Message.Should().Contain("Custom error");
+        caught.ShouldNotBeNull();
+        caught!.Code.ShouldBe(-32001);
+        caught.Message.ShouldContain("Custom error");
 
         await client.DisposeAsync();
     }

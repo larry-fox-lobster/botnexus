@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.Playwright;
 
 namespace BotNexus.WebUI.Tests;
@@ -28,8 +27,8 @@ public sealed class ConnectionLifecycleE2ETests
         await using var host = await _fixture.CreatePageAsync();
         await Assertions.Expect(host.Page.Locator("#agents-list .list-item")).ToHaveCountAsync(2, new() { Timeout = 15000 });
         var text = await host.Page.Locator("#agents-list").InnerTextAsync();
-        text.Should().Contain(AgentA);
-        text.Should().Contain("agent-b");
+        text.ShouldContain(AgentA);
+        text.ShouldContain("agent-b");
     }
 
     [PlaywrightFact(Timeout = 90000)]

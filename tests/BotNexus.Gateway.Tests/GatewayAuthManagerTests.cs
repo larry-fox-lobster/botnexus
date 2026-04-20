@@ -1,6 +1,5 @@
 using System.Reflection;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 
@@ -42,7 +41,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
 
         var apiKey = await manager.GetApiKeyAsync("openai");
 
-        apiKey.Should().Be("auth-access-key");
+        apiKey.ShouldBe("auth-access-key");
     }
 
     [Fact]
@@ -64,7 +63,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
 
         var apiKey = await manager.GetApiKeyAsync("copilot");
 
-        apiKey.Should().Be("copilot-access-key");
+        apiKey.ShouldBe("copilot-access-key");
     }
 
     [Fact]
@@ -86,7 +85,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
 
         var apiKey = await manager.GetApiKeyAsync("openai");
 
-        apiKey.Should().Be("legacy-auth-access-key");
+        apiKey.ShouldBe("legacy-auth-access-key");
     }
 
     [Fact]
@@ -97,7 +96,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
 
         var apiKey = await manager.GetApiKeyAsync("openai");
 
-        apiKey.Should().Be("env-openai-key");
+        apiKey.ShouldBe("env-openai-key");
     }
 
     [Fact]
@@ -109,7 +108,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
 
         var apiKey = await manager.GetApiKeyAsync("openai");
 
-        apiKey.Should().Be("env-openai-key");
+        apiKey.ShouldBe("env-openai-key");
     }
 
     [Fact]
@@ -129,7 +128,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
 
         var apiKey = await manager.GetApiKeyAsync("openai");
 
-        apiKey.Should().Be("config-openai-key");
+        apiKey.ShouldBe("config-openai-key");
     }
 
     [Fact]
@@ -161,7 +160,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
 
         var apiKey = await manager.GetApiKeyAsync("openai");
 
-        apiKey.Should().Be("copilot-auth-access-key");
+        apiKey.ShouldBe("copilot-auth-access-key");
     }
 
     [Fact]
@@ -193,7 +192,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
 
         var apiKey = await manager.GetApiKeyAsync("openai");
 
-        apiKey.Should().Be("copilot-auth-access-key");
+        apiKey.ShouldBe("copilot-auth-access-key");
     }
 
     [Fact]
@@ -203,7 +202,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
 
         var apiKey = await manager.GetApiKeyAsync(null!);
 
-        apiKey.Should().BeNull();
+        apiKey.ShouldBeNull();
     }
 
     [Fact]
@@ -224,7 +223,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
 
         var endpoint = manager.GetApiEndpoint("openai");
 
-        endpoint.Should().Be("https://auth-endpoint.test");
+        endpoint.ShouldBe("https://auth-endpoint.test");
     }
 
     [Fact]
@@ -243,7 +242,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
 
         var endpoint = manager.GetApiEndpoint("openai");
 
-        endpoint.Should().Be("https://platform-base-url.test");
+        endpoint.ShouldBe("https://platform-base-url.test");
     }
 
     [Fact]
@@ -253,7 +252,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
 
         var endpoint = manager.GetApiEndpoint("openai");
 
-        endpoint.Should().BeNull();
+        endpoint.ShouldBeNull();
     }
 
     public void Dispose()
@@ -270,8 +269,8 @@ public sealed class GatewayAuthManagerTests : IDisposable
         var manager = new GatewayAuthManager(platformConfig, NullLogger<GatewayAuthManager>.Instance, _fileSystem);
         var authPathField = typeof(GatewayAuthManager).GetField("_authFilePath", BindingFlags.NonPublic | BindingFlags.Instance);
         var legacyAuthPathField = typeof(GatewayAuthManager).GetField("_legacyAuthFilePath", BindingFlags.NonPublic | BindingFlags.Instance);
-        authPathField.Should().NotBeNull();
-        legacyAuthPathField.Should().NotBeNull();
+        authPathField.ShouldNotBeNull();
+        legacyAuthPathField.ShouldNotBeNull();
         authPathField!.SetValue(manager, usePrimaryAuthPath ? _authFilePath : Path.Combine(_rootPath, "missing-auth.json"));
         legacyAuthPathField!.SetValue(manager, _legacyAuthFilePath);
         return manager;

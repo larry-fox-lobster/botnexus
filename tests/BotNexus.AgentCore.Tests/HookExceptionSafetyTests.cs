@@ -1,7 +1,6 @@
 using BotNexus.Agent.Core.Configuration;
 using BotNexus.AgentCore.Tests.TestUtils;
 using BotNexus.Agent.Core.Types;
-using FluentAssertions;
 
 namespace BotNexus.AgentCore.Tests;
 
@@ -27,8 +26,8 @@ public sealed class HookExceptionSafetyTests
 
         var result = await agent.PromptAsync("calculate 1+1");
 
-        var toolResult = result.OfType<ToolResultAgentMessage>().Should().ContainSingle().Subject;
-        toolResult.IsError.Should().BeTrue();
+        var toolResult = result.OfType<ToolResultAgentMessage>().ShouldHaveSingleItem();
+        toolResult.IsError.ShouldBeTrue();
     }
 
     [Fact]
@@ -49,9 +48,9 @@ public sealed class HookExceptionSafetyTests
 
         var result = await agent.PromptAsync("calculate 1+1");
 
-        var toolResult = result.OfType<ToolResultAgentMessage>().Should().ContainSingle().Subject;
-        toolResult.IsError.Should().BeFalse();
-        toolResult.Result.Content[0].Value.Should().Be("2");
+        var toolResult = result.OfType<ToolResultAgentMessage>().ShouldHaveSingleItem();
+        toolResult.IsError.ShouldBeFalse();
+        toolResult.Result.Content[0].Value.ShouldBe("2");
     }
 
     private static IDisposable RegisterToolCallThenStopProvider()

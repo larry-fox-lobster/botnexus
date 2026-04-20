@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Configuration;
 
@@ -12,7 +11,7 @@ public sealed class ExtensionConfigMergerTests
     {
         var merged = ExtensionConfigMerger.Merge(null, null);
 
-        merged.Should().BeEmpty();
+        merged.ShouldBeEmpty();
     }
 
     [Fact]
@@ -100,6 +99,6 @@ public sealed class ExtensionConfigMergerTests
     {
         var actualNode = JsonNode.Parse(actual.GetRawText());
         var expectedNode = JsonNode.Parse(expectedJson);
-        JsonNode.DeepEquals(actualNode, expectedNode).Should().BeTrue();
+        JsonNode.DeepEquals(actualNode, expectedNode).ShouldBeTrue();
     }
 }

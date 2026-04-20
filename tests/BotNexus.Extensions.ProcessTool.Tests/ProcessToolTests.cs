@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Extensions.ProcessTool;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.ProcessTool.Tests;
 
@@ -88,7 +87,7 @@ public sealed class ProcessToolTests : IDisposable
             await Task.Delay(interval);
         }
 
-        condition().Should().BeTrue("condition should be met within timeout");
+        condition().ShouldBeTrue("condition should be met within timeout");
     }
 
     private static async Task WaitUntilAsync(Func<Task<bool>> condition, TimeSpan timeout, TimeSpan? pollInterval = null)
@@ -105,7 +104,7 @@ public sealed class ProcessToolTests : IDisposable
             await Task.Delay(interval);
         }
 
-        (await condition()).Should().BeTrue("condition should be met within timeout");
+        (await condition()).ShouldBeTrue("condition should be met within timeout");
     }
 
     private async Task WaitForOutputContainsAsync(int pid, string expectedText, int? tail = null)
@@ -124,7 +123,7 @@ public sealed class ProcessToolTests : IDisposable
         }
 
         var finalResult = await _tool.ExecuteAsync("c1", Args("output", pid: pid, tail: tail));
-        ResultText(finalResult).Should().Contain(expectedText);
+        ResultText(finalResult).ShouldContain(expectedText);
     }
 
     // ───────────── list ─────────────
@@ -135,7 +134,7 @@ public sealed class ProcessToolTests : IDisposable
         var result = await _tool.ExecuteAsync("c1", Args("list"));
         var text = ResultText(result);
 
-        text.Should().Contain("No tracked processes");
+        text.ShouldContain("No tracked processes");
     }
 
     [Fact]
@@ -147,8 +146,8 @@ public sealed class ProcessToolTests : IDisposable
         var result = await _tool.ExecuteAsync("c1", Args("list"));
         var text = ResultText(result);
 
-        text.Should().Contain(managed.Pid.ToString());
-        text.Should().Contain("echo hello");
+        text.ShouldContain(managed.Pid.ToString());
+        text.ShouldContain("echo hello");
     }
 
     // ───────────── status ─────────────
@@ -165,8 +164,8 @@ public sealed class ProcessToolTests : IDisposable
             return text.Contains("running", StringComparison.Ordinal);
         }, TimeSpan.FromSeconds(5));
 
-        text.Should().Contain("running");
-        text.Should().Contain(managed.Pid.ToString());
+        text.ShouldContain("running");
+        text.ShouldContain(managed.Pid.ToString());
     }
 
     [Fact]
@@ -178,8 +177,8 @@ public sealed class ProcessToolTests : IDisposable
         var result = await _tool.ExecuteAsync("c1", Args("status", pid: managed.Pid));
         var text = ResultText(result);
 
-        text.Should().Contain("exited");
-        text.Should().Contain("Exit Code");
+        text.ShouldContain("exited");
+        text.ShouldContain("Exit Code");
     }
 
     [Fact]
@@ -188,7 +187,7 @@ public sealed class ProcessToolTests : IDisposable
         var result = await _tool.ExecuteAsync("c1", Args("status", pid: 99999));
         var text = ResultText(result);
 
-        text.Should().Contain("No tracked process");
+        text.ShouldContain("No tracked process");
     }
 
     // ───────────── output ─────────────
@@ -202,7 +201,7 @@ public sealed class ProcessToolTests : IDisposable
         var result = await _tool.ExecuteAsync("c1", Args("output", pid: managed.Pid));
         var text = ResultText(result);
 
-        text.Should().Contain("test-output-line");
+        text.ShouldContain("test-output-line");
     }
 
     [Fact]
@@ -218,9 +217,9 @@ public sealed class ProcessToolTests : IDisposable
         var text = ResultText(result);
 
         var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        lines.Length.Should().BeGreaterThanOrEqualTo(1);
-        text.Should().Contain("line5");
-        text.Should().NotContain("line1");
+        lines.Length.ShouldBeGreaterThanOrEqualTo(1);
+        text.ShouldContain("line5");
+        text.ShouldNotContain("line1");
     }
 
     // ───────────── kill ─────────────
@@ -231,14 +230,14 @@ public sealed class ProcessToolTests : IDisposable
         var managed = SpawnTestProcess("ping -n 60 127.0.0.1 >nul", "sleep 60");
         await WaitUntilAsync(() => managed.IsRunning, TimeSpan.FromSeconds(5));
 
-        managed.IsRunning.Should().BeTrue();
+        managed.IsRunning.ShouldBeTrue();
 
         var result = await _tool.ExecuteAsync("c1", Args("kill", pid: managed.Pid));
         var text = ResultText(result);
 
-        text.Should().Contain("terminated");
+        text.ShouldContain("terminated");
         await WaitUntilAsync(() => !managed.IsRunning, TimeSpan.FromSeconds(5));
-        managed.IsRunning.Should().BeFalse();
+        managed.IsRunning.ShouldBeFalse();
     }
 
     [Fact]
@@ -250,6 +249,6 @@ public sealed class ProcessToolTests : IDisposable
         var result = await _tool.ExecuteAsync("c1", Args("kill", pid: managed.Pid));
         var text = ResultText(result);
 
-        text.Should().Contain("already exited");
+        text.ShouldContain("already exited");
     }
 }

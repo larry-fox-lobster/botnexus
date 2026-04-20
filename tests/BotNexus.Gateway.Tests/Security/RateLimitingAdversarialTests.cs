@@ -1,7 +1,6 @@
 using System.Net;
 using BotNexus.Gateway.Api;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 
 namespace BotNexus.Gateway.Tests.Security;
@@ -18,16 +17,16 @@ public sealed class RateLimitingAdversarialTests
         {
             var firstRequest = CreateContext($"10.0.0.{i}");
             await middleware.InvokeAsync(firstRequest);
-            firstRequest.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+            firstRequest.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
         }
 
         var repeatedIpRequest = CreateContext("10.0.0.1");
         await middleware.InvokeAsync(repeatedIpRequest);
-        repeatedIpRequest.Response.StatusCode.Should().Be(StatusCodes.Status429TooManyRequests);
+        repeatedIpRequest.Response.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
 
         var unseenIpRequest = CreateContext("10.0.1.1");
         await middleware.InvokeAsync(unseenIpRequest);
-        unseenIpRequest.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+        unseenIpRequest.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
     }
 
     [Fact]
@@ -41,8 +40,8 @@ public sealed class RateLimitingAdversarialTests
         var secondRequest = CreateContext("127.0.0.5", xForwardedFor: "198.51.100.9");
         await middleware.InvokeAsync(secondRequest);
 
-        firstRequest.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
-        secondRequest.Response.StatusCode.Should().Be(StatusCodes.Status429TooManyRequests);
+        firstRequest.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
+        secondRequest.Response.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
     }
 
     [Fact]
@@ -57,8 +56,8 @@ public sealed class RateLimitingAdversarialTests
         foreach (var request in requests)
             await middleware.InvokeAsync(request);
 
-        requests.Take(3).Should().OnlyContain(request => request.Response.StatusCode == StatusCodes.Status200OK);
-        requests[3].Response.StatusCode.Should().Be(StatusCodes.Status429TooManyRequests);
+        requests.Take(3).ShouldAllBe(request => request.Response.StatusCode == StatusCodes.Status200OK);
+        requests[3].Response.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
     }
 
     [Fact]
@@ -71,14 +70,14 @@ public sealed class RateLimitingAdversarialTests
 
         var secondRequest = CreateContext("127.0.0.20");
         await middleware.InvokeAsync(secondRequest);
-        secondRequest.Response.StatusCode.Should().Be(StatusCodes.Status429TooManyRequests);
+        secondRequest.Response.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
 
         await Task.Delay(TimeSpan.FromMilliseconds(1100));
 
         var thirdRequest = CreateContext("127.0.0.20");
         await middleware.InvokeAsync(thirdRequest);
 
-        thirdRequest.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+        thirdRequest.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
     }
 
     private static PlatformConfig CreateConfig(int requestsPerMinute, int windowSeconds)

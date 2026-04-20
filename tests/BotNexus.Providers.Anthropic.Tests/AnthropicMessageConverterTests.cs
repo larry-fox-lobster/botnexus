@@ -1,5 +1,4 @@
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Anthropic.Tests;
 
@@ -12,8 +11,8 @@ public class AnthropicMessageConverterTests
     {
         var msg = new UserMessage(new UserMessageContent("hello"), Ts);
 
-        msg.Content.IsText.Should().BeTrue();
-        msg.Content.Text.Should().Be("hello");
+        msg.Content.IsText.ShouldBeTrue();
+        msg.Content.Text.ShouldBe("hello");
     }
 
     [Fact]
@@ -26,12 +25,12 @@ public class AnthropicMessageConverterTests
         };
         var msg = new UserMessage(new UserMessageContent(blocks), Ts);
 
-        msg.Content.IsText.Should().BeFalse();
-        msg.Content.Blocks.Should().HaveCount(2);
-        msg.Content.Blocks![1].Should().BeOfType<ImageContent>();
+        msg.Content.IsText.ShouldBeFalse();
+        msg.Content.Blocks!.Count().ShouldBe(2);
+        msg.Content.Blocks![1].ShouldBeOfType<ImageContent>();
         var image = (ImageContent)msg.Content.Blocks[1];
-        image.MimeType.Should().Be("image/png");
-        image.Data.Should().Be("aGVsbG8=");
+        image.MimeType.ShouldBe("image/png");
+        image.Data.ShouldBe("aGVsbG8=");
     }
 
     [Fact]
@@ -39,7 +38,7 @@ public class AnthropicMessageConverterTests
     {
         var block = new TextContent("response text");
 
-        block.Text.Should().Be("response text");
+        block.Text.ShouldBe("response text");
     }
 
     [Fact]
@@ -47,8 +46,8 @@ public class AnthropicMessageConverterTests
     {
         var block = new ThinkingContent("reasoning", "sig-abc");
 
-        block.Thinking.Should().Be("reasoning");
-        block.ThinkingSignature.Should().Be("sig-abc");
+        block.Thinking.ShouldBe("reasoning");
+        block.ThinkingSignature.ShouldBe("sig-abc");
     }
 
     [Fact]
@@ -57,9 +56,9 @@ public class AnthropicMessageConverterTests
         var args = new Dictionary<string, object?> { ["query"] = "test" };
         var block = new ToolCallContent("toolu_01", "search", args);
 
-        block.Id.Should().Be("toolu_01");
-        block.Name.Should().Be("search");
-        block.Arguments.Should().ContainKey("query");
+        block.Id.ShouldBe("toolu_01");
+        block.Name.ShouldBe("search");
+        block.Arguments.ShouldContainKey("query");
     }
 
     [Fact]
@@ -72,8 +71,8 @@ public class AnthropicMessageConverterTests
             IsError: false,
             Timestamp: Ts);
 
-        msg.ToolCallId.Should().Be("toolu_01");
-        msg.ToolName.Should().Be("search");
+        msg.ToolCallId.ShouldBe("toolu_01");
+        msg.ToolName.ShouldBe("search");
     }
 
     [Fact]
@@ -85,8 +84,8 @@ public class AnthropicMessageConverterTests
         var tr2 = new ToolResultMessage("tc2", "tool_b", [new TextContent("result 2")], false, Ts);
 
         var messages = new Message[] { tr1, tr2 };
-        messages.Should().HaveCount(2);
-        messages.All(m => m is ToolResultMessage).Should().BeTrue();
+        messages.Count().ShouldBe(2);
+        messages.All(m => m is ToolResultMessage).ShouldBeTrue();
     }
 
     [Fact]
@@ -94,7 +93,7 @@ public class AnthropicMessageConverterTests
     {
         var context = TestHelpers.MakeContext("You are a coding assistant");
 
-        context.SystemPrompt.Should().Be("You are a coding assistant");
+        context.SystemPrompt.ShouldBe("You are a coding assistant");
     }
 
     [Fact]
@@ -102,7 +101,7 @@ public class AnthropicMessageConverterTests
     {
         var block = new ThinkingContent("redacted data", Redacted: true);
 
-        block.Redacted.Should().BeTrue();
-        block.Thinking.Should().Be("redacted data");
+        block.Redacted.ShouldBeTrue();
+        block.Thinking.ShouldBe("redacted data");
     }
 }

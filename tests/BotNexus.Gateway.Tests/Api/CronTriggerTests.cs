@@ -5,7 +5,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Abstractions.Triggers;
 using BotNexus.Gateway.Api.Triggers;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -16,8 +15,8 @@ public sealed class CronTriggerTests
     [Fact]
     public void CronTrigger_ImplementsInternalTrigger_NotChannelAdapter()
     {
-        typeof(IInternalTrigger).IsAssignableFrom(typeof(CronTrigger)).Should().BeTrue();
-        typeof(IChannelAdapter).IsAssignableFrom(typeof(CronTrigger)).Should().BeFalse();
+        typeof(IInternalTrigger).IsAssignableFrom(typeof(CronTrigger)).ShouldBeTrue();
+        typeof(IChannelAdapter).IsAssignableFrom(typeof(CronTrigger)).ShouldBeFalse();
     }
 
     [Fact]
@@ -52,14 +51,14 @@ public sealed class CronTriggerTests
         var trigger = new CronTrigger(supervisor.Object, sessionStore.Object, NullLogger<CronTrigger>.Instance);
         var sessionId = await trigger.CreateSessionAsync(AgentId.From("agent-a"), "Run scheduled task");
 
-        trigger.Type.Should().Be(TriggerType.Cron);
-        sessionId.Value.Should().StartWith("cron:");
-        savedSession.Should().NotBeNull();
-        savedSession!.SessionType.Should().Be(SessionType.Cron);
-        savedSession.ChannelType.Should().Be(ChannelKey.From("cron"));
-        savedSession.CallerId.Should().Be("cron:agent-a");
-        savedSession.History.Should().ContainSingle(e => e.Role == MessageRole.User && e.Content == "Run scheduled task");
-        savedSession.History.Should().ContainSingle(e => e.Role == MessageRole.Assistant && e.Content == "cron-response");
+        trigger.Type.ShouldBe(TriggerType.Cron);
+        sessionId.Value.ShouldStartWith("cron:");
+        savedSession.ShouldNotBeNull();
+        savedSession!.SessionType.ShouldBe(SessionType.Cron);
+        savedSession.ChannelType.ShouldBe(ChannelKey.From("cron"));
+        savedSession.CallerId.ShouldBe("cron:agent-a");
+        savedSession.History.Where(e => e.Role == MessageRole.User && e.Content == "Run scheduled task").ShouldHaveSingleItem();
+        savedSession.History.Where(e => e.Role == MessageRole.Assistant && e.Content == "cron-response").ShouldHaveSingleItem();
 
         supervisor.Verify(
             s => s.GetOrCreateAsync(AgentId.From("agent-a"), sessionId, It.IsAny<CancellationToken>()),

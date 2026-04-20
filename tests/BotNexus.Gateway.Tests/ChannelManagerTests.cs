@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Channels;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -15,7 +14,7 @@ public sealed class ChannelManagerTests
 
         var resolved = manager.Get(ChannelKey.From("signalr"));
 
-        resolved.Should().BeSameAs(adapter);
+        resolved.ShouldBeSameAs(adapter);
     }
 
     [Fact]
@@ -25,7 +24,7 @@ public sealed class ChannelManagerTests
 
         var resolved = manager.Get(ChannelKey.From("signalr"));
 
-        resolved.Should().BeNull();
+        resolved.ShouldBeNull();
     }
 
     [Fact]
@@ -33,7 +32,7 @@ public sealed class ChannelManagerTests
     {
         var manager = new ChannelManager([]);
 
-        manager.Adapters.Should().BeEmpty();
+        manager.Adapters.ShouldBeEmpty();
     }
 
     private sealed class TestChannelAdapter : IChannelAdapter

@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Abstractions.Extensions;
 using BotNexus.Gateway.Commands;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BotNexus.Gateway.Tests.Commands;
@@ -14,7 +13,7 @@ public sealed class CommandRegistryTests
 
         var commands = registry.GetAll();
 
-        commands.Should().BeEmpty();
+        commands.ShouldBeEmpty();
     }
 
     [Fact]
@@ -29,7 +28,7 @@ public sealed class CommandRegistryTests
 
         var commands = registry.GetAll();
 
-        commands.Should().ContainSingle(c => c.Name == "/skills");
+        commands.Where(c => c.Name == "/skills").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -41,9 +40,7 @@ public sealed class CommandRegistryTests
 
         var commandNames = registry.GetAll().Select(c => c.Name);
 
-        commandNames.Should().BeEquivalentTo(
-            ["/skills", "/mcp"],
-            options => options.WithStrictOrdering());
+        commandNames.ToList().ShouldBe(new[] { "/skills", "/mcp" }, ignoreOrder: false);
     }
 
     [Fact]
@@ -59,7 +56,7 @@ public sealed class CommandRegistryTests
 
         await registry.ExecuteAsync("/skills", CreateContext("/skills"), CancellationToken.None);
 
-        contributor.LastCommandName.Should().Be("/skills");
+        contributor.LastCommandName.ShouldBe("/skills");
     }
 
     [Fact]
@@ -70,7 +67,7 @@ public sealed class CommandRegistryTests
 
         var result = await registry.ExecuteAsync("/unknown", CreateContext("/unknown"), CancellationToken.None);
 
-        result.IsError.Should().BeTrue();
+        result.IsError.ShouldBeTrue();
     }
 
     [Fact]
@@ -86,7 +83,7 @@ public sealed class CommandRegistryTests
 
         await registry.ExecuteAsync("/skills list", CreateContext("/skills list"), CancellationToken.None);
 
-        contributor.LastContext!.SubCommand.Should().Be("list");
+        contributor.LastContext!.SubCommand.ShouldBe("list");
     }
 
     [Fact]
@@ -105,7 +102,7 @@ public sealed class CommandRegistryTests
             CreateContext("/skills info ado-work-management"),
             CancellationToken.None);
 
-        contributor.LastContext!.Arguments.Should().Equal("ado-work-management");
+        contributor.LastContext!.Arguments.ShouldHaveSingleItem().ShouldBe("ado-work-management");
     }
 
     [Fact]
@@ -121,7 +118,7 @@ public sealed class CommandRegistryTests
 
         var result = await registry.ExecuteAsync("/skills", CreateContext("/skills"), CancellationToken.None);
 
-        result.Body.Should().Be("first");
+        result.Body.ShouldBe("first");
     }
 
     [Fact]
@@ -132,7 +129,7 @@ public sealed class CommandRegistryTests
 
         var result = await registry.ExecuteAsync(string.Empty, CreateContext(string.Empty), CancellationToken.None);
 
-        result.IsError.Should().BeTrue();
+        result.IsError.ShouldBeTrue();
     }
 
     [Fact]
@@ -148,7 +145,7 @@ public sealed class CommandRegistryTests
 
         var result = await registry.ExecuteAsync("/skills", CreateContext("/skills"), CancellationToken.None);
 
-        result.IsError.Should().BeTrue();
+        result.IsError.ShouldBeTrue();
     }
 
     private static CommandRegistry CreateRegistry(IEnumerable<ICommandContributor> contributors)

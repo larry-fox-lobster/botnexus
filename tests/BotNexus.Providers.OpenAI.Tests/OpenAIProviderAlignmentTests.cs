@@ -4,7 +4,6 @@ using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Streaming;
 using BotNexus.Agent.Providers.OpenAI;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BotNexus.Providers.OpenAI.Tests;
@@ -28,9 +27,9 @@ public class OpenAIProviderAlignmentTests
         var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-        handler.RequestCount.Should().Be(1);
-        handler.LastRequestUri.Should().NotBeNull();
-        handler.LastRequestUri!.AbsoluteUri.Should().Be($"{model.BaseUrl}/chat/completions");
+        handler.RequestCount.ShouldBe(1);
+        handler.LastRequestUri.ShouldNotBeNull();
+        handler.LastRequestUri!.AbsoluteUri.ShouldBe($"{model.BaseUrl}/chat/completions");
     }
 
     [Fact]
@@ -53,16 +52,16 @@ public class OpenAIProviderAlignmentTests
         var events = await ReadAllEventsAsync(stream);
         var final = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-        events.Should().ContainSingle(e => e is ThinkingStartEvent);
+        events.Where(e => e is ThinkingStartEvent).ShouldHaveSingleItem();
         events.OfType<ThinkingDeltaEvent>().Select(e => e.Delta)
-            .Should().Equal("step-1 ", "step-2 ", "step-3");
-        events.Should().ContainSingle(e => e is ThinkingEndEvent);
+            .ShouldBe(new[] { "step-1 ", "step-2 ", "step-3" });
+        events.Where(e => e is ThinkingEndEvent).ShouldHaveSingleItem();
 
-        final.Content.Should().HaveCount(2);
-        final.Content[0].Should().BeOfType<ThinkingContent>();
-        final.Content[1].Should().BeOfType<TextContent>();
-        ((ThinkingContent)final.Content[0]).Thinking.Should().Be("step-1 step-2 step-3");
-        ((TextContent)final.Content[1]).Text.Should().Be("final answer");
+        final.Content.Count().ShouldBe(2);
+        final.Content[0].ShouldBeOfType<ThinkingContent>();
+        final.Content[1].ShouldBeOfType<TextContent>();
+        ((ThinkingContent)final.Content[0]).Thinking.ShouldBe("step-1 step-2 step-3");
+        ((TextContent)final.Content[1]).Text.ShouldBe("final answer");
     }
 
     [Fact]
@@ -83,8 +82,8 @@ public class OpenAIProviderAlignmentTests
         var final = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         var thinking = final.Content.OfType<ThinkingContent>().Single();
-        thinking.Thinking.Should().Be("step-1");
-        thinking.ThinkingSignature.Should().Be("reasoning_text");
+        thinking.Thinking.ShouldBe("step-1");
+        thinking.ThinkingSignature.ShouldBe("reasoning_text");
     }
 
     [Fact]
@@ -105,8 +104,8 @@ public class OpenAIProviderAlignmentTests
         var final = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         var toolCalls = final.Content.OfType<ToolCallContent>().ToDictionary(tc => tc.Id, tc => tc.ThoughtSignature);
-        toolCalls["call_a"].Should().Contain("\"data\":\"sig-a\"");
-        toolCalls["call_b"].Should().Contain("\"data\":\"sig-b\"");
+        toolCalls["call_a"]!.ShouldContain("\"data\":\"sig-a\"");
+        toolCalls["call_b"]!.ShouldContain("\"data\":\"sig-b\"");
     }
 
     [Fact]
@@ -116,8 +115,8 @@ public class OpenAIProviderAlignmentTests
             null!,
             NullLogger<OpenAICompletionsProvider>.Instance);
 
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("httpClient");
+        act.ShouldThrow<ArgumentNullException>()
+            .ParamName.ShouldBe("httpClient");
     }
 
     private static async Task<List<AssistantMessageEvent>> ReadAllEventsAsync(LlmStream stream)

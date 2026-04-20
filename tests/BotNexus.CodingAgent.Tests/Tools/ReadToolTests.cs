@@ -1,5 +1,4 @@
 using BotNexus.Tools;
-using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.CodingAgent.Tests.Tools;
@@ -24,8 +23,8 @@ public sealed class ReadToolTests
 
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "sample.txt" });
 
-        result.Content.Should().ContainSingle();
-        result.Content[0].Value.Should().Be($"alpha{Environment.NewLine}beta{Environment.NewLine}gamma");
+        result.Content.ShouldHaveSingleItem();
+        result.Content[0].Value.ShouldBe($"alpha{Environment.NewLine}beta{Environment.NewLine}gamma");
     }
 
     [Fact]
@@ -38,10 +37,10 @@ public sealed class ReadToolTests
 
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "." });
 
-        result.Content.Should().ContainSingle();
-        result.Content[0].Value.Should().Contain($"nested{Path.DirectorySeparatorChar}");
-        result.Content[0].Value.Should().Contain("root.txt");
-        result.Content[0].Value.Should().Contain(Path.Combine("nested", "child.txt"));
+        result.Content.ShouldHaveSingleItem();
+        result.Content[0].Value.ShouldContain($"nested{Path.DirectorySeparatorChar}");
+        result.Content[0].Value.ShouldContain("root.txt");
+        result.Content[0].Value.ShouldContain(Path.Combine("nested", "child.txt"));
     }
 
     [Fact]
@@ -57,7 +56,7 @@ public sealed class ReadToolTests
             ["limit"] = 2
         });
 
-        result.Content[0].Value.Should().Be($"line2{Environment.NewLine}line3{Environment.NewLine}{Environment.NewLine}[1 more lines in file. Use offset=4 to continue.]");
+        result.Content[0].Value.ShouldBe($"line2{Environment.NewLine}line3{Environment.NewLine}{Environment.NewLine}[1 more lines in file. Use offset=4 to continue.]");
     }
 
     [Fact]
@@ -65,7 +64,7 @@ public sealed class ReadToolTests
     {
         var action = () => _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "missing.txt" });
 
-        await action.Should().ThrowAsync<FileNotFoundException>();
+        await action.ShouldThrowAsync<FileNotFoundException>();
     }
 
     [Fact]
@@ -77,11 +76,11 @@ public sealed class ReadToolTests
 
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "sample.png" });
 
-        result.Content.Should().HaveCount(2);
-        result.Content[0].Type.Should().Be(BotNexus.Agent.Core.Types.AgentToolContentType.Text);
-        result.Content[0].Value.Should().Contain("Read image file");
-        result.Content[1].Type.Should().Be(BotNexus.Agent.Core.Types.AgentToolContentType.Image);
-        result.Content[1].Value.Should().Be($"data:image/png;base64,{Convert.ToBase64String(bytes)}");
+        result.Content.Count().ShouldBe(2);
+        result.Content[0].Type.ShouldBe(BotNexus.Agent.Core.Types.AgentToolContentType.Text);
+        result.Content[0].Value.ShouldContain("Read image file");
+        result.Content[1].Type.ShouldBe(BotNexus.Agent.Core.Types.AgentToolContentType.Image);
+        result.Content[1].Value.ShouldBe($"data:image/png;base64,{Convert.ToBase64String(bytes)}");
     }
 
     [Fact]
@@ -94,8 +93,8 @@ public sealed class ReadToolTests
 
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "large.txt" });
 
-        result.Content[0].Value.Should().Contain("51200 byte limit");
-        result.Content[0].Value.Should().Contain("Use offset=");
+        result.Content[0].Value.ShouldContain("51200 byte limit");
+        result.Content[0].Value.ShouldContain("Use offset=");
     }
 
 }

@@ -3,7 +3,6 @@ using BotNexus.Agent.Core.Tools;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Tools;
-using FluentAssertions;
 using Microsoft.Extensions.Options;
 
 namespace BotNexus.Gateway.Tests.Tools;
@@ -17,8 +16,8 @@ public sealed class FileWatcherToolTests : IDisposable
     {
         var tool = CreateTool();
 
-        tool.Name.Should().Be("watch_file");
-        tool.Label.Should().Be("Watch File");
+        tool.Name.ShouldBe("watch_file");
+        tool.Label.ShouldBe("Watch File");
     }
 
     [Fact]
@@ -40,7 +39,7 @@ public sealed class FileWatcherToolTests : IDisposable
         await File.WriteAllTextAsync(path, "updated");
 
         var result = await watchTask;
-        ReadText(result).Should().Contain("File modified:");
+        ReadText(result).ShouldContain("File modified:");
     }
 
     [Fact]
@@ -61,7 +60,7 @@ public sealed class FileWatcherToolTests : IDisposable
         await File.WriteAllTextAsync(path, "created");
 
         var result = await watchTask;
-        ReadText(result).Should().Contain("File created:");
+        ReadText(result).ShouldContain("File created:");
     }
 
     [Fact]
@@ -83,7 +82,7 @@ public sealed class FileWatcherToolTests : IDisposable
         File.Delete(path);
 
         var result = await watchTask;
-        ReadText(result).Should().Contain("File deleted:");
+        ReadText(result).ShouldContain("File deleted:");
     }
 
     [Fact]
@@ -101,7 +100,7 @@ public sealed class FileWatcherToolTests : IDisposable
             ["timeout"] = 2
         });
 
-        ReadText(result).Should().Contain("Timeout after 2 seconds");
+        ReadText(result).ShouldContain("Timeout after 2 seconds");
     }
 
     [Fact]
@@ -115,7 +114,7 @@ public sealed class FileWatcherToolTests : IDisposable
         using var cts = new CancellationTokenSource();
         cts.CancelAfter(TimeSpan.FromMilliseconds(500));
 
-        var act = () => ExecuteAsync(
+        var result = await ExecuteAsync(
             tool,
             new Dictionary<string, object?>
             {
@@ -125,8 +124,7 @@ public sealed class FileWatcherToolTests : IDisposable
             },
             cts.Token);
 
-        var result = await act.Should().NotThrowAsync();
-        ReadText(result.Subject).ToLowerInvariant().Should().Contain("cancel");
+        ReadText(result).ToLowerInvariant().ShouldContain("cancel");
     }
 
     [Fact]
@@ -134,9 +132,9 @@ public sealed class FileWatcherToolTests : IDisposable
     {
         var tool = CreateTool();
 
-        var act = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?>());
+        Func<Task> act = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?>());
 
-        await act.Should().ThrowAsync<ArgumentException>();
+        await act.ShouldThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -155,9 +153,9 @@ public sealed class FileWatcherToolTests : IDisposable
             ["timeout"] = 999
         });
 
-        stopwatch.ElapsedMilliseconds.Should().BeGreaterThanOrEqualTo(1800);
-        stopwatch.ElapsedMilliseconds.Should().BeLessThan(4000);
-        ReadText(result).Should().Contain("Timeout after 2 seconds");
+        stopwatch.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(1800);
+        stopwatch.ElapsedMilliseconds.ShouldBeLessThan(4000);
+        ReadText(result).ShouldContain("Timeout after 2 seconds");
     }
 
     [Fact]
@@ -179,7 +177,7 @@ public sealed class FileWatcherToolTests : IDisposable
         await File.WriteAllTextAsync(path, "updated");
 
         var result = await watchTask;
-        ReadText(result).Should().MatchRegex(@"after \d+ seconds");
+        ReadText(result).ShouldMatch(@"after \d+ seconds");
     }
 
     [Fact]
@@ -205,7 +203,7 @@ public sealed class FileWatcherToolTests : IDisposable
         }
 
         var result = await watchTask;
-        ReadText(result).Should().Contain("File modified:");
+        ReadText(result).ShouldContain("File modified:");
     }
 
     public void Dispose()

@@ -1,6 +1,5 @@
 using System.Reflection;
 using BotNexus.CodingAgent;
-using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.CodingAgent.Tests.Configuration;
@@ -14,19 +13,19 @@ public sealed class CodingAgentConfigTests
     public void CreateDefaults_HasExpectedDefaultValues()
     {
         var createDefaults = typeof(CodingAgentConfig).GetMethod("CreateDefaults", BindingFlags.NonPublic | BindingFlags.Static);
-        createDefaults.Should().NotBeNull();
+        createDefaults.ShouldNotBeNull();
 
         var config = createDefaults!.Invoke(null, [Path.GetFullPath(_workingDirectory)]) as CodingAgentConfig;
 
-        config.Should().NotBeNull();
-        config!.ConfigDirectory.Should().Be(Path.Combine(_workingDirectory, ".botnexus-agent"));
-        config.SessionsDirectory.Should().Be(Path.Combine(_workingDirectory, ".botnexus-agent", "sessions"));
-        config.ExtensionsDirectory.Should().Be(Path.Combine(_workingDirectory, ".botnexus-agent", "extensions"));
-        config.SkillsDirectory.Should().Be(Path.Combine(_workingDirectory, ".botnexus-agent", "skills"));
-        config.MaxToolIterations.Should().Be(40);
-        config.MaxContextTokens.Should().Be(100000);
-        config.AllowedCommands.Should().BeEmpty();
-        config.BlockedPaths.Should().BeEmpty();
+        config.ShouldNotBeNull();
+        config!.ConfigDirectory.ShouldBe(Path.Combine(_workingDirectory, ".botnexus-agent"));
+        config.SessionsDirectory.ShouldBe(Path.Combine(_workingDirectory, ".botnexus-agent", "sessions"));
+        config.ExtensionsDirectory.ShouldBe(Path.Combine(_workingDirectory, ".botnexus-agent", "extensions"));
+        config.SkillsDirectory.ShouldBe(Path.Combine(_workingDirectory, ".botnexus-agent", "skills"));
+        config.MaxToolIterations.ShouldBe(40);
+        config.MaxContextTokens.ShouldBe(100000);
+        config.AllowedCommands.ShouldBeEmpty();
+        config.BlockedPaths.ShouldBeEmpty();
     }
 
     [Fact]
@@ -50,15 +49,15 @@ public sealed class CodingAgentConfigTests
 
         var config = CodingAgentConfig.Load(_fileSystem, _workingDirectory);
 
-        config.Model.Should().Be("gpt-test");
-        config.Provider.Should().Be("openai");
-        config.ApiKey.Should().Be("test-key");
-        config.MaxToolIterations.Should().Be(12);
-        config.MaxContextTokens.Should().Be(4096);
-        config.AllowedCommands.Should().Equal("dotnet", "git");
-        config.BlockedPaths.Should().Equal("secrets");
-        config.Custom.Should().ContainKey("mode");
-        config.Custom["mode"]?.ToString().Should().Be("strict");
+        config.Model.ShouldBe("gpt-test");
+        config.Provider.ShouldBe("openai");
+        config.ApiKey.ShouldBe("test-key");
+        config.MaxToolIterations.ShouldBe(12);
+        config.MaxContextTokens.ShouldBe(4096);
+        config.AllowedCommands.ShouldBe(new[] { "dotnet", "git" });
+        config.BlockedPaths.ShouldBe(new[] { "secrets" });
+        config.Custom.ShouldContainKey("mode");
+        config.Custom["mode"]?.ToString().ShouldBe("strict");
     }
 
     [Fact]
@@ -66,9 +65,9 @@ public sealed class CodingAgentConfigTests
     {
         CodingAgentConfig.EnsureDirectories(_fileSystem, _workingDirectory);
 
-        _fileSystem.Directory.Exists(Path.Combine(_workingDirectory, ".botnexus-agent")).Should().BeTrue();
-        _fileSystem.Directory.Exists(Path.Combine(_workingDirectory, ".botnexus-agent", "sessions")).Should().BeTrue();
-        _fileSystem.Directory.Exists(Path.Combine(_workingDirectory, ".botnexus-agent", "extensions")).Should().BeTrue();
-        _fileSystem.Directory.Exists(Path.Combine(_workingDirectory, ".botnexus-agent", "skills")).Should().BeTrue();
+        _fileSystem.Directory.Exists(Path.Combine(_workingDirectory, ".botnexus-agent")).ShouldBeTrue();
+        _fileSystem.Directory.Exists(Path.Combine(_workingDirectory, ".botnexus-agent", "sessions")).ShouldBeTrue();
+        _fileSystem.Directory.Exists(Path.Combine(_workingDirectory, ".botnexus-agent", "extensions")).ShouldBeTrue();
+        _fileSystem.Directory.Exists(Path.Combine(_workingDirectory, ".botnexus-agent", "skills")).ShouldBeTrue();
     }
 }

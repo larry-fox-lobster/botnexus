@@ -3,7 +3,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -60,13 +59,13 @@ public class SessionCleanupServiceTests
         await service.RunCleanupOnceAsync();
 
         var expired = await store.GetAsync(SessionId.From("s-old"));
-        expired.Should().NotBeNull();
-        expired!.Status.Should().Be(SessionStatus.Expired);
-        expired.ExpiresAt.Should().NotBeNull();
+        expired.ShouldNotBeNull();
+        expired!.Status.ShouldBe(SessionStatus.Expired);
+        expired.ExpiresAt.ShouldNotBeNull();
 
         var stillActive = await store.GetAsync(SessionId.From("s-fresh"));
-        stillActive.Should().NotBeNull();
-        stillActive!.Status.Should().Be(SessionStatus.Active);
+        stillActive.ShouldNotBeNull();
+        stillActive!.Status.ShouldBe(SessionStatus.Active);
     }
 
     [Fact]
@@ -84,8 +83,8 @@ public class SessionCleanupServiceTests
         await service.RunCleanupOnceAsync();
 
         var result = await store.GetAsync(SessionId.From("s-expired"));
-        result.Should().NotBeNull();
-        result!.Status.Should().Be(SessionStatus.Expired);
+        result.ShouldNotBeNull();
+        result!.Status.ShouldBe(SessionStatus.Expired);
     }
 
     [Fact]
@@ -107,7 +106,7 @@ public class SessionCleanupServiceTests
         await service.RunCleanupOnceAsync();
 
         var deleted = await store.GetAsync(SessionId.From("s-sealed"));
-        deleted.Should().BeNull("sealed session past retention should be deleted");
+        deleted.ShouldBeNull("sealed session past retention should be deleted");
     }
 
     [Fact]
@@ -129,8 +128,8 @@ public class SessionCleanupServiceTests
         await service.RunCleanupOnceAsync();
 
         var kept = await store.GetAsync(SessionId.From("s-sealed-recent"));
-        kept.Should().NotBeNull("sealed session within retention should be kept");
-        kept!.Status.Should().Be(SessionStatus.Sealed);
+        kept.ShouldNotBeNull("sealed session within retention should be kept");
+        kept!.Status.ShouldBe(SessionStatus.Sealed);
     }
 
     [Fact]
@@ -152,7 +151,7 @@ public class SessionCleanupServiceTests
         await service.RunCleanupOnceAsync();
 
         var kept = await store.GetAsync(SessionId.From("s-sealed-noret"));
-        kept.Should().NotBeNull("sealed sessions should not be deleted when no retention is configured");
+        kept.ShouldNotBeNull("sealed sessions should not be deleted when no retention is configured");
     }
 
     [Fact]
@@ -162,8 +161,8 @@ public class SessionCleanupServiceTests
         var options = new SessionCleanupOptions();
         var service = CreateService(store, options);
 
-        var act = () => service.RunCleanupOnceAsync();
-        await act.Should().NotThrowAsync();
+        Func<Task> act = () => service.RunCleanupOnceAsync();
+        await act.ShouldNotThrowAsync();
     }
 
     [Fact]
@@ -187,9 +186,9 @@ public class SessionCleanupServiceTests
 
         await service.RunCleanupOnceAsync();
 
-        events.Should().ContainSingle();
-        events[0].Type.Should().Be(SessionLifecycleEventType.Expired);
-        events[0].SessionId.Should().Be("s-lifecycle");
+        events.ShouldHaveSingleItem();
+        events[0].Type.ShouldBe(SessionLifecycleEventType.Expired);
+        events[0].SessionId.ShouldBe("s-lifecycle");
     }
 
     [Fact]
@@ -217,8 +216,8 @@ public class SessionCleanupServiceTests
 
         await service.RunCleanupOnceAsync();
 
-        events.Should().ContainSingle();
-        events[0].Type.Should().Be(SessionLifecycleEventType.Deleted);
+        events.ShouldHaveSingleItem();
+        events[0].Type.ShouldBe(SessionLifecycleEventType.Deleted);
     }
 
     [Fact]
@@ -239,8 +238,8 @@ public class SessionCleanupServiceTests
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var act = () => service.RunCleanupOnceAsync(cts.Token);
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        Func<Task> act = () => service.RunCleanupOnceAsync(cts.Token);
+        await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -259,8 +258,8 @@ public class SessionCleanupServiceTests
         await service.RunCleanupOnceAsync();
 
         var result = await store.GetAsync(SessionId.From("s-default-ttl"));
-        result.Should().NotBeNull();
-        result!.Status.Should().Be(SessionStatus.Active, "23h-old session shouldn't expire with 24h fallback TTL");
+        result.ShouldNotBeNull();
+        result!.Status.ShouldBe(SessionStatus.Active, "23h-old session shouldn't expire with 24h fallback TTL");
     }
 
     [Fact]
@@ -282,11 +281,11 @@ public class SessionCleanupServiceTests
             .Select(_ => service.RunCleanupOnceAsync())
             .ToArray();
 
-        var act = () => Task.WhenAll(tasks);
-        await act.Should().NotThrowAsync("concurrent cleanup should not corrupt state");
+        Func<Task> act = () => Task.WhenAll(tasks);
+        await act.ShouldNotThrowAsync("concurrent cleanup should not corrupt state");
 
         // All sessions should be expired
         var sessions = await store.ListAsync();
-        sessions.Should().OnlyContain(s => s.Status == SessionStatus.Expired);
+        sessions.ShouldAllBe(s => s.Status == SessionStatus.Expired);
     }
 }

@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -17,8 +16,8 @@ public sealed class GatewaySessionThreadSafetyTests
         await Task.WhenAll(writers);
 
         var snapshot = session.GetHistorySnapshot();
-        snapshot.Should().HaveCount(totalEntries);
-        snapshot.Select(e => e.Content).Should().OnlyHaveUniqueItems();
+        snapshot.Count().ShouldBe(totalEntries);
+        snapshot.Select(e => e.Content).ShouldBeUnique();
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public sealed class GatewaySessionThreadSafetyTests
                 try
                 {
                     var snapshot = session.GetHistorySnapshot();
-                    snapshot.Should().OnlyContain(e => !string.IsNullOrWhiteSpace(e.Role));
+                    snapshot.ShouldAllBe(e => !string.IsNullOrWhiteSpace(e.Role));
                 }
                 catch (Exception ex)
                 {
@@ -56,7 +55,7 @@ public sealed class GatewaySessionThreadSafetyTests
         });
 
         await Task.WhenAll(writer, reader);
-        errors.Should().BeEmpty();
+        errors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -104,7 +103,7 @@ public sealed class GatewaySessionThreadSafetyTests
         });
 
         await Task.WhenAll(writer, reader);
-        errors.Should().BeEmpty();
+        errors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -116,9 +115,9 @@ public sealed class GatewaySessionThreadSafetyTests
 
         var snapshot = session.GetHistorySnapshot(offset: 3, limit: 4);
 
-        snapshot.Should().HaveCount(4);
-        snapshot[0].Content.Should().Be("entry-3");
-        snapshot[^1].Content.Should().Be("entry-6");
+        snapshot.Count().ShouldBe(4);
+        snapshot[0].Content.ShouldBe("entry-3");
+        snapshot[^1].Content.ShouldBe("entry-6");
     }
 
     [Fact]
@@ -130,9 +129,9 @@ public sealed class GatewaySessionThreadSafetyTests
         var second = session.AllocateSequenceId();
         var third = session.AllocateSequenceId();
 
-        first.Should().Be(1);
-        second.Should().Be(2);
-        third.Should().Be(3);
+        first.ShouldBe(1);
+        second.ShouldBe(2);
+        third.ShouldBe(3);
     }
 
     [Fact]
@@ -145,8 +144,8 @@ public sealed class GatewaySessionThreadSafetyTests
         session.AddStreamEvent(3, """{"type":"pong","sequenceId":3}""", replayWindowSize: 2);
 
         var replay = session.GetStreamEventSnapshot();
-        replay.Should().HaveCount(2);
-        replay.Select(evt => evt.SequenceId).Should().ContainInOrder(2, 3);
+        replay.Count().ShouldBe(2);
+        replay.Select(evt => evt.SequenceId).ToList().ShouldBe(new long[] { 2, 3 });
     }
 
     [Fact]
@@ -158,7 +157,7 @@ public sealed class GatewaySessionThreadSafetyTests
 
         var replay = session.GetStreamEventsAfter(lastSequenceId: 2, maxReplayCount: 10);
 
-        replay.Should().BeEmpty();
+        replay.ShouldBeEmpty();
     }
 
     [Fact]
@@ -170,12 +169,11 @@ public sealed class GatewaySessionThreadSafetyTests
         session.ReplayBuffer.AddStreamEvent(2, """{"type":"pong","sequenceId":2}""", replayWindowSize: 2);
         session.ReplayBuffer.AddStreamEvent(3, """{"type":"pong","sequenceId":3}""", replayWindowSize: 2);
 
-        session.GetStreamEventSnapshot().Select(evt => evt.SequenceId).Should().ContainInOrder(2, 3);
+        session.GetStreamEventSnapshot().Select(evt => evt.SequenceId).ToList().ShouldBe(new long[] { 2, 3 });
         session.GetStreamEventsAfter(lastSequenceId: 2, maxReplayCount: 10)
             .Select(evt => evt.SequenceId)
-            .Should()
-            .ContainSingle()
-            .Which.Should().Be(3);
+            .ShouldHaveSingleItem()
+            .ShouldBe(3);
     }
 
     private static GatewaySession CreateSession()

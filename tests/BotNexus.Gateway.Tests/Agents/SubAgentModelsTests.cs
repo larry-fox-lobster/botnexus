@@ -2,7 +2,6 @@ using System.Reflection;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Agents;
 
@@ -17,7 +16,7 @@ public sealed class SubAgentModelsTests
             .Select(property => property.Name)
             .ToArray();
 
-        requiredProperties.Should().BeEquivalentTo(["ParentAgentId", "ParentSessionId", "Task"]);
+        requiredProperties.ShouldBe(new[] { "ParentAgentId", "ParentSessionId", "Task" });
     }
 
     [Fact]
@@ -30,14 +29,14 @@ public sealed class SubAgentModelsTests
             Task = "Analyze issue"
         };
 
-        request.MaxTurns.Should().Be(30);
-        request.TimeoutSeconds.Should().Be(600);
-        request.Name.Should().BeNull();
-        request.ModelOverride.Should().BeNull();
-        request.ApiProviderOverride.Should().BeNull();
-        request.ToolIds.Should().BeNull();
-        request.SystemPromptOverride.Should().BeNull();
-        request.Archetype.Should().Be(SubAgentArchetype.General);
+        request.MaxTurns.ShouldBe(30);
+        request.TimeoutSeconds.ShouldBe(600);
+        request.Name.ShouldBeNull();
+        request.ModelOverride.ShouldBeNull();
+        request.ApiProviderOverride.ShouldBeNull();
+        request.ToolIds.ShouldBeNull();
+        request.SystemPromptOverride.ShouldBeNull();
+        request.Archetype.ShouldBe(SubAgentArchetype.General);
     }
 
     [Fact]
@@ -54,8 +53,8 @@ public sealed class SubAgentModelsTests
         var equalCopy = baseline with { };
         var modified = baseline with { Task = "Different task" };
 
-        equalCopy.Should().Be(baseline);
-        modified.Should().NotBe(baseline);
+        equalCopy.ShouldBe(baseline);
+        modified.ShouldNotBe(baseline);
     }
 
     [Fact]
@@ -67,7 +66,7 @@ public sealed class SubAgentModelsTests
             .Select(property => property.Name)
             .ToArray();
 
-        requiredProperties.Should().BeEquivalentTo(["SubAgentId", "ParentSessionId", "ChildSessionId", "Task"]);
+        requiredProperties.ShouldBe(new[] { "SubAgentId", "ParentSessionId", "ChildSessionId", "Task" });
     }
 
     [Fact]
@@ -81,10 +80,10 @@ public sealed class SubAgentModelsTests
             Task = "Analyze issue"
         };
 
-        info.Status.Should().Be(SubAgentStatus.Running);
-        info.Archetype.Should().Be(SubAgentArchetype.General);
-        info.StartedAt.Should().Be(default);
-        info.CompletedAt.Should().BeNull();
+        info.Status.ShouldBe(SubAgentStatus.Running);
+        info.Archetype.ShouldBe(SubAgentArchetype.General);
+        info.StartedAt.ShouldBe(default);
+        info.CompletedAt.ShouldBeNull();
     }
 
     [Fact]
@@ -92,8 +91,8 @@ public sealed class SubAgentModelsTests
     {
         var property = typeof(SubAgentInfo).GetProperty(nameof(SubAgentInfo.Archetype));
 
-        property.Should().NotBeNull();
-        property!.PropertyType.Should().Be(typeof(SubAgentArchetype));
+        property.ShouldNotBeNull();
+        property!.PropertyType.ShouldBe(typeof(SubAgentArchetype));
     }
 
     [Fact]
@@ -117,10 +116,10 @@ public sealed class SubAgentModelsTests
             ResultSummary = "Done"
         };
 
-        completed.Status.Should().Be(SubAgentStatus.Completed);
-        completed.CompletedAt.Should().Be(completedAt);
-        completed.ResultSummary.Should().Be("Done");
-        running.Status.Should().Be(SubAgentStatus.Running);
+        completed.Status.ShouldBe(SubAgentStatus.Completed);
+        completed.CompletedAt.ShouldBe(completedAt);
+        completed.ResultSummary.ShouldBe("Done");
+        running.Status.ShouldBe(SubAgentStatus.Running);
     }
 
     [Fact]
@@ -128,22 +127,22 @@ public sealed class SubAgentModelsTests
     {
         var statuses = Enum.GetValues<SubAgentStatus>();
 
-        statuses.Should().Equal(
+        statuses.ShouldBe(new[] {
             SubAgentStatus.Running,
             SubAgentStatus.Completed,
             SubAgentStatus.Failed,
             SubAgentStatus.Killed,
-            SubAgentStatus.TimedOut);
+            SubAgentStatus.TimedOut });
     }
 
     [Fact]
     public void SubAgentStatus_UnderlyingValues_AreStable()
     {
-        ((int)SubAgentStatus.Running).Should().Be(0);
-        ((int)SubAgentStatus.Completed).Should().Be(1);
-        ((int)SubAgentStatus.Failed).Should().Be(2);
-        ((int)SubAgentStatus.Killed).Should().Be(3);
-        ((int)SubAgentStatus.TimedOut).Should().Be(4);
+        ((int)SubAgentStatus.Running).ShouldBe(0);
+        ((int)SubAgentStatus.Completed).ShouldBe(1);
+        ((int)SubAgentStatus.Failed).ShouldBe(2);
+        ((int)SubAgentStatus.Killed).ShouldBe(3);
+        ((int)SubAgentStatus.TimedOut).ShouldBe(4);
     }
 
     [Fact]
@@ -151,11 +150,11 @@ public sealed class SubAgentModelsTests
     {
         var options = new SubAgentOptions();
 
-        options.MaxConcurrentPerSession.Should().Be(5);
-        options.DefaultMaxTurns.Should().Be(30);
-        options.DefaultTimeoutSeconds.Should().Be(600);
-        options.MaxDepth.Should().Be(1);
-        options.DefaultModel.Should().BeEmpty();
+        options.MaxConcurrentPerSession.ShouldBe(5);
+        options.DefaultMaxTurns.ShouldBe(30);
+        options.DefaultTimeoutSeconds.ShouldBe(600);
+        options.MaxDepth.ShouldBe(1);
+        options.DefaultModel.ShouldBeEmpty();
     }
 
     [Fact]
@@ -170,10 +169,10 @@ public sealed class SubAgentModelsTests
             DefaultModel = "gpt-5-mini"
         };
 
-        options.MaxConcurrentPerSession.Should().Be(2);
-        options.DefaultMaxTurns.Should().Be(15);
-        options.DefaultTimeoutSeconds.Should().Be(120);
-        options.MaxDepth.Should().Be(3);
-        options.DefaultModel.Should().Be("gpt-5-mini");
+        options.MaxConcurrentPerSession.ShouldBe(2);
+        options.DefaultMaxTurns.ShouldBe(15);
+        options.DefaultTimeoutSeconds.ShouldBe(120);
+        options.MaxDepth.ShouldBe(3);
+        options.DefaultModel.ShouldBe("gpt-5-mini");
     }
 }

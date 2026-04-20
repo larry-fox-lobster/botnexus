@@ -3,7 +3,6 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Api.Triggers;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
@@ -53,11 +52,11 @@ public sealed class SoulTriggerTests
 
         var result = await trigger.CreateSessionAsync(agentId, "hello");
 
-        result.Should().Be(expectedSessionId);
-        savedSession.Should().NotBeNull();
-        savedSession!.SessionType.Should().Be(SessionType.Soul);
-        savedSession.CallerId.Should().Be("soul:agent-a");
-        savedSession.Metadata["soulDate"].Should().Be("2026-01-10");
+        result.ShouldBe(expectedSessionId);
+        savedSession.ShouldNotBeNull();
+        savedSession!.SessionType.ShouldBe(SessionType.Soul);
+        savedSession.CallerId.ShouldBe("soul:agent-a");
+        savedSession.Metadata["soulDate"].ShouldBe("2026-01-10");
     }
 
     [Fact]
@@ -124,16 +123,16 @@ public sealed class SoulTriggerTests
 
         var result = await trigger.CreateSessionAsync(agentId, "new soul prompt");
 
-        result.Should().Be(todaySessionId);
-        previousSession.Status.Should().Be(GatewaySessionStatus.Sealed);
-        previousSession.History.Should().Contain(entry =>
+        result.ShouldBe(todaySessionId);
+        previousSession.Status.ShouldBe(GatewaySessionStatus.Sealed);
+        previousSession.History.ShouldContain(entry =>
             entry.Role == MessageRole.User && entry.Content == "Reflect on yesterday");
-        previousSession.History.Should().Contain(entry =>
+        previousSession.History.ShouldContain(entry =>
             entry.Role == MessageRole.Assistant && entry.Content == "Yesterday summary");
 
-        todaySession.Metadata["soulDate"].Should().Be("2026-01-10");
-        todaySession.History.Should().Contain(entry => entry.Role == MessageRole.User && entry.Content == "new soul prompt");
-        todaySession.History.Should().Contain(entry => entry.Role == MessageRole.Assistant && entry.Content == "Today response");
+        todaySession.Metadata["soulDate"].ShouldBe("2026-01-10");
+        todaySession.History.ShouldContain(entry => entry.Role == MessageRole.User && entry.Content == "new soul prompt");
+        todaySession.History.ShouldContain(entry => entry.Role == MessageRole.Assistant && entry.Content == "Today response");
         sessions.Verify(s => s.SaveAsync(previousSession, It.IsAny<CancellationToken>()), Times.Once);
         sessions.Verify(s => s.SaveAsync(todaySession, It.IsAny<CancellationToken>()), Times.Once);
     }

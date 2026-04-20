@@ -1,6 +1,5 @@
 using BotNexus.Agent.Core.Configuration;
 using BotNexus.Agent.Core.Types;
-using FluentAssertions;
 
 namespace BotNexus.AgentCore.Tests;
 
@@ -9,7 +8,7 @@ public class PendingMessageQueueTests
     [Fact]
     public void QueueMode_Default_IsOneAtATime()
     {
-        default(QueueMode).Should().Be(QueueMode.OneAtATime);
+        default(QueueMode).ShouldBe(QueueMode.OneAtATime);
     }
 
     [Fact]
@@ -21,8 +20,8 @@ public class PendingMessageQueueTests
 
         var drained = queue.Drain();
 
-        drained.Should().HaveCount(2);
-        queue.Drain().Should().BeEmpty();
+        drained.Count().ShouldBe(2);
+        queue.Drain().ShouldBeEmpty();
     }
 
     [Fact]
@@ -36,9 +35,9 @@ public class PendingMessageQueueTests
         var second = queue.Drain();
         var third = queue.Drain();
 
-        first.Should().ContainSingle();
-        second.Should().ContainSingle();
-        third.Should().BeEmpty();
+        first.ShouldHaveSingleItem();
+        second.ShouldHaveSingleItem();
+        third.ShouldBeEmpty();
     }
 
     [Fact]
@@ -50,21 +49,21 @@ public class PendingMessageQueueTests
 
         queue.Clear();
 
-        queue.Drain().Should().BeEmpty();
-        queue.HasItems.Should().BeFalse();
+        queue.Drain().ShouldBeEmpty();
+        queue.HasItems.ShouldBeFalse();
     }
 
     [Fact]
     public void HasItems_ReflectsQueueState()
     {
         var queue = new PendingMessageQueue(QueueMode.All);
-        queue.HasItems.Should().BeFalse();
+        queue.HasItems.ShouldBeFalse();
 
         queue.Enqueue(new UserMessage("one"));
-        queue.HasItems.Should().BeTrue();
+        queue.HasItems.ShouldBeTrue();
 
         queue.Drain();
-        queue.HasItems.Should().BeFalse();
+        queue.HasItems.ShouldBeFalse();
     }
 
     [Fact]
@@ -101,7 +100,7 @@ public class PendingMessageQueueTests
         await producersTask;
         await consumer;
 
-        consumed.Should().Be(totalMessages);
-        queue.HasItems.Should().BeFalse();
+        consumed.ShouldBe(totalMessages);
+        queue.HasItems.ShouldBeFalse();
     }
 }

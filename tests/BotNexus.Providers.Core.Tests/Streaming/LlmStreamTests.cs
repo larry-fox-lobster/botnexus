@@ -1,6 +1,5 @@
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Streaming;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Streaming;
 
@@ -34,9 +33,9 @@ public class LlmStreamTests
         await foreach (var evt in stream)
             events.Add(evt);
 
-        events.Should().HaveCount(2);
-        events[0].Should().BeOfType<TextDeltaEvent>();
-        events[1].Should().BeOfType<DoneEvent>();
+        events.Count().ShouldBe(2);
+        events[0].ShouldBeOfType<TextDeltaEvent>();
+        events[1].ShouldBeOfType<DoneEvent>();
     }
 
     [Fact]
@@ -51,7 +50,7 @@ public class LlmStreamTests
         await foreach (var _ in stream)
             count++;
 
-        count.Should().Be(1);
+        count.ShouldBe(1);
     }
 
     [Fact]
@@ -66,8 +65,8 @@ public class LlmStreamTests
         await foreach (var evt in stream)
             events.Add(evt);
 
-        events.Should().ContainSingle();
-        events[0].Should().BeOfType<ErrorEvent>();
+        events.ShouldHaveSingleItem();
+        events[0].ShouldBeOfType<ErrorEvent>();
     }
 
     [Fact]
@@ -80,8 +79,8 @@ public class LlmStreamTests
 
         var result = await stream.GetResultAsync();
 
-        result.StopReason.Should().Be(StopReason.Stop);
-        result.Api.Should().Be("test-api");
+        result.StopReason.ShouldBe(StopReason.Stop);
+        result.Api.ShouldBe("test-api");
     }
 
     [Fact]
@@ -94,8 +93,8 @@ public class LlmStreamTests
 
         var result = await stream.GetResultAsync();
 
-        result.StopReason.Should().Be(StopReason.Error);
-        result.ErrorMessage.Should().Be("failure");
+        result.StopReason.ShouldBe(StopReason.Error);
+        result.ErrorMessage.ShouldBe("failure");
     }
 
     [Fact]
@@ -117,7 +116,7 @@ public class LlmStreamTests
         await foreach (var evt in stream)
             types.Add(evt.Type);
 
-        types.Should().Equal("start", "text_start", "text_delta", "text_delta", "text_end", "done");
+        types.ShouldBe(new[] { "start", "text_start", "text_delta", "text_delta", "text_end", "done" });
     }
 
     [Fact]
@@ -138,7 +137,7 @@ public class LlmStreamTests
             }
         };
 
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -153,8 +152,8 @@ public class LlmStreamTests
         await foreach (var evt in stream)
             events.Add(evt);
 
-        events.Should().ContainSingle()
-            .Which.Should().BeOfType<DoneEvent>();
+        events.ShouldHaveSingleItem()
+            .ShouldBeOfType<DoneEvent>();
     }
 
     [Fact]
@@ -175,7 +174,7 @@ public class LlmStreamTests
         await foreach (var evt in stream)
             types.Add(evt.Type);
 
-        types.Should().Equal("toolcall_start", "toolcall_delta", "toolcall_end", "done");
+        types.ShouldBe(new[] { "toolcall_start", "toolcall_delta", "toolcall_end", "done" });
     }
 
     [Fact]
@@ -195,6 +194,6 @@ public class LlmStreamTests
         await foreach (var evt in stream)
             types.Add(evt.Type);
 
-        types.Should().Equal("thinking_start", "thinking_delta", "thinking_end", "done");
+        types.ShouldBe(new[] { "thinking_start", "thinking_delta", "thinking_end", "done" });
     }
 }

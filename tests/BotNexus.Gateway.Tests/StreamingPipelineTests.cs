@@ -5,7 +5,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Routing;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -31,7 +30,7 @@ public sealed class StreamingPipelineTests
         await host.DispatchAsync(CreateMessage("hello"));
         var session = await sessionStore.GetAsync("session-1");
 
-        session!.History.Should().Contain(e => e.Role == MessageRole.Assistant && e.Content == "stream works");
+        session!.History.ShouldContain(e => e.Role == MessageRole.Assistant && e.Content == "stream works");
     }
 
     [Fact]
@@ -52,8 +51,8 @@ public sealed class StreamingPipelineTests
         await host.DispatchAsync(CreateMessage("what time"));
         var session = await sessionStore.GetAsync("session-1");
 
-        session!.History.Should().Contain(e => e.Role == MessageRole.Tool && e.ToolName == "clock" && e.ToolCallId == "call-1");
-        session.History.Should().Contain(e => e.Role == MessageRole.Tool && e.Content == "12:00");
+        session!.History.ShouldContain(e => e.Role == MessageRole.Tool && e.ToolName == "clock" && e.ToolCallId == "call-1");
+        session.History.ShouldContain(e => e.Role == MessageRole.Tool && e.Content == "12:00");
     }
 
     [Fact]
@@ -75,12 +74,12 @@ public sealed class StreamingPipelineTests
         await host.DispatchAsync(CreateMessage("solve"));
         var session = await sessionStore.GetAsync("session-1");
 
-        session!.History.Select(h => h.Role).Should().Equal(
+        session!.History.Select(h => h.Role).ShouldBe(new[] {
             MessageRole.User,
             MessageRole.Tool,
             MessageRole.Tool,
-            MessageRole.Assistant);
-        session.History.Last().Content.Should().Be("The answer is 42.");
+            MessageRole.Assistant });
+        session.History.Last().Content.ShouldBe("The answer is 42.");
     }
 
     [Fact]
@@ -98,8 +97,8 @@ public sealed class StreamingPipelineTests
 
         await host.DispatchAsync(CreateMessage("cancel me"));
 
-        handle.EnumeratorDisposed.Should().BeTrue();
-        activity.Activities.Should().Contain(a => a.Type == GatewayActivityType.Error);
+        handle.EnumeratorDisposed.ShouldBeTrue();
+        activity.Activities.ShouldContain(a => a.Type == GatewayActivityType.Error);
     }
 
     [Fact]
@@ -112,9 +111,9 @@ public sealed class StreamingPipelineTests
         await host.DispatchAsync(CreateMessage("empty"));
         var session = await sessionStore.GetAsync("session-1");
 
-        session!.History.Should().HaveCount(1);
-        session.History[0].Role.Should().Be(MessageRole.User);
-        session.History[0].Content.Should().Be("empty");
+        session!.History.Count().ShouldBe(1);
+        session.History[0].Role.ShouldBe(MessageRole.User);
+        session.History[0].Content.ShouldBe("empty");
     }
 
     private static Mock<IChannelAdapter> CreateStreamingChannel()

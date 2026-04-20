@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.Playwright;
 
 namespace BotNexus.WebUI.Tests;
@@ -24,7 +23,7 @@ public sealed class CopyInteractionsE2ETests
 
         await host.Page.ClickAsync("#btn-copy-session-id");
         var copied = await host.Page.EvaluateAsync<string>("() => window.__copiedText || ''");
-        copied.Should().Be(sessionId);
+        copied.ShouldBe(sessionId);
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -42,7 +41,7 @@ public sealed class CopyInteractionsE2ETests
 
         await host.Page.ClickAsync($"{WebUiE2ETestHost.ActiveChat} .message.assistant .btn-copy-msg");
         var copied = await host.Page.EvaluateAsync<string>("() => window.__copiedText || ''");
-        copied.Should().Be("**bold** text");
+        copied.ShouldBe("**bold** text");
     }
 
     private static Task StubClipboardAsync(WebUiE2ETestHost host)

@@ -1,5 +1,4 @@
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Models;
 
@@ -21,17 +20,17 @@ public class LlmModelTests
             ContextWindow: 200000,
             MaxTokens: 16384);
 
-        model.Id.Should().Be("claude-opus-4");
-        model.Name.Should().Be("Claude Opus 4");
-        model.Api.Should().Be("anthropic-messages");
-        model.Provider.Should().Be("anthropic");
-        model.BaseUrl.Should().Be("https://api.anthropic.com");
-        model.Reasoning.Should().BeTrue();
-        model.Input.Should().Contain("image");
-        model.Cost.Input.Should().Be(3.0m);
-        model.ContextWindow.Should().Be(200000);
-        model.MaxTokens.Should().Be(16384);
-        model.SupportsExtraHighThinking.Should().BeFalse();
+        model.Id.ShouldBe("claude-opus-4");
+        model.Name.ShouldBe("Claude Opus 4");
+        model.Api.ShouldBe("anthropic-messages");
+        model.Provider.ShouldBe("anthropic");
+        model.BaseUrl.ShouldBe("https://api.anthropic.com");
+        model.Reasoning.ShouldBeTrue();
+        model.Input.ShouldContain("image");
+        model.Cost.Input.ShouldBe(3.0m);
+        model.ContextWindow.ShouldBe(200000);
+        model.MaxTokens.ShouldBe(16384);
+        model.SupportsExtraHighThinking.ShouldBeFalse();
     }
 
     [Fact]
@@ -49,9 +48,9 @@ public class LlmModelTests
             ContextWindow: 4096,
             MaxTokens: 1024);
 
-        model.Headers.Should().BeNull();
-        model.Compat.Should().BeNull();
-        model.SupportsExtraHighThinking.Should().BeFalse();
+        model.Headers.ShouldBeNull();
+        model.Compat.ShouldBeNull();
+        model.SupportsExtraHighThinking.ShouldBeFalse();
     }
 
     [Fact]
@@ -59,9 +58,9 @@ public class LlmModelTests
     {
         var cost = new ModelCost(1.0m, 2.0m, 0.5m, 0.75m);
 
-        cost.Input.Should().Be(1.0m);
-        cost.Output.Should().Be(2.0m);
-        cost.CacheRead.Should().Be(0.5m);
-        cost.CacheWrite.Should().Be(0.75m);
+        cost.Input.ShouldBe(1.0m);
+        cost.Output.ShouldBe(2.0m);
+        cost.CacheRead.ShouldBe(0.5m);
+        cost.CacheWrite.ShouldBe(0.75m);
     }
 }

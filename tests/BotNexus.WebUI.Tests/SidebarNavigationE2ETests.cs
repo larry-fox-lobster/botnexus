@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.Playwright;
 
 namespace BotNexus.WebUI.Tests;
@@ -30,9 +29,9 @@ public sealed class SidebarNavigationE2ETests
         await using var host = await _fixture.CreatePageAsync();
         var header = host.Page.Locator("#sessions-list .agent-group-header").First;
         await header.ClickAsync();
-        (await header.GetAttributeAsync("class")).Should().Contain("collapsed");
+        (await header.GetAttributeAsync("class")).ShouldContain("collapsed");
         await header.ClickAsync();
-        (await header.GetAttributeAsync("class")).Should().NotContain("collapsed");
+        (await header.GetAttributeAsync("class")).ShouldNotContain("collapsed");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -62,9 +61,9 @@ public sealed class SidebarNavigationE2ETests
         var header = host.Page.Locator(".section-header[data-toggle='channels-list']").First;
         var section = host.Page.Locator("#channels-list");
         await header.ClickAsync();
-        (await section.GetAttributeAsync("class")).Should().Contain("collapsed");
+        (await section.GetAttributeAsync("class")).ShouldContain("collapsed");
         await header.ClickAsync();
-        (await section.GetAttributeAsync("class")).Should().NotContain("collapsed");
+        (await section.GetAttributeAsync("class")).ShouldNotContain("collapsed");
     }
 }
 

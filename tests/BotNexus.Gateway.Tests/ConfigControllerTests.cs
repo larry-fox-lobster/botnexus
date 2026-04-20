@@ -1,5 +1,4 @@
 using BotNexus.Gateway.Api.Controllers;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BotNexus.Gateway.Tests;
@@ -14,11 +13,11 @@ public sealed class ConfigControllerTests
 
         var result = await controller.Validate(missingPath, CancellationToken.None);
 
-        var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var payload = ok.Value.Should().BeOfType<ConfigValidationResponse>().Subject;
-        payload.IsValid.Should().BeFalse();
-        payload.Errors.Should().Contain(e => e.Contains("Config file not found", StringComparison.Ordinal));
-        payload.Errors.Should().Contain(e => e.Contains("Create ~/.botnexus/config.json", StringComparison.Ordinal));
+        var ok = result.Result.ShouldBeOfType<OkObjectResult>();
+        var payload = ok.Value.ShouldBeOfType<ConfigValidationResponse>();
+        payload.IsValid.ShouldBeFalse();
+        payload.Errors.ShouldContain(e => e.Contains("Config file not found", StringComparison.Ordinal));
+        payload.Errors.ShouldContain(e => e.Contains("Create ~/.botnexus/config.json", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -34,10 +33,10 @@ public sealed class ConfigControllerTests
 
             var result = await controller.Validate(path, CancellationToken.None);
 
-            var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
-            var payload = ok.Value.Should().BeOfType<ConfigValidationResponse>().Subject;
-            payload.IsValid.Should().BeFalse();
-            payload.Errors.Should().Contain(e => e.Contains("gateway.apiKeys.tenant-a.apiKey", StringComparison.Ordinal));
+            var ok = result.Result.ShouldBeOfType<OkObjectResult>();
+            var payload = ok.Value.ShouldBeOfType<ConfigValidationResponse>();
+            payload.IsValid.ShouldBeFalse();
+            payload.Errors.ShouldContain(e => e.Contains("gateway.apiKeys.tenant-a.apiKey", StringComparison.Ordinal));
         }
         finally
         {

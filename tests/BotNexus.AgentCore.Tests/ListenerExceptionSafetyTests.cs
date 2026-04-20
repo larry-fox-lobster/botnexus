@@ -1,6 +1,5 @@
 using BotNexus.AgentCore.Tests.TestUtils;
 using BotNexus.Agent.Core.Types;
-using FluentAssertions;
 
 namespace BotNexus.AgentCore.Tests;
 
@@ -23,8 +22,8 @@ public sealed class ListenerExceptionSafetyTests
 
         var result = await agent.PromptAsync("hello");
 
-        result.OfType<AssistantAgentMessage>().Should().ContainSingle();
-        agent.Status.Should().Be(AgentStatus.Idle);
-        diagnostics.Should().Contain(message => message.Contains("Listener threw", StringComparison.Ordinal));
+        result.OfType<AssistantAgentMessage>().ShouldHaveSingleItem();
+        agent.Status.ShouldBe(AgentStatus.Idle);
+        diagnostics.ShouldContain(message => message.Contains("Listener threw", StringComparison.Ordinal));
     }
 }

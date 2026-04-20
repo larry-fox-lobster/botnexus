@@ -5,7 +5,6 @@ using BotNexus.Extensions.Mcp.Protocol;
 using BotNexus.Extensions.Mcp.Transport;
 using BotNexus.Extensions.WebTools.Search;
 using BotNexus.Extensions.WebTools.Tests.Helpers;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.WebTools.Tests.Search;
 
@@ -61,12 +60,12 @@ public class CopilotMcpSearchProviderTests
 
         var results = await provider.SearchAsync("botnexus", 5, CancellationToken.None);
 
-        results.Should().ContainSingle();
-        results[0].Title.Should().Be("Doc");
+        results.ShouldHaveSingleItem();
+        results[0].Title.ShouldBe("Doc");
         handler.Requests.Select(r => r.Body).Where(b => b is not null)
-            .Should().Contain(body => body!.Contains("\"method\":\"initialize\""));
+            .ShouldContain(body => body!.Contains("\"method\":\"initialize\""));
         handler.Requests.Select(r => r.Body).Where(b => b is not null)
-            .Should().Contain(body => body!.Contains("\"method\":\"tools/call\""));
+            .ShouldContain(body => body!.Contains("\"method\":\"tools/call\""));
     }
 
     [Fact]
@@ -96,9 +95,9 @@ public class CopilotMcpSearchProviderTests
 
         var results = await provider.SearchAsync("query", 5, CancellationToken.None);
 
-        results.Should().ContainSingle();
-        results[0].Title.Should().Be("Fallback");
-        results[0].Url.Should().Be("https://example.com/fallback");
+        results.ShouldHaveSingleItem();
+        results[0].Title.ShouldBe("Fallback");
+        results[0].Url.ShouldBe("https://example.com/fallback");
     }
 
     [Fact]
@@ -110,8 +109,8 @@ public class CopilotMcpSearchProviderTests
 
         var act = () => provider.SearchAsync("query", 5, CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Copilot token unavailable*");
+        (await act.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("Copilot token unavailable");
     }
 
     [Fact]
@@ -134,8 +133,9 @@ public class CopilotMcpSearchProviderTests
 
         var act = () => provider.SearchAsync("query", 5, CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*returned an error*upstream failed*");
+        var ex = await act.ShouldThrowAsync<InvalidOperationException>();
+        ex.Message.ShouldContain("returned an error");
+        ex.Message.ShouldContain("upstream failed");
     }
 
     [Fact]
@@ -160,8 +160,8 @@ public class CopilotMcpSearchProviderTests
 
         var results = await Task.WhenAll(tasks);
 
-        results.Should().HaveCount(10);
-        transport.ConnectCallCount.Should().Be(1);
+        results.Count().ShouldBe(10);
+        transport.ConnectCallCount.ShouldBe(1);
     }
 
     [Fact]
@@ -175,8 +175,8 @@ public class CopilotMcpSearchProviderTests
 
         await provider.DisposeAsync();
 
-        transport.DisconnectCallCount.Should().Be(1);
-        transport.DisposeCallCount.Should().Be(1);
+        transport.DisconnectCallCount.ShouldBe(1);
+        transport.DisposeCallCount.ShouldBe(1);
     }
 
     private static HttpResponseMessage JsonRpcResult<T>(T result)

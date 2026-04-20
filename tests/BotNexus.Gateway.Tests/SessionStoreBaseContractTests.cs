@@ -2,7 +2,6 @@ using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using System.Reflection;
@@ -30,9 +29,9 @@ public sealed class SessionStoreBaseContractTests
 
         var session = await harness.Store.GetOrCreateAsync(SessionId.From("defaults"), AgentId.From("agent-defaults"));
 
-        session.Status.Should().Be(GatewaySessionStatus.Active);
-        session.CreatedAt.Should().BeOnOrAfter(before);
-        session.UpdatedAt.Should().BeOnOrAfter(session.CreatedAt);
+        session.Status.ShouldBe(GatewaySessionStatus.Active);
+        session.CreatedAt.ShouldBeGreaterThanOrEqualTo(before);
+        session.UpdatedAt.ShouldBeGreaterThanOrEqualTo(session.CreatedAt);
     }
 
     [Theory]
@@ -63,7 +62,7 @@ public sealed class SessionStoreBaseContractTests
 
         var filtered = await ListByStatusAsync(harness.Store, AgentId.From("agent-a"), GatewaySessionStatus.Suspended);
 
-        filtered.Select(s => s.SessionId.Value).Should().Equal("suspended");
+        filtered.Select(s => s.SessionId.Value).ShouldHaveSingleItem().ShouldBe("suspended");
     }
 
     [Theory]
@@ -102,7 +101,7 @@ public sealed class SessionStoreBaseContractTests
 
         var sessions = await harness.Store.ListByChannelAsync(AgentId.From("agent-a"), ChannelKey.From("web chat"));
 
-        sessions.Select(s => s.SessionId.Value).Should().Equal("new", "old");
+        sessions.Select(s => s.SessionId.Value).ShouldBe(new[] { "new", "old" }, ignoreOrder: false);
     }
 
     [Theory]
@@ -122,7 +121,7 @@ public sealed class SessionStoreBaseContractTests
 
         var sessions = await harness.Store.ListByChannelAsync(AgentId.From("agent-a"), ChannelKey.From("web chat"));
 
-        sessions.Select(s => s.SessionId.Value).Should().ContainSingle().Which.Should().Be("signalr-session");
+        sessions.Select(s => s.SessionId.Value).ShouldHaveSingleItem().ShouldBe("signalr-session");
     }
 
     [Theory]
@@ -133,8 +132,8 @@ public sealed class SessionStoreBaseContractTests
     {
         using var harness = createHarness();
 
-        harness.Store.GetType().BaseType.Should().NotBeNull();
-        harness.Store.GetType().BaseType!.Name.Should().Be("SessionStoreBase");
+        harness.Store.GetType().BaseType.ShouldNotBeNull();
+        harness.Store.GetType().BaseType!.Name.ShouldBe("SessionStoreBase");
     }
 
     private static async Task<IReadOnlyList<GatewaySession>> ListByStatusAsync(
@@ -149,7 +148,7 @@ public sealed class SessionStoreBaseContractTests
                 parameter.ParameterType == typeof(GatewaySessionStatus) ||
                 parameter.ParameterType == typeof(Nullable<GatewaySessionStatus>)));
 
-        statusListMethod.Should().NotBeNull("SessionStoreBase contract requires status filtering support in ListAsync");
+        statusListMethod.ShouldNotBeNull("SessionStoreBase contract requires status filtering support in ListAsync");
 
         var parameters = statusListMethod!.GetParameters();
         var args = new object?[parameters.Length];
@@ -165,8 +164,8 @@ public sealed class SessionStoreBaseContractTests
                 args[i] = parameters[i].HasDefaultValue ? parameters[i].DefaultValue : null;
         }
 
-        var task = statusListMethod.Invoke(store, args).Should().BeAssignableTo<Task<IReadOnlyList<GatewaySession>>>().Subject;
-        return await task;
+        var task = statusListMethod.Invoke(store, args).ShouldBeAssignableTo<Task<IReadOnlyList<GatewaySession>>>();
+        return await task!;
     }
 
     public interface IStoreHarness : IDisposable

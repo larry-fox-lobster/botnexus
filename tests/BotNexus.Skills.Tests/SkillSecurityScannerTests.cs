@@ -1,5 +1,4 @@
 using BotNexus.Extensions.Skills.Security;
-using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.Extensions.Skills.Tests;
@@ -20,9 +19,9 @@ public sealed class SkillSecurityScannerTests
 
         var findings = SkillSecurityScanner.ScanSource(source, "test.js");
 
-        findings.Should().ContainSingle(f => f.RuleId == "dangerous-exec");
-        findings[0].Severity.Should().Be(ScanSeverity.Critical);
-        findings[0].Message.Should().Contain("child_process");
+        findings.Where(f => f.RuleId == "dangerous-exec").ShouldHaveSingleItem();
+        findings[0].Severity.ShouldBe(ScanSeverity.Critical);
+        findings[0].Message.ShouldContain("child_process");
     }
 
     [Fact]
@@ -33,7 +32,7 @@ public sealed class SkillSecurityScannerTests
 
         var findings = SkillSecurityScanner.ScanSource(source, "test.js");
 
-        findings.Should().NotContain(f => f.RuleId == "dangerous-exec");
+        findings.ShouldNotContain(f => f.RuleId == "dangerous-exec");
     }
 
     [Fact]
@@ -46,8 +45,8 @@ public sealed class SkillSecurityScannerTests
 
         var findings = SkillSecurityScanner.ScanSource(source, "test.js");
 
-        findings.Should().ContainSingle(f => f.RuleId == "dynamic-code-execution");
-        findings[0].Severity.Should().Be(ScanSeverity.Critical);
+        findings.Where(f => f.RuleId == "dynamic-code-execution").ShouldHaveSingleItem();
+        findings[0].Severity.ShouldBe(ScanSeverity.Critical);
     }
 
     [Fact]
@@ -57,8 +56,8 @@ public sealed class SkillSecurityScannerTests
 
         var findings = SkillSecurityScanner.ScanSource(source, "test.js");
 
-        findings.Should().ContainSingle(f => f.RuleId == "crypto-mining");
-        findings[0].Severity.Should().Be(ScanSeverity.Critical);
+        findings.Where(f => f.RuleId == "crypto-mining").ShouldHaveSingleItem();
+        findings[0].Severity.ShouldBe(ScanSeverity.Critical);
     }
 
     [Fact]
@@ -68,7 +67,7 @@ public sealed class SkillSecurityScannerTests
 
         var findings = SkillSecurityScanner.ScanSource(source, "test.js");
 
-        findings.Should().ContainSingle(f => f.RuleId == "crypto-mining");
+        findings.Where(f => f.RuleId == "crypto-mining").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -78,8 +77,8 @@ public sealed class SkillSecurityScannerTests
 
         var findings = SkillSecurityScanner.ScanSource(source, "test.js");
 
-        findings.Should().ContainSingle(f => f.RuleId == "suspicious-network");
-        findings[0].Severity.Should().Be(ScanSeverity.Warn);
+        findings.Where(f => f.RuleId == "suspicious-network").ShouldHaveSingleItem();
+        findings[0].Severity.ShouldBe(ScanSeverity.Warn);
     }
 
     [Fact]
@@ -89,7 +88,7 @@ public sealed class SkillSecurityScannerTests
 
         var findings = SkillSecurityScanner.ScanSource(source, "test.js");
 
-        findings.Should().NotContain(f => f.RuleId == "suspicious-network");
+        findings.ShouldNotContain(f => f.RuleId == "suspicious-network");
     }
 
     // -----------------------------------------------------------------------
@@ -106,8 +105,8 @@ public sealed class SkillSecurityScannerTests
 
         var findings = SkillSecurityScanner.ScanSource(source, "test.js");
 
-        findings.Should().ContainSingle(f => f.RuleId == "env-harvesting");
-        findings[0].Severity.Should().Be(ScanSeverity.Critical);
+        findings.Where(f => f.RuleId == "env-harvesting").ShouldHaveSingleItem();
+        findings[0].Severity.ShouldBe(ScanSeverity.Critical);
     }
 
     [Fact]
@@ -120,8 +119,8 @@ public sealed class SkillSecurityScannerTests
 
         var findings = SkillSecurityScanner.ScanSource(source, "test.js");
 
-        findings.Should().ContainSingle(f => f.RuleId == "potential-exfiltration");
-        findings[0].Severity.Should().Be(ScanSeverity.Warn);
+        findings.Where(f => f.RuleId == "potential-exfiltration").ShouldHaveSingleItem();
+        findings[0].Severity.ShouldBe(ScanSeverity.Warn);
     }
 
     [Fact]
@@ -131,7 +130,7 @@ public sealed class SkillSecurityScannerTests
 
         var findings = SkillSecurityScanner.ScanSource(source, "test.js");
 
-        findings.Should().Contain(f => f.RuleId == "obfuscated-code" && f.Message.Contains("Hex"));
+        findings.ShouldContain(f => f.RuleId == "obfuscated-code" && f.Message.Contains("Hex"));
     }
 
     [Fact]
@@ -142,7 +141,7 @@ public sealed class SkillSecurityScannerTests
 
         var findings = SkillSecurityScanner.ScanSource(source, "test.js");
 
-        findings.Should().Contain(f => f.RuleId == "obfuscated-code" && f.Message.Contains("base64"));
+        findings.ShouldContain(f => f.RuleId == "obfuscated-code" && f.Message.Contains("base64"));
     }
 
     // -----------------------------------------------------------------------
@@ -161,7 +160,7 @@ public sealed class SkillSecurityScannerTests
 
         var findings = SkillSecurityScanner.ScanSource(source, "clean.js");
 
-        findings.Should().BeEmpty();
+        findings.ShouldBeEmpty();
     }
 
     // -----------------------------------------------------------------------
@@ -181,8 +180,8 @@ public sealed class SkillSecurityScannerTests
 
         var summary = SkillSecurityScanner.ScanDirectory(dir, maxFileBytes: 100, fileSystem: fileSystem);
 
-        summary.ScannedFiles.Should().Be(0);
-        summary.Findings.Should().BeEmpty();
+        summary.ScannedFiles.ShouldBe(0);
+        summary.Findings.ShouldBeEmpty();
     }
 
     [Fact]
@@ -203,10 +202,10 @@ public sealed class SkillSecurityScannerTests
 
         var summary = SkillSecurityScanner.ScanDirectory(dir, fileSystem: fileSystem);
 
-        summary.ScannedFiles.Should().Be(1);
-        summary.Critical.Should().BeGreaterThanOrEqualTo(2); // dangerous-exec + env-harvesting
-        summary.Warn.Should().BeGreaterThanOrEqualTo(1); // suspicious-network
-        (summary.Critical + summary.Warn + summary.Info).Should().Be(summary.Findings.Count);
+        summary.ScannedFiles.ShouldBe(1);
+        summary.Critical.ShouldBeGreaterThanOrEqualTo(2); // dangerous-exec + env-harvesting
+        summary.Warn.ShouldBeGreaterThanOrEqualTo(1); // suspicious-network
+        (summary.Critical + summary.Warn + summary.Info).ShouldBe(summary.Findings.Count);
     }
 
     [Fact]
@@ -221,7 +220,7 @@ public sealed class SkillSecurityScannerTests
 
         var summary = SkillSecurityScanner.ScanDirectory(dir, fileSystem: fileSystem);
 
-        summary.ScannedFiles.Should().Be(0);
+        summary.ScannedFiles.ShouldBe(0);
     }
 
     [Fact]
@@ -238,7 +237,7 @@ public sealed class SkillSecurityScannerTests
 
         var summary = SkillSecurityScanner.ScanDirectory(dir, fileSystem: fileSystem);
 
-        summary.ScannedFiles.Should().Be(4);
+        summary.ScannedFiles.ShouldBe(4);
     }
 
     // -----------------------------------------------------------------------
@@ -287,8 +286,8 @@ public sealed class SkillSecurityScannerTests
 
         var skills = SkillDiscovery.Discover(skillsDir, null, null, fileSystem);
 
-        skills.Should().ContainSingle(s => s.Name == "safe-skill");
-        skills.Should().NotContain(s => s.Name == "evil-skill");
+        skills.Where(s => s.Name == "safe-skill").ShouldHaveSingleItem();
+        skills.ShouldNotContain(s => s.Name == "evil-skill");
     }
 
 }

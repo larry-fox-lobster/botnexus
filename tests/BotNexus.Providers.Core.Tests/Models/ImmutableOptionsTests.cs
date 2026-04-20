@@ -1,6 +1,5 @@
 using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Models;
 
@@ -21,10 +20,10 @@ public class ImmutableOptionsTests
 
         var clone = original with { Output = 9 };
 
-        clone.Should().NotBeSameAs(original);
-        clone.Output.Should().Be(9);
-        original.Output.Should().Be(3);
-        original.TotalTokens.Should().Be(16);
+        clone.ShouldNotBeSameAs(original);
+        clone.Output.ShouldBe(9);
+        original.Output.ShouldBe(3);
+        original.TotalTokens.ShouldBe(16);
     }
 
     [Fact]
@@ -42,8 +41,8 @@ public class ImmutableOptionsTests
             Cost = original.Cost with { Total = 0.999m }
         };
 
-        clone.Cost.Total.Should().Be(0.999m);
-        original.Cost.Total.Should().Be(0.037m);
+        clone.Cost.Total.ShouldBe(0.999m);
+        original.Cost.Total.ShouldBe(0.037m);
     }
 
     [Fact]
@@ -68,20 +67,20 @@ public class ImmutableOptionsTests
 
         var clone = original with { Temperature = 0.9f };
 
-        clone.Should().NotBeSameAs(original);
-        clone.Temperature.Should().Be(0.9f);
-        clone.MaxTokens.Should().Be(original.MaxTokens);
-        clone.CancellationToken.Should().Be(original.CancellationToken);
-        clone.ApiKey.Should().Be(original.ApiKey);
-        clone.Transport.Should().Be(original.Transport);
-        clone.CacheRetention.Should().Be(original.CacheRetention);
-        clone.SessionId.Should().Be(original.SessionId);
-        clone.MaxRetryDelayMs.Should().Be(original.MaxRetryDelayMs);
-        clone.Headers.Should().NotBeSameAs(originalHeaders);
-        clone.Headers.Should().BeEquivalentTo(originalHeaders);
-        clone.Metadata.Should().NotBeSameAs(originalMetadata);
-        clone.Metadata.Should().BeEquivalentTo(originalMetadata);
-        original.Temperature.Should().Be(0.7f);
+        clone.ShouldNotBeSameAs(original);
+        clone.Temperature.ShouldBe(0.9f);
+        clone.MaxTokens.ShouldBe(original.MaxTokens);
+        clone.CancellationToken.ShouldBe(original.CancellationToken);
+        clone.ApiKey.ShouldBe(original.ApiKey);
+        clone.Transport.ShouldBe(original.Transport);
+        clone.CacheRetention.ShouldBe(original.CacheRetention);
+        clone.SessionId.ShouldBe(original.SessionId);
+        clone.MaxRetryDelayMs.ShouldBe(original.MaxRetryDelayMs);
+        clone.Headers.ShouldNotBeSameAs(originalHeaders);
+        clone.Headers.ShouldBe(originalHeaders);
+        clone.Metadata.ShouldNotBeSameAs(originalMetadata);
+        clone.Metadata.ShouldBe(originalMetadata);
+        original.Temperature.ShouldBe(0.7f);
     }
 
     [Fact]
@@ -97,7 +96,7 @@ public class ImmutableOptionsTests
         clone.Headers!["x-key"] = "changed";
         clone.Metadata!["flag"] = "changed";
 
-        original.Headers!["x-key"].Should().Be("v1");
-        original.Metadata!["flag"].Should().Be("on");
+        original.Headers!["x-key"].ShouldBe("v1");
+        original.Metadata!["flag"].ShouldBe("on");
     }
 }

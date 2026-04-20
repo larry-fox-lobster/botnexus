@@ -17,7 +17,6 @@ using BotNexus.Tools;
 using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -87,28 +86,30 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
             _configDirectory,
             new ListLogger<PlatformConfigAgentSource>());
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.AgentId.Should().Be("assistant");
-        descriptor.DisplayName.Should().Be("Assistant");
-        descriptor.Description.Should().Be("Helpful assistant");
-        descriptor.ApiProvider.Should().Be("copilot");
-        descriptor.ModelId.Should().Be("gpt-4.1");
-        descriptor.AllowedModelIds.Should().Equal(["gpt-4.1", "gpt-4o"]);
-        descriptor.SubAgentIds.Should().Equal(["helper-agent"]);
-        descriptor.IsolationStrategy.Should().Be("remote");
-        descriptor.MaxConcurrentSessions.Should().Be(3);
-        descriptor.Metadata.Should().ContainKey("owner").WhoseValue.Should().Be("team-gateway");
-        descriptor.IsolationOptions.Should().ContainKey("timeoutMs").WhoseValue.Should().Be(1000L);
-        descriptor.SystemPrompt.Should().BeNull();
-        descriptor.SystemPromptFiles.Should().Equal(["AGENTS.md", "SOUL.md"]);
-        descriptor.Memory.Should().NotBeNull();
-        descriptor.Memory!.Enabled.Should().BeTrue();
-        descriptor.Memory.Indexing.Should().Be("auto");
-        descriptor.Memory.Search.Should().NotBeNull();
-        descriptor.Memory.Search!.DefaultTopK.Should().Be(7);
-        descriptor.Memory.Search.TemporalDecay.Should().NotBeNull();
-        descriptor.Memory.Search.TemporalDecay!.HalfLifeDays.Should().Be(21);
+        descriptor.AgentId.Value.ShouldBe("assistant");
+        descriptor.DisplayName.ShouldBe("Assistant");
+        descriptor.Description.ShouldBe("Helpful assistant");
+        descriptor.ApiProvider.ShouldBe("copilot");
+        descriptor.ModelId.ShouldBe("gpt-4.1");
+        descriptor.AllowedModelIds.ShouldBe(new[] { "gpt-4.1", "gpt-4o" });
+        descriptor.SubAgentIds.ShouldBe(new[] { "helper-agent" });
+        descriptor.IsolationStrategy.ShouldBe("remote");
+        descriptor.MaxConcurrentSessions.ShouldBe(3);
+        descriptor.Metadata.ShouldContainKey("owner");
+        descriptor.Metadata["owner"].ShouldBe("team-gateway");
+        descriptor.IsolationOptions.ShouldContainKey("timeoutMs");
+        descriptor.IsolationOptions["timeoutMs"].ShouldBe(1000L);
+        descriptor.SystemPrompt.ShouldBeNull();
+        descriptor.SystemPromptFiles.ShouldBe(new[] { "AGENTS.md", "SOUL.md" });
+        descriptor.Memory.ShouldNotBeNull();
+        descriptor.Memory!.Enabled.ShouldBeTrue();
+        descriptor.Memory.Indexing.ShouldBe("auto");
+        descriptor.Memory.Search.ShouldNotBeNull();
+        descriptor.Memory.Search!.DefaultTopK.ShouldBe(7);
+        descriptor.Memory.Search.TemporalDecay.ShouldNotBeNull();
+        descriptor.Memory.Search.TemporalDecay!.HalfLifeDays.ShouldBe(21);
     }
 
     [Fact]
@@ -129,10 +130,10 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
 
         var source = new PlatformConfigAgentSource(new TestOptionsMonitor<PlatformConfig>(config), _configDirectory, new ListLogger<PlatformConfigAgentSource>());
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.SystemPromptFile.Should().Be(@"prompts\missing.txt");
-        descriptor.SystemPromptFiles.Should().Equal([@"prompts\missing.txt"]);
+        descriptor.SystemPromptFile.ShouldBe(@"prompts\missing.txt");
+        descriptor.SystemPromptFiles.ShouldBe(new[] { @"prompts\missing.txt" });
     }
 
     [Fact]
@@ -163,9 +164,9 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
             _configDirectory,
             new ListLogger<PlatformConfigAgentSource>());
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.ExtensionConfig.Should().ContainKey("ext");
+        descriptor.ExtensionConfig.ShouldContainKey("ext");
         AssertJsonEquals(descriptor.ExtensionConfig["ext"], """{"a":1}""");
     }
 
@@ -200,9 +201,9 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
             _configDirectory,
             new ListLogger<PlatformConfigAgentSource>());
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.ExtensionConfig.Should().ContainKey("ext");
+        descriptor.ExtensionConfig.ShouldContainKey("ext");
         AssertJsonEquals(descriptor.ExtensionConfig["ext"], """{"a":1,"b":3,"c":4}""");
     }
 
@@ -229,12 +230,12 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
 
         var source = new PlatformConfigAgentSource(new TestOptionsMonitor<PlatformConfig>(config), _configDirectory, new ListLogger<PlatformConfigAgentSource>());
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.FileAccess.Should().NotBeNull();
-        descriptor.FileAccess!.AllowedReadPaths.Should().Equal(@"Q:\repos\botnexus\docs");
-        descriptor.FileAccess.AllowedWritePaths.Should().Equal(@"Q:\repos\botnexus\artifacts");
-        descriptor.FileAccess.DeniedPaths.Should().Equal(@"Q:\repos\botnexus\docs\secrets");
+        descriptor.FileAccess.ShouldNotBeNull();
+        descriptor.FileAccess!.AllowedReadPaths.ShouldHaveSingleItem().ShouldBe(@"Q:\repos\botnexus\docs");
+        descriptor.FileAccess.AllowedWritePaths.ShouldHaveSingleItem().ShouldBe(@"Q:\repos\botnexus\artifacts");
+        descriptor.FileAccess.DeniedPaths.ShouldHaveSingleItem().ShouldBe(@"Q:\repos\botnexus\docs\secrets");
     }
 
     [Fact]
@@ -265,10 +266,10 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
                 ["repo-botnexus"] = @"Q:\repos\botnexus"
             }));
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.FileAccess.Should().NotBeNull();
-        descriptor.FileAccess!.AllowedReadPaths.Should().Equal(Path.GetFullPath(@"Q:\repos\botnexus"));
+        descriptor.FileAccess.ShouldNotBeNull();
+        descriptor.FileAccess!.AllowedReadPaths.ShouldHaveSingleItem().ShouldBe(Path.GetFullPath(@"Q:\repos\botnexus"));
     }
 
     [Fact]
@@ -299,10 +300,10 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
                 ["repo-botnexus"] = @"Q:\repos\botnexus"
             }));
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.FileAccess.Should().NotBeNull();
-        descriptor.FileAccess!.AllowedReadPaths.Should().Equal(Path.GetFullPath(@"Q:\repos\botnexus\docs\planning"));
+        descriptor.FileAccess.ShouldNotBeNull();
+        descriptor.FileAccess!.AllowedReadPaths.ShouldHaveSingleItem().ShouldBe(Path.GetFullPath(@"Q:\repos\botnexus\docs\planning"));
     }
 
     [Fact]
@@ -331,11 +332,11 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
             logger,
             new StubLocationResolver(new Dictionary<string, string>()));
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.FileAccess.Should().NotBeNull();
-        descriptor.FileAccess!.AllowedReadPaths.Should().BeEmpty();
-        logger.Entries.Should().Contain(entry =>
+        descriptor.FileAccess.ShouldNotBeNull();
+        descriptor.FileAccess!.AllowedReadPaths.ShouldBeEmpty();
+        logger.Entries.ShouldContain(entry =>
             entry.Level == LogLevel.Warning &&
             entry.Message.Contains("Skipping unresolved location reference '@missing'", StringComparison.Ordinal));
     }
@@ -370,16 +371,16 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
                 ["repo-botnexus"] = @"Q:\repos\botnexus"
             }));
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.FileAccess.Should().NotBeNull();
-        descriptor.FileAccess!.AllowedReadPaths.Should().Equal(
+        descriptor.FileAccess.ShouldNotBeNull();
+        descriptor.FileAccess!.AllowedReadPaths.ShouldBe(new[] {
             Path.GetFullPath(@"Q:\repos\botnexus\docs"),
-            @"Q:\repos\shared");
-        descriptor.FileAccess.AllowedWritePaths.Should().Equal(Path.GetFullPath(@"Q:\repos\botnexus\artifacts"));
-        descriptor.FileAccess.DeniedPaths.Should().Equal(
+            @"Q:\repos\shared" }, ignoreOrder: false);
+        descriptor.FileAccess.AllowedWritePaths.ShouldHaveSingleItem().ShouldBe(Path.GetFullPath(@"Q:\repos\botnexus\artifacts"));
+        descriptor.FileAccess.DeniedPaths.ShouldBe(new[] {
             Path.GetFullPath(@"Q:\repos\botnexus\.env"),
-            @"Q:\repos\shared\blocked");
+            @"Q:\repos\shared\blocked" }, ignoreOrder: false);
     }
 
     [Fact]
@@ -402,7 +403,7 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
             _configDirectory,
             new ListLogger<PlatformConfigAgentSource>());
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
         var modelRegistry = new ModelRegistry();
         modelRegistry.Register("test-provider", new LlmModel(
@@ -432,8 +433,8 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
             descriptor,
             new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1") });
 
-        handle.AgentId.Should().Be("assistant");
-        handle.SessionId.Should().Be("session-1");
+        handle.AgentId.Value.ShouldBe("assistant");
+        handle.SessionId.Value.ShouldBe("session-1");
     }
 
     [Fact]
@@ -461,7 +462,7 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
             _configDirectory,
             new ListLogger<PlatformConfigAgentSource>());
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
         var toolFactory = new CapturingAgentToolFactory();
 
         var modelRegistry = new ModelRegistry();
@@ -493,13 +494,11 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
             new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1") });
 
         var pathValidator = toolFactory.CapturedPathValidator;
-        pathValidator.Should().NotBeNull();
+        pathValidator.ShouldNotBeNull();
         pathValidator!.ValidateAndResolve(@"Q:\repos\botnexus\docs\guide.md", FileAccessMode.Read)
-            .Should()
-            .Be(@"Q:\repos\botnexus\docs\guide.md");
+            .ShouldBe(@"Q:\repos\botnexus\docs\guide.md");
         pathValidator.ValidateAndResolve(@"Q:\repos\botnexus\docs\secrets\tokens.txt", FileAccessMode.Read)
-            .Should()
-            .BeNull();
+            .ShouldBeNull();
     }
 
     [Fact]
@@ -512,7 +511,7 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
 
         using var subscription = source.Watch(_ => { });
 
-        subscription.Should().NotBeNull();
+        subscription.ShouldNotBeNull();
     }
 
     public void Dispose()
@@ -525,7 +524,7 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
     {
         var authManager = new GatewayAuthManager(new PlatformConfig(), NullLogger<GatewayAuthManager>.Instance, new FileSystem());
         var authPathField = typeof(GatewayAuthManager).GetField("_authFilePath", BindingFlags.NonPublic | BindingFlags.Instance);
-        authPathField.Should().NotBeNull();
+        authPathField.ShouldNotBeNull();
         authPathField!.SetValue(authManager, Path.Combine(_configDirectory, "auth.json"));
         return authManager;
     }
@@ -534,7 +533,7 @@ public sealed class PlatformConfigAgentSourceTests : IDisposable
     {
         var actualNode = JsonNode.Parse(actual.GetRawText());
         var expectedNode = JsonNode.Parse(expectedJson);
-        JsonNode.DeepEquals(actualNode, expectedNode).Should().BeTrue();
+        JsonNode.DeepEquals(actualNode, expectedNode).ShouldBeTrue();
     }
 
     private sealed class ListLogger<T> : ILogger<T>

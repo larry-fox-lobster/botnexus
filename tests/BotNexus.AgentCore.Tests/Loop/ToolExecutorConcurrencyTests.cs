@@ -5,7 +5,6 @@ using BotNexus.Agent.Core.Tools;
 using BotNexus.AgentCore.Tests.TestUtils;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.AgentCore.Tests.Loop;
 
@@ -22,8 +21,8 @@ public sealed class ToolExecutorConcurrencyTests
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        results.Should().HaveCount(2);
-        results.Count(r => r.IsError).Should().Be(1);
+        results.Count().ShouldBe(2);
+        results.Count(r => r.IsError).ShouldBe(1);
     }
 
     [Fact]
@@ -36,8 +35,8 @@ public sealed class ToolExecutorConcurrencyTests
         var context = new AgentContext(null, [], tools);
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
-        results.Should().HaveCount(3);
-        results.Should().OnlyContain(r => r.IsError);
+        results.Count().ShouldBe(3);
+        results.ShouldAllBe(r => r.IsError);
     }
 
     [Fact]
@@ -51,9 +50,9 @@ public sealed class ToolExecutorConcurrencyTests
         var context = new AgentContext(null, [], tools);
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
-        results.Should().HaveCount(2);
-        results[0].IsError.Should().BeTrue();
-        results[1].IsError.Should().BeFalse();
+        results.Count().ShouldBe(2);
+        results[0].IsError.ShouldBeTrue();
+        results[1].IsError.ShouldBeFalse();
     }
 
     [Fact]
@@ -68,8 +67,8 @@ public sealed class ToolExecutorConcurrencyTests
         var context = new AgentContext(null, [], [tracker]);
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
-        results.Should().HaveCount(100);
-        tracker.MaxConcurrency.Should().BeGreaterThan(10);
+        results.Count().ShouldBe(100);
+        tracker.MaxConcurrency.ShouldBeGreaterThan(10);
     }
 
     [Fact]
@@ -90,8 +89,8 @@ public sealed class ToolExecutorConcurrencyTests
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
 
         var values = results.Select(r => r.Result.Content[0].Value).ToList();
-        values.Should().Contain("first");
-        values.Should().Contain("second");
+        values.ShouldContain("first");
+        values.ShouldContain("second");
     }
 
     private static AssistantAgentMessage CreateAssistant(params (string id, string name)[] calls)

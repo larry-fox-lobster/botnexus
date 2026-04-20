@@ -3,7 +3,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Channels;
 using BotNexus.Domain.Primitives;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -105,7 +104,7 @@ public sealed class InternalChannelAdapterTests
             Content = "hello"
         }, CancellationToken.None);
 
-        await act.Should().NotThrowAsync();
+        await act.ShouldNotThrowAsync();
 
         logger.Verify(
             x => x.Log(
@@ -187,7 +186,7 @@ public sealed class InternalChannelAdapterTests
     {
         var sut = CreateAdapter(new Mock<IChannelManager>().Object, new Mock<ISessionStore>().Object);
 
-        sut.ChannelType.Value.Should().Be("internal");
+        sut.ChannelType.Value.ShouldBe("internal");
     }
 
     private static InternalChannelAdapter CreateAdapter(IChannelManager channelManager, ISessionStore sessionStore)

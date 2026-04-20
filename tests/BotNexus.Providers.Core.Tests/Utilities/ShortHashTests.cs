@@ -1,6 +1,5 @@
 using System.Text.RegularExpressions;
 using BotNexus.Agent.Providers.Core.Utilities;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Utilities;
 
@@ -12,7 +11,7 @@ public class ShortHashTests
         var first = ShortHash.Generate("toolu_abc123");
         var second = ShortHash.Generate("toolu_abc123");
 
-        first.Should().Be(second);
+        first.ShouldBe(second);
     }
 
     [Fact]
@@ -22,7 +21,7 @@ public class ShortHashTests
 
         // pi-mono's shortHash concatenates two base-36 uint32 representations,
         // producing variable-length strings typically 12-14 characters.
-        hash.Length.Should().BeInRange(6, 14);
+        hash.Length.ShouldBeInRange(6, 14);
     }
 
     [Fact]
@@ -30,6 +29,6 @@ public class ShortHashTests
     {
         var hash = ShortHash.Generate("toolu_abc123");
 
-        Regex.IsMatch(hash, "^[a-zA-Z0-9]+$").Should().BeTrue();
+        Regex.IsMatch(hash, "^[a-zA-Z0-9]+$").ShouldBeTrue();
     }
 }

@@ -4,7 +4,6 @@ using System.Text.Json;
 using BotNexus.Extensions.Channels.Telegram;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -75,8 +74,8 @@ public sealed class TelegramChannelAdapterTests
         dispatcher.Invocations
             .Where(i => i.Method.Name == nameof(IChannelDispatcher.DispatchAsync))
             .Select(i => (InboundMessage)i.Arguments[0])
-            .Should()
-            .ContainSingle(m => m.ConversationId == "42" && m.Content == "hello");
+            .Where(m => m.ConversationId == "42" && m.Content == "hello")
+            .ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -105,9 +104,9 @@ public sealed class TelegramChannelAdapterTests
         });
 
         var messageCalls = calls.Where(c => c.MethodName == "sendMessage").ToList();
-        messageCalls.Should().HaveCount(2);
-        messageCalls[0].Text.Should().HaveLength(4096);
-        messageCalls[1].Text.Should().HaveLength(904);
+        messageCalls.Count().ShouldBe(2);
+        messageCalls[0].Text.Length.ShouldBe(4096);
+        messageCalls[1].Text.Length.ShouldBe(904);
     }
 
     [Fact]
@@ -135,8 +134,8 @@ public sealed class TelegramChannelAdapterTests
             Content = "_*[]()~`>#+-=|{}.!\\"
         });
 
-        sendCall.Should().NotBeNull();
-        sendCall!.Text.Should().Be("\\_\\*\\[\\]\\(\\)\\~\\`\\>\\#\\+\\-\\=\\|\\{\\}\\.\\!\\\\");
+        sendCall.ShouldNotBeNull();
+        sendCall!.Text.ShouldBe("\\_\\*\\[\\]\\(\\)\\~\\`\\>\\#\\+\\-\\=\\|\\{\\}\\.\\!\\\\");
     }
 
     [Fact]
@@ -191,10 +190,10 @@ public sealed class TelegramChannelAdapterTests
         await secondPollSeen.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await adapter.StopAsync(CancellationToken.None);
 
-        offsets.Count.Should().BeGreaterThanOrEqualTo(2);
-        offsets[0].Should().BeNull();
-        offsets[1].Should().Be(101);
-        dispatcher.Invocations.Count(i => i.Method.Name == nameof(IChannelDispatcher.DispatchAsync)).Should().Be(1);
+        offsets.Count.ShouldBeGreaterThanOrEqualTo(2);
+        offsets[0].ShouldBeNull();
+        offsets[1].ShouldBe(101);
+        dispatcher.Invocations.Count(i => i.Method.Name == nameof(IChannelDispatcher.DispatchAsync)).ShouldBe(1);
     }
 
     [Fact]
@@ -225,7 +224,7 @@ public sealed class TelegramChannelAdapterTests
 
         var stopTask = adapter.StopAsync(CancellationToken.None);
         var completed = await Task.WhenAny(stopTask, Task.Delay(TimeSpan.FromSeconds(5)));
-        completed.Should().Be(stopTask);
+        completed.ShouldBe(stopTask);
     }
 
     [Fact]
@@ -248,9 +247,9 @@ public sealed class TelegramChannelAdapterTests
         await adapter.StartAsync(Mock.Of<IChannelDispatcher>(), CancellationToken.None);
         await adapter.StopAsync(CancellationToken.None);
 
-        calls.Select(c => c.MethodName).Should().ContainSingle("setWebhook");
-        calls.Select(c => c.MethodName).Should().NotContain("deleteWebhook");
-        calls.Select(c => c.MethodName).Should().NotContain("getUpdates");
+        calls.Select(c => c.MethodName).ShouldHaveSingleItem().ShouldBe("setWebhook");
+        calls.Select(c => c.MethodName).ShouldNotContain("deleteWebhook");
+        calls.Select(c => c.MethodName).ShouldNotContain("getUpdates");
     }
 
     [Fact]
@@ -279,9 +278,9 @@ public sealed class TelegramChannelAdapterTests
         await pollingSeen.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await adapter.StopAsync(CancellationToken.None);
 
-        calls.Select(c => c.MethodName).Should().Contain("deleteWebhook");
-        calls.Select(c => c.MethodName).Should().Contain("getUpdates");
-        calls.Select(c => c.MethodName).Should().NotContain("setWebhook");
+        calls.Select(c => c.MethodName).ShouldContain("deleteWebhook");
+        calls.Select(c => c.MethodName).ShouldContain("getUpdates");
+        calls.Select(c => c.MethodName).ShouldNotContain("setWebhook");
     }
 
     [Fact]
@@ -311,10 +310,10 @@ public sealed class TelegramChannelAdapterTests
         await adapter.SendStreamEventAsync("42", new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = new string('a', 101) });
         await adapter.SendStreamEventAsync("42", new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = new string('b', 101) });
 
-        calls.Count(c => c.MethodName == "sendMessage").Should().Be(1);
-        calls.Count(c => c.MethodName == "editMessageText").Should().BeGreaterThan(0);
-        calls.Where(c => c.MethodName == "editMessageText").Last().Text.Should().Contain(new string('a', 101));
-        calls.Where(c => c.MethodName == "editMessageText").Last().Text.Should().Contain(new string('b', 101));
+        calls.Count(c => c.MethodName == "sendMessage").ShouldBe(1);
+        calls.Count(c => c.MethodName == "editMessageText").ShouldBeGreaterThan(0);
+        calls.Where(c => c.MethodName == "editMessageText").Last().Text.ShouldContain(new string('a', 101));
+        calls.Where(c => c.MethodName == "editMessageText").Last().Text.ShouldContain(new string('b', 101));
     }
 
     [Fact]
@@ -324,8 +323,8 @@ public sealed class TelegramChannelAdapterTests
 
         Func<Task> act = () => adapter.StartAsync(Mock.Of<IChannelDispatcher>(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*BotToken*");
+        (await act.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("BotToken");
     }
 
     [Fact]
@@ -356,8 +355,8 @@ public sealed class TelegramChannelAdapterTests
         await pollSeen.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await adapter.StopAsync(CancellationToken.None);
 
-        pollingCall.Should().NotBeNull();
-        pollingCall!.Timeout.Should().Be(1);
+        pollingCall.ShouldNotBeNull();
+        pollingCall!.Timeout.ShouldBe(1);
     }
 
     [Fact]
@@ -376,8 +375,8 @@ public sealed class TelegramChannelAdapterTests
             Content = "blocked"
         });
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*not allowed*");
+        (await act.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("not allowed");
     }
 
     private static TelegramChannelAdapter CreateAdapter(TelegramOptions options, HttpMessageHandler handler)

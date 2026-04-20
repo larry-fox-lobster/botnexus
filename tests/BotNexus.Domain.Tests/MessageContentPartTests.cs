@@ -1,5 +1,4 @@
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 
 namespace BotNexus.Domain.Tests;
 
@@ -14,8 +13,8 @@ public sealed class MessageContentPartTests
             Text = "hello"
         };
 
-        part.MimeType.Should().Be("text/plain");
-        part.Text.Should().Be("hello");
+        part.MimeType.ShouldBe("text/plain");
+        part.Text.ShouldBe("hello");
     }
 
     [Fact]
@@ -24,7 +23,7 @@ public sealed class MessageContentPartTests
         var left = new TextContentPart { MimeType = "text/plain", Text = "hello" };
         var right = new TextContentPart { MimeType = "text/plain", Text = "hello" };
 
-        left.Should().Be(right);
+        left.ShouldBe(right);
     }
 
     [Fact]
@@ -34,9 +33,9 @@ public sealed class MessageContentPartTests
 
         var updated = original with { Text = "updated" };
 
-        updated.MimeType.Should().Be("text/plain");
-        updated.Text.Should().Be("updated");
-        original.Text.Should().Be("hello");
+        updated.MimeType.ShouldBe("text/plain");
+        updated.Text.ShouldBe("updated");
+        original.Text.ShouldBe("hello");
     }
 
     [Fact]
@@ -49,9 +48,9 @@ public sealed class MessageContentPartTests
             Data = data
         };
 
-        part.MimeType.Should().Be("audio/wav");
-        part.Data.Should().BeSameAs(data);
-        part.FileName.Should().BeNull();
+        part.MimeType.ShouldBe("audio/wav");
+        part.Data.ShouldBeSameAs(data);
+        part.FileName.ShouldBeNull();
     }
 
     [Fact]
@@ -61,7 +60,7 @@ public sealed class MessageContentPartTests
         var left = new BinaryContentPart { MimeType = "application/octet-stream", Data = shared };
         var right = new BinaryContentPart { MimeType = "application/octet-stream", Data = shared };
 
-        left.Should().Be(right);
+        left.ShouldBe(right);
     }
 
     [Fact]
@@ -70,7 +69,7 @@ public sealed class MessageContentPartTests
         var left = new BinaryContentPart { MimeType = "application/octet-stream", Data = [1, 2, 3] };
         var right = new BinaryContentPart { MimeType = "application/octet-stream", Data = [1, 2, 3] };
 
-        left.Should().NotBe(right);
+        left.ShouldNotBe(right);
     }
 
     [Fact]
@@ -82,10 +81,10 @@ public sealed class MessageContentPartTests
             Uri = "https://example.invalid/image.png"
         };
 
-        part.MimeType.Should().Be("image/png");
-        part.Uri.Should().Be("https://example.invalid/image.png");
-        part.SizeBytes.Should().BeNull();
-        part.FileName.Should().BeNull();
+        part.MimeType.ShouldBe("image/png");
+        part.Uri.ShouldBe("https://example.invalid/image.png");
+        part.SizeBytes.ShouldBeNull();
+        part.FileName.ShouldBeNull();
     }
 
     [Fact]
@@ -106,7 +105,7 @@ public sealed class MessageContentPartTests
             FileName = "image.png"
         };
 
-        left.Should().Be(right);
+        left.ShouldBe(right);
     }
 
     [Fact]
@@ -118,12 +117,12 @@ public sealed class MessageContentPartTests
 
         IReadOnlyList<MessageContentPart> parts = [text, binary, reference];
 
-        text.Should().BeAssignableTo<MessageContentPart>();
-        binary.Should().BeAssignableTo<MessageContentPart>();
-        reference.Should().BeAssignableTo<MessageContentPart>();
-        parts.Should().HaveCount(3);
-        parts[0].Should().BeOfType<TextContentPart>();
-        parts[1].Should().BeOfType<BinaryContentPart>();
-        parts[2].Should().BeOfType<ReferenceContentPart>();
+        text.ShouldBeAssignableTo<MessageContentPart>();
+        binary.ShouldBeAssignableTo<MessageContentPart>();
+        reference.ShouldBeAssignableTo<MessageContentPart>();
+        parts.Count().ShouldBe(3);
+        parts[0].ShouldBeOfType<TextContentPart>();
+        parts[1].ShouldBeOfType<BinaryContentPart>();
+        parts[2].ShouldBeOfType<ReferenceContentPart>();
     }
 }

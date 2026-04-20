@@ -1,6 +1,5 @@
 using BotNexus.Extensions.Skills;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Skills.Tests;
 
@@ -66,7 +65,7 @@ public sealed class AdversaryTests : IDisposable
 
         // ASSERT: The END_SKILLS_CONTEXT marker should appear ONLY ONCE at the end
         var endMarkerCount = CountOccurrences(prompt, "<!-- END_SKILLS_CONTEXT -->");
-        endMarkerCount.Should().Be(1, "skill content should not be able to inject additional end markers");
+        endMarkerCount.ShouldBe(1, "skill content should not be able to inject additional end markers");
 
         // The malicious content AFTER the injected marker should still be INSIDE the skills section
         var endMarkerIndex = prompt.LastIndexOf("<!-- END_SKILLS_CONTEXT -->");
@@ -74,7 +73,7 @@ public sealed class AdversaryTests : IDisposable
         var injectionIndex = prompt.IndexOf(injectionText);
 
         // If the marker is properly sanitized, the injection text should appear BEFORE the final END marker
-        injectionIndex.Should().BeLessThan(endMarkerIndex,
+        injectionIndex.ShouldBeLessThan(endMarkerIndex,
             "injected content should not escape the skills section");
     }
 
@@ -91,7 +90,7 @@ public sealed class AdversaryTests : IDisposable
         var prompt = SkillPromptBuilder.Build([skill], []);
 
         var startMarkerCount = CountOccurrences(prompt, "<!-- SKILLS_CONTEXT -->");
-        startMarkerCount.Should().Be(1, "skill content should not be able to inject additional start markers");
+        startMarkerCount.ShouldBe(1, "skill content should not be able to inject additional start markers");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -113,7 +112,7 @@ public sealed class AdversaryTests : IDisposable
         await Task.WhenAll(tasks);
 
         // ASSERT: All loaded skills should be tracked (no corruption)
-        tool.SessionLoadedSkills.Count.Should().Be(50, "all 50 skills should be tracked after concurrent loads");
+        tool.SessionLoadedSkills.Count.ShouldBe(50, "all 50 skills should be tracked after concurrent loads");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -129,7 +128,7 @@ public sealed class AdversaryTests : IDisposable
         // First load
         var result1 = await tool.ExecuteAsync("call-1", Args("load", "my-skill"));
         var text1 = ResultText(result1);
-        text1.Should().Contain("Very long content");
+        text1.ShouldContain("Very long content");
 
         // Second load - should NOT return full content again
         var result2 = await tool.ExecuteAsync("call-2", Args("load", "my-skill"));
@@ -137,7 +136,7 @@ public sealed class AdversaryTests : IDisposable
 
         // Current behavior: returns full content again (BUG)
         // Expected behavior: returns "already loaded" message
-        text2.Should().Contain("already loaded", "duplicate load should not return full content");
+        text2.ShouldContain("already loaded");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -157,7 +156,7 @@ public sealed class AdversaryTests : IDisposable
 
         // Expected: Should either reject negative values or treat as "unlimited"
         // Actual: Treats as 0 (nothing loads)
-        result.Loaded.Should().NotBeEmpty("negative MaxLoadedSkills should not prevent loading");
+        result.Loaded.ShouldNotBeEmpty("negative MaxLoadedSkills should not prevent loading");
     }
 
     [Fact]
@@ -172,7 +171,7 @@ public sealed class AdversaryTests : IDisposable
         // is `0 + N > -1` which is always true, so content check passes
         // But this relies on undefined behavior
 
-        result.Loaded.Should().NotBeEmpty("negative MaxSkillContentChars should not prevent loading");
+        result.Loaded.ShouldNotBeEmpty("negative MaxSkillContentChars should not prevent loading");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -193,9 +192,9 @@ public sealed class AdversaryTests : IDisposable
         var skill = SkillParser.Parse("test-dir", markdown, "/s", SkillSource.Global);
 
         // With unclosed frontmatter, the entire file becomes content
-        skill.Name.Should().Be("test-dir", "should fall back to directory name");
-        skill.Description.Should().BeEmpty();
-        skill.Content.Should().Contain("name: test", "frontmatter lines become content");
+        skill.Name.ShouldBe("test-dir", "should fall back to directory name");
+        skill.Description.ShouldBeEmpty();
+        skill.Content.ShouldContain("name: test");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -218,8 +217,8 @@ public sealed class AdversaryTests : IDisposable
         var skill = SkillParser.Parse("test", markdown, "/s", SkillSource.Global);
 
         // Dictionary semantics: last value wins
-        skill.Name.Should().Be("second-name");
-        skill.Description.Should().Be("Second description");
+        skill.Name.ShouldBe("second-name");
+        skill.Description.ShouldBe("Second description");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -242,8 +241,8 @@ public sealed class AdversaryTests : IDisposable
         var skill = SkillParser.Parse("bom-test", markdown, "/s", SkillSource.Global);
 
         // BOM may prevent detection of leading ---
-        skill.Name.Should().Be("bom-test", "BOM should not break frontmatter detection");
-        skill.Description.Should().Be("Has BOM");
+        skill.Name.ShouldBe("bom-test", "BOM should not break frontmatter detection");
+        skill.Description.ShouldBe("Has BOM");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -264,7 +263,7 @@ public sealed class AdversaryTests : IDisposable
         // Should not throw
         var skill = SkillParser.Parse("null-test", markdown, "/s", SkillSource.Global);
 
-        skill.Content.Should().Contain("\0", "null bytes should be preserved or stripped, not crash");
+        skill.Content.ShouldContain("\0");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -275,14 +274,14 @@ public sealed class AdversaryTests : IDisposable
     public void IsValidName_Exactly64Chars_ShouldBeValid()
     {
         var name64 = new string('a', 64);
-        SkillParser.IsValidName(name64).Should().BeTrue("64 chars is the max allowed");
+        SkillParser.IsValidName(name64).ShouldBeTrue("64 chars is the max allowed");
     }
 
     [Fact]
     public void IsValidName_Exactly65Chars_ShouldBeInvalid()
     {
         var name65 = new string('a', 65);
-        SkillParser.IsValidName(name65).Should().BeFalse("65 chars exceeds max");
+        SkillParser.IsValidName(name65).ShouldBeFalse("65 chars exceeds max");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -304,7 +303,7 @@ public sealed class AdversaryTests : IDisposable
 
         var skills = SkillDiscovery.Discover(Path.Combine(_tempDir, "skills"), null, null);
 
-        skills.Should().BeEmpty("whitespace-only description should be rejected");
+        skills.ShouldBeEmpty("whitespace-only description should be rejected");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -333,9 +332,9 @@ public sealed class AdversaryTests : IDisposable
 
         var skill = SkillParser.Parse("dash-test", markdown, "/s", SkillSource.Global);
 
-        skill.Description.Should().Be("Has dashes in body");
-        skill.Content.Should().Contain("apiVersion: v1");
-        skill.Content.Should().Contain("More content after embedded YAML");
+        skill.Description.ShouldBe("Has dashes in body");
+        skill.Content.ShouldContain("apiVersion: v1");
+        skill.Content.ShouldContain("More content after embedded YAML");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -351,7 +350,7 @@ public sealed class AdversaryTests : IDisposable
 
         // Load the skill
         await tool.ExecuteAsync("call-1", Args("load", "test-skill"));
-        tool.SessionLoadedSkills.Should().Contain("test-skill");
+        tool.SessionLoadedSkills.ShouldContain("test-skill");
 
         // Now "change" config to deny it
         // Note: SkillTool takes config at construction, so we can't change it
@@ -362,7 +361,7 @@ public sealed class AdversaryTests : IDisposable
         // The skill is still in _sessionLoaded but would be denied on new tool
         var result = await newTool.ExecuteAsync("call-2", Args("load", "test-skill"));
         var text = ResultText(result);
-        text.Should().Contain("not available");
+        text.ShouldContain("not available");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -382,8 +381,8 @@ public sealed class AdversaryTests : IDisposable
         var result = SkillResolver.Resolve(skills, config);
 
         // With 0 chars, empty skill loads, non-empty goes to available
-        result.Loaded.Should().ContainSingle(s => s.Name == "empty");
-        result.Available.Should().ContainSingle(s => s.Name == "nonempty");
+        result.Loaded.Where(s => s.Name == "empty").ShouldHaveSingleItem();
+        result.Available.Where(s => s.Name == "nonempty").ShouldHaveSingleItem();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -398,8 +397,8 @@ public sealed class AdversaryTests : IDisposable
 
         var result = SkillResolver.Resolve(skills, config);
 
-        result.Loaded.Should().BeEmpty();
-        result.Available.Should().ContainSingle(s => s.Name == "test");
+        result.Loaded.ShouldBeEmpty();
+        result.Available.Where(s => s.Name == "test").ShouldHaveSingleItem();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -423,8 +422,8 @@ public sealed class AdversaryTests : IDisposable
         var skill = SkillParser.Parse("meta-test", markdown, "/s", SkillSource.Global);
 
         // Empty value should result in empty string, not missing key
-        skill.Metadata.Should().ContainKey("empty-key");
-        skill.Metadata["filled-key"].Should().Be("value");
+        skill.Metadata.ShouldContainKey("empty-key");
+        skill.Metadata["filled-key"].ShouldBe("value");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -440,7 +439,7 @@ public sealed class AdversaryTests : IDisposable
     [InlineData("valid-name-123", true)]
     public void IsValidName_SpecialCharacters_ShouldReject(string name, bool expectedValid)
     {
-        SkillParser.IsValidName(name).Should().Be(expectedValid);
+        SkillParser.IsValidName(name).ShouldBe(expectedValid);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -455,10 +454,10 @@ public sealed class AdversaryTests : IDisposable
 
         var skill = SkillParser.Parse("mixed-eol", markdown, "/s", SkillSource.Global);
 
-        skill.Name.Should().Be("mixed-eol");
-        skill.Description.Should().Be("Mixed endings");
-        skill.Content.Should().Contain("Content line one");
-        skill.Content.Should().Contain("Content line two");
+        skill.Name.ShouldBe("mixed-eol");
+        skill.Description.ShouldBe("Mixed endings");
+        skill.Content.ShouldContain("Content line one");
+        skill.Content.ShouldContain("Content line two");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -473,8 +472,8 @@ public sealed class AdversaryTests : IDisposable
 
         var skill = SkillParser.Parse("long-line", markdown, "/s", SkillSource.Global);
 
-        skill.Name.Should().Be("long-line");
-        skill.Content.Should().HaveLength(100_000);
+        skill.Name.ShouldBe("long-line");
+        skill.Content.Length.ShouldBe(100_000);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -489,7 +488,7 @@ public sealed class AdversaryTests : IDisposable
 
         var skills = SkillDiscovery.Discover(emptyDir, null, null);
 
-        skills.Should().BeEmpty("empty directory should produce no skills");
+        skills.ShouldBeEmpty("empty directory should produce no skills");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -501,7 +500,7 @@ public sealed class AdversaryTests : IDisposable
     {
         var prompt = SkillPromptBuilder.Build([], []);
 
-        prompt.Should().BeEmpty("no skills means no prompt section");
+        prompt.ShouldBeEmpty("no skills means no prompt section");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

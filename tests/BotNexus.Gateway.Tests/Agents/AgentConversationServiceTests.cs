@@ -9,7 +9,6 @@ using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -49,22 +48,22 @@ public sealed class AgentConversationServiceTests
             MaxTurns = 1
         });
 
-        result.Status.Should().Be("sealed");
-        result.Turns.Should().Be(2);
-        result.Transcript.Should().ContainSingle(entry => entry.Role == "user" && entry.Content == "Review this design");
-        result.Transcript.Should().ContainSingle(entry => entry.Role == "assistant" && entry.Content.Contains("Looks good"));
+        result.Status.ShouldBe("sealed");
+        result.Turns.ShouldBe(2);
+        result.Transcript.Where(entry => entry.Role == "user" && entry.Content == "Review this design").ShouldHaveSingleItem();
+        result.Transcript.Where(entry => entry.Role == "assistant" && entry.Content.Contains("Looks good")).ShouldHaveSingleItem();
 
         var session = await sessionStore.GetAsync(result.SessionId);
-        session.Should().NotBeNull();
-        session!.SessionType.Should().Be(SessionType.AgentAgent);
-        session.Status.Should().Be(GatewaySessionStatus.Sealed);
-        session.Participants.Should().ContainSingle(p => p.Type == ParticipantType.Agent && p.Id == "nova" && p.Role == "initiator");
-        session.Participants.Should().ContainSingle(p => p.Type == ParticipantType.Agent && p.Id == "leela" && p.Role == "target");
+        session.ShouldNotBeNull();
+        session!.SessionType.ShouldBe(SessionType.AgentAgent);
+        session.Status.ShouldBe(GatewaySessionStatus.Sealed);
+        session.Participants.Where(p => p.Type == ParticipantType.Agent && p.Id == "nova" && p.Role == "initiator").ShouldHaveSingleItem();
+        session.Participants.Where(p => p.Type == ParticipantType.Agent && p.Id == "leela" && p.Role == "target").ShouldHaveSingleItem();
 
         var initiatorExistence = await sessionStore.GetExistenceAsync(initiator, new ExistenceQuery());
         var targetExistence = await sessionStore.GetExistenceAsync(target, new ExistenceQuery());
-        initiatorExistence.Should().Contain(item => item.SessionId == result.SessionId);
-        targetExistence.Should().Contain(item => item.SessionId == result.SessionId);
+        initiatorExistence.ShouldContain(item => item.SessionId == result.SessionId);
+        targetExistence.ShouldContain(item => item.SessionId == result.SessionId);
     }
 
     [Fact]
@@ -80,14 +79,14 @@ public sealed class AgentConversationServiceTests
             Options.Create(new GatewayOptions()),
             NullLogger<AgentConversationService>.Instance);
 
-        var action = () => service.ConverseAsync(new ConversationRequest
+        Func<Task> action = () => service.ConverseAsync(new ConversationRequest
         {
             InitiatorId = initiator,
             TargetId = target,
             Message = "hello"
         });
 
-        await action.Should().ThrowAsync<UnauthorizedAccessException>();
+        await action.ShouldThrowAsync<UnauthorizedAccessException>();
     }
 
     [Fact]
@@ -103,7 +102,7 @@ public sealed class AgentConversationServiceTests
             Options.Create(new GatewayOptions { AgentConversationMaxDepth = 4 }),
             NullLogger<AgentConversationService>.Instance);
 
-        var action = () => service.ConverseAsync(new ConversationRequest
+        Func<Task> action = () => service.ConverseAsync(new ConversationRequest
         {
             InitiatorId = initiator,
             TargetId = target,
@@ -111,8 +110,8 @@ public sealed class AgentConversationServiceTests
             CallChain = [AgentId.From("nova"), AgentId.From("leela")]
         });
 
-        await action.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Cycle detected:*");
+        (await action.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldStartWith("Cycle detected:");
     }
 
     [Fact]
@@ -128,7 +127,7 @@ public sealed class AgentConversationServiceTests
             Options.Create(new GatewayOptions { AgentConversationMaxDepth = 2 }),
             NullLogger<AgentConversationService>.Instance);
 
-        var action = () => service.ConverseAsync(new ConversationRequest
+        Func<Task> action = () => service.ConverseAsync(new ConversationRequest
         {
             InitiatorId = initiator,
             TargetId = target,
@@ -136,8 +135,8 @@ public sealed class AgentConversationServiceTests
             CallChain = [AgentId.From("alpha"), AgentId.From("nova")]
         });
 
-        await action.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*exceeded maximum configured depth*");
+        (await action.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("exceeded maximum configured depth");
     }
 
     [Fact]
@@ -212,17 +211,17 @@ public sealed class AgentConversationServiceTests
             MaxTurns = 1
         });
 
-        result.Status.Should().Be("sealed");
-        result.FinalResponse.Should().Be("Remote response");
+        result.Status.ShouldBe("sealed");
+        result.FinalResponse.ShouldBe("Remote response");
         var session = await sessionStore.GetAsync(result.SessionId);
-        session.Should().NotBeNull();
-        session!.ChannelType.Should().Be(ChannelKey.From("cross-world"));
-        session.Participants.Should().ContainSingle(p => p.Id == "nova" && p.WorldId == "world-a");
-        session.Participants.Should().ContainSingle(p => p.Id == "leela" && p.WorldId == "world-b");
+        session.ShouldNotBeNull();
+        session!.ChannelType.ShouldBe(ChannelKey.From("cross-world"));
+        session.Participants.Where(p => p.Id == "nova" && p.WorldId == "world-a").ShouldHaveSingleItem();
+        session.Participants.Where(p => p.Id == "leela" && p.WorldId == "world-b").ShouldHaveSingleItem();
 
-        capturedRequest.Should().NotBeNull();
-        capturedRequest!.Headers.TryGetValues("X-Cross-World-Key", out var keys).Should().BeTrue();
-        keys!.Should().ContainSingle().Which.Should().Be("peer-key");
+        capturedRequest.ShouldNotBeNull();
+        capturedRequest!.Headers.TryGetValues("X-Cross-World-Key", out var keys).ShouldBeTrue();
+        keys!.ShouldHaveSingleItem().ShouldBe("peer-key");
     }
 
     [Fact]
@@ -267,15 +266,15 @@ public sealed class AgentConversationServiceTests
                 }
             });
 
-        var action = () => service.ConverseAsync(new ConversationRequest
+        Func<Task> action = () => service.ConverseAsync(new ConversationRequest
         {
             InitiatorId = initiator,
             TargetId = target,
             Message = "blocked"
         });
 
-        await action.Should().ThrowAsync<UnauthorizedAccessException>()
-            .WithMessage("*not allowed*");
+        (await action.ShouldThrowAsync<UnauthorizedAccessException>())
+            .Message.ShouldContain("not allowed");
     }
 
     private static Mock<IAgentRegistry> CreateRegistry(AgentId initiator, AgentId target, IReadOnlyList<string> allowedTargets)

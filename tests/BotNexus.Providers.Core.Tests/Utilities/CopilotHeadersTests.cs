@@ -1,6 +1,5 @@
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Utilities;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Utilities;
 
@@ -16,7 +15,7 @@ public class CopilotHeadersTests
             new UserMessage(new UserMessageContent("hello"), Ts)
         };
 
-        CopilotHeaders.InferInitiator(messages).Should().Be("user");
+        CopilotHeaders.InferInitiator(messages).ShouldBe("user");
     }
 
     [Fact]
@@ -31,7 +30,7 @@ public class CopilotHeadersTests
                 ErrorMessage: null, ResponseId: null, Timestamp: Ts)
         };
 
-        CopilotHeaders.InferInitiator(messages).Should().Be("agent");
+        CopilotHeaders.InferInitiator(messages).ShouldBe("agent");
     }
 
     [Fact]
@@ -47,7 +46,7 @@ public class CopilotHeadersTests
             new ToolResultMessage("tc1", "tool", [new TextContent("result")], false, Ts)
         };
 
-        CopilotHeaders.InferInitiator(messages).Should().Be("agent");
+        CopilotHeaders.InferInitiator(messages).ShouldBe("agent");
     }
 
     [Fact]
@@ -63,7 +62,7 @@ public class CopilotHeadersTests
             new UserMessage(new UserMessageContent(blocks), Ts)
         };
 
-        CopilotHeaders.HasVisionInput(messages).Should().BeTrue();
+        CopilotHeaders.HasVisionInput(messages).ShouldBeTrue();
     }
 
     [Fact]
@@ -74,7 +73,7 @@ public class CopilotHeadersTests
             new UserMessage(new UserMessageContent("just text"), Ts)
         };
 
-        CopilotHeaders.HasVisionInput(messages).Should().BeFalse();
+        CopilotHeaders.HasVisionInput(messages).ShouldBeFalse();
     }
 
     [Fact]
@@ -87,7 +86,8 @@ public class CopilotHeadersTests
 
         var headers = CopilotHeaders.BuildDynamicHeaders(messages, hasImages: false);
 
-        headers.Should().ContainKey("X-Initiator").WhoseValue.Should().Be("user");
+        headers.ShouldContainKey("X-Initiator");
+        headers["X-Initiator"].ShouldBe("user");
     }
 
     [Fact]
@@ -100,7 +100,8 @@ public class CopilotHeadersTests
 
         var headers = CopilotHeaders.BuildDynamicHeaders(messages, hasImages: true);
 
-        headers.Should().ContainKey("Copilot-Vision-Request").WhoseValue.Should().Be("true");
+        headers.ShouldContainKey("Copilot-Vision-Request");
+        headers["Copilot-Vision-Request"].ShouldBe("true");
     }
 
     [Fact]
@@ -113,6 +114,6 @@ public class CopilotHeadersTests
 
         var headers = CopilotHeaders.BuildDynamicHeaders(messages, hasImages: false);
 
-        headers.Should().NotContainKey("Copilot-Vision-Request");
+        headers.ShouldNotContainKey("Copilot-Vision-Request");
     }
 }

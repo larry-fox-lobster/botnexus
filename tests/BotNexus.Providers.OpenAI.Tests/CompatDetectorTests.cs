@@ -1,6 +1,5 @@
 using BotNexus.Agent.Providers.Core.Compatibility;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.Providers.OpenAI.Tests;
 
@@ -11,14 +10,14 @@ public class CompatDetectorTests
     {
         var compat = new OpenAICompletionsCompat();
 
-        compat.SupportsStore.Should().BeTrue();
-        compat.SupportsDeveloperRole.Should().BeTrue();
-        compat.SupportsReasoningEffort.Should().BeTrue();
-        compat.SupportsUsageInStreaming.Should().BeTrue();
-        compat.MaxTokensField.Should().Be("max_completion_tokens");
-        compat.SupportsStrictMode.Should().BeTrue();
-        compat.RequiresThinkingAsText.Should().BeFalse();
-        compat.ThinkingFormat.Should().Be("openai");
+        compat.SupportsStore.ShouldBeTrue();
+        compat.SupportsDeveloperRole.ShouldBeTrue();
+        compat.SupportsReasoningEffort.ShouldBeTrue();
+        compat.SupportsUsageInStreaming.ShouldBeTrue();
+        compat.MaxTokensField.ShouldBe("max_completion_tokens");
+        compat.SupportsStrictMode.ShouldBeTrue();
+        compat.RequiresThinkingAsText.ShouldBeFalse();
+        compat.ThinkingFormat.ShouldBe("openai");
     }
 
     [Fact]
@@ -34,10 +33,10 @@ public class CompatDetectorTests
             SupportsStrictMode = false
         };
 
-        compat.SupportsStore.Should().BeFalse();
-        compat.SupportsDeveloperRole.Should().BeFalse();
-        compat.SupportsReasoningEffort.Should().BeFalse();
-        compat.MaxTokensField.Should().Be("max_tokens");
+        compat.SupportsStore.ShouldBeFalse();
+        compat.SupportsDeveloperRole.ShouldBeFalse();
+        compat.SupportsReasoningEffort.ShouldBeFalse();
+        compat.MaxTokensField.ShouldBe("max_tokens");
     }
 
     [Fact]
@@ -48,8 +47,8 @@ public class CompatDetectorTests
             SupportsReasoningEffort = false
         };
 
-        compat.SupportsReasoningEffort.Should().BeFalse();
-        compat.SupportsDeveloperRole.Should().BeTrue(); // default
+        compat.SupportsReasoningEffort.ShouldBeFalse();
+        compat.SupportsDeveloperRole.ShouldBeTrue(); // default
     }
 
     [Fact]
@@ -60,7 +59,7 @@ public class CompatDetectorTests
             ThinkingFormat = "zai"
         };
 
-        compat.ThinkingFormat.Should().Be("zai");
+        compat.ThinkingFormat.ShouldBe("zai");
     }
 
     [Fact]
@@ -75,11 +74,11 @@ public class CompatDetectorTests
         };
         var model = TestHelpers.MakeModel(compat: customCompat);
 
-        model.Compat.Should().NotBeNull();
-        model.Compat!.SupportsStore.Should().BeFalse();
-        model.Compat.RequiresThinkingAsText.Should().BeTrue();
-        model.Compat.RequiresToolResultName.Should().BeTrue();
-        model.Compat.RequiresAssistantAfterToolResult.Should().BeTrue();
+        model.Compat.ShouldNotBeNull();
+        model.Compat!.SupportsStore.ShouldBeFalse();
+        model.Compat.RequiresThinkingAsText.ShouldBeTrue();
+        model.Compat.RequiresToolResultName.ShouldBeTrue();
+        model.Compat.RequiresAssistantAfterToolResult.ShouldBeTrue();
     }
 
     [Fact]
@@ -95,7 +94,7 @@ public class CompatDetectorTests
             }
         };
 
-        compat.ReasoningEffortMap.Should().ContainKey(ThinkingLevel.Medium);
-        compat.ReasoningEffortMap[ThinkingLevel.Medium].Should().Be("standard");
+        compat.ReasoningEffortMap.ShouldContainKey(ThinkingLevel.Medium);
+        compat.ReasoningEffortMap[ThinkingLevel.Medium].ShouldBe("standard");
     }
 }

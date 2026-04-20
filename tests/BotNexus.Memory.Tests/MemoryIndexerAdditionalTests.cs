@@ -3,7 +3,6 @@ using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Memory.Models;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BotNexus.Memory.Tests;
@@ -22,7 +21,7 @@ public sealed class MemoryIndexerAdditionalTests
         {
             await lifecycle.RaiseAsync(new SessionLifecycleEvent("s-null", "agent-a", SessionLifecycleEventType.Closed, null));
             await Task.Delay(100);
-            store.All.Should().BeEmpty();
+            store.All.ShouldBeEmpty();
         }
         finally
         {
@@ -48,7 +47,7 @@ public sealed class MemoryIndexerAdditionalTests
 
             await lifecycle.RaiseAsync(new SessionLifecycleEvent("s-created", "agent-a", SessionLifecycleEventType.Created, session));
             await Task.Delay(100);
-            store.All.Should().BeEmpty();
+            store.All.ShouldBeEmpty();
         }
         finally
         {
@@ -79,9 +78,9 @@ public sealed class MemoryIndexerAdditionalTests
             await lifecycle.RaiseAsync(new SessionLifecycleEvent("s-expired", "agent-a", SessionLifecycleEventType.Expired, session));
             await WaitForAsync(() => store.All.Count == 2);
 
-            store.All.Should().OnlyContain(entry => entry.SourceType == "conversation");
-            store.All.Select(entry => entry.Content).Should().Contain(content => content.Contains("User: one", StringComparison.Ordinal));
-            store.All.Select(entry => entry.Content).Should().Contain(content => content.Contains("User: two", StringComparison.Ordinal));
+            store.All.ShouldAllBe(entry => entry.SourceType == "conversation");
+            store.All.Select(entry => entry.Content).ShouldContain(content => content.Contains("User: one", StringComparison.Ordinal));
+            store.All.Select(entry => entry.Content).ShouldContain(content => content.Contains("User: two", StringComparison.Ordinal));
         }
         finally
         {
@@ -112,7 +111,7 @@ public sealed class MemoryIndexerAdditionalTests
 
             await Task.WhenAll(tasks);
             await WaitForAsync(() => store.All.Count == 8);
-            store.All.Should().HaveCount(8);
+            store.All.Count().ShouldBe(8);
         }
         finally
         {
@@ -146,7 +145,7 @@ public sealed class MemoryIndexerAdditionalTests
             await lifecycle.RaiseAsync(new SessionLifecycleEvent("s-pass", "agent-a", SessionLifecycleEventType.Closed, second));
             await WaitForAsync(() => store.All.Any(entry => entry.SessionId == "s-pass"));
 
-            store.All.Should().ContainSingle(entry => entry.SessionId == "s-pass");
+            store.All.ShouldHaveSingleItem().SessionId.ShouldBe("s-pass");
         }
         finally
         {
@@ -171,7 +170,7 @@ public sealed class MemoryIndexerAdditionalTests
         await lifecycle.RaiseAsync(new SessionLifecycleEvent("s-after-stop", "agent-a", SessionLifecycleEventType.Closed, session));
         await Task.Delay(100);
 
-        store.All.Should().BeEmpty();
+        store.All.ShouldBeEmpty();
     }
 
     private static async Task WaitForAsync(Func<bool> condition, int timeoutMs = 5000)

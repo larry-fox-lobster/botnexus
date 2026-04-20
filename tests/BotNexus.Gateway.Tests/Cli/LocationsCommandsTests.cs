@@ -1,4 +1,3 @@
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Cli;
 
@@ -23,9 +22,9 @@ public sealed class LocationsCommandsTests
 
         var result = await fixture.RunCliAsync("locations", "list");
 
-        result.ExitCode.Should().Be(0);
-        result.StdOut.Should().Contain("docs");
-        result.StdOut.Should().Contain("Documentation");
+        result.ExitCode.ShouldBe(0);
+        result.StdOut.ShouldContain("docs");
+        result.StdOut.ShouldContain("Documentation");
     }
 
     [Fact]
@@ -49,10 +48,10 @@ public sealed class LocationsCommandsTests
         var deleteResult = await fixture.RunCliAsync("locations", "delete", "repo");
         var config = await fixture.LoadConfigAsync();
 
-        addResult.ExitCode.Should().Be(0);
-        updateResult.ExitCode.Should().Be(0);
-        deleteResult.ExitCode.Should().Be(0);
-        config.Gateway?.Locations.Should().NotContainKey("repo");
+        addResult.ExitCode.ShouldBe(0);
+        updateResult.ExitCode.ShouldBe(0);
+        deleteResult.ExitCode.ShouldBe(0);
+        config.Gateway?.Locations.ShouldNotContainKey("repo");
     }
 
     [Fact]
@@ -85,10 +84,10 @@ public sealed class LocationsCommandsTests
 
         var result = await fixture.RunCliAsync("locations", "delete", "docs");
 
-        result.ExitCode.Should().Be(0);
-        result.StdOut.Should().Contain("Warning: Location 'docs' is referenced by fileAccess policies");
-        result.StdOut.Should().Contain("gateway.fileAccess.allowedReadPaths[0]");
-        result.StdOut.Should().Contain("agents.assistant.fileAccess.allowedWritePaths[0]");
+        result.ExitCode.ShouldBe(0);
+        result.StdOut.ShouldContain("Warning: Location 'docs' is referenced by fileAccess policies");
+        result.StdOut.ShouldContain("gateway.fileAccess.allowedReadPaths[0]");
+        result.StdOut.ShouldContain("agents.assistant.fileAccess.allowedWritePaths[0]");
     }
 
     [Fact]
@@ -120,10 +119,10 @@ public sealed class LocationsCommandsTests
 
         var result = await fixture.RunCliAsync("doctor", "locations");
 
-        result.ExitCode.Should().Be(1);
-        result.StdOut.Should().Contain("Checking");
-        result.StdOut.Should().Contain("exists");
-        result.StdOut.Should().Contain("missing");
-        result.StdOut.Should().Contain("not found");
+        result.ExitCode.ShouldBe(1);
+        result.StdOut.ShouldContain("Checking");
+        result.StdOut.ShouldContain("exists");
+        result.StdOut.ShouldContain("missing");
+        result.StdOut.ShouldContain("not found");
     }
 }

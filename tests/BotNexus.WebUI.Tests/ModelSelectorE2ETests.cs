@@ -1,6 +1,5 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using FluentAssertions;
 using Microsoft.Playwright;
 
 namespace BotNexus.WebUI.Tests;
@@ -52,7 +51,7 @@ public sealed class ModelSelectorE2ETests
         await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.system-msg").Last).ToContainTextAsync($"Model changed to {selected}");
 
         var agent = await host.ApiClient.GetFromJsonAsync<JsonElement>($"/api/agents/{AgentA}");
-        agent.GetProperty("modelId").GetString().Should().Be(selected);
+        agent.GetProperty("modelId").GetString().ShouldBe(selected);
     }
 
     [PlaywrightFact(Timeout = 90000)]

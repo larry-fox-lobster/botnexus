@@ -16,7 +16,6 @@ using BotNexus.Memory.Models;
 using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -37,7 +36,7 @@ public sealed class SubAgentIntegrationTests
         var spawned = await manager.SpawnAsync(CreateSpawnRequest());
         var listed = await manager.ListAsync("parent-session");
 
-        listed.Should().ContainSingle(info => info.SubAgentId == spawned.SubAgentId);
+        listed.Where(info => info.SubAgentId == spawned.SubAgentId).ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -53,9 +52,9 @@ public sealed class SubAgentIntegrationTests
         var killed = await manager.KillAsync(spawned.SubAgentId, spawned.ParentSessionId);
         var updated = await manager.GetAsync(spawned.SubAgentId);
 
-        killed.Should().BeTrue();
-        updated.Should().NotBeNull();
-        updated!.Status.Should().BeOneOf(SubAgentStatus.Killed, SubAgentStatus.TimedOut);
+        killed.ShouldBeTrue();
+        updated.ShouldNotBeNull();
+        updated!.Status.ShouldBeOneOf(SubAgentStatus.Killed, SubAgentStatus.TimedOut);
     }
 
     [Fact]
@@ -69,10 +68,10 @@ public sealed class SubAgentIntegrationTests
             new GatewayOptions { SubAgents = new SubAgentOptions { MaxConcurrentPerSession = 1 } });
 
         _ = await manager.SpawnAsync(CreateSpawnRequest());
-        var act = () => manager.SpawnAsync(CreateSpawnRequest());
+        Func<Task> act = () => manager.SpawnAsync(CreateSpawnRequest());
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*running sub-agents*");
+        (await act.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("running sub-agents");
     }
 
     [Fact]
@@ -86,9 +85,9 @@ public sealed class SubAgentIntegrationTests
         var killed = await manager.KillAsync(spawned.SubAgentId, "different-session");
         var updated = await manager.GetAsync(spawned.SubAgentId);
 
-        killed.Should().BeFalse();
-        updated.Should().NotBeNull();
-        updated!.Status.Should().Be(SubAgentStatus.Running);
+        killed.ShouldBeFalse();
+        updated.ShouldNotBeNull();
+        updated!.Status.ShouldBe(SubAgentStatus.Running);
     }
 
     [Fact]
@@ -103,10 +102,12 @@ public sealed class SubAgentIntegrationTests
         var subAgentHandle = await strategy.CreateAsync(descriptor, new AgentExecutionContext { SessionId = BotNexus.Domain.Primitives.SessionId.From("parent-session::subagent::child") });
         var subAgentToolNames = GetToolNames(subAgentHandle);
 
-        parentToolNames.Should().Contain("spawn_subagent");
-        parentToolNames.Should().Contain("list_subagents");
-        parentToolNames.Should().Contain("manage_subagent");
-        subAgentToolNames.Should().NotContain(["spawn_subagent", "list_subagents", "manage_subagent"]);
+        parentToolNames.ShouldContain("spawn_subagent");
+        parentToolNames.ShouldContain("list_subagents");
+        parentToolNames.ShouldContain("manage_subagent");
+        subAgentToolNames.ShouldNotContain("spawn_subagent");
+        subAgentToolNames.ShouldNotContain("list_subagents");
+        subAgentToolNames.ShouldNotContain("manage_subagent");
     }
 
     private static DefaultSubAgentManager CreateManager(
@@ -211,10 +212,10 @@ public sealed class SubAgentIntegrationTests
     private static IReadOnlyList<string> GetToolNames(IAgentHandle handle)
     {
         var agentField = handle.GetType().GetField("_agent", BindingFlags.Instance | BindingFlags.NonPublic);
-        agentField.Should().NotBeNull();
+        agentField.ShouldNotBeNull();
 
         var agent = agentField!.GetValue(handle) as BotNexus.Agent.Core.Agent;
-        agent.Should().NotBeNull();
+        agent.ShouldNotBeNull();
 
         return [.. agent!.State.Tools.Select(tool => tool.Name)];
     }

@@ -1,7 +1,6 @@
 using System.Text.Json;
 using BotNexus.Domain.Primitives;
 using BotNexus.Domain.World;
-using FluentAssertions;
 
 namespace BotNexus.Domain.Tests;
 
@@ -47,14 +46,18 @@ public sealed class WorldDescriptorTests
         var json = JsonSerializer.Serialize(original);
         var roundTrip = JsonSerializer.Deserialize<WorldDescriptor>(json);
 
-        roundTrip.Should().NotBeNull();
-        roundTrip!.Identity.Id.Should().Be("local-dev");
-        roundTrip.Identity.Name.Should().Be("Local Development");
-        roundTrip.HostedAgents.Should().ContainSingle(agent => agent.Value == "assistant");
-        roundTrip.Locations.Should().ContainSingle(location => location.Type == LocationType.FileSystem && location.Path == "C:\\agents");
-        roundTrip.Locations.Should().ContainSingle(location => location.Description == "Gateway agent storage");
-        roundTrip.AvailableStrategies.Should().ContainSingle(strategy => strategy == ExecutionStrategy.InProcess);
-        roundTrip.CrossWorldPermissions.Should().ContainSingle(permission => permission.TargetWorldId == "prod" && !permission.AllowOutbound);
+        roundTrip.ShouldNotBeNull();
+        roundTrip!.Identity.Id.ShouldBe("local-dev");
+        roundTrip.Identity.Name.ShouldBe("Local Development");
+        roundTrip.HostedAgents.ShouldHaveSingleItem().Value.ShouldBe("assistant");
+        var singleLocation = roundTrip.Locations.ShouldHaveSingleItem();
+        singleLocation.Type.ShouldBe(LocationType.FileSystem);
+        singleLocation.Path.ShouldBe("C:\\agents");
+        singleLocation.Description.ShouldBe("Gateway agent storage");
+        roundTrip.AvailableStrategies.ShouldHaveSingleItem().ShouldBe(ExecutionStrategy.InProcess);
+        var singlePermission = roundTrip.CrossWorldPermissions.ShouldHaveSingleItem();
+        singlePermission.TargetWorldId.ShouldBe("prod");
+        singlePermission.AllowOutbound.ShouldBeFalse();
     }
 
     [Fact]
@@ -65,9 +68,9 @@ public sealed class WorldDescriptorTests
             TargetWorldId = "prod"
         };
 
-        permission.TargetWorldId.Should().Be("prod");
-        permission.AllowedAgents.Should().BeNull();
-        permission.AllowInbound.Should().BeTrue();
-        permission.AllowOutbound.Should().BeTrue();
+        permission.TargetWorldId.ShouldBe("prod");
+        permission.AllowedAgents.ShouldBeNull();
+        permission.AllowInbound.ShouldBeTrue();
+        permission.AllowOutbound.ShouldBeTrue();
     }
 }

@@ -1,0 +1,21 @@
+<Project>
+  <!--
+    When SkipTests=true, strip all build inputs so test projects produce
+    empty assemblies almost instantly.
+    Usage: dotnet build BotNexus.slnx /p:SkipTests=true
+  -->
+  <PropertyGroup Condition="'$(SkipTests)' == 'true'">
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <EnableDefaultItems>false</EnableDefaultItems>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(SkipTests)' == 'true'">
+    <Compile Remove="@(Compile)" />
+    <Content Remove="@(Content)" />
+    <EmbeddedResource Remove="@(EmbeddedResource)" />
+    <None Remove="@(None)" />
+    <RazorComponent Remove="@(RazorComponent)" />
+    <PackageReference Remove="@(PackageReference)" />
+    <ProjectReference Remove="@(ProjectReference)" />
+  </ItemGroup>
+</Project>

@@ -8,7 +8,6 @@ using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
 using BotNexus.Agent.Providers.Core.Streaming;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -56,10 +55,10 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
 
         var reloaded = await fixture.CreateStore().GetAsync("compaction-persist");
 
-        reloaded.Should().NotBeNull();
-        reloaded!.History.Should().HaveCount(11);
-        reloaded.History[0].IsCompactionSummary.Should().BeTrue();
-        reloaded.History[0].Content.Should().Be("compaction-summary");
+        reloaded.ShouldNotBeNull();
+        reloaded!.History.Count().ShouldBe(11);
+        reloaded.History[0].IsCompactionSummary.ShouldBeTrue();
+        reloaded.History[0].Content.ShouldBe("compaction-summary");
     }
 
     [Fact]
@@ -84,11 +83,10 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
         await store.SaveAsync(session);
         var reloaded = await fixture.CreateStore().GetAsync("multi-compaction");
 
-        reloaded.Should().NotBeNull();
+        reloaded.ShouldNotBeNull();
         reloaded!.History.Select(entry => entry.Content)
-            .Should()
-            .ContainInOrder("summary-2", "tail-1", "tail-2");
-        reloaded.History.Should().HaveCount(3);
+            .ShouldBe(new[] { "summary-2", "tail-1", "tail-2" }, ignoreOrder: false);
+        reloaded.History.Count().ShouldBe(3);
     }
 
     [Fact]
@@ -118,10 +116,9 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
         var historyPath = Path.Combine(storePath, $"{encodedName}.jsonl");
         var lines = await File.ReadAllLinesAsync(historyPath);
 
-        lines.Should().HaveCount(11);
+        lines.Count().ShouldBe(11);
         lines.Count(line => line.Contains("\"isCompactionSummary\":true", StringComparison.Ordinal))
-            .Should()
-            .Be(1);
+            .ShouldBe(1);
     }
 
     [Fact]
@@ -147,10 +144,10 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
         await store.SaveAsync(session);
         var reloaded = await fixture.CreateStore().GetAsync("sqlite-compaction");
 
-        reloaded.Should().NotBeNull();
-        reloaded!.History.Should().HaveCount(11);
-        reloaded.History[0].IsCompactionSummary.Should().BeTrue();
-        reloaded.History[0].Content.Should().Be("sqlite-summary");
+        reloaded.ShouldNotBeNull();
+        reloaded!.History.Count().ShouldBe(11);
+        reloaded.History[0].IsCompactionSummary.ShouldBeTrue();
+        reloaded.History[0].Content.ShouldBe("sqlite-summary");
     }
 
     [Fact]
@@ -173,15 +170,13 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
         });
 
         var history = session.GetHistorySnapshot();
-        history.Should().HaveCount(7);
-        history[0].IsCompactionSummary.Should().BeTrue();
+        history.Count().ShouldBe(7);
+        history[0].IsCompactionSummary.ShouldBeTrue();
         history.Skip(1).Select(entry => entry.Content)
-            .Should()
-            .ContainInOrder("user-8", "assistant-8", "user-9", "assistant-9", "user-10", "assistant-10");
+            .ShouldBe(new[] { "user-8", "assistant-8", "user-9", "assistant-9", "user-10", "assistant-10" }, ignoreOrder: false);
 
         history.Skip(1).Select(entry => entry.Content)
-            .Should()
-            .Equal(originalEntries.Skip(14).Select(entry => entry.Content));
+            .ShouldBe(originalEntries.Skip(14).Select(entry => entry.Content));
     }
 
     [Fact]
@@ -206,8 +201,7 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
         });
 
         session.GetHistorySnapshot().Select(entry => entry.Content)
-            .Should()
-            .ContainInOrder("tool-summary", "u2", "a2", "tool-call", "tool-result");
+            .ShouldBe(new[] { "tool-summary", "u2", "a2", "tool-call", "tool-result" }, ignoreOrder: false);
     }
 
     [Fact]
@@ -233,8 +227,7 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
         session.AddEntry(new SessionEntry { Role = MessageRole.Assistant, Content = "a3" });
 
         session.GetHistorySnapshot().Select(entry => entry.Content)
-            .Should()
-            .ContainInOrder("coherent-summary", "u2", "a2", "u3", "a3");
+            .ShouldBe(new[] { "coherent-summary", "u2", "a2", "u3", "a3" }, ignoreOrder: false);
     }
 
     [Fact]
@@ -264,9 +257,9 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
         await store.ArchiveAsync(sessionId);
         var newSession = await store.GetOrCreateAsync(sessionId, "agent-a");
 
-        Directory.GetFiles(storePath, $"{encodedSessionId}.jsonl.archived.*").Should().ContainSingle();
-        Directory.GetFiles(storePath, $"{encodedSessionId}.meta.json.archived.*").Should().ContainSingle();
-        newSession.History.Should().BeEmpty();
+        Directory.GetFiles(storePath, $"{encodedSessionId}.jsonl.archived.*").ShouldHaveSingleItem();
+        Directory.GetFiles(storePath, $"{encodedSessionId}.meta.json.archived.*").ShouldHaveSingleItem();
+        newSession.History.ShouldBeEmpty();
     }
 
     [Fact]
@@ -283,7 +276,7 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
             SummarizationModel = TestModel.Id
         });
 
-        session.GetHistorySnapshot().First().Content.Length.Should().BeLessThanOrEqualTo(16_000);
+        session.GetHistorySnapshot().First().Content.Length.ShouldBeLessThanOrEqualTo(16_000);
     }
 
     [Fact]
@@ -293,17 +286,16 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
         var session = BuildCompactionSession();
         var compactor = CreateCompactor(string.Empty);
 
-        var act = async () => await compactor.CompactAsync(session.Session, new CompactionOptions
+        Func<Task> act = async () => await compactor.CompactAsync(session.Session, new CompactionOptions
         {
             PreservedTurns = 1,
             SummarizationModel = TestModel.Id
         });
 
-        await act.Should().NotThrowAsync();
-        session.GetHistorySnapshot().Should().HaveCount(3);
+        await act.ShouldNotThrowAsync();
+        session.GetHistorySnapshot().Count().ShouldBe(3);
         session.GetHistorySnapshot().Skip(1).Select(entry => entry.Content)
-            .Should()
-            .ContainInOrder("recent-user", "recent-assistant");
+            .ShouldBe(new[] { "recent-user", "recent-assistant" }, ignoreOrder: false);
     }
 
     [Fact]
@@ -313,7 +305,7 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
         var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("empty"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
         var compactor = CreateCompactor("unused");
 
-        compactor.ShouldCompact(session.Session, new CompactionOptions()).Should().BeFalse();
+        compactor.ShouldCompact(session.Session, new CompactionOptions()).ShouldBeFalse();
     }
 
     [Fact]
@@ -324,7 +316,7 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
         session.AddEntry(new SessionEntry { Role = MessageRole.System, Content = "summary", IsCompactionSummary = true });
         var compactor = CreateCompactor("unused");
 
-        compactor.ShouldCompact(session.Session, new CompactionOptions()).Should().BeFalse();
+        compactor.ShouldCompact(session.Session, new CompactionOptions()).ShouldBeFalse();
     }
 
     [Fact]
@@ -346,19 +338,19 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
         });
         var addTask = Task.Run(() => session.AddEntry(new SessionEntry { Role = MessageRole.User, Content = "late-user" }));
 
-        var act = async () => await Task.WhenAll(compactTask, addTask);
-        await act.Should().NotThrowAsync();
+        Func<Task> act = async () => await Task.WhenAll(compactTask, addTask);
+        await act.ShouldNotThrowAsync();
 
         var history = session.GetHistorySnapshot();
         foreach (var entry in history)
         {
-            entry.Role.Value.Should().NotBeNullOrWhiteSpace();
-            entry.Content.Should().NotBeNull();
+            entry.Role.Value.ShouldNotBeNullOrWhiteSpace();
+            entry.Content.ShouldNotBeNull();
         }
 
-        history.Count(entry => entry.IsCompactionSummary).Should().BeLessThanOrEqualTo(1);
+        history.Count(entry => entry.IsCompactionSummary).ShouldBeLessThanOrEqualTo(1);
         if (history.Any(entry => entry.IsCompactionSummary))
-            history.First().IsCompactionSummary.Should().BeTrue();
+            history.First().IsCompactionSummary.ShouldBeTrue();
     }
 
     [Fact]
@@ -375,8 +367,8 @@ public sealed class SessionCompactionIntegrationTests : IDisposable
         var serialized = JsonSerializer.Serialize(entry, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
         var roundTrip = JsonSerializer.Deserialize<SessionEntry>(serialized, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
-        roundTrip.Should().NotBeNull();
-        roundTrip!.IsCompactionSummary.Should().BeTrue();
+        roundTrip.ShouldNotBeNull();
+        roundTrip!.IsCompactionSummary.ShouldBeTrue();
     }
 
     public void Dispose()

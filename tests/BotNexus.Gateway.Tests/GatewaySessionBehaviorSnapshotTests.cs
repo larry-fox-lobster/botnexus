@@ -1,6 +1,5 @@
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -14,9 +13,9 @@ public sealed class GatewaySessionBehaviorSnapshotTests
 
         session.AddEntry(new SessionEntry { Role = MessageRole.User, Content = "hello" });
 
-        session.History.Should().ContainSingle(e => e.Content == "hello" && e.Role == MessageRole.User);
-        session.UpdatedAt.Should().BeOnOrAfter(initialUpdatedAt);
-        session.MessageCount.Should().Be(1);
+        session.History.Where(e => e.Content == "hello" && e.Role == MessageRole.User).ShouldHaveSingleItem();
+        session.UpdatedAt.ShouldBeGreaterThanOrEqualTo(initialUpdatedAt);
+        session.MessageCount.ShouldBe(1);
     }
 
     [Fact]
@@ -33,9 +32,9 @@ public sealed class GatewaySessionBehaviorSnapshotTests
             new SessionEntry { Role = MessageRole.User, Content = "new-tail" }
         ]);
 
-        session.GetHistorySnapshot().Select(e => e.Content).Should().ContainInOrder("summary", "new-tail");
-        session.UpdatedAt.Should().BeOnOrAfter(updatedAtBeforeReplace);
-        session.MessageCount.Should().Be(2);
+        session.GetHistorySnapshot().Select(e => e.Content).ToList().ShouldBe(new[] { "summary", "new-tail" });
+        session.UpdatedAt.ShouldBeGreaterThanOrEqualTo(updatedAtBeforeReplace);
+        session.MessageCount.ShouldBe(2);
     }
 
     [Fact]
@@ -50,12 +49,11 @@ public sealed class GatewaySessionBehaviorSnapshotTests
             new GatewaySessionStreamEvent(4, """{"type":"delta","sequenceId":4}""", DateTimeOffset.UtcNow.AddSeconds(-1))
         ]);
 
-        session.NextSequenceId.Should().Be(10);
-        session.GetStreamEventSnapshot().Select(e => e.SequenceId).Should().ContainInOrder(3, 4, 5);
+        session.NextSequenceId.ShouldBe(10);
+        session.GetStreamEventSnapshot().Select(e => e.SequenceId).ToList().ShouldBe(new long[] { 3, 4, 5 });
         session.GetStreamEventsAfter(lastSequenceId: 3, maxReplayCount: 10)
             .Select(e => e.SequenceId)
-            .Should()
-            .ContainInOrder(4, 5);
+            .ShouldBe(new long[] { 4, 5 }, ignoreOrder: false);
     }
 
     [Fact]
@@ -68,7 +66,7 @@ public sealed class GatewaySessionBehaviorSnapshotTests
         var snapshot = session.StreamEventLog;
         snapshot.RemoveAt(0);
 
-        session.GetStreamEventSnapshot().Select(evt => evt.SequenceId).Should().ContainInOrder(1, 2);
+        session.GetStreamEventSnapshot().Select(evt => evt.SequenceId).ToList().ShouldBe(new long[] { 1, 2 });
     }
 
     [Fact]
@@ -82,8 +80,8 @@ public sealed class GatewaySessionBehaviorSnapshotTests
         var gatewaySession = GatewaySession.FromSession(domainSession);
 
         gatewaySession.Runtime.AddEntry(new SessionEntry { Role = MessageRole.User, Content = "from-runtime" });
-        gatewaySession.Session.History.Should().ContainSingle(entry => entry.Content == "from-runtime");
-        gatewaySession.MessageCount.Should().Be(1);
+        gatewaySession.Session.History.Where(entry => entry.Content == "from-runtime").ShouldHaveSingleItem();
+        gatewaySession.MessageCount.ShouldBe(1);
     }
 
     private static GatewaySession CreateSession()

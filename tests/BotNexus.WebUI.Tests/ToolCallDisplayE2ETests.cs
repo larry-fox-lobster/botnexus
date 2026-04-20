@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.Playwright;
 
 namespace BotNexus.WebUI.Tests;
@@ -82,7 +81,7 @@ public sealed class ToolCallDisplayE2ETests
         await host.WaitForStreamingCompleteAsync();
         var tool = host.Page.Locator(".tool-call[data-call-id='tc-expand']").First;
         await tool.ClickAsync();
-        (await tool.GetAttributeAsync("class")).Should().Contain("expanded");
+        (await tool.GetAttributeAsync("class")).ShouldContain("expanded");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -99,11 +98,11 @@ public sealed class ToolCallDisplayE2ETests
         await host.WaitForStreamingCompleteAsync();
         var tool = host.Page.Locator(".tool-call[data-call-id='tc-toggle']").First;
 
-        (await tool.GetAttributeAsync("class")).Should().NotContain("hidden");
+        (await tool.GetAttributeAsync("class")).ShouldNotContain("hidden");
         await SetToolsVisibilityAsync(host, false);
-        (await tool.GetAttributeAsync("class")).Should().Contain("hidden");
+        (await tool.GetAttributeAsync("class")).ShouldContain("hidden");
         await SetToolsVisibilityAsync(host, true);
-        (await tool.GetAttributeAsync("class")).Should().NotContain("hidden");
+        (await tool.GetAttributeAsync("class")).ShouldNotContain("hidden");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -118,7 +117,7 @@ public sealed class ToolCallDisplayE2ETests
 
         await host.SendMessageAsync("tool-visible");
         await host.WaitForStreamingCompleteAsync();
-        (await host.Page.Locator(".tool-call[data-call-id='tc-visible']").First.GetAttributeAsync("class")).Should().NotContain("hidden");
+        (await host.Page.Locator(".tool-call[data-call-id='tc-visible']").First.GetAttributeAsync("class")).ShouldNotContain("hidden");
     }
 
     private async Task<WebUiE2ETestHost> OpenChatAsync()

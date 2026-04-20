@@ -1,6 +1,5 @@
 using BotNexus.Domain.Conversations;
 using BotNexus.Domain.Primitives;
-using FluentAssertions;
 
 namespace BotNexus.Domain.Tests;
 
@@ -16,9 +15,9 @@ public sealed class ConversationRequestTests
             Message = "hello"
         };
 
-        request.MaxTurns.Should().Be(1);
-        request.CallChain.Should().BeEmpty();
-        request.Objective.Should().BeNull();
+        request.MaxTurns.ShouldBe(1);
+        request.CallChain.ShouldBeEmpty();
+        request.Objective.ShouldBeNull();
     }
 
     [Fact]
@@ -34,8 +33,8 @@ public sealed class ConversationRequestTests
             CallChain = [AgentId.From("agent-a"), AgentId.From("agent-c")]
         };
 
-        request.MaxTurns.Should().Be(4);
-        request.Objective.Should().Be("finish task");
-        request.CallChain.Select(agent => agent.Value).Should().Equal("agent-a", "agent-c");
+        request.MaxTurns.ShouldBe(4);
+        request.Objective.ShouldBe("finish task");
+        request.CallChain.Select(agent => agent.Value).ShouldBe(new[] { "agent-a", "agent-c" });
     }
 }

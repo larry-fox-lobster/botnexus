@@ -1,5 +1,4 @@
 using BotNexus.AgentCore.Tests.TestUtils;
-using FluentAssertions;
 using System.Diagnostics;
 
 namespace BotNexus.AgentCore.Tests;
@@ -35,7 +34,7 @@ public sealed class RetryDelayCapTests
         _ = await agent.PromptAsync("retry please");
         stopwatch.Stop();
 
-        attempts.Should().Be(4);
-        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
+        attempts.ShouldBe(4);
+        stopwatch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(2));
     }
 }

@@ -1,7 +1,6 @@
 using System.Net;
 using BotNexus.Extensions.WebTools.Search;
 using BotNexus.Extensions.WebTools.Tests.Helpers;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.WebTools.Tests.Search;
 
@@ -26,9 +25,9 @@ public class BingSearchProviderTests
 
         var results = await provider.SearchAsync("query", 5, CancellationToken.None);
 
-        results.Should().HaveCount(2);
-        results[0].Title.Should().Be("A");
-        results[0].Snippet.Should().Be("Alpha");
+        results.Count().ShouldBe(2);
+        results[0].Title.ShouldBe("A");
+        results[0].Snippet.ShouldBe("Alpha");
     }
 
     [Fact]
@@ -40,7 +39,8 @@ public class BingSearchProviderTests
 
         var act = () => provider.SearchAsync("query", 5, CancellationToken.None);
 
-        await act.Should().ThrowAsync<HttpRequestException>().WithMessage("*401*");
+        var ex = await act.ShouldThrowAsync<HttpRequestException>();
+        ex.Message.ShouldContain("401");
     }
 
     [Fact]
@@ -52,7 +52,8 @@ public class BingSearchProviderTests
 
         var act = () => provider.SearchAsync("query", 5, CancellationToken.None);
 
-        await act.Should().ThrowAsync<HttpRequestException>().WithMessage("*429*");
+        var ex = await act.ShouldThrowAsync<HttpRequestException>();
+        ex.Message.ShouldContain("429");
     }
 
     [Fact]
@@ -64,7 +65,7 @@ public class BingSearchProviderTests
 
         var act = () => provider.SearchAsync("query", 5, CancellationToken.None);
 
-        await act.Should().ThrowAsync<System.Text.Json.JsonException>();
+        await act.ShouldThrowAsync<System.Text.Json.JsonException>();
     }
 
     [Theory]
@@ -77,7 +78,7 @@ public class BingSearchProviderTests
         var provider = new BingSearchProvider(new HttpClient(handler), apiKey!);
 
         var results = await provider.SearchAsync("query", 5, CancellationToken.None);
-        results.Should().BeEmpty();
-        handler.Requests.Should().ContainSingle();
+        results.ShouldBeEmpty();
+        handler.Requests.ShouldHaveSingleItem();
     }
 }

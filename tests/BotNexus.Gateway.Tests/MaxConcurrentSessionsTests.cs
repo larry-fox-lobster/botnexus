@@ -3,7 +3,6 @@ using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Agents;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -17,9 +16,9 @@ public sealed class MaxConcurrentSessionsTests
         var supervisor = CreateSupervisor(maxConcurrentSessions: 1);
 
         await supervisor.GetOrCreateAsync("agent-a", "session-1");
-        var act = () => supervisor.GetOrCreateAsync("agent-a", "session-2");
+        Func<Task> act = () => supervisor.GetOrCreateAsync("agent-a", "session-2");
 
-        await act.Should().ThrowAsync<AgentConcurrencyLimitExceededException>();
+        await act.ShouldThrowAsync<AgentConcurrencyLimitExceededException>();
     }
 
     [Fact]
@@ -29,7 +28,7 @@ public sealed class MaxConcurrentSessionsTests
 
         var handle = await supervisor.GetOrCreateAsync("agent-a", "session-1");
 
-        handle.Should().NotBeNull();
+        handle.ShouldNotBeNull();
     }
 
     [Fact]
@@ -41,7 +40,7 @@ public sealed class MaxConcurrentSessionsTests
             .Select(i => supervisor.GetOrCreateAsync("agent-a", $"session-{i}"));
         await Task.WhenAll(createTasks);
 
-        supervisor.GetAllInstances().Should().HaveCount(20);
+        supervisor.GetAllInstances().Count().ShouldBe(20);
     }
 
     [Fact]
@@ -53,7 +52,7 @@ public sealed class MaxConcurrentSessionsTests
             .Select(i => supervisor.GetOrCreateAsync("agent-a", $"session-{i}"));
         await Task.WhenAll(createTasks);
 
-        supervisor.GetAllInstances().Should().HaveCount(20);
+        supervisor.GetAllInstances().Count().ShouldBe(20);
     }
 
     [Fact]
@@ -64,7 +63,7 @@ public sealed class MaxConcurrentSessionsTests
         var first = await supervisor.GetOrCreateAsync("agent-a", "session-1");
         var second = await supervisor.GetOrCreateAsync("agent-a", "session-1");
 
-        second.Should().BeSameAs(first);
+        second.ShouldBeSameAs(first);
     }
 
     private static DefaultAgentSupervisor CreateSupervisor(int? maxConcurrentSessions = null)

@@ -5,7 +5,6 @@ using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Api.Controllers;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Sessions;
 
@@ -16,8 +15,8 @@ public sealed class SessionModelWave2Tests
     {
         var names = Enum.GetNames<GatewaySessionStatus>();
 
-        names.Should().Contain(nameof(GatewaySessionStatus.Sealed));
-        names.Should().NotContain("Closed");
+        names.ShouldContain(nameof(GatewaySessionStatus.Sealed));
+        names.ShouldNotContain("Closed");
     }
 
     [Fact]
@@ -25,7 +24,7 @@ public sealed class SessionModelWave2Tests
     {
         var session = CreateSession();
 
-        session.Status.Should().Be(GatewaySessionStatus.Active);
+        session.Status.ShouldBe(GatewaySessionStatus.Active);
     }
 
     [Fact]
@@ -35,7 +34,7 @@ public sealed class SessionModelWave2Tests
 
         session.Status = GatewaySessionStatus.Suspended;
 
-        session.Status.Should().Be(GatewaySessionStatus.Suspended);
+        session.Status.ShouldBe(GatewaySessionStatus.Suspended);
     }
 
     [Fact]
@@ -45,7 +44,7 @@ public sealed class SessionModelWave2Tests
 
         session.Status = GatewaySessionStatus.Sealed;
 
-        session.Status.Should().Be(GatewaySessionStatus.Sealed);
+        session.Status.ShouldBe(GatewaySessionStatus.Sealed);
     }
 
     [Fact]
@@ -56,7 +55,7 @@ public sealed class SessionModelWave2Tests
 
         session.Status = GatewaySessionStatus.Sealed;
 
-        session.Status.Should().Be(GatewaySessionStatus.Sealed);
+        session.Status.ShouldBe(GatewaySessionStatus.Sealed);
     }
 
     [Fact]
@@ -70,8 +69,8 @@ public sealed class SessionModelWave2Tests
         var result = await controller.Resume("s1", CancellationToken.None);
 
         var resumed = result.Value ?? (result.Result as Microsoft.AspNetCore.Mvc.OkObjectResult)?.Value as GatewaySession;
-        resumed.Should().NotBeNull();
-        resumed!.Status.Should().Be(GatewaySessionStatus.Active);
+        resumed.ShouldNotBeNull();
+        resumed!.Status.ShouldBe(GatewaySessionStatus.Active);
     }
 
     [Fact]
@@ -84,8 +83,8 @@ public sealed class SessionModelWave2Tests
 
         var result = await controller.Resume("s1", CancellationToken.None);
 
-        result.Result.Should().BeOfType<Microsoft.AspNetCore.Mvc.ConflictObjectResult>();
-        session.Status.Should().Be(GatewaySessionStatus.Sealed);
+        result.Result.ShouldBeOfType<Microsoft.AspNetCore.Mvc.ConflictObjectResult>();
+        session.Status.ShouldBe(GatewaySessionStatus.Sealed);
     }
 
     [Fact]
@@ -93,8 +92,8 @@ public sealed class SessionModelWave2Tests
     {
         var session = CreateSession();
 
-        session.SessionType.Should().Be(SessionType.UserAgent);
-        session.IsInteractive.Should().BeTrue();
+        session.SessionType.ShouldBe(SessionType.UserAgent);
+        session.IsInteractive.ShouldBeTrue();
     }
 
     [Fact]
@@ -103,7 +102,7 @@ public sealed class SessionModelWave2Tests
         var session = CreateSession();
         session.SessionType = SessionType.Cron;
 
-        session.IsInteractive.Should().BeFalse();
+        session.IsInteractive.ShouldBeFalse();
     }
 
     [Fact]
@@ -112,7 +111,7 @@ public sealed class SessionModelWave2Tests
         var session = CreateSession();
         session.SessionType = SessionType.AgentSubAgent;
 
-        session.IsInteractive.Should().BeFalse();
+        session.IsInteractive.ShouldBeFalse();
     }
 
     [Fact]
@@ -125,7 +124,7 @@ public sealed class SessionModelWave2Tests
             SessionType = SessionType.Cron
         };
 
-        session.SessionType.Should().Be(SessionType.Cron);
+        session.SessionType.ShouldBe(SessionType.Cron);
     }
 
     [Fact]
@@ -136,8 +135,8 @@ public sealed class SessionModelWave2Tests
         session.Participants.Add(new SessionParticipant { Type = ParticipantType.User, Id = "user-123" });
         session.Participants.Add(new SessionParticipant { Type = ParticipantType.Agent, Id = "agent-a" });
 
-        session.CallerId.Should().Be("user-123");
-        session.Participants.Should().HaveCount(2);
+        session.CallerId.ShouldBe("user-123");
+        session.Participants.Count().ShouldBe(2);
     }
 
     [Fact]
@@ -150,7 +149,7 @@ public sealed class SessionModelWave2Tests
 
         var firstUser = session.Participants.First(p => p.Type == ParticipantType.User);
 
-        firstUser.Id.Should().Be(session.CallerId);
+        firstUser.Id.ShouldBe(session.CallerId);
     }
 
     [Fact]
@@ -158,7 +157,7 @@ public sealed class SessionModelWave2Tests
     {
         var key = new ChannelKey("  SIGNALR  ");
 
-        key.Value.Should().Be("signalr");
+        key.Value.ShouldBe("signalr");
     }
 
     [Fact]
@@ -166,8 +165,8 @@ public sealed class SessionModelWave2Tests
     {
         var method = typeof(ISessionStore).GetMethod(nameof(ISessionStore.ListByChannelAsync));
 
-        method.Should().NotBeNull();
-        method!.GetParameters()[1].ParameterType.Should().Be(typeof(ChannelKey));
+        method.ShouldNotBeNull();
+        method!.GetParameters()[1].ParameterType.ShouldBe(typeof(ChannelKey));
     }
 
     [Fact]
@@ -184,7 +183,7 @@ public sealed class SessionModelWave2Tests
         foreach (var type in candidates)
         {
             var normalizeMethod = type.GetMethod("NormalizeChannelKey", BindingFlags.NonPublic | BindingFlags.Static);
-            normalizeMethod.Should().BeNull($"{type.Name} should use ChannelKey normalization instead of custom helpers");
+            normalizeMethod.ShouldBeNull($"{type.Name} should use ChannelKey normalization instead of custom helpers");
         }
     }
 
@@ -193,8 +192,8 @@ public sealed class SessionModelWave2Tests
     {
         var roleProperty = typeof(SessionEntry).GetProperty(nameof(SessionEntry.Role));
 
-        roleProperty.Should().NotBeNull();
-        roleProperty!.PropertyType.Should().Be(typeof(MessageRole));
+        roleProperty.ShouldNotBeNull();
+        roleProperty!.PropertyType.ShouldBe(typeof(MessageRole));
     }
 
     [Fact]
@@ -208,11 +207,11 @@ public sealed class SessionModelWave2Tests
             new SessionEntry { Role = MessageRole.Tool, Content = "tool" }
         };
 
-        entries.Select(e => e.Role).Should().ContainInOrder(
+        entries.Select(e => e.Role).ToList().ShouldBe(new[] {
             MessageRole.User,
             MessageRole.Assistant,
             MessageRole.System,
-            MessageRole.Tool);
+            MessageRole.Tool });
     }
 
     private static GatewaySession CreateSession()

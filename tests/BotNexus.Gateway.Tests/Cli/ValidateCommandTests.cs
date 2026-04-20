@@ -1,4 +1,3 @@
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Cli;
 
@@ -20,8 +19,8 @@ public sealed class ValidateCommandTests
 
         var result = await fixture.RunCliAsync("validate");
 
-        result.ExitCode.Should().Be(0);
-        result.StdOut.Should().Contain("Result: VALID");
+        result.ExitCode.ShouldBe(0);
+        result.StdOut.ShouldContain("Result: VALID");
     }
 
     [Fact]
@@ -40,9 +39,9 @@ public sealed class ValidateCommandTests
 
         var result = await fixture.RunCliAsync("validate");
 
-        result.ExitCode.Should().Be(1);
-        result.CombinedOutput.Should().Contain("agents.assistant.provider");
-        result.CombinedOutput.Should().Contain("agents.assistant.model");
+        result.ExitCode.ShouldBe(1);
+        result.CombinedOutput.ShouldContain("agents.assistant.provider");
+        result.CombinedOutput.ShouldContain("agents.assistant.model");
     }
 
     [Fact]
@@ -52,7 +51,7 @@ public sealed class ValidateCommandTests
 
         var result = await fixture.RunCliAsync("validate");
 
-        result.ExitCode.Should().Be(1);
-        result.CombinedOutput.Should().Contain("Config file not found");
+        result.ExitCode.ShouldBe(1);
+        result.CombinedOutput.ShouldContain("Config file not found");
     }
 }

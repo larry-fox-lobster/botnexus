@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using FluentAssertions;
 using Microsoft.Playwright;
 
 namespace BotNexus.WebUI.Tests;
@@ -32,14 +31,14 @@ public sealed class SessionSwitchingE2ETests
         var first = host.Supervisor.Dispatches[0];
         var second = host.Supervisor.Dispatches[1];
 
-        first.AgentId.Should().Be(AgentA);
-        first.SessionId.Should().Be(sessionA);
-        first.Content.Should().Be("basic-a");
+        first.AgentId.ShouldBe(AgentA);
+        first.SessionId.ShouldBe(sessionA);
+        first.Content.ShouldBe("basic-a");
 
-        second.AgentId.Should().Be(AgentB);
-        second.SessionId.Should().Be(sessionB);
-        second.Content.Should().Be("basic-b");
-        sessionB.Should().NotBe(sessionA);
+        second.AgentId.ShouldBe(AgentB);
+        second.SessionId.ShouldBe(sessionB);
+        second.Content.ShouldBe("basic-b");
+        sessionB.ShouldNotBe(sessionA);
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -56,9 +55,9 @@ public sealed class SessionSwitchingE2ETests
         await host.SendMessageAsync("switchback-target");
 
         var last = host.Supervisor.Dispatches.Last();
-        last.AgentId.Should().Be(AgentA);
-        last.SessionId.Should().Be(sessionA);
-        last.Content.Should().Be("switchback-target");
+        last.AgentId.ShouldBe(AgentA);
+        last.SessionId.ShouldBe(sessionA);
+        last.Content.ShouldBe("switchback-target");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -79,15 +78,15 @@ public sealed class SessionSwitchingE2ETests
 
         await host.SendMessageAsync("during-switch");
 
-        host.Supervisor.Dispatches.Should().NotContain(record =>
+        host.Supervisor.Dispatches.ShouldNotContain(record =>
             record.Content == "during-switch" &&
             record.AgentId == AgentA &&
             record.SessionId == sessionA);
 
         var last = host.Supervisor.Dispatches.Last();
-        last.AgentId.Should().Be(AgentB);
-        last.SessionId.Should().NotBe(sessionA);
-        last.Content.Should().Be("during-switch");
+        last.AgentId.ShouldBe(AgentB);
+        last.SessionId.ShouldNotBe(sessionA);
+        last.Content.ShouldBe("during-switch");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -115,7 +114,7 @@ public sealed class SessionSwitchingE2ETests
         await host.Page.Keyboard.PressAsync("Enter");
         await Task.Delay(200);
 
-        host.Supervisor.Dispatches.Count(d => d.Kind == DispatchKind.Send).Should().Be(sendCountBefore);
+        host.Supervisor.Dispatches.Count(d => d.Kind == DispatchKind.Send).ShouldBe(sendCountBefore);
 
         await host.Page.UnrouteAsync(delayedRoutePattern);
         await Assertions.Expect(host.Page.Locator("#chat-input")).ToBeEditableAsync(new() { Timeout = 15000 });
@@ -147,7 +146,7 @@ public sealed class SessionSwitchingE2ETests
 
         var badge = host.Page.Locator($"#sessions-list .list-item[data-agent-id='{AgentA}'][data-channel-type='web chat'] .unread-badge");
         await Assertions.Expect(badge).ToBeVisibleAsync(new() { Timeout = 15000 });
-        (await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat}").InnerTextAsync()).Should().NotContain("background-event-2");
+        (await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat}").InnerTextAsync()).ShouldNotContain("background-event-2");
 
         await host.OpenAgentTimelineAsync(AgentA);
         await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat}")).ToContainTextAsync(
@@ -177,8 +176,8 @@ public sealed class SessionSwitchingE2ETests
         var badge = host.Page.Locator($"#sessions-list .list-item[data-agent-id='{AgentA}'][data-channel-type='web chat'] .unread-badge");
         await Assertions.Expect(badge).ToBeVisibleAsync(new() { Timeout = 15000 });
         var badgeText = await badge.InnerTextAsync();
-        badgeText.Should().NotBeNullOrWhiteSpace();
-        badgeText.Should().NotBe("0");
+        badgeText.ShouldNotBeNullOrWhiteSpace();
+        badgeText.ShouldNotBe("0");
 
         await host.OpenAgentTimelineAsync(AgentA);
         await Assertions.Expect(badge).ToHaveCountAsync(0, new() { Timeout = 15000 });
@@ -190,7 +189,7 @@ public sealed class SessionSwitchingE2ETests
         await using var host = await _fixture.CreatePageAsync();
 
         await host.WaitForConsoleMessageAsync("SubscribeAll: 2 sessions");
-        host.GetHubInvocationCount("SubscribeAll").Should().BeGreaterThanOrEqualTo(1);
+        host.GetHubInvocationCount("SubscribeAll").ShouldBeGreaterThanOrEqualTo(1);
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -214,10 +213,10 @@ public sealed class SessionSwitchingE2ETests
         await host.OpenAgentTimelineAsync(AgentA);
         sw.Stop();
 
-        host.GetHubInvocationCount("JoinSession").Should().Be(joinBefore);
-        host.GetHubInvocationCount("LeaveSession").Should().Be(leaveBefore);
-        host.GetHubInvocationCount("SubscribeAll").Should().Be(subscribeAllBefore);
-        host.GetHubInvocationCount("SendMessage").Should().Be(sendBefore);
-        sw.ElapsedMilliseconds.Should().BeLessThan(2500);
+        host.GetHubInvocationCount("JoinSession").ShouldBe(joinBefore);
+        host.GetHubInvocationCount("LeaveSession").ShouldBe(leaveBefore);
+        host.GetHubInvocationCount("SubscribeAll").ShouldBe(subscribeAllBefore);
+        host.GetHubInvocationCount("SendMessage").ShouldBe(sendBefore);
+        sw.ElapsedMilliseconds.ShouldBeLessThan(2500);
     }
 }

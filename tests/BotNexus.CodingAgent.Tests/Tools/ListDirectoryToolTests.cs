@@ -1,5 +1,4 @@
 using BotNexus.Tools;
-using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.CodingAgent.Tests.Tools;
@@ -29,10 +28,10 @@ public sealed class ListDirectoryToolTests
 
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "." });
 
-        result.Content[0].Value.Should().Contain("src/");
-        result.Content[0].Value.Should().Contain("src/agent/");
-        result.Content[0].Value.Should().Contain("src/agent/child.txt");
-        result.Content[0].Value.Should().NotContain("src/agent/deep/too-deep.txt");
+        result.Content[0].Value.ShouldContain("src/");
+        result.Content[0].Value.ShouldContain("src/agent/");
+        result.Content[0].Value.ShouldContain("src/agent/child.txt");
+        result.Content[0].Value.ShouldNotContain("src/agent/deep/too-deep.txt");
     }
 
     [Fact]
@@ -44,9 +43,9 @@ public sealed class ListDirectoryToolTests
 
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "." });
 
-        result.Content[0].Value.Should().Contain("alpha/");
-        result.Content[0].Value.Should().Contain("alpha/beta/");
-        result.Content[0].Value.Should().NotContain("alpha/beta/child.txt/");
+        result.Content[0].Value.ShouldContain("alpha/");
+        result.Content[0].Value.ShouldContain("alpha/beta/");
+        result.Content[0].Value.ShouldNotContain("alpha/beta/child.txt/");
     }
 
     [Fact]
@@ -57,8 +56,8 @@ public sealed class ListDirectoryToolTests
 
         var listing = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "." });
 
-        listing.Content[0].Value.Should().Contain("visible.txt");
-        listing.Content[0].Value.Should().Contain(".hidden.txt");
+        listing.Content[0].Value.ShouldContain("visible.txt");
+        listing.Content[0].Value.ShouldContain(".hidden.txt");
     }
 
     [Fact]
@@ -74,9 +73,9 @@ public sealed class ListDirectoryToolTests
             .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
             .Take(3)
             .ToArray();
-        lines.Should().Contain("README.md");
-        lines.Should().Contain("src/");
-        lines.Should().Contain("src/agent/");
+        lines.ShouldContain("README.md");
+        lines.ShouldContain("src/");
+        lines.ShouldContain("src/agent/");
     }
 
     [Fact]
@@ -90,14 +89,14 @@ public sealed class ListDirectoryToolTests
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "." });
         var lines = result.Content[0].Value.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
 
-        lines.Should().Contain(line => line.Contains("500 entries limit reached", StringComparison.Ordinal));
+        lines.ShouldContain(line => line.Contains("500 entries limit reached", StringComparison.Ordinal));
     }
 
     [Fact]
     public async Task ExecuteAsync_WhenPathMissing_ReturnsErrorResult()
     {
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "missing" });
-        result.Content[0].Value.Should().Contain("does not exist or is not a directory");
+        result.Content[0].Value.ShouldContain("does not exist or is not a directory");
     }
 
     [Fact]
@@ -107,14 +106,14 @@ public sealed class ListDirectoryToolTests
         _fileSystem.Directory.CreateDirectory(empty);
 
         var result = await _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "empty" });
-        result.Content[0].Value.Should().Be("(empty directory)");
+        result.Content[0].Value.ShouldBe("(empty directory)");
     }
 
     [Fact]
     public async Task ExecuteAsync_WhenPathEscapesWorkingDirectory_Throws()
     {
         var action = () => _tool.ExecuteAsync("test-call", new Dictionary<string, object?> { ["path"] = "..\\outside" });
-        await action.Should().ThrowAsync<InvalidOperationException>();
+        await action.ShouldThrowAsync<InvalidOperationException>();
     }
 
 }

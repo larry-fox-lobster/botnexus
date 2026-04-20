@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Extensions;
 using BotNexus.Gateway.Isolation;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BotNexus.Gateway.Tests;
@@ -20,12 +19,10 @@ public sealed class IsolationStrategyRegistrationTests
             .Select(d => d.ImplementationType)
             .ToList();
 
-        strategyImplementations.Should().Contain([
-            typeof(InProcessIsolationStrategy),
-            typeof(SandboxIsolationStrategy),
-            typeof(ContainerIsolationStrategy),
-            typeof(RemoteIsolationStrategy)
-        ]);
+        strategyImplementations.ShouldContain(typeof(InProcessIsolationStrategy));
+        strategyImplementations.ShouldContain(typeof(SandboxIsolationStrategy));
+        strategyImplementations.ShouldContain(typeof(ContainerIsolationStrategy));
+        strategyImplementations.ShouldContain(typeof(RemoteIsolationStrategy));
     }
 
     [Theory]
@@ -55,10 +52,11 @@ public sealed class IsolationStrategyRegistrationTests
             SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1")
         };
 
-        var act = () => strategy.CreateAsync(descriptor, context);
+        Func<Task> act = () => strategy.CreateAsync(descriptor, context);
 
-        await act.Should().ThrowAsync<NotSupportedException>()
-            .WithMessage($"*{strategyName}*not yet implemented*");
+        var ex = await act.ShouldThrowAsync<NotSupportedException>();
+        ex.Message.ShouldContain(strategyName);
+        ex.Message.ShouldContain("not yet implemented");
     }
 
     [Theory]
@@ -74,6 +72,6 @@ public sealed class IsolationStrategyRegistrationTests
             _ => new RemoteIsolationStrategy()
         };
 
-        strategy.Name.Should().Be(strategyName);
+        strategy.Name.ShouldBe(strategyName);
     }
 }

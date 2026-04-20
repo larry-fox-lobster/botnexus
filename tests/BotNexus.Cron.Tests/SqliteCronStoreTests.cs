@@ -1,5 +1,4 @@
 using BotNexus.Cron.Tests.TestInfrastructure;
-using FluentAssertions;
 using Microsoft.Data.Sqlite;
 
 namespace BotNexus.Cron.Tests;
@@ -27,7 +26,8 @@ public sealed class SqliteCronStoreTests
         while (await reader.ReadAsync())
             tables.Add(reader.GetString(0));
 
-        tables.Should().Contain(["cron_jobs", "cron_runs"]);
+        tables.ShouldContain("cron_jobs");
+        tables.ShouldContain("cron_runs");
     }
 
     [Fact]
@@ -39,10 +39,10 @@ public sealed class SqliteCronStoreTests
         await context.Store.CreateAsync(job);
         var loaded = await context.Store.GetAsync("job-1");
 
-        loaded.Should().NotBeNull();
-        loaded!.Id.Should().Be("job-1");
-        loaded.Name.Should().Be(job.Name);
-        loaded.AgentId.Should().Be("agent-a");
+        loaded.ShouldNotBeNull();
+        loaded!.Id.ShouldBe("job-1");
+        loaded.Name.ShouldBe(job.Name);
+        loaded.AgentId.ShouldBe("agent-a");
     }
 
     [Fact]
@@ -54,8 +54,8 @@ public sealed class SqliteCronStoreTests
 
         var jobs = await context.Store.ListAsync();
 
-        jobs.Should().HaveCount(2);
-        jobs.Select(job => job.Id).Should().BeEquivalentTo("job-1", "job-2");
+        jobs.Count().ShouldBe(2);
+        jobs.Select(job => job.Id).OrderBy(id => id).ShouldBe(["job-1", "job-2"]);
     }
 
     [Fact]
@@ -67,8 +67,8 @@ public sealed class SqliteCronStoreTests
 
         var filtered = await context.Store.ListAsync("agent-a");
 
-        filtered.Should().ContainSingle();
-        filtered[0].Id.Should().Be("job-1");
+        filtered.ShouldHaveSingleItem();
+        filtered[0].Id.ShouldBe("job-1");
     }
 
     [Fact]
@@ -86,10 +86,10 @@ public sealed class SqliteCronStoreTests
         await context.Store.UpdateAsync(updated);
 
         var loaded = await context.Store.GetAsync("job-1");
-        loaded.Should().NotBeNull();
-        loaded!.Name.Should().Be("Updated Name");
-        loaded.Enabled.Should().BeFalse();
-        loaded.LastRunStatus.Should().Be("ok");
+        loaded.ShouldNotBeNull();
+        loaded!.Name.ShouldBe("Updated Name");
+        loaded.Enabled.ShouldBeFalse();
+        loaded.LastRunStatus.ShouldBe("ok");
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public sealed class SqliteCronStoreTests
 
         await context.Store.DeleteAsync("job-1");
 
-        (await context.Store.GetAsync("job-1")).Should().BeNull();
+        (await context.Store.GetAsync("job-1")).ShouldBeNull();
     }
 
     [Fact]
@@ -111,10 +111,12 @@ public sealed class SqliteCronStoreTests
 
         var run = await context.Store.RecordRunStartAsync("job-1");
 
-        run.JobId.Should().Be("job-1");
-        run.Status.Should().Be("running");
+        run.JobId.ShouldBe("job-1");
+        run.Status.ShouldBe("running");
         var history = await context.Store.GetRunHistoryAsync("job-1");
-        history.Should().ContainSingle(entry => entry.Id == run.Id && entry.Status == "running");
+        var entry = history.ShouldHaveSingleItem();
+        entry.Id.ShouldBe(run.Id);
+        entry.Status.ShouldBe("running");
     }
 
     [Fact]
@@ -127,10 +129,10 @@ public sealed class SqliteCronStoreTests
         await context.Store.RecordRunCompleteAsync(run.Id, "ok", sessionId: "session-1");
         var history = await context.Store.GetRunHistoryAsync("job-1");
 
-        history.Should().ContainSingle();
-        history[0].Status.Should().Be("ok");
-        history[0].SessionId.Should().Be("session-1");
-        history[0].CompletedAt.Should().NotBeNull();
+        history.ShouldHaveSingleItem();
+        history[0].Status.ShouldBe("ok");
+        history[0].SessionId.ShouldBe("session-1");
+        history[0].CompletedAt.ShouldNotBeNull();
     }
 
     [Fact]
@@ -147,8 +149,8 @@ public sealed class SqliteCronStoreTests
 
         var history = await context.Store.GetRunHistoryAsync("job-1");
 
-        history.Should().ContainSingle();
-        history[0].JobId.Should().Be("job-1");
-        history[0].Status.Should().Be("ok");
+        history.ShouldHaveSingleItem();
+        history[0].JobId.ShouldBe("job-1");
+        history[0].Status.ShouldBe("ok");
     }
 }

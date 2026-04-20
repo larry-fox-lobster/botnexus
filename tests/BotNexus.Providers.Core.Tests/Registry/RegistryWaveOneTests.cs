@@ -1,7 +1,6 @@
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
 using BotNexus.Agent.Providers.Core.Streaming;
-using FluentAssertions;
 using Moq;
 
 namespace BotNexus.Providers.Core.Tests.Registry;
@@ -34,8 +33,8 @@ public sealed class RegistryWaveOneTests
         registry.Register(provider.Object);
         var resolved = registry.Get("wave-api");
 
-        resolved.Should().NotBeNull();
-        resolved!.Api.Should().Be("wave-api");
+        resolved.ShouldNotBeNull();
+        resolved!.Api.ShouldBe("wave-api");
     }
 
     [Fact]
@@ -45,7 +44,7 @@ public sealed class RegistryWaveOneTests
 
         var resolved = registry.Get("unknown-api");
 
-        resolved.Should().BeNull();
+        resolved.ShouldBeNull();
     }
 
     [Fact]
@@ -59,7 +58,7 @@ public sealed class RegistryWaveOneTests
         first.Register(provider.Object);
         var resolved = second.Get("isolated-api");
 
-        resolved.Should().BeNull();
+        resolved.ShouldBeNull();
     }
 
     [Fact]
@@ -71,7 +70,7 @@ public sealed class RegistryWaveOneTests
         registry.Register("provider-1", model);
         var resolved = registry.GetModel("provider-1", "model-1");
 
-        resolved.Should().BeEquivalentTo(model);
+        resolved.ShouldBe(model);
     }
 
     [Fact]
@@ -83,7 +82,7 @@ public sealed class RegistryWaveOneTests
 
         var models = registry.GetModels("provider-a");
 
-        models.Should().HaveCount(2);
+        models.Count().ShouldBe(2);
     }
 
     [Fact]
@@ -94,7 +93,7 @@ public sealed class RegistryWaveOneTests
         new BuiltInModels().RegisterAll(registry);
         var model = registry.GetModel("github-copilot", "claude-sonnet-4.6");
 
-        model.Should().NotBeNull();
+        model.ShouldNotBeNull();
     }
 
     [Fact]
@@ -106,7 +105,7 @@ public sealed class RegistryWaveOneTests
 
         var resolved = second.GetModel("provider-a", "shared-model");
 
-        resolved.Should().BeNull();
+        resolved.ShouldBeNull();
     }
 
     [Fact]
@@ -125,7 +124,7 @@ public sealed class RegistryWaveOneTests
 
         var result = client.Stream(model, context);
 
-        result.Should().BeSameAs(stream);
+        result.ShouldBeSameAs(stream);
     }
 
     [Fact]
@@ -143,6 +142,6 @@ public sealed class RegistryWaveOneTests
 
         var act = () => client.Stream(model, context);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.ShouldThrow<InvalidOperationException>();
     }
 }

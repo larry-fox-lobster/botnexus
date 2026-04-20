@@ -1,7 +1,6 @@
 using System.Net;
 using BotNexus.Extensions.WebTools.Search;
 using BotNexus.Extensions.WebTools.Tests.Helpers;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.WebTools.Tests.Search;
 
@@ -24,9 +23,9 @@ public class TavilySearchProviderTests
 
         var results = await provider.SearchAsync("query", 5, CancellationToken.None);
 
-        results.Should().HaveCount(2);
-        results[1].Title.Should().Be("B");
-        results[1].Snippet.Should().Be("Beta");
+        results.Count().ShouldBe(2);
+        results[1].Title.ShouldBe("B");
+        results[1].Snippet.ShouldBe("Beta");
     }
 
     [Fact]
@@ -38,7 +37,8 @@ public class TavilySearchProviderTests
 
         var act = () => provider.SearchAsync("query", 5, CancellationToken.None);
 
-        await act.Should().ThrowAsync<HttpRequestException>().WithMessage("*401*");
+        var ex = await act.ShouldThrowAsync<HttpRequestException>();
+        ex.Message.ShouldContain("401");
     }
 
     [Fact]
@@ -50,7 +50,8 @@ public class TavilySearchProviderTests
 
         var act = () => provider.SearchAsync("query", 5, CancellationToken.None);
 
-        await act.Should().ThrowAsync<HttpRequestException>().WithMessage("*429*");
+        var ex = await act.ShouldThrowAsync<HttpRequestException>();
+        ex.Message.ShouldContain("429");
     }
 
     [Fact]
@@ -62,7 +63,7 @@ public class TavilySearchProviderTests
 
         var act = () => provider.SearchAsync("query", 5, CancellationToken.None);
 
-        await act.Should().ThrowAsync<System.Text.Json.JsonException>();
+        await act.ShouldThrowAsync<System.Text.Json.JsonException>();
     }
 
     [Theory]
@@ -76,8 +77,8 @@ public class TavilySearchProviderTests
 
         var results = await provider.SearchAsync("query", 5, CancellationToken.None);
 
-        results.Should().BeEmpty();
-        handler.Requests.Should().ContainSingle();
-        handler.Requests[0].Body.Should().Contain("\"api_key\"");
+        results.ShouldBeEmpty();
+        handler.Requests.ShouldHaveSingleItem();
+        handler.Requests[0].Body.ShouldContain("\"api_key\"");
     }
 }

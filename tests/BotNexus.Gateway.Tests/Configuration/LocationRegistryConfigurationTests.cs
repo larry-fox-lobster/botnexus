@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Configuration;
 
@@ -32,11 +31,11 @@ public sealed class LocationRegistryConfigurationTests
             PropertyNameCaseInsensitive = true
         });
 
-        config.Should().NotBeNull();
-        config!.Gateway!.Locations.Should().ContainKey("repo-root");
-        config.Gateway.Locations!["repo-root"].Path.Should().Be("Q:\\repos\\botnexus");
-        config.Gateway.Locations!["repo-root"].Description.Should().Be("Repository root");
-        config.Gateway.Locations!["gateway-api"].Endpoint.Should().Be("https://example.test");
+        config.ShouldNotBeNull();
+        config!.Gateway!.Locations.ShouldContainKey("repo-root");
+        config.Gateway.Locations!["repo-root"].Path.ShouldBe("Q:\\repos\\botnexus");
+        config.Gateway.Locations!["repo-root"].Description.ShouldBe("Repository root");
+        config.Gateway.Locations!["gateway-api"].Endpoint.ShouldBe("https://example.test");
     }
 
     [Fact]
@@ -57,8 +56,8 @@ public sealed class LocationRegistryConfigurationTests
 
         var errors = PlatformConfigLoader.Validate(config);
 
-        errors.Should().Contain(error => error.Contains("gateway.locations.repo-root.path is required for filesystem locations.", StringComparison.Ordinal));
-        errors.Should().Contain(error => error.Contains("gateway.locations.gateway-api.endpoint is required for api locations.", StringComparison.Ordinal));
-        errors.Should().Contain(error => error.Contains("gateway.locations.memory-db.connectionString is required for database locations.", StringComparison.Ordinal));
+        errors.ShouldContain(error => error.Contains("gateway.locations.repo-root.path is required for filesystem locations.", StringComparison.Ordinal));
+        errors.ShouldContain(error => error.Contains("gateway.locations.gateway-api.endpoint is required for api locations.", StringComparison.Ordinal));
+        errors.ShouldContain(error => error.Contains("gateway.locations.memory-db.connectionString is required for database locations.", StringComparison.Ordinal));
     }
 }

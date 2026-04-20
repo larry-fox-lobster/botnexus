@@ -1,5 +1,4 @@
 using BotNexus.Tools;
-using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests.Tools;
 
@@ -24,8 +23,8 @@ public sealed class GrepToolTests : IDisposable
             ["pattern"] = "needle"
         });
 
-        result.Content.Should().ContainSingle();
-        result.Content[0].Value.Should().Contain($"sample.txt:2: needle hit");
+        result.Content.ShouldHaveSingleItem();
+        result.Content[0].Value.ShouldContain($"sample.txt:2: needle hit");
     }
 
     [Fact]
@@ -38,9 +37,9 @@ public sealed class GrepToolTests : IDisposable
             ["pattern"] = "foo\\d"
         });
 
-        result.Content[0].Value.Should().Contain("regex.txt:1: foo1");
-        result.Content[0].Value.Should().Contain("regex.txt:2: foo2");
-        result.Content[0].Value.Should().NotContain("bar");
+        result.Content[0].Value.ShouldContain("regex.txt:1: foo1");
+        result.Content[0].Value.ShouldContain("regex.txt:2: foo2");
+        result.Content[0].Value.ShouldNotContain("bar");
     }
 
     [Fact]
@@ -55,8 +54,8 @@ public sealed class GrepToolTests : IDisposable
         });
 
         var lines = result.Content[0].Value.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-        lines.Count(line => line.StartsWith("many.txt:", StringComparison.Ordinal)).Should().Be(2);
-        result.Content[0].Value.Should().Contain("[warning] Results truncated at 2 matches.");
+        lines.Count(line => line.StartsWith("many.txt:", StringComparison.Ordinal)).ShouldBe(2);
+        result.Content[0].Value.ShouldContain("[warning] Results truncated at 2 matches.");
     }
 
     [Fact]
@@ -68,7 +67,7 @@ public sealed class GrepToolTests : IDisposable
             ["path"] = "missing-directory"
         });
 
-        result.Content[0].Value.Should().Contain("does not exist");
+        result.Content[0].Value.ShouldContain("does not exist");
     }
 
     [Fact]
@@ -83,8 +82,8 @@ public sealed class GrepToolTests : IDisposable
             ["glob"] = "*.cs"
         });
 
-        result.Content[0].Value.Should().Contain("file.cs:1: target");
-        result.Content[0].Value.Should().NotContain("file.txt");
+        result.Content[0].Value.ShouldContain("file.cs:1: target");
+        result.Content[0].Value.ShouldNotContain("file.txt");
     }
 
     [Fact]
@@ -98,7 +97,7 @@ public sealed class GrepToolTests : IDisposable
             ["ignore_case"] = true
         });
 
-        result.Content[0].Value.Should().Contain("case.txt:1: NeedLe");
+        result.Content[0].Value.ShouldContain("case.txt:1: NeedLe");
     }
 
     [Fact]
@@ -112,9 +111,9 @@ public sealed class GrepToolTests : IDisposable
             ["context"] = 1
         });
 
-        result.Content[0].Value.Should().Contain("context.txt-1- line1");
-        result.Content[0].Value.Should().Contain("context.txt:2: needle");
-        result.Content[0].Value.Should().Contain("context.txt-3- line3");
+        result.Content[0].Value.ShouldContain("context.txt-1- line1");
+        result.Content[0].Value.ShouldContain("context.txt:2: needle");
+        result.Content[0].Value.ShouldContain("context.txt-3- line3");
     }
 
     [Fact]
@@ -128,8 +127,8 @@ public sealed class GrepToolTests : IDisposable
             ["pattern"] = "x+"
         });
 
-        result.Content[0].Value.Should().Contain($"{new string('x', 500)}... [truncated]");
-        result.Content[0].Value.Should().NotContain(longLine);
+        result.Content[0].Value.ShouldContain($"{new string('x', 500)}... [truncated]");
+        result.Content[0].Value.ShouldNotContain(longLine);
     }
 
     [Fact]
@@ -146,8 +145,8 @@ public sealed class GrepToolTests : IDisposable
         var matchedLines = result.Content[0].Value
             .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
             .Count(line => line.StartsWith("default-max.txt:", StringComparison.Ordinal));
-        matchedLines.Should().Be(100);
-        result.Content[0].Value.Should().Contain("[warning] Results truncated at 100 matches.");
+        matchedLines.ShouldBe(100);
+        result.Content[0].Value.ShouldContain("[warning] Results truncated at 100 matches.");
     }
 
     public void Dispose()

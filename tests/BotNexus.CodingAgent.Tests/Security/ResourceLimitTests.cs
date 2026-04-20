@@ -1,5 +1,4 @@
 using BotNexus.Tools;
-using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests.Security;
 
@@ -27,8 +26,8 @@ public sealed class ResourceLimitTests : IDisposable
             ["command"] = "sleep 3"
         });
 
-        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
-        result.Details.As<ShellTool.ShellToolDetails>().TimedOut.Should().BeTrue();
+        var details = result.Details.ShouldBeOfType<ShellTool.ShellToolDetails>();
+        details.TimedOut.ShouldBeTrue();
     }
 
     [Fact]
@@ -40,8 +39,8 @@ public sealed class ResourceLimitTests : IDisposable
             ["command"] = "while true; do :; done"
         });
 
-        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
-        result.Details.As<ShellTool.ShellToolDetails>().TimedOut.Should().BeTrue();
+        var details = result.Details.ShouldBeOfType<ShellTool.ShellToolDetails>();
+        details.TimedOut.ShouldBeTrue();
     }
 
     [Fact]
@@ -56,7 +55,7 @@ public sealed class ResourceLimitTests : IDisposable
             ["content"] = largeContent
         });
 
-        result.Content[0].Value.Should().Contain("Wrote 'disk-fill-simulated.txt'");
+        result.Content[0].Value.ShouldContain("Wrote 'disk-fill-simulated.txt'");
     }
 
     [Fact]
@@ -67,8 +66,8 @@ public sealed class ResourceLimitTests : IDisposable
         await File.WriteAllBytesAsync(binaryPath, Enumerable.Repeat((byte)0xFF, 8192).ToArray());
 
         var result = await _readTool.ExecuteAsync("t1", new Dictionary<string, object?> { ["path"] = "blob.bin" });
-        result.Content.Should().ContainSingle();
-        result.Content[0].Value.Length.Should().BeLessThan(60_000);
+        result.Content.ShouldHaveSingleItem();
+        result.Content[0].Value.Length.ShouldBeLessThan(60_000);
     }
 
     [Fact]
@@ -84,7 +83,7 @@ public sealed class ResourceLimitTests : IDisposable
             }));
 
         var results = await Task.WhenAll(tasks);
-        results.Should().HaveCount(20);
+        results.Count().ShouldBe(20);
     }
 
     public void Dispose()

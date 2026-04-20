@@ -4,7 +4,6 @@ using BotNexus.AgentCore.Tests.TestUtils;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.AgentCore.Tests.Loop;
 
@@ -27,7 +26,7 @@ public class AgentLoopRunnerTests
 
         _ = await AgentLoopRunner.RunAsync([new AgentUserMessage("retry me")], context, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        transformCount.Should().BeGreaterThan(1);
+        transformCount.ShouldBeGreaterThan(1);
     }
 
     [Fact]
@@ -52,8 +51,8 @@ public class AgentLoopRunnerTests
 
         _ = await AgentLoopRunner.RunAsync([new AgentUserMessage("retry me")], context, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        transformedSnapshots.Should().HaveCountGreaterThan(1);
-        transformedSnapshots.Distinct(StringComparer.Ordinal).Should().ContainSingle();
+        transformedSnapshots.Count().ShouldBeGreaterThan(1);
+        transformedSnapshots.Distinct(StringComparer.Ordinal).ShouldHaveSingleItem();
     }
 
     private static AgentLoopConfig CreateConfig(TransformContextDelegate transformContext)

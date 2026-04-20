@@ -2,7 +2,6 @@ using System.Text.Json;
 using BotNexus.Agent.Core.Tools;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Extensions.Mcp;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.McpInvoke.Tests;
 
@@ -17,7 +16,7 @@ public class McpInvokeToolTests
         var config = new McpInvokeConfig();
         var tool = new McpInvokeTool(config);
 
-        tool.Name.Should().Be("invoke_mcp");
+        tool.Name.ShouldBe("invoke_mcp");
     }
 
     [Fact]
@@ -26,7 +25,7 @@ public class McpInvokeToolTests
         var config = new McpInvokeConfig();
         var tool = new McpInvokeTool(config);
 
-        tool.Label.Should().Be("MCP Invoke");
+        tool.Label.ShouldBe("MCP Invoke");
     }
 
     [Fact]
@@ -37,26 +36,26 @@ public class McpInvokeToolTests
 
         var definition = tool.Definition;
 
-        definition.Name.Should().Be("invoke_mcp");
-        definition.Description.Should().NotBeNullOrEmpty();
+        definition.Name.ShouldBe("invoke_mcp");
+        definition.Description.ShouldNotBeNullOrEmpty();
         
         var schema = definition.Parameters;
-        schema.ValueKind.Should().Be(JsonValueKind.Object);
+        schema.ValueKind.ShouldBe(JsonValueKind.Object);
         
-        schema.GetProperty("type").GetString().Should().Be("object");
-        schema.GetProperty("properties").TryGetProperty("action", out _).Should().BeTrue();
-        schema.GetProperty("properties").TryGetProperty("server", out _).Should().BeTrue();
-        schema.GetProperty("properties").TryGetProperty("tool", out _).Should().BeTrue();
-        schema.GetProperty("properties").TryGetProperty("arguments", out _).Should().BeTrue();
+        schema.GetProperty("type").GetString().ShouldBe("object");
+        schema.GetProperty("properties").TryGetProperty("action", out _).ShouldBeTrue();
+        schema.GetProperty("properties").TryGetProperty("server", out _).ShouldBeTrue();
+        schema.GetProperty("properties").TryGetProperty("tool", out _).ShouldBeTrue();
+        schema.GetProperty("properties").TryGetProperty("arguments", out _).ShouldBeTrue();
         
         var actionProperty = schema.GetProperty("properties").GetProperty("action");
-        actionProperty.GetProperty("type").GetString().Should().Be("string");
-        actionProperty.TryGetProperty("enum", out var enumValues).Should().BeTrue();
+        actionProperty.GetProperty("type").GetString().ShouldBe("string");
+        actionProperty.TryGetProperty("enum", out var enumValues).ShouldBeTrue();
         
         var enumArray = enumValues.EnumerateArray().Select(e => e.GetString()).ToList();
-        enumArray.Should().Contain("call");
-        enumArray.Should().Contain("list_tools");
-        enumArray.Should().Contain("list_servers");
+        enumArray.ShouldContain("call");
+        enumArray.ShouldContain("list_tools");
+        enumArray.ShouldContain("list_servers");
     }
 
     [Fact]
@@ -68,9 +67,9 @@ public class McpInvokeToolTests
         var args = new Dictionary<string, object?> { ["action"] = "list_servers" };
         var result = await tool.ExecuteAsync("test-call", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[0].Value.Should().Be("No MCP servers configured.");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[0].Value.ShouldBe("No MCP servers configured.");
 
         await tool.DisposeAsync();
     }
@@ -91,16 +90,16 @@ public class McpInvokeToolTests
         var args = new Dictionary<string, object?> { ["action"] = "list_servers" };
         var result = await tool.ExecuteAsync("test-call", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
         
         var text = result.Content[0].Value;
-        text.Should().Contain("Available MCP Servers");
-        text.Should().Contain("github");
-        text.Should().Contain("stdio");
-        text.Should().Contain("web");
-        text.Should().Contain("HTTP/SSE");
-        text.Should().Contain("not started");
+        text.ShouldContain("Available MCP Servers");
+        text.ShouldContain("github");
+        text.ShouldContain("stdio");
+        text.ShouldContain("web");
+        text.ShouldContain("HTTP/SSE");
+        text.ShouldContain("not started");
 
         await tool.DisposeAsync();
     }
@@ -114,9 +113,9 @@ public class McpInvokeToolTests
         var args = new Dictionary<string, object?> { ["action"] = "list_tools" };
         var result = await tool.ExecuteAsync("test-call", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[0].Value.Should().Contain("'server' is required");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[0].Value.ShouldContain("'server' is required");
 
         await tool.DisposeAsync();
     }
@@ -130,9 +129,9 @@ public class McpInvokeToolTests
         var args = new Dictionary<string, object?> { ["action"] = "call", ["tool"] = "search" };
         var result = await tool.ExecuteAsync("test-call", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[0].Value.Should().Contain("'server' is required");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[0].Value.ShouldContain("'server' is required");
 
         await tool.DisposeAsync();
     }
@@ -146,9 +145,9 @@ public class McpInvokeToolTests
         var args = new Dictionary<string, object?> { ["action"] = "call", ["server"] = "github" };
         var result = await tool.ExecuteAsync("test-call", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[0].Value.Should().Contain("'tool' is required");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[0].Value.ShouldContain("'tool' is required");
 
         await tool.DisposeAsync();
     }
@@ -167,9 +166,9 @@ public class McpInvokeToolTests
         };
         var result = await tool.ExecuteAsync("test-call", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[0].Value.Should().Contain("not configured");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[0].Value.ShouldContain("not configured");
 
         await tool.DisposeAsync();
     }
@@ -183,9 +182,9 @@ public class McpInvokeToolTests
         var args = new Dictionary<string, object?> { ["action"] = "invalid_action" };
         var result = await tool.ExecuteAsync("test-call", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[0].Value.Should().Contain("Unknown action");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[0].Value.ShouldContain("Unknown action");
 
         await tool.DisposeAsync();
     }
@@ -198,9 +197,9 @@ public class McpInvokeToolTests
 
         var guidelines = tool.GetPromptGuidelines();
 
-        guidelines.Should().NotBeEmpty();
-        guidelines.Should().Contain(g => g.Contains("skill", StringComparison.OrdinalIgnoreCase));
-        guidelines.Should().Contain(g => g.Contains("invoke_mcp", StringComparison.OrdinalIgnoreCase));
+        guidelines.ShouldNotBeEmpty();
+        guidelines.ShouldContain(g => g.Contains("skill", StringComparison.OrdinalIgnoreCase));
+        guidelines.ShouldContain(g => g.Contains("invoke_mcp", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -211,8 +210,8 @@ public class McpInvokeToolTests
 
         var snippet = tool.GetPromptSnippet();
 
-        snippet.Should().NotBeNullOrEmpty();
-        snippet.Should().Contain("invoke_mcp");
+        snippet.ShouldNotBeNullOrEmpty();
+        snippet.ShouldContain("invoke_mcp");
     }
 
     [Fact]
@@ -239,7 +238,7 @@ public class McpInvokeToolTests
 
         var preparedArgs = await tool.PrepareArgumentsAsync(originalArgs);
 
-        preparedArgs.Should().BeSameAs(originalArgs);
+        preparedArgs.ShouldBeSameAs(originalArgs);
 
         await tool.DisposeAsync();
     }
@@ -260,8 +259,8 @@ public class McpInvokeToolTests
         };
         var result = await tool.ExecuteAsync("test-empty-server", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Value.Should().Contain("server");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Value.ShouldContain("server");
 
         await tool.DisposeAsync();
     }
@@ -280,9 +279,9 @@ public class McpInvokeToolTests
         };
         var result = await tool.ExecuteAsync("test-ws-server", args);
 
-        result.Content.Should().HaveCount(1);
+        result.Content.Count().ShouldBe(1);
         // Should indicate server is missing or not found
-        result.Content[0].Value.Should().NotBeNullOrEmpty();
+        result.Content[0].Value.ShouldNotBeNullOrEmpty();
 
         await tool.DisposeAsync();
     }
@@ -296,8 +295,8 @@ public class McpInvokeToolTests
         var args = new Dictionary<string, object?> { ["action"] = null };
         var result = await tool.ExecuteAsync("test-null-action", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Value.Should().NotBeNullOrEmpty();
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Value.ShouldNotBeNullOrEmpty();
 
         await tool.DisposeAsync();
     }
@@ -311,8 +310,8 @@ public class McpInvokeToolTests
         var args = new Dictionary<string, object?> { ["action"] = "" };
         var result = await tool.ExecuteAsync("test-empty-action", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Value.Should().Contain("Unknown action");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Value.ShouldContain("Unknown action");
 
         await tool.DisposeAsync();
     }
@@ -330,8 +329,8 @@ public class McpInvokeToolTests
         };
         var result = await tool.ExecuteAsync("test-list-unconfigured", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Value.Should().Contain("not configured");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Value.ShouldContain("not configured");
 
         await tool.DisposeAsync();
     }
@@ -355,8 +354,8 @@ public class McpInvokeToolTests
         var args = new Dictionary<string, object?>();
         var result = await tool.ExecuteAsync("test-no-args", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Value.Should().NotBeNullOrEmpty();
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Value.ShouldNotBeNullOrEmpty();
 
         await tool.DisposeAsync();
     }
@@ -365,13 +364,13 @@ public class McpInvokeToolTests
     public void McpInvokeConfig_DefaultEnabled_IsTrue()
     {
         var config = new McpInvokeConfig();
-        config.Enabled.Should().BeTrue();
+        config.Enabled.ShouldBeTrue();
     }
 
     [Fact]
     public void McpInvokeConfig_DefaultServers_IsNotNull()
     {
         var config = new McpInvokeConfig();
-        config.Servers.Should().NotBeNull();
+        config.Servers.ShouldNotBeNull();
     }
 }

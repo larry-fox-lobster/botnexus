@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using BotNexus.Gateway;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Api;
-using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -26,7 +25,7 @@ public sealed class LiveGatewayIntegrationTests
 
         var response = await client.GetAsync("/health");
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -37,7 +36,7 @@ public sealed class LiveGatewayIntegrationTests
 
         var response = await client.GetAsync("/swagger/v1/swagger.json");
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -47,10 +46,10 @@ public sealed class LiveGatewayIntegrationTests
         using var client = factory.CreateClient();
 
         var listAgentsResponse = await client.GetAsync("/api/agents");
-        listAgentsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        listAgentsResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var listSessionsResponse = await client.GetAsync("/api/sessions");
-        listSessionsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        listSessionsResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var descriptor = new AgentDescriptor
         {
@@ -61,10 +60,10 @@ public sealed class LiveGatewayIntegrationTests
             IsolationStrategy = "in-process"
         };
         var registerResponse = await client.PostAsJsonAsync("/api/agents", descriptor);
-        registerResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        registerResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
 
         var validateResponse = await client.GetAsync("/api/config/validate");
-        validateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        validateResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -81,13 +80,13 @@ public sealed class LiveGatewayIntegrationTests
             IsolationStrategy = "in-process"
         };
         var registerResponse = await client.PostAsJsonAsync("/api/agents", descriptor);
-        registerResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        registerResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
 
         // Verify the hub endpoint is mapped by checking a simple HTTP request
         // (SignalR negotiate endpoint)
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var negotiateResponse = await client.PostAsync("/hub/gateway/negotiate?negotiateVersion=1", null, cts.Token);
-        negotiateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        negotiateResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
     private static WebApplicationFactory<Program> CreateTestFactory(Action<IServiceCollection>? configureTestServices = null)

@@ -6,7 +6,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Api;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -43,10 +42,10 @@ public sealed class SessionResumeIntegrationTests : IDisposable
         var secondStore = CreateFileStore(storePath);
         var reloaded = await secondStore.GetOrCreateAsync("persist-1", "different-agent");
 
-        reloaded.History.Should().HaveCount(5);
-        reloaded.AgentId.Should().Be("agent-alpha");
-        reloaded.ChannelType.Should().Be(ChannelKey.From("signalr"));
-        reloaded.CreatedAt.Should().Be(createdAt);
+        reloaded.History.Count().ShouldBe(5);
+        reloaded.AgentId.Value.ShouldBe("agent-alpha");
+        reloaded.ChannelType.ShouldBe(ChannelKey.From("signalr"));
+        reloaded.CreatedAt.ShouldBe(createdAt);
     }
 
     [Fact]
@@ -73,12 +72,12 @@ public sealed class SessionResumeIntegrationTests : IDisposable
         var store = factory.Services.GetRequiredService<ISessionStore>();
         var reloaded = await store.GetAsync("expired-join", cts.Token);
 
-        result.GetProperty("isResumed").GetBoolean().Should().BeTrue();
-        result.GetProperty("status").GetString().Should().Be(SessionStatus.Active.ToString());
-        reloaded.Should().NotBeNull();
-        reloaded!.Status.Should().Be(SessionStatus.Active);
-        reloaded.ExpiresAt.Should().BeNull();
-        reloaded.History.Should().ContainSingle(e => e.Content == "persisted-message");
+        result.GetProperty("isResumed").GetBoolean().ShouldBeTrue();
+        result.GetProperty("status").GetString().ShouldBe(SessionStatus.Active.ToString());
+        reloaded.ShouldNotBeNull();
+        reloaded!.Status.ShouldBe(SessionStatus.Active);
+        reloaded.ExpiresAt.ShouldBeNull();
+        reloaded.History.Where(e => e.Content == "persisted-message").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -101,9 +100,9 @@ public sealed class SessionResumeIntegrationTests : IDisposable
         await connection.InvokeAsync("ResetSession", TestAgentId, sessionId, cts.Token);
         var newSession = await store.GetOrCreateAsync(sessionId, TestAgentId, cts.Token);
 
-        newSession.History.Should().BeEmpty();
-        Directory.GetFiles(storePath, $"{encodedSessionId}.jsonl.archived.*").Should().ContainSingle();
-        Directory.GetFiles(storePath, $"{encodedSessionId}.meta.json.archived.*").Should().ContainSingle();
+        newSession.History.ShouldBeEmpty();
+        Directory.GetFiles(storePath, $"{encodedSessionId}.jsonl.archived.*").ShouldHaveSingleItem();
+        Directory.GetFiles(storePath, $"{encodedSessionId}.meta.json.archived.*").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -127,9 +126,9 @@ public sealed class SessionResumeIntegrationTests : IDisposable
         await store.ArchiveAsync(sessionId);
 
         var active = await store.GetOrCreateAsync(sessionId, "agent-a");
-        active.History.Should().BeEmpty();
-        Directory.GetFiles(storePath, $"{encodedSessionId}.jsonl.archived.*").Should().HaveCount(2);
-        Directory.GetFiles(storePath, $"{encodedSessionId}.meta.json.archived.*").Should().HaveCount(2);
+        active.History.ShouldBeEmpty();
+        Directory.GetFiles(storePath, $"{encodedSessionId}.jsonl.archived.*").Count().ShouldBe(2);
+        Directory.GetFiles(storePath, $"{encodedSessionId}.meta.json.archived.*").Count().ShouldBe(2);
     }
 
     [Fact]
@@ -154,10 +153,10 @@ public sealed class SessionResumeIntegrationTests : IDisposable
         await secondStore.ArchiveAsync("session-a");
         var unaffectedB = await secondStore.GetAsync("session-b");
 
-        reloadedA!.History.Should().HaveCount(3);
-        reloadedB!.History.Should().HaveCount(5);
-        unaffectedB!.History.Should().HaveCount(5);
-        unaffectedB.AgentId.Should().Be("beta");
+        reloadedA!.History.Count().ShouldBe(3);
+        reloadedB!.History.Count().ShouldBe(5);
+        unaffectedB!.History.Count().ShouldBe(5);
+        unaffectedB.AgentId.Value.ShouldBe("beta");
     }
 
     [Fact]
@@ -189,11 +188,11 @@ public sealed class SessionResumeIntegrationTests : IDisposable
         var expiredReloaded = sessions.Single(s => s.SessionId == "expired-1");
         var closedReloaded = sessions.Single(s => s.SessionId == "closed-1");
 
-        sessions.Should().HaveCount(3);
-        activeReloaded.Status.Should().Be(SessionStatus.Active);
-        expiredReloaded.Status.Should().Be(SessionStatus.Expired);
-        closedReloaded.Status.Should().Be(SessionStatus.Sealed);
-        activeReloaded.History.Should().ContainSingle(e => e.Content == "active-history");
+        sessions.Count().ShouldBe(3);
+        activeReloaded.Status.ShouldBe(SessionStatus.Active);
+        expiredReloaded.Status.ShouldBe(SessionStatus.Expired);
+        closedReloaded.Status.ShouldBe(SessionStatus.Sealed);
+        activeReloaded.History.Where(e => e.Content == "active-history").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -227,12 +226,12 @@ public sealed class SessionResumeIntegrationTests : IDisposable
         var secondStore = CreateFileStore(storePath);
         var reloaded = await secondStore.GetAsync("large-history");
 
-        reloaded.Should().NotBeNull();
-        reloaded!.History.Should().HaveCount(500);
-        reloaded.History[2].Role.Should().Be(MessageRole.Tool);
-        reloaded.History[2].ToolName.Should().Be("tool-2");
-        reloaded.History[2].ToolCallId.Should().Be("call-2");
-        reloaded.History[499].Content.Should().Be("content-499");
+        reloaded.ShouldNotBeNull();
+        reloaded!.History.Count().ShouldBe(500);
+        reloaded.History[2].Role.ShouldBe(MessageRole.Tool);
+        reloaded.History[2].ToolName.ShouldBe("tool-2");
+        reloaded.History[2].ToolCallId.ShouldBe("call-2");
+        reloaded.History[499].Content.ShouldBe("content-499");
     }
 
     [Fact]
@@ -247,11 +246,11 @@ public sealed class SessionResumeIntegrationTests : IDisposable
         await store.SaveAsync(session);
 
         await store.ArchiveAsync(sessionId);
-        var act = async () => await store.DeleteAsync(sessionId);
+        Func<Task> act = async () => await store.DeleteAsync(sessionId);
 
-        await act.Should().NotThrowAsync();
-        File.Exists(Path.Combine(storePath, $"{encodedSessionId}.jsonl")).Should().BeFalse();
-        File.Exists(Path.Combine(storePath, $"{encodedSessionId}.meta.json")).Should().BeFalse();
+        await act.ShouldNotThrowAsync();
+        File.Exists(Path.Combine(storePath, $"{encodedSessionId}.jsonl")).ShouldBeFalse();
+        File.Exists(Path.Combine(storePath, $"{encodedSessionId}.meta.json")).ShouldBeFalse();
     }
 
     [Fact]
@@ -278,9 +277,9 @@ public sealed class SessionResumeIntegrationTests : IDisposable
         var store = CreateFileStore(storePath);
         var loaded = await store.GetAsync(sessionId);
 
-        loaded.Should().NotBeNull();
-        loaded!.History.Should().HaveCount(2);
-        loaded.History.Select(h => h.Content).Should().ContainInOrder("valid-1", "valid-2");
+        loaded.ShouldNotBeNull();
+        loaded!.History.Count().ShouldBe(2);
+        loaded.History.Select(h => h.Content).ToList().ShouldBe(new[] { "valid-1", "valid-2" });
     }
 
     [Fact]
@@ -302,11 +301,11 @@ public sealed class SessionResumeIntegrationTests : IDisposable
         var store = CreateFileStore(storePath);
         var loaded = await store.GetAsync(sessionId);
 
-        loaded.Should().NotBeNull();
-        loaded!.History.Should().BeEmpty();
-        loaded.AgentId.Should().Be("agent-a");
-        loaded.ChannelType.Should().Be(ChannelKey.From("signalr"));
-        loaded.CreatedAt.Should().Be(createdAt);
+        loaded.ShouldNotBeNull();
+        loaded!.History.ShouldBeEmpty();
+        loaded.AgentId.Value.ShouldBe("agent-a");
+        loaded.ChannelType.ShouldBe(ChannelKey.From("signalr"));
+        loaded.CreatedAt.ShouldBe(createdAt);
     }
 
     [Fact]
@@ -321,7 +320,7 @@ public sealed class SessionResumeIntegrationTests : IDisposable
         var store = CreateFileStore(storePath);
         var loaded = await store.GetAsync(sessionId);
 
-        loaded.Should().BeNull();
+        loaded.ShouldBeNull();
     }
 
     [Fact]
@@ -338,11 +337,11 @@ public sealed class SessionResumeIntegrationTests : IDisposable
 
         var reloaded = await CreateFileStore(storePath).GetAsync(sessionId);
 
-        File.Exists(Path.Combine(storePath, $"{encoded}.jsonl")).Should().BeTrue();
-        File.Exists(Path.Combine(storePath, $"{encoded}.meta.json")).Should().BeTrue();
-        reloaded.Should().NotBeNull();
-        reloaded!.SessionId.Should().Be(sessionId);
-        reloaded.History.Should().ContainSingle(e => e.Content == "hello 🌍");
+        File.Exists(Path.Combine(storePath, $"{encoded}.jsonl")).ShouldBeTrue();
+        File.Exists(Path.Combine(storePath, $"{encoded}.meta.json")).ShouldBeTrue();
+        reloaded.ShouldNotBeNull();
+        reloaded!.SessionId.Value.ShouldBe(sessionId);
+        reloaded.History.Where(e => e.Content == "hello 🌍").ShouldHaveSingleItem();
     }
 
     public void Dispose()
@@ -420,7 +419,7 @@ public sealed class SessionResumeIntegrationTests : IDisposable
         };
 
         var response = await client.PostAsJsonAsync("/api/agents", descriptor, cancellationToken);
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.Created, HttpStatusCode.Conflict);
+        response.StatusCode.ShouldBeOneOf(HttpStatusCode.Created, HttpStatusCode.Conflict);
     }
 
     private static CancellationTokenSource CreateTimeout()

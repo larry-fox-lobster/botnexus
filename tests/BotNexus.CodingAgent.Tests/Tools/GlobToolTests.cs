@@ -1,5 +1,4 @@
 using BotNexus.Tools;
-using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests.Tools;
 
@@ -28,10 +27,10 @@ public sealed class GlobToolTests : IDisposable
             ["pattern"] = "**/*.cs"
         });
 
-        result.Content.Should().ContainSingle();
-        result.Content[0].Value.Should().Contain(Path.Combine("src", "a.cs"));
-        result.Content[0].Value.Should().Contain(Path.Combine("src", "b.cs"));
-        result.Content[0].Value.Should().NotContain(Path.Combine("docs", "readme.md"));
+        result.Content.ShouldHaveSingleItem();
+        result.Content[0].Value.ShouldContain(Path.Combine("src", "a.cs"));
+        result.Content[0].Value.ShouldContain(Path.Combine("src", "b.cs"));
+        result.Content[0].Value.ShouldNotContain(Path.Combine("docs", "readme.md"));
     }
 
     [Fact]
@@ -44,7 +43,7 @@ public sealed class GlobToolTests : IDisposable
             ["pattern"] = "**/*.json"
         });
 
-        result.Content[0].Value.Should().Be("No matches.");
+        result.Content[0].Value.ShouldBe("No matches.");
     }
 
     [Fact]
@@ -61,7 +60,7 @@ public sealed class GlobToolTests : IDisposable
             ["pattern"] = "**/*.txt"
         });
 
-        result.Content[0].Value.Should().Contain("[Showing first 1000 of 1005 matches]");
+        result.Content[0].Value.ShouldContain("[Showing first 1000 of 1005 matches]");
     }
 
     public void Dispose()

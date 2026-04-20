@@ -3,7 +3,6 @@ using BotNexus.Agent.Core.Types;
 using BotNexus.CodingAgent;
 using BotNexus.CodingAgent.Hooks;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests.Hooks;
 
@@ -38,9 +37,9 @@ public sealed class SafetyHooksTests : IDisposable
 
         var result = await _hooks.ValidateAsync(context, _config);
 
-        result.Should().NotBeNull();
-        result!.Block.Should().BeTrue();
-        result.Reason.Should().Contain("Unsafe path");
+        result.ShouldNotBeNull();
+        result!.Block.ShouldBeTrue();
+        result.Reason.ShouldContain("Unsafe path");
     }
 
     [Fact]
@@ -53,9 +52,9 @@ public sealed class SafetyHooksTests : IDisposable
 
         var result = await _hooks.ValidateAsync(context, _config);
 
-        result.Should().NotBeNull();
-        result!.Block.Should().BeTrue();
-        result.Reason.Should().Contain("dangerous command pattern");
+        result.ShouldNotBeNull();
+        result!.Block.ShouldBeTrue();
+        result.Reason.ShouldContain("dangerous command pattern");
     }
 
     [Fact]
@@ -74,8 +73,8 @@ public sealed class SafetyHooksTests : IDisposable
         var writeResult = await _hooks.ValidateAsync(writeContext, _config);
         var shellResult = await _hooks.ValidateAsync(shellContext, _config);
 
-        writeResult.Should().BeNull();
-        shellResult.Should().BeNull();
+        writeResult.ShouldBeNull();
+        shellResult.ShouldBeNull();
     }
 
     private static BeforeToolCallContext CreateContext(string toolName, Dictionary<string, object?> args)

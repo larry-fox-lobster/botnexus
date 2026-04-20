@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Security;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Security;
 
@@ -16,7 +15,7 @@ public sealed class PathValidatorTests
             AllowedReadPaths = [@"Q:\repos\botnexus\src"]
         });
 
-        sut.CanRead(@"Q:\repos\botnexus\src\gateway\file.cs").Should().BeTrue();
+        sut.CanRead(@"Q:\repos\botnexus\src\gateway\file.cs").ShouldBeTrue();
     }
 
     [Fact]
@@ -28,7 +27,7 @@ public sealed class PathValidatorTests
             DeniedPaths = [@"Q:\repos\botnexus\src\gateway\secrets"]
         });
 
-        sut.CanRead(@"Q:\repos\botnexus\src\gateway\secrets\file.txt").Should().BeFalse();
+        sut.CanRead(@"Q:\repos\botnexus\src\gateway\secrets\file.txt").ShouldBeFalse();
     }
 
     [Fact]
@@ -39,7 +38,7 @@ public sealed class PathValidatorTests
             AllowedReadPaths = [@"Q:\repos\botnexus\src"]
         }, workspace: @"Q:\workspace");
 
-        sut.CanRead(@"Q:\outside\file.txt").Should().BeFalse();
+        sut.CanRead(@"Q:\outside\file.txt").ShouldBeFalse();
     }
 
     [Fact]
@@ -50,7 +49,7 @@ public sealed class PathValidatorTests
             AllowedWritePaths = [@"Q:\repos\botnexus\artifacts"]
         }, workspace: @"Q:\workspace");
 
-        sut.CanWrite(@"Q:\repos\botnexus\artifacts\output.json").Should().BeTrue();
+        sut.CanWrite(@"Q:\repos\botnexus\artifacts\output.json").ShouldBeTrue();
     }
 
     [Fact]
@@ -61,7 +60,7 @@ public sealed class PathValidatorTests
             AllowedReadPaths = [@"Q:\repos\botnexus\docs"]
         }, workspace: @"Q:\workspace");
 
-        sut.CanWrite(@"Q:\repos\botnexus\docs\spec.md").Should().BeFalse();
+        sut.CanWrite(@"Q:\repos\botnexus\docs\spec.md").ShouldBeFalse();
     }
 
     [Fact]
@@ -74,8 +73,8 @@ public sealed class PathValidatorTests
             DeniedPaths = [@"Q:\repos\botnexus\src\private"]
         }, workspace: @"Q:\workspace");
 
-        sut.CanRead(@"Q:\repos\botnexus\src\private\secrets.txt").Should().BeFalse();
-        sut.CanWrite(@"Q:\repos\botnexus\src\private\secrets.txt").Should().BeFalse();
+        sut.CanRead(@"Q:\repos\botnexus\src\private\secrets.txt").ShouldBeFalse();
+        sut.CanWrite(@"Q:\repos\botnexus\src\private\secrets.txt").ShouldBeFalse();
     }
 
     [Fact]
@@ -85,7 +84,7 @@ public sealed class PathValidatorTests
 
         var resolved = sut.ValidateAndResolve(@"src\gateway\Program.cs", FileAccessMode.Read);
 
-        resolved.Should().Be(@"Q:\repos\botnexus\src\gateway\Program.cs");
+        resolved.ShouldBe(@"Q:\repos\botnexus\src\gateway\Program.cs");
     }
 
     [Fact]
@@ -99,7 +98,7 @@ public sealed class PathValidatorTests
 
         var resolved = sut.ValidateAndResolve(@"Q:\repos\botnexus\src\gateway\Program.cs", FileAccessMode.Read);
 
-        resolved.Should().BeNull();
+        resolved.ShouldBeNull();
     }
 
     [Fact]
@@ -112,7 +111,7 @@ public sealed class PathValidatorTests
 
         var resolved = sut.ValidateAndResolve(@"Q:/repos/botnexus/src/gateway/Program.cs", FileAccessMode.Read);
 
-        resolved.Should().Be(@"Q:\repos\botnexus\src\gateway\Program.cs");
+        resolved.ShouldBe(@"Q:\repos\botnexus\src\gateway\Program.cs");
     }
 
     [Fact]
@@ -121,10 +120,10 @@ public sealed class PathValidatorTests
         var nullPolicyValidator = CreateValidator(policy: null);
         var emptyPolicyValidator = CreateValidator(new FileAccessPolicy());
 
-        nullPolicyValidator.CanRead(@"Q:\repos\botnexus\README.md").Should().BeTrue();
-        nullPolicyValidator.CanRead(@"Q:\elsewhere\README.md").Should().BeFalse();
-        emptyPolicyValidator.CanWrite(@"Q:\repos\botnexus\artifacts\output.txt").Should().BeTrue();
-        emptyPolicyValidator.CanWrite(@"Q:\elsewhere\output.txt").Should().BeFalse();
+        nullPolicyValidator.CanRead(@"Q:\repos\botnexus\README.md").ShouldBeTrue();
+        nullPolicyValidator.CanRead(@"Q:\elsewhere\README.md").ShouldBeFalse();
+        emptyPolicyValidator.CanWrite(@"Q:\repos\botnexus\artifacts\output.txt").ShouldBeTrue();
+        emptyPolicyValidator.CanWrite(@"Q:\elsewhere\output.txt").ShouldBeFalse();
     }
 
     [Fact]
@@ -135,7 +134,7 @@ public sealed class PathValidatorTests
             AllowedReadPaths = [@"Q:\Repos\BotNexus"]
         }, workspace: @"Q:\workspace");
 
-        sut.CanRead(@"q:\repos\botnexus\src\gateway\Program.cs").Should().Be(OperatingSystem.IsWindows());
+        sut.CanRead(@"q:\repos\botnexus\src\gateway\Program.cs").ShouldBe(OperatingSystem.IsWindows());
     }
 
     [Fact]
@@ -146,7 +145,7 @@ public sealed class PathValidatorTests
             AllowedReadPaths = [@"Q:\repos\botnexus"]
         }, workspace: @"Q:\workspace");
 
-        sut.CanRead(@"Q:\repos\botnexus\src").Should().BeTrue();
+        sut.CanRead(@"Q:\repos\botnexus\src").ShouldBeTrue();
     }
 
     [Fact]
@@ -157,7 +156,7 @@ public sealed class PathValidatorTests
             AllowedReadPaths = [@"Q:\repos\botnexus"]
         }, workspace: @"Q:\workspace");
 
-        sut.CanRead(@"Q:\repos\botnexus-other\src").Should().BeFalse();
+        sut.CanRead(@"Q:\repos\botnexus-other\src").ShouldBeFalse();
     }
 
     [Fact]
@@ -168,7 +167,7 @@ public sealed class PathValidatorTests
             AllowedReadPaths = [@"Q:\repos\*"]
         }, workspace: @"Q:\workspace");
 
-        sut.CanRead(@"Q:\repos\botnexus\file.cs").Should().BeTrue();
+        sut.CanRead(@"Q:\repos\botnexus\file.cs").ShouldBeTrue();
     }
 
     [Fact]
@@ -179,8 +178,8 @@ public sealed class PathValidatorTests
             AllowedReadPaths = [@"Q:\repos\**\*.cs"]
         }, workspace: @"Q:\workspace");
 
-        sut.CanRead(@"Q:\repos\botnexus\src\gateway\Program.cs").Should().BeTrue();
-        sut.CanRead(@"Q:\repos\botnexus\src\gateway\file.txt").Should().BeFalse();
+        sut.CanRead(@"Q:\repos\botnexus\src\gateway\Program.cs").ShouldBeTrue();
+        sut.CanRead(@"Q:\repos\botnexus\src\gateway\file.txt").ShouldBeFalse();
     }
 
     [Fact]
@@ -192,9 +191,9 @@ public sealed class PathValidatorTests
             DeniedPaths = [@"**\*.env"]
         });
 
-        sut.CanRead(@"Q:\repos\botnexus\src\.env").Should().BeFalse();
-        sut.CanRead(@"Q:\repos\botnexus\config\production.env").Should().BeFalse();
-        sut.CanRead(@"Q:\repos\botnexus\src\Program.cs").Should().BeTrue();
+        sut.CanRead(@"Q:\repos\botnexus\src\.env").ShouldBeFalse();
+        sut.CanRead(@"Q:\repos\botnexus\config\production.env").ShouldBeFalse();
+        sut.CanRead(@"Q:\repos\botnexus\src\Program.cs").ShouldBeTrue();
     }
 
     [Fact]
@@ -209,9 +208,9 @@ public sealed class PathValidatorTests
             ]
         }, workspace: @"Q:\workspace");
 
-        sut.CanRead(@"Q:\repos\botnexus\docs\spec.md").Should().BeTrue();
-        sut.CanRead(@"Q:\repos\botnexus\src\Program.cs").Should().BeTrue();
-        sut.CanRead(@"Q:\repos\botnexus\src\readme.md").Should().BeFalse();
+        sut.CanRead(@"Q:\repos\botnexus\docs\spec.md").ShouldBeTrue();
+        sut.CanRead(@"Q:\repos\botnexus\src\Program.cs").ShouldBeTrue();
+        sut.CanRead(@"Q:\repos\botnexus\src\readme.md").ShouldBeFalse();
     }
 
     [Fact]
@@ -222,7 +221,7 @@ public sealed class PathValidatorTests
             AllowedReadPaths = [@"Q:\other\*"]
         }, workspace: @"Q:\workspace");
 
-        sut.CanRead(@"Q:\repos\file.cs").Should().BeFalse();
+        sut.CanRead(@"Q:\repos\file.cs").ShouldBeFalse();
     }
 
     private static DefaultPathValidator CreateValidator(FileAccessPolicy? policy, string workspace = Workspace)

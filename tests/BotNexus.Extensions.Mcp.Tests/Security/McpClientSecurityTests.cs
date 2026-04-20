@@ -1,7 +1,6 @@
 using System.Text.Json;
 using BotNexus.Extensions.Mcp.Protocol;
 using BotNexus.Extensions.Mcp.Transport;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Mcp.Tests.Security;
 
@@ -19,9 +18,9 @@ public sealed class McpClientSecurityTests
         var _ = await client.CallToolAsync("\"; DROP TABLE");
 
         var callRequest = transport.SentRequests[1];
-        callRequest.Method.Should().Be("tools/call");
-        callRequest.Params.Should().NotBeNull();
-        callRequest.Params!.Value.GetProperty("name").GetString().Should().Be("\"; DROP TABLE");
+        callRequest.Method.ShouldBe("tools/call");
+        callRequest.Params.ShouldNotBeNull();
+        callRequest.Params!.Value.GetProperty("name").GetString().ShouldBe("\"; DROP TABLE");
         await client.DisposeAsync();
     }
 
@@ -37,7 +36,7 @@ public sealed class McpClientSecurityTests
 
         var args = JsonSerializer.SerializeToElement(new { payload = new string('x', 5 * 1024 * 1024) });
         var result = await client.CallToolAsync("large", args);
-        result.Should().NotBeNull();
+        result.ShouldNotBeNull();
         await client.DisposeAsync();
     }
 
@@ -50,7 +49,7 @@ public sealed class McpClientSecurityTests
         var client = new McpClient(transport, "test");
 
         var act = () => client.InitializeAsync();
-        await act.Should().ThrowAsync<JsonException>();
+        await act.ShouldThrowAsync<JsonException>();
     }
 
     [Fact]
@@ -67,7 +66,7 @@ public sealed class McpClientSecurityTests
         var client = new McpClient(transport, "test");
 
         await client.InitializeAsync();
-        client.Capabilities.Should().NotBeNull();
+        client.Capabilities.ShouldNotBeNull();
         await client.DisposeAsync();
     }
 
@@ -81,7 +80,8 @@ public sealed class McpClientSecurityTests
         await client.InitializeAsync();
 
         var act = () => client.CallToolAsync("secret");
-        await act.Should().ThrowAsync<McpException>().WithMessage("*denied*");
+        var ex = await act.ShouldThrowAsync<McpException>();
+        ex.Message.ShouldContain("denied");
         await client.DisposeAsync();
     }
 
@@ -103,7 +103,7 @@ public sealed class McpClientSecurityTests
         await client.InitializeAsync();
 
         var tools = await client.ListToolsAsync();
-        tools.Count(t => t.Name == "dup").Should().Be(2);
+        tools.Count(t => t.Name == "dup").ShouldBe(2);
         await client.DisposeAsync();
     }
 
@@ -126,8 +126,8 @@ public sealed class McpClientSecurityTests
         await client.InitializeAsync();
 
         var result = await client.CallToolAsync("binary");
-        result.Content.Should().ContainSingle();
-        result.Content[0].Type.Should().Be("image");
+        result.Content.ShouldHaveSingleItem();
+        result.Content[0].Type.ShouldBe("image");
         await client.DisposeAsync();
     }
 
@@ -141,7 +141,8 @@ public sealed class McpClientSecurityTests
         await client.InitializeAsync();
 
         var act = () => client.ListToolsAsync();
-        await act.Should().ThrowAsync<McpException>().WithMessage("*blocked*");
+        var ex = await act.ShouldThrowAsync<McpException>();
+        ex.Message.ShouldContain("blocked");
         await client.DisposeAsync();
     }
 

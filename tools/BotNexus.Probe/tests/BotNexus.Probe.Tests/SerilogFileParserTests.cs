@@ -1,5 +1,4 @@
 using BotNexus.Probe.LogIngestion;
-using FluentAssertions;
 
 namespace BotNexus.Probe.Tests;
 
@@ -17,14 +16,14 @@ public sealed class SerilogFileParserTests
 
         var entries = await CollectAsync(_parser.ParseFileAsync(filePath, new LogQuery()));
 
-        entries.Should().ContainSingle();
+        entries.ShouldHaveSingleItem();
         var entry = entries[0];
-        entry.Level.Should().Be("INF");
-        entry.Message.Should().Be("Started probe");
-        entry.SourceFile.Should().Be("app.log");
-        entry.LineNumber.Should().Be(1);
-        entry.Exception.Should().BeNull();
-        entry.Timestamp.Date.Should().Be(new DateTime(2025, 1, 15));
+        entry.Level.ShouldBe("INF");
+        entry.Message.ShouldBe("Started probe");
+        entry.SourceFile.ShouldBe("app.log");
+        entry.LineNumber.ShouldBe(1);
+        entry.Exception.ShouldBeNull();
+        entry.Timestamp.Date.ShouldBe(new DateTime(2025, 1, 15));
     }
 
     [Fact]
@@ -35,10 +34,10 @@ public sealed class SerilogFileParserTests
 
         var entries = await CollectAsync(_parser.ParseFileAsync(temp.File("props.log"), new LogQuery()));
 
-        entries.Should().ContainSingle();
-        entries[0].Properties.Should().Contain(new KeyValuePair<string, string>("Channel", "cli"));
-        entries[0].Properties.Should().Contain(new KeyValuePair<string, string>("UserId", "42"));
-        entries[0].Channel.Should().Be("cli");
+        entries.ShouldHaveSingleItem();
+        entries[0].Properties.ShouldContain(new KeyValuePair<string, string>("Channel", "cli"));
+        entries[0].Properties.ShouldContain(new KeyValuePair<string, string>("UserId", "42"));
+        entries[0].Channel.ShouldBe("cli");
     }
 
     [Fact]
@@ -53,8 +52,8 @@ System.InvalidOperationException: bad
 
         var entries = await CollectAsync(_parser.ParseFileAsync(temp.File("error.log"), new LogQuery()));
 
-        entries.Should().ContainSingle();
-        entries[0].Exception!.Replace("\r\n", "\n").Should().Be("System.InvalidOperationException: bad\n   at stack");
+        entries.ShouldHaveSingleItem();
+        entries[0].Exception!.Replace("\r\n", "\n").ShouldBe("System.InvalidOperationException: bad\n   at stack");
     }
 
     [Fact]
@@ -65,10 +64,10 @@ System.InvalidOperationException: bad
 
         var entries = await CollectAsync(_parser.ParseFileAsync(temp.File("ids.log"), new LogQuery()));
 
-        entries.Should().ContainSingle();
-        entries[0].CorrelationId.Should().Be("corr-1");
-        entries[0].SessionId.Should().Be("s-1");
-        entries[0].AgentId.Should().Be("a-1");
+        entries.ShouldHaveSingleItem();
+        entries[0].CorrelationId.ShouldBe("corr-1");
+        entries[0].SessionId.ShouldBe("s-1");
+        entries[0].AgentId.ShouldBe("a-1");
     }
 
     [Fact]
@@ -83,8 +82,8 @@ still invalid
 
         var entries = await CollectAsync(_parser.ParseFileAsync(temp.File("bad.log"), new LogQuery()));
 
-        entries.Should().ContainSingle();
-        entries[0].Message.Should().Be("valid line");
+        entries.ShouldHaveSingleItem();
+        entries[0].Message.ShouldBe("valid line");
     }
 
     [Fact]
@@ -95,7 +94,7 @@ still invalid
 
         var entries = await CollectAsync(_parser.ParseFileAsync(temp.File("empty.log"), new LogQuery()));
 
-        entries.Should().BeEmpty();
+        entries.ShouldBeEmpty();
     }
 
     [Fact]
@@ -109,8 +108,8 @@ still invalid
 
         var entries = await CollectAsync(_parser.ParseFileAsync(temp.File("levels.log"), new LogQuery(Level: "ERR")));
 
-        entries.Should().ContainSingle();
-        entries[0].Level.Should().Be("ERR");
+        entries.ShouldHaveSingleItem();
+        entries[0].Level.ShouldBe("ERR");
     }
 
     [Fact]
@@ -145,8 +144,8 @@ TimeoutException
 
         var entries = await CollectAsync(_parser.ParseFileAsync(temp.File("search.log"), new LogQuery(SearchText: "timeout")));
 
-        entries.Should().ContainSingle();
-        entries[0].Level.Should().Be("ERR");
+        entries.ShouldHaveSingleItem();
+        entries[0].Level.ShouldBe("ERR");
     }
 
     [Fact]
@@ -162,8 +161,8 @@ TimeoutException
             temp.File("filter-ids.log"),
             new LogQuery(CorrelationId: "c2", SessionId: "s2")));
 
-        entries.Should().ContainSingle();
-        entries[0].Message.Should().Be("B");
+        entries.ShouldHaveSingleItem();
+        entries[0].Message.ShouldBe("B");
     }
 
     [Fact]
@@ -175,8 +174,8 @@ TimeoutException
 
         var entries = await CollectAsync(_parser.ParseDirectoryAsync(temp.Path, new LogQuery()));
 
-        entries.Should().HaveCount(2);
-        entries.Select(e => e.SourceFile).Should().Contain(["a.log", "b.log"]);
+        entries.Count().ShouldBe(2);
+        entries.Select(e => e.SourceFile).ShouldContain(["a.log", "b.log"]);
     }
 
     [Fact]
@@ -187,8 +186,8 @@ TimeoutException
 
         var entries = await CollectAsync(_parser.ParseFileAsync(temp.File("nonewline.log"), new LogQuery()));
 
-        entries.Should().ContainSingle();
-        entries[0].Message.Should().Be("last-line");
+        entries.ShouldHaveSingleItem();
+        entries[0].Message.ShouldBe("last-line");
     }
 
     private static async Task<List<LogEntry>> CollectAsync(IAsyncEnumerable<LogEntry> source)

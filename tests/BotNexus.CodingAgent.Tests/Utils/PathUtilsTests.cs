@@ -1,5 +1,4 @@
 using BotNexus.Tools.Utils;
-using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests.Utils;
 
@@ -17,7 +16,7 @@ public sealed class PathUtilsTests : IDisposable
     {
         var resolved = PathUtils.ResolvePath(Path.Combine("src", "file.txt"), _workingDirectory);
 
-        resolved.Should().Be(Path.Combine(_workingDirectory, "src", "file.txt"));
+        resolved.ShouldBe(Path.Combine(_workingDirectory, "src", "file.txt"));
     }
 
     [Fact]
@@ -25,8 +24,8 @@ public sealed class PathUtilsTests : IDisposable
     {
         var action = () => PathUtils.ResolvePath("..\\outside.txt", _workingDirectory);
 
-        action.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Path traversal is not allowed*");
+        action.ShouldThrow<InvalidOperationException>()
+            .Message.ShouldContain("Path traversal is not allowed");
     }
 
     [Fact]
@@ -34,7 +33,7 @@ public sealed class PathUtilsTests : IDisposable
     {
         var sanitized = PathUtils.SanitizePath(Path.Combine("folder", "child", "..", "file.txt"));
 
-        sanitized.Should().Be(Path.Combine("folder", "file.txt"));
+        sanitized.ShouldBe(Path.Combine("folder", "file.txt"));
     }
 
     [Fact]
@@ -43,7 +42,7 @@ public sealed class PathUtilsTests : IDisposable
         var fullPath = Path.Combine(_workingDirectory, "nested", "target.txt");
         var relative = PathUtils.GetRelativePath(fullPath, _workingDirectory);
 
-        relative.Should().Be(Path.Combine("nested", "target.txt"));
+        relative.ShouldBe(Path.Combine("nested", "target.txt"));
     }
 
     [Fact]
@@ -68,7 +67,7 @@ public sealed class PathUtilsTests : IDisposable
 
             var action = () => PathUtils.ResolvePath(Path.Combine("escape-link", "secret.txt"), _workingDirectory);
 
-            action.Should().Throw<UnauthorizedAccessException>();
+            action.ShouldThrow<UnauthorizedAccessException>();
         }
         finally
         {
@@ -101,7 +100,7 @@ public sealed class PathUtilsTests : IDisposable
 
             var action = () => PathUtils.ResolvePath("escape-link-root", _workingDirectory);
 
-            action.Should().Throw<UnauthorizedAccessException>();
+            action.ShouldThrow<UnauthorizedAccessException>();
         }
         finally
         {
@@ -124,7 +123,7 @@ public sealed class PathUtilsTests : IDisposable
 
         var result = PathUtils.NormalizePath(input);
 
-        result.Should().Be(expected);
+        result.ShouldBe(expected);
     }
 
     [Fact]
@@ -135,7 +134,7 @@ public sealed class PathUtilsTests : IDisposable
 
         var result = PathUtils.NormalizePath(relativePath, _workingDirectory);
 
-        result.Should().Be(expected);
+        result.ShouldBe(expected);
     }
 
     [Fact]
@@ -143,8 +142,8 @@ public sealed class PathUtilsTests : IDisposable
     {
         var action = () => PathUtils.NormalizePath(Path.Combine("src", "file.txt"));
 
-        action.Should().Throw<ArgumentException>()
-            .WithMessage("*base directory*");
+        action.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("base directory");
     }
 
     [Theory]
@@ -155,8 +154,8 @@ public sealed class PathUtilsTests : IDisposable
     {
         var action = () => PathUtils.NormalizePath(path!);
 
-        action.Should().Throw<ArgumentException>()
-            .WithMessage("*Path cannot be empty*");
+        action.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Path cannot be empty");
     }
 
     [Fact]
@@ -173,7 +172,7 @@ public sealed class PathUtilsTests : IDisposable
             // NormalizePath should NOT throw for out-of-workspace paths (unlike ResolvePath).
             var result = PathUtils.NormalizePath(outsidePath);
 
-            result.Should().Be(outsidePath);
+            result.ShouldBe(outsidePath);
         }
         finally
         {
@@ -206,7 +205,7 @@ public sealed class PathUtilsTests : IDisposable
             var ignored = PathUtils.GetGitIgnoredPaths(outsidePaths, _workingDirectory);
 
             // Out-of-workspace paths are never reported as git-ignored by this workspace.
-            ignored.Should().BeEmpty();
+            ignored.ShouldBeEmpty();
         }
         finally
         {
@@ -233,7 +232,7 @@ public sealed class PathUtilsTests : IDisposable
             // Should not throw, and out-of-workspace paths must not appear in the ignored set.
             var ignored = PathUtils.GetGitIgnoredPaths(allPaths, _workingDirectory);
 
-            ignored.Should().NotContain(outsidePath,
+            ignored.ShouldNotContain(outsidePath,
                 "out-of-workspace paths should never appear in the ignored set");
         }
         finally
@@ -252,7 +251,7 @@ public sealed class PathUtilsTests : IDisposable
 
         var ignored = PathUtils.GetGitIgnoredPaths(paths, _workingDirectory);
 
-        ignored.Should().BeEmpty();
+        ignored.ShouldBeEmpty();
     }
 
     [Fact]
@@ -269,7 +268,7 @@ public sealed class PathUtilsTests : IDisposable
         // We only assert the call completes without throwing.
         var action = () => PathUtils.GetGitIgnoredPaths(workspacePaths, _workingDirectory);
 
-        action.Should().NotThrow();
+        action.ShouldNotThrow();
     }
 
     public void Dispose()

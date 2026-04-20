@@ -3,7 +3,6 @@ using System.Text;
 using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.OpenAICompat;
-using FluentAssertions;
 
 namespace BotNexus.Providers.OpenAICompat.Tests;
 
@@ -24,9 +23,9 @@ public class OpenAICompatProviderConstructorTests
         var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-        handler.RequestCount.Should().Be(1);
-        handler.LastRequestUri.Should().NotBeNull();
-        handler.LastRequestUri!.AbsoluteUri.Should().Be($"{model.BaseUrl}/chat/completions");
+        handler.RequestCount.ShouldBe(1);
+        handler.LastRequestUri.ShouldNotBeNull();
+        handler.LastRequestUri!.AbsoluteUri.ShouldBe($"{model.BaseUrl}/chat/completions");
     }
 
     [Fact]
@@ -34,8 +33,8 @@ public class OpenAICompatProviderConstructorTests
     {
         var act = () => _ = new OpenAICompatProvider(null!);
 
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("httpClient");
+        act.ShouldThrow<ArgumentNullException>()
+            .ParamName.ShouldBe("httpClient");
     }
 
     private static HttpResponseMessage SseResponse(string payload) =>

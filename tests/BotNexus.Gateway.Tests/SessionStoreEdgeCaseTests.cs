@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Api.Controllers;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Abstractions;
@@ -21,11 +20,11 @@ public sealed class SessionStoreEdgeCaseTests
         await store.SaveAsync(session);
 
         var encodedName = Uri.EscapeDataString(sessionId);
-        File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.jsonl")).Should().BeTrue();
-        File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.meta.json")).Should().BeTrue();
+        File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.jsonl")).ShouldBeTrue();
+        File.Exists(Path.Combine(fixture.StorePath, $"{encodedName}.meta.json")).ShouldBeTrue();
 
         var parentPath = Directory.GetParent(fixture.StorePath)!.FullName;
-        Directory.GetFiles(parentPath, "shadow*", SearchOption.TopDirectoryOnly).Should().BeEmpty();
+        Directory.GetFiles(parentPath, "shadow*", SearchOption.TopDirectoryOnly).ShouldBeEmpty();
     }
 
     [Fact]
@@ -35,10 +34,10 @@ public sealed class SessionStoreEdgeCaseTests
         var store = fixture.CreateStore();
 
         var nullAct = async () => await store.GetOrCreateAsync(null!, "agent-a");
-        await nullAct.Should().ThrowAsync<ArgumentException>();
+        await nullAct.ShouldThrowAsync<ArgumentException>();
 
         var emptyAct = async () => await store.GetOrCreateAsync(string.Empty, "agent-a");
-        await emptyAct.Should().ThrowAsync<ArgumentException>();
+        await emptyAct.ShouldThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -51,11 +50,11 @@ public sealed class SessionStoreEdgeCaseTests
             .Select(_ => store.GetOrCreateAsync("shared-session", "agent-a")));
 
         var first = sessions[0];
-        sessions.Should().OnlyContain(session => ReferenceEquals(session, first));
+        sessions.ShouldAllBe(session => ReferenceEquals(session, first));
 
         await store.SaveAsync(first);
         var allSessions = await fixture.CreateStore().ListAsync();
-        allSessions.Should().ContainSingle(session => session.SessionId == "shared-session");
+        allSessions.Where(session => session.SessionId == "shared-session").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -71,13 +70,13 @@ public sealed class SessionStoreEdgeCaseTests
         var result = await controller.GetHistory("large-history", offset: 1000, limit: 500, cancellationToken: CancellationToken.None);
 
         var response = (result.Result as OkObjectResult)?.Value as SessionHistoryResponse;
-        response.Should().NotBeNull();
-        response!.Offset.Should().Be(1000);
-        response.Limit.Should().Be(200);
-        response.TotalCount.Should().Be(1200);
-        response.Entries.Should().HaveCount(200);
-        response.Entries[0].Content.Should().Be("m-1000");
-        response.Entries[^1].Content.Should().Be("m-1199");
+        response.ShouldNotBeNull();
+        response!.Offset.ShouldBe(1000);
+        response.Limit.ShouldBe(200);
+        response.TotalCount.ShouldBe(1200);
+        response.Entries.Count().ShouldBe(200);
+        response.Entries[0].Content.ShouldBe("m-1000");
+        response.Entries[^1].Content.ShouldBe("m-1199");
     }
 
     private sealed class StoreFixture : IDisposable

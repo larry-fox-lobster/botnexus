@@ -1,5 +1,4 @@
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -14,9 +13,9 @@ public sealed class SessionReplayBufferTests
             buffer.AddStreamEvent(sequenceId, $$"""{"sequenceId":{{sequenceId}}}""", replayWindowSize: 0);
 
         var snapshot = buffer.GetStreamEventSnapshot();
-        snapshot.Should().HaveCount(SessionReplayBuffer.DefaultReplayWindowSize);
-        snapshot[0].SequenceId.Should().Be(6);
-        snapshot[^1].SequenceId.Should().Be(SessionReplayBuffer.DefaultReplayWindowSize + 5);
+        snapshot.Count().ShouldBe(SessionReplayBuffer.DefaultReplayWindowSize);
+        snapshot[0].SequenceId.ShouldBe(6);
+        snapshot[^1].SequenceId.ShouldBe(SessionReplayBuffer.DefaultReplayWindowSize + 5);
     }
 
     [Fact]
@@ -32,7 +31,7 @@ public sealed class SessionReplayBufferTests
 
         buffer.SetState(nextSequenceId: 0, replay);
 
-        buffer.NextSequenceId.Should().Be(1);
-        buffer.GetStreamEventSnapshot().Select(evt => evt.SequenceId).Should().ContainInOrder(1, 2, 3);
+        buffer.NextSequenceId.ShouldBe(1);
+        buffer.GetStreamEventSnapshot().Select(evt => evt.SequenceId).ToList().ShouldBe(new long[] { 1, 2, 3 });
     }
 }

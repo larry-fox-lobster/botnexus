@@ -1,7 +1,6 @@
 using BotNexus.Agent.Providers.Core.Registry;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Streaming;
-using FluentAssertions;
 using Moq;
 
 namespace BotNexus.Providers.Core.Tests.Registry;
@@ -35,8 +34,8 @@ public class ApiProviderRegistryTests : IDisposable
 
         var result = _registry.Get("test-api");
 
-        result.Should().NotBeNull();
-        result!.Api.Should().Be("test-api");
+        result.ShouldNotBeNull();
+        result!.Api.ShouldBe("test-api");
     }
 
     [Fact]
@@ -44,7 +43,7 @@ public class ApiProviderRegistryTests : IDisposable
     {
         var result = _registry.Get("nonexistent");
 
-        result.Should().BeNull();
+        result.ShouldBeNull();
     }
 
     [Fact]
@@ -55,7 +54,7 @@ public class ApiProviderRegistryTests : IDisposable
 
         _registry.Unregister("source-1");
 
-        _registry.Get("test-api").Should().BeNull();
+        _registry.Get("test-api").ShouldBeNull();
     }
 
     [Fact]
@@ -68,7 +67,7 @@ public class ApiProviderRegistryTests : IDisposable
 
         var all = _registry.GetAll();
 
-        all.Should().HaveCount(2);
+        all.Count().ShouldBe(2);
     }
 
     [Fact]
@@ -79,7 +78,7 @@ public class ApiProviderRegistryTests : IDisposable
 
         _registry.Clear();
 
-        _registry.GetAll().Should().BeEmpty();
+        _registry.GetAll().ShouldBeEmpty();
     }
 
     [Fact]
@@ -92,8 +91,8 @@ public class ApiProviderRegistryTests : IDisposable
 
         var result = _registry.Get("same-api");
 
-        result.Should().NotBeNull();
-        result!.Api.Should().Be("same-api");
+        result.ShouldNotBeNull();
+        result!.Api.ShouldBe("same-api");
     }
 
     [Fact]
@@ -106,14 +105,14 @@ public class ApiProviderRegistryTests : IDisposable
         _registry.Register(mock.Object);
 
         var provider = _registry.Get("anthropic-messages");
-        provider.Should().NotBeNull();
+        provider.ShouldNotBeNull();
         var model = MakeModel("openai-completions");
         var context = new Context(null, []);
 
         var act = () => provider!.Stream(model, context);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("Mismatched api: openai-completions expected anthropic-messages");
+        act.ShouldThrow<InvalidOperationException>()
+            .Message.ShouldBe("Mismatched api: openai-completions expected anthropic-messages");
     }
 
     [Fact]
@@ -126,14 +125,14 @@ public class ApiProviderRegistryTests : IDisposable
         _registry.Register(mock.Object);
 
         var provider = _registry.Get("openai-completions");
-        provider.Should().NotBeNull();
+        provider.ShouldNotBeNull();
         var model = MakeModel("anthropic-messages");
         var context = new Context(null, []);
 
         var act = () => provider!.StreamSimple(model, context);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("Mismatched api: anthropic-messages expected openai-completions");
+        act.ShouldThrow<InvalidOperationException>()
+            .Message.ShouldBe("Mismatched api: anthropic-messages expected openai-completions");
     }
 
     private static LlmModel MakeModel(string api) => new(

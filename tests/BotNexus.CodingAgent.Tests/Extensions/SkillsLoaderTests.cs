@@ -1,5 +1,4 @@
 using BotNexus.CodingAgent.Extensions;
-using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests.Extensions;
 
@@ -21,7 +20,7 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().NotContain(skill => skill.Contains("not a skill", StringComparison.Ordinal));
+        skills.ShouldNotContain(skill => skill.Contains("not a skill", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -40,7 +39,7 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().Contain(skill =>
+        skills.ShouldContain(skill =>
             skill.Contains("name: example", StringComparison.Ordinal) &&
             skill.Contains("description: Sample skill", StringComparison.Ordinal) &&
             skill.Contains("Skill body", StringComparison.Ordinal));
@@ -61,7 +60,7 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().NotContain(skill => skill.Contains("name: BadSkill", StringComparison.Ordinal));
+        skills.ShouldNotContain(skill => skill.Contains("name: BadSkill", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -79,7 +78,7 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().NotContain(skill => skill.Contains("name: different-name", StringComparison.Ordinal));
+        skills.ShouldNotContain(skill => skill.Contains("name: different-name", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -98,7 +97,7 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().NotContain(skill => skill.Contains($"name: {longName}", StringComparison.Ordinal));
+        skills.ShouldNotContain(skill => skill.Contains($"name: {longName}", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -117,7 +116,7 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().NotContain(skill => skill.Contains("name: long-description", StringComparison.Ordinal));
+        skills.ShouldNotContain(skill => skill.Contains("name: long-description", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -147,9 +146,9 @@ public sealed class SkillsLoaderTests : IDisposable
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, config);
 
         var duplicateSkills = skills.Where(skill => skill.Contains("name: duplicate-skill", StringComparison.Ordinal)).ToList();
-        duplicateSkills.Should().ContainSingle();
-        duplicateSkills[0].Should().Contain("description: First");
-        duplicateSkills[0].Should().Contain("First body");
+        duplicateSkills.ShouldHaveSingleItem();
+        duplicateSkills[0].ShouldContain("description: First");
+        duplicateSkills[0].ShouldContain("First body");
     }
 
     [Fact]
@@ -167,7 +166,7 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().NotContain(skill => skill.Contains("ignored-node-modules", StringComparison.Ordinal));
+        skills.ShouldNotContain(skill => skill.Contains("ignored-node-modules", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -185,7 +184,7 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().NotContain(skill => skill.Contains("ignored-bin", StringComparison.Ordinal));
+        skills.ShouldNotContain(skill => skill.Contains("ignored-bin", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -203,7 +202,7 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().Contain(skill => skill.Contains("name: normal-skill", StringComparison.Ordinal));
+        skills.ShouldContain(skill => skill.Contains("name: normal-skill", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -235,8 +234,8 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().Contain(skill => skill.Contains("visible-skill", StringComparison.Ordinal));
-        skills.Should().NotContain(skill => skill.Contains("ignored-by-gitignore", StringComparison.Ordinal));
+        skills.ShouldContain(skill => skill.Contains("visible-skill", StringComparison.Ordinal));
+        skills.ShouldNotContain(skill => skill.Contains("ignored-by-gitignore", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -264,8 +263,8 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().ContainSingle(skill => skill.Contains("name: allowed-skill", StringComparison.Ordinal));
-        skills.Should().NotContain(skill => skill.Contains("name: ignored-skill", StringComparison.Ordinal));
+        skills.Where(skill => skill.Contains("name: allowed-skill", StringComparison.Ordinal)).ShouldHaveSingleItem();
+        skills.ShouldNotContain(skill => skill.Contains("name: ignored-skill", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -300,8 +299,8 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().Contain(skill => skill.Contains("name: allowed", StringComparison.Ordinal));
-        skills.Should().NotContain(skill => skill.Contains("name: blocked", StringComparison.Ordinal));
+        skills.ShouldContain(skill => skill.Contains("name: allowed", StringComparison.Ordinal));
+        skills.ShouldNotContain(skill => skill.Contains("name: blocked", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -318,7 +317,7 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().NotContain(skill => skill.Contains("name: missing-description", StringComparison.Ordinal));
+        skills.ShouldNotContain(skill => skill.Contains("name: missing-description", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -336,7 +335,7 @@ public sealed class SkillsLoaderTests : IDisposable
 
         var skills = new SkillsLoader().LoadSkills(_tempDirectory, new CodingAgentConfig());
 
-        skills.Should().NotContain(skill => skill.Contains("name: bad--name", StringComparison.Ordinal));
+        skills.ShouldNotContain(skill => skill.Contains("name: bad--name", StringComparison.Ordinal));
     }
 
     public void Dispose()

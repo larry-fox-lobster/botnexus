@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Extensions.ProcessTool;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.ProcessTool.Tests;
 
@@ -28,7 +27,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
     {
         var result = await _tool.ExecuteAsync("call-1", Args("mystery"));
 
-        Text(result).Should().Contain("Unknown action");
+        Text(result).ShouldContain("Unknown action");
     }
 
     [Theory]
@@ -39,7 +38,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
     {
         var result = await _tool.ExecuteAsync("call-1", Args(action));
 
-        Text(result).Should().Contain("Unknown action");
+        Text(result).ShouldContain("Unknown action");
     }
 
     [Theory]
@@ -51,7 +50,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
     {
         var result = await _tool.ExecuteAsync("call-1", Args(action));
 
-        Text(result).Should().Contain("pid is required");
+        Text(result).ShouldContain("pid is required");
     }
 
     [Fact]
@@ -61,7 +60,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
 
         var result = await _tool.ExecuteAsync("call-1", Args("input", pid: managed.Pid));
 
-        Text(result).Should().Contain("content is required");
+        Text(result).ShouldContain("content is required");
     }
 
     [Theory]
@@ -72,7 +71,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
     {
         var result = await _tool.ExecuteAsync("call-1", Args(action, pid: 654321));
 
-        Text(result).Should().Contain("No tracked process");
+        Text(result).ShouldContain("No tracked process");
     }
 
     [Fact]
@@ -83,8 +82,8 @@ public sealed class ProcessToolAdditionalTests : IDisposable
         var firstKill = await _tool.ExecuteAsync("call-1", Args("kill", pid: managed.Pid));
         var secondKill = await _tool.ExecuteAsync("call-2", Args("kill", pid: managed.Pid));
 
-        Text(firstKill).Should().Contain("terminated");
-        Text(secondKill).Should().Contain("already exited");
+        Text(firstKill).ShouldContain("terminated");
+        Text(secondKill).ShouldContain("already exited");
     }
 
     [Fact]
@@ -95,7 +94,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
 
         var result = await _tool.ExecuteAsync("call-1", Args("status", pid: managed.Pid));
 
-        Text(result).Should().Contain("Exit Code: 3");
+        Text(result).ShouldContain("Exit Code: 3");
     }
 
     [Fact]
@@ -107,7 +106,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
         await WaitForOutputContainsAsync(managed.Pid, "err-line");
         var output = await _tool.ExecuteAsync("call-1", Args("output", pid: managed.Pid));
 
-        Text(output).Should().Contain("err-line");
+        Text(output).ShouldContain("err-line");
     }
 
     [Fact]
@@ -118,7 +117,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
 
         var result = await _tool.ExecuteAsync("call-1", Args("output", pid: managed.Pid));
 
-        Text(result).Should().Contain("No output captured");
+        Text(result).ShouldContain("No output captured");
     }
 
     [Fact]
@@ -128,7 +127,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
 
         var result = await _tool.ExecuteAsync("call-1", Args("status", pid: managed.Pid, timeout: 4_000));
 
-        Text(result).Should().Contain("Status: exited");
+        Text(result).ShouldContain("Status: exited");
     }
 
     [Theory]
@@ -142,7 +141,9 @@ public sealed class ProcessToolAdditionalTests : IDisposable
 
         var result = await _tool.ExecuteAsync("call-1", Args("output", pid: managed.Pid, tail: tail));
 
-        Text(result).Should().Contain("alpha").And.Contain("beta");
+        var text = Text(result);
+        text.ShouldContain("alpha");
+        text.ShouldContain("beta");
     }
 
     [Fact]
@@ -154,7 +155,9 @@ public sealed class ProcessToolAdditionalTests : IDisposable
 
         var result = await _tool.ExecuteAsync("call-1", Args("output", pid: managed.Pid, tail: 1000));
 
-        Text(result).Should().Contain("line1").And.Contain("line2");
+        var text = Text(result);
+        text.ShouldContain("line1");
+        text.ShouldContain("line2");
     }
 
     [Fact]
@@ -162,7 +165,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
     {
         var act = () => _tool.ExecuteAsync("call-1", null!);
 
-        await act.Should().ThrowAsync<NullReferenceException>();
+        await act.ShouldThrowAsync<NullReferenceException>();
     }
 
     [Fact]
@@ -173,7 +176,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
 
         var act = () => _tool.PrepareArgumentsAsync(new Dictionary<string, object?>(), cts.Token);
 
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -185,7 +188,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
         var args = new Dictionary<string, object?> { ["action"] = "status", ["pid"] = managed.Pid.ToString() };
         var result = await _tool.ExecuteAsync("call-1", args);
 
-        Text(result).Should().Contain($"PID: {managed.Pid}");
+        Text(result).ShouldContain($"PID: {managed.Pid}");
     }
 
     [Fact]
@@ -205,7 +208,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
 
         var results = await Task.WhenAll(tasks);
 
-        results.Should().OnlyContain(result => result.Content.Count > 0);
+        results.ShouldAllBe(result => result.Content.Count > 0);
     }
 
     [Fact]
@@ -227,7 +230,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
         var killTask = _tool.ExecuteAsync("kill", Args("kill", pid: managed.Pid));
 
         await Task.WhenAll(readTask, killTask);
-        managed.IsRunning.Should().BeFalse();
+        managed.IsRunning.ShouldBeFalse();
     }
 
     [Fact]
@@ -240,8 +243,8 @@ public sealed class ProcessToolAdditionalTests : IDisposable
         var statusResult = await secondTool.ExecuteAsync("call-1", Args("status", pid: managed.Pid));
         var outputResult = await _tool.ExecuteAsync("call-2", Args("output", pid: managed.Pid));
 
-        Text(statusResult).Should().Contain(managed.Pid.ToString());
-        Text(outputResult).Should().Contain("shared-process");
+        Text(statusResult).ShouldContain(managed.Pid.ToString());
+        Text(outputResult).ShouldContain("shared-process");
     }
 
     [Fact]
@@ -254,7 +257,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
         await WaitForOutputContainsAsync(managed.Pid, payload[..100]);
         var result = await _tool.ExecuteAsync("call-1", Args("output", pid: managed.Pid));
 
-        Text(result).Should().Contain(payload[..100]);
+        Text(result).ShouldContain(payload[..100]);
     }
 
     [Fact]
@@ -269,7 +272,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
         await WaitForOutputContainsAsync(managed.Pid, token);
         var result = await _tool.ExecuteAsync("call-1", Args("output", pid: managed.Pid));
 
-        Text(result).Should().Contain(token);
+        Text(result).ShouldContain(token);
     }
 
     [Fact]
@@ -283,8 +286,10 @@ public sealed class ProcessToolAdditionalTests : IDisposable
         await WaitForOutputContainsAsync(managed.Pid, "safe-text");
         var outputResult = await _tool.ExecuteAsync("call-2", Args("output", pid: managed.Pid));
 
-        Text(inputResult).Should().Contain("Sent");
-        Text(outputResult).Should().Contain("safe-text").And.Contain("quoted");
+        Text(inputResult).ShouldContain("Sent");
+        var outputText = Text(outputResult);
+        outputText.ShouldContain("safe-text");
+        outputText.ShouldContain("quoted");
     }
 
     [Theory]
@@ -298,7 +303,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
 
         var result = await _tool.ExecuteAsync("call-1", args);
 
-        Text(result).Should().Contain("pid is required");
+        Text(result).ShouldContain("pid is required");
     }
 
     private static IReadOnlyDictionary<string, object?> Args(string action, int? pid = null, string? content = null, int? tail = null, int? timeout = null)
@@ -357,7 +362,7 @@ public sealed class ProcessToolAdditionalTests : IDisposable
         }
 
         var finalResult = await _tool.ExecuteAsync("call", Args("output", pid: pid));
-        Text(finalResult).Should().Contain(expectedText);
+        Text(finalResult).ShouldContain(expectedText);
     }
 }
 
@@ -376,13 +381,13 @@ public sealed class ProcessManagerAndManagedProcessTests : IDisposable
     [Fact]
     public void Kill_NonExistentPid_ReturnsFalse()
     {
-        _manager.Kill(999999).Should().BeFalse();
+        _manager.Kill(999999).ShouldBeFalse();
     }
 
     [Fact]
     public void Remove_UnknownPid_ReturnsFalse()
     {
-        _manager.Remove(888888).Should().BeFalse();
+        _manager.Remove(888888).ShouldBeFalse();
     }
 
     [Fact]
@@ -390,7 +395,7 @@ public sealed class ProcessManagerAndManagedProcessTests : IDisposable
     {
         var act = () => _manager.Register(1, null!);
 
-        act.Should().Throw<ArgumentNullException>();
+        act.ShouldThrow<ArgumentNullException>();
     }
 
     [Fact]
@@ -402,8 +407,8 @@ public sealed class ProcessManagerAndManagedProcessTests : IDisposable
 
         var items = _manager.List();
 
-        items.Should().ContainSingle(item => item.Pid == running.Pid && item.IsRunning);
-        items.Should().ContainSingle(item => item.Pid == exited.Pid && item.ExitCode.HasValue);
+        items.Where(item => item.Pid == running.Pid && item.IsRunning).ShouldHaveSingleItem();
+        items.Where(item => item.Pid == exited.Pid && item.ExitCode.HasValue).ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -413,7 +418,7 @@ public sealed class ProcessManagerAndManagedProcessTests : IDisposable
 
         _manager.Clear();
 
-        running.IsRunning.Should().BeFalse();
+        running.IsRunning.ShouldBeFalse();
     }
 
     [Fact]
@@ -424,7 +429,7 @@ public sealed class ProcessManagerAndManagedProcessTests : IDisposable
 
         var act = () => process.WriteInput("hello");
 
-        act.Should().Throw<InvalidOperationException>();
+        act.ShouldThrow<InvalidOperationException>();
     }
 
     [Fact]
@@ -435,7 +440,7 @@ public sealed class ProcessManagerAndManagedProcessTests : IDisposable
 
         var act = () => process.WriteInput("hello");
 
-        act.Should().Throw<ObjectDisposedException>();
+        act.ShouldThrow<ObjectDisposedException>();
     }
 
     [Fact]
@@ -446,7 +451,7 @@ public sealed class ProcessManagerAndManagedProcessTests : IDisposable
 
         var act = () => process.Kill();
 
-        act.Should().NotThrow();
+        act.ShouldNotThrow();
     }
 
     [Fact]
@@ -458,8 +463,8 @@ public sealed class ProcessManagerAndManagedProcessTests : IDisposable
 
         var output = process.GetOutput(2);
 
-        output.Should().Contain("three");
-        output.Should().NotContain("one");
+        output.ShouldContain("three");
+        output.ShouldNotContain("one");
     }
 
     [Fact]
@@ -471,7 +476,7 @@ public sealed class ProcessManagerAndManagedProcessTests : IDisposable
         process.Dispose();
 
         Action act = () => Process.GetProcessById(pid);
-        act.Should().Throw<ArgumentException>();
+        act.ShouldThrow<ArgumentException>();
     }
 
     [Fact]
@@ -482,7 +487,7 @@ public sealed class ProcessManagerAndManagedProcessTests : IDisposable
         process.Kill();
         Action second = () => process.Kill();
 
-        second.Should().NotThrow();
+        second.ShouldNotThrow();
     }
 
     [Fact]
@@ -493,7 +498,8 @@ public sealed class ProcessManagerAndManagedProcessTests : IDisposable
         SpinWaitFor(() => process.GetOutput().Contains("err-line", StringComparison.Ordinal));
 
         var output = process.GetOutput();
-        output.Should().Contain("out-line").And.Contain("err-line");
+        output.ShouldContain("out-line");
+        output.ShouldContain("err-line");
     }
 
     private ManagedProcess SpawnManagedProcess(string windowsCommand, string unixCommand, bool redirectInput = false)

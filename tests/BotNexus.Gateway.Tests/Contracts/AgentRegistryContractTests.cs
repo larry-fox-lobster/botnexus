@@ -1,7 +1,6 @@
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Contracts;
 
@@ -20,10 +19,10 @@ public sealed class AgentRegistryContractTests
             ApiProvider = "test-provider"
         };
 
-        var action = () => registry.Update(AgentId.From("agent-a"), descriptor);
+        Action action = () => registry.Update(AgentId.From("agent-a"), descriptor);
 
-        action.Should().Throw<NotSupportedException>()
-            .WithMessage("*does not support descriptor updates*");
+        action.ShouldThrow<NotSupportedException>()
+            .Message.ShouldContain("does not support descriptor updates");
     }
 
     private sealed class MinimalRegistry : IAgentRegistry

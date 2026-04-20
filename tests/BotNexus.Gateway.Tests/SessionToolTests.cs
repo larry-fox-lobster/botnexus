@@ -3,7 +3,6 @@ using BotNexus.Agent.Core.Types;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Tools;
-using FluentAssertions;
 using Moq;
 
 namespace BotNexus.Gateway.Tests;
@@ -21,8 +20,8 @@ public sealed class SessionToolTests
         var result = await tool.ExecuteAsync("call-1", Args("list"));
         var text = ReadText(result);
 
-        text.Should().Contain("s1");
-        text.Should().Contain("s2");
+        text.ShouldContain("s1");
+        text.ShouldContain("s2");
         store.Verify(s => s.ListAsync("agent-a", It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -32,9 +31,9 @@ public sealed class SessionToolTests
         var store = new Mock<ISessionStore>();
         var tool = new SessionTool(store.Object, "agent-a");
 
-        var act = () => tool.ExecuteAsync("call-1", Args("list", agentId: "agent-b"));
+        Func<Task> act = () => tool.ExecuteAsync("call-1", Args("list", agentId: "agent-b"));
 
-        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        await act.ShouldThrowAsync<UnauthorizedAccessException>();
     }
 
     [Fact]
@@ -48,7 +47,7 @@ public sealed class SessionToolTests
         var result = await tool.ExecuteAsync("call-1", Args("list", agentId: "agent-b"));
         var text = ReadText(result);
 
-        text.Should().Contain("s1");
+        text.ShouldContain("s1");
     }
 
     [Fact]
@@ -57,9 +56,9 @@ public sealed class SessionToolTests
         var store = new Mock<ISessionStore>();
         var tool = new SessionTool(store.Object, "agent-a", SessionAccessLevel.Allowlist, ["agent-b"]);
 
-        var act = () => tool.ExecuteAsync("call-1", Args("list", agentId: "agent-c"));
+        Func<Task> act = () => tool.ExecuteAsync("call-1", Args("list", agentId: "agent-c"));
 
-        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        await act.ShouldThrowAsync<UnauthorizedAccessException>();
     }
 
     [Fact]
@@ -73,7 +72,7 @@ public sealed class SessionToolTests
         var result = await tool.ExecuteAsync("call-1", Args("list", agentId: "agent-x"));
         var text = ReadText(result);
 
-        text.Should().Contain("s1");
+        text.ShouldContain("s1");
     }
 
     [Fact]
@@ -87,8 +86,8 @@ public sealed class SessionToolTests
         var result = await tool.ExecuteAsync("call-1", Args("get", sessionId: "s1"));
         var text = ReadText(result);
 
-        text.Should().Contain("s1");
-        text.Should().Contain("agent-a");
+        text.ShouldContain("s1");
+        text.ShouldContain("agent-a");
     }
 
     [Fact]
@@ -98,9 +97,9 @@ public sealed class SessionToolTests
         store.Setup(s => s.GetAsync("missing", It.IsAny<CancellationToken>())).ReturnsAsync((GatewaySession?)null);
         var tool = new SessionTool(store.Object, "agent-a");
 
-        var act = () => tool.ExecuteAsync("call-1", Args("get", sessionId: "missing"));
+        Func<Task> act = () => tool.ExecuteAsync("call-1", Args("get", sessionId: "missing"));
 
-        await act.Should().ThrowAsync<KeyNotFoundException>();
+        await act.ShouldThrowAsync<KeyNotFoundException>();
     }
 
     [Fact]
@@ -111,9 +110,9 @@ public sealed class SessionToolTests
             .ReturnsAsync(CreateSession("s1", "agent-b"));
         var tool = new SessionTool(store.Object, "agent-a");
 
-        var act = () => tool.ExecuteAsync("call-1", Args("get", sessionId: "s1"));
+        Func<Task> act = () => tool.ExecuteAsync("call-1", Args("get", sessionId: "s1"));
 
-        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        await act.ShouldThrowAsync<UnauthorizedAccessException>();
     }
 
     [Fact]
@@ -129,9 +128,9 @@ public sealed class SessionToolTests
         var result = await tool.ExecuteAsync("call-1", Args("history", sessionId: "s1"));
         var text = ReadText(result);
 
-        text.Should().Contain("Hello");
-        text.Should().Contain("Hi there!");
-        text.Should().Contain("\"totalCount\":2");
+        text.ShouldContain("Hello");
+        text.ShouldContain("Hi there!");
+        text.ShouldContain("\"totalCount\":2");
     }
 
     [Fact]
@@ -148,8 +147,8 @@ public sealed class SessionToolTests
         var result = await tool.ExecuteAsync("call-1", Args("search", query: "Seattle"));
         var text = ReadText(result);
 
-        text.Should().Contain("Seattle");
-        text.Should().Contain("s1");
+        text.ShouldContain("Seattle");
+        text.ShouldContain("s1");
     }
 
     [Fact]
@@ -165,7 +164,7 @@ public sealed class SessionToolTests
         var result = await tool.ExecuteAsync("call-1", Args("search", query: "nonexistent"));
         var text = ReadText(result);
 
-        text.Should().Be("[]");
+        text.ShouldBe("[]");
     }
 
     private static GatewaySession CreateSession(string sessionId, string agentId)

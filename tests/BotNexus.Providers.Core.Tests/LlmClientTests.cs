@@ -2,7 +2,6 @@ using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
 using BotNexus.Agent.Providers.Core.Streaming;
-using FluentAssertions;
 using Moq;
 
 namespace BotNexus.Providers.Core.Tests;
@@ -55,7 +54,7 @@ public class LlmClientTests : IDisposable
 
         var result = _llmClient.Stream(model, context);
 
-        result.Should().BeSameAs(expectedStream);
+        result.ShouldBeSameAs(expectedStream);
     }
 
     [Fact]
@@ -66,8 +65,8 @@ public class LlmClientTests : IDisposable
 
         var act = () => _llmClient.Stream(model, context);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*unregistered-api*");
+        act.ShouldThrow<InvalidOperationException>()
+            .Message.ShouldContain("unregistered-api");
     }
 
     [Fact]
@@ -98,7 +97,7 @@ public class LlmClientTests : IDisposable
 
         var result = await _llmClient.CompleteAsync(model, context);
 
-        result.StopReason.Should().Be(StopReason.Stop);
-        result.Content.Should().ContainSingle();
+        result.StopReason.ShouldBe(StopReason.Stop);
+        result.Content.ShouldHaveSingleItem();
     }
 }

@@ -5,7 +5,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -22,11 +21,11 @@ public sealed class DefaultSubAgentManagerActivityTests
 
         await WaitUntilAsync(() => activity.Activities.Any(HasLifecycleEvent("subagent_spawned")), TimeSpan.FromSeconds(2));
 
-        activity.Activities.Should().Contain(activity =>
+        activity.Activities.ShouldContain(activity =>
             activity.Type == GatewayActivityType.SubAgentSpawned &&
             activity.SessionId == "parent-session" &&
             HasLifecycleEvent("subagent_spawned")(activity));
-        (await manager.GetAsync(spawned.SubAgentId))!.Status.Should().Be(SubAgentStatus.Running);
+        (await manager.GetAsync(spawned.SubAgentId))!.Status.ShouldBe(SubAgentStatus.Running);
     }
 
     [Fact]
@@ -39,7 +38,7 @@ public sealed class DefaultSubAgentManagerActivityTests
             async () => (await manager.GetAsync(spawned.SubAgentId))?.Status == SubAgentStatus.Completed,
             TimeSpan.FromSeconds(2));
 
-        activity.Activities.Any(HasLifecycleEvent("subagent_completed")).Should().BeTrue();
+        activity.Activities.Any(HasLifecycleEvent("subagent_completed")).ShouldBeTrue();
     }
 
     [Fact]
@@ -52,7 +51,7 @@ public sealed class DefaultSubAgentManagerActivityTests
             async () => (await manager.GetAsync(spawned.SubAgentId))?.Status == SubAgentStatus.Failed,
             TimeSpan.FromSeconds(2));
 
-        activity.Activities.Any(HasLifecycleEvent("subagent_failed")).Should().BeTrue();
+        activity.Activities.Any(HasLifecycleEvent("subagent_failed")).ShouldBeTrue();
     }
 
     [Fact]
@@ -63,9 +62,9 @@ public sealed class DefaultSubAgentManagerActivityTests
 
         var killed = await manager.KillAsync(spawned.SubAgentId, "parent-session");
 
-        killed.Should().BeTrue();
+        killed.ShouldBeTrue();
         await WaitUntilAsync(() => activity.Activities.Any(HasLifecycleEvent("subagent_killed")), TimeSpan.FromSeconds(2));
-        activity.Activities.Any(HasLifecycleEvent("subagent_killed")).Should().BeTrue();
+        activity.Activities.Any(HasLifecycleEvent("subagent_killed")).ShouldBeTrue();
     }
 
     private static DefaultSubAgentManager CreateManager(

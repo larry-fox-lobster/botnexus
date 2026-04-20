@@ -1,5 +1,4 @@
 using BotNexus.Probe.Otel;
-using FluentAssertions;
 
 namespace BotNexus.Probe.Tests;
 
@@ -13,7 +12,7 @@ public sealed class TraceStoreTests
 
         store.AddSpans([span]);
 
-        store.GetTraces(10).Should().ContainSingle().Which.Should().Be(span);
+        store.GetTraces(10).ShouldHaveSingleItem().ShouldBe(span);
     }
 
     [Fact]
@@ -27,9 +26,9 @@ public sealed class TraceStoreTests
         store.AddSpans([first, second, third]);
 
         var traces = store.GetTraces(10);
-        traces.Should().HaveCount(2);
-        traces.Should().NotContain(first);
-        traces.Should().Contain([second, third]);
+        traces.Count().ShouldBe(2);
+        traces.ShouldNotContain(first);
+        traces.ShouldContain([second, third]);
     }
 
     [Fact]
@@ -71,8 +70,8 @@ public sealed class TraceStoreTests
 
         var matches = store.SearchByAttribute("http.route", "traces");
 
-        matches.Should().ContainSingle();
-        matches[0].SpanId.Should().Be("s2");
+        matches.ShouldHaveSingleItem();
+        matches[0].SpanId.ShouldBe("s2");
     }
 
     [Fact]
@@ -86,8 +85,8 @@ public sealed class TraceStoreTests
         });
 
         var spans = store.GetTraces(10_000);
-        spans.Should().HaveCount(500);
-        store.SearchBySession("sess-1").Should().HaveCount(500);
+        spans.Count().ShouldBe(500);
+        store.SearchBySession("sess-1").Count().ShouldBe(500);
     }
 
     [Fact]
@@ -95,10 +94,10 @@ public sealed class TraceStoreTests
     {
         var store = new TraceStore();
 
-        store.GetTraces(100).Should().BeEmpty();
-        store.GetTraceById("missing").Should().BeEmpty();
-        store.SearchByAttribute("k", "v").Should().BeEmpty();
-        store.SearchBySession("s").Should().BeEmpty();
+        store.GetTraces(100).ShouldBeEmpty();
+        store.GetTraceById("missing").ShouldBeEmpty();
+        store.SearchByAttribute("k", "v").ShouldBeEmpty();
+        store.SearchBySession("s").ShouldBeEmpty();
     }
 
     private static SpanModel CreateSpan(

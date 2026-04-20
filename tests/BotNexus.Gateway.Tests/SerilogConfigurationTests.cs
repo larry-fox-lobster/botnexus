@@ -1,4 +1,3 @@
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -12,10 +11,10 @@ public sealed class SerilogConfigurationTests
             "..", "..", "..", "..", "..",
             "src", "gateway", "BotNexus.Gateway.Api", "Program.cs"));
 
-        File.Exists(programPath).Should().BeTrue();
+        File.Exists(programPath).ShouldBeTrue();
 
         var programSource = File.ReadAllText(programPath);
-        programSource.Should().Contain("builder.Host.UseSerilog(");
-        programSource.Should().Contain("app.UseSerilogRequestLogging();");
+        programSource.ShouldContain("builder.Host.UseSerilog(");
+        programSource.ShouldContain("app.UseSerilogRequestLogging();");
     }
 }

@@ -1,5 +1,4 @@
 using BotNexus.Gateway.Prompts;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Prompts.Tests;
 
@@ -18,7 +17,7 @@ public sealed class PromptPrimitivesTests
 
         var ordered = ContextFileOrdering.SortForPrompt(files);
 
-        ordered.Select(f => f.Path).Should().Equal("AGENTS.md", "SOUL.md", "identity.md", "docs/README.md");
+        ordered.Select(f => f.Path).ShouldBe(new[] { "AGENTS.md", "SOUL.md", "identity.md", "docs/README.md" });
     }
 
     [Fact]
@@ -26,9 +25,9 @@ public sealed class PromptPrimitivesTests
     {
         var registry = new ToolNameRegistry(["Read", "exec"]);
 
-        registry.Resolve("read").Should().Be("Read");
-        registry.Resolve("process").Should().Be("process");
-        registry.Contains("EXEC").Should().BeTrue();
+        registry.Resolve("read").ShouldBe("Read");
+        registry.Resolve("process").ShouldBe("process");
+        registry.Contains("EXEC").ShouldBeTrue();
     }
 
     [Fact]
@@ -42,9 +41,9 @@ public sealed class PromptPrimitivesTests
             Body line
             """);
 
-        parsed.Name.Should().Be("skill-a");
-        parsed.Description.Should().Be("desc");
-        parsed.Content.Should().Be("Body line");
+        parsed.Name.ShouldBe("skill-a");
+        parsed.Description.ShouldBe("desc");
+        parsed.Content.ShouldBe("Body line");
     }
 
     [Fact]
@@ -62,7 +61,7 @@ public sealed class PromptPrimitivesTests
             Capabilities = ["InlineButtons", "Reactions"]
         });
 
-        line.Should().Be("Runtime: agent=a | host=h | os=Windows (x64) | provider=openai | model=gpt | channel=signalr | capabilities=inlinebuttons,reactions");
+        line.ShouldBe("Runtime: agent=a | host=h | os=Windows (x64) | provider=openai | model=gpt | channel=signalr | capabilities=inlinebuttons,reactions");
     }
 
     [Fact]
@@ -75,7 +74,7 @@ public sealed class PromptPrimitivesTests
 
         var result = pipeline.Build(new PromptContext { WorkspaceDir = "C:/repo" });
 
-        result.Should().Be("first\n## Extra\nmiddle\nsecond");
+        result.ShouldBe("first\n## Extra\nmiddle\nsecond");
     }
 
     private sealed class TestSection(int order, IReadOnlyList<string> lines) : IPromptSection

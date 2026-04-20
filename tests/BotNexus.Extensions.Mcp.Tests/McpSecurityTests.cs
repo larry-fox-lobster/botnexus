@@ -5,7 +5,6 @@ using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Hooks;
 using BotNexus.Gateway.Security;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -29,14 +28,14 @@ public sealed class McpSecurityTests
         var provider = CreateProvider();
         provider.RegisterMcpServerId("github");
 
-        provider.GetRiskLevel("github_search_repositories").Should().Be(ToolRiskLevel.Moderate);
+        provider.GetRiskLevel("github_search_repositories").ShouldBe(ToolRiskLevel.Moderate);
     }
 
     [Fact]
     public void McpTool_ReturnsSafe_WhenServerNotRegistered()
     {
         var provider = CreateProvider();
-        provider.GetRiskLevel("github_search_repositories").Should().Be(ToolRiskLevel.Safe);
+        provider.GetRiskLevel("github_search_repositories").ShouldBe(ToolRiskLevel.Safe);
     }
 
     [Theory]
@@ -49,15 +48,15 @@ public sealed class McpSecurityTests
         provider.RegisterMcpServerId("github");
         provider.RegisterMcpServerId("filesystem");
 
-        provider.GetRiskLevel(toolName).Should().Be(ToolRiskLevel.Moderate);
+        provider.GetRiskLevel(toolName).ShouldBe(ToolRiskLevel.Moderate);
     }
 
     [Fact]
     public void McpTool_BuiltInDangerous_StillDangerous()
     {
         var provider = CreateProvider();
-        provider.GetRiskLevel("exec").Should().Be(ToolRiskLevel.Dangerous);
-        provider.GetRiskLevel("bash").Should().Be(ToolRiskLevel.Dangerous);
+        provider.GetRiskLevel("exec").ShouldBe(ToolRiskLevel.Dangerous);
+        provider.GetRiskLevel("bash").ShouldBe(ToolRiskLevel.Dangerous);
     }
 
     // -- MCP wildcard server deny --
@@ -82,9 +81,9 @@ public sealed class McpSecurityTests
         var provider = CreateProvider(config);
         provider.RegisterMcpServerId("github");
 
-        provider.IsDenied("github_search_repositories", "agent-1").Should().BeTrue();
-        provider.IsDenied("github_create_issue", "agent-1").Should().BeTrue();
-        provider.IsDenied("filesystem_read_file", "agent-1").Should().BeFalse();
+        provider.IsDenied("github_search_repositories", "agent-1").ShouldBeTrue();
+        provider.IsDenied("github_create_issue", "agent-1").ShouldBeTrue();
+        provider.IsDenied("filesystem_read_file", "agent-1").ShouldBeFalse();
     }
 
     [Fact]
@@ -106,8 +105,8 @@ public sealed class McpSecurityTests
 
         var provider = CreateProvider(config);
 
-        provider.IsDenied("github_delete_repo", "agent-1").Should().BeTrue();
-        provider.IsDenied("github_list_repos", "agent-1").Should().BeFalse();
+        provider.IsDenied("github_delete_repo", "agent-1").ShouldBeTrue();
+        provider.IsDenied("github_list_repos", "agent-1").ShouldBeFalse();
     }
 
     // -- Hook handler: denied MCP tool --
@@ -142,9 +141,9 @@ public sealed class McpSecurityTests
 
         var result = await handler.HandleAsync(evt);
 
-        result.Should().NotBeNull();
-        result!.Denied.Should().BeTrue();
-        result.DenyReason.Should().Contain("github_search_repositories");
+        result.ShouldNotBeNull();
+        result!.Denied.ShouldBeTrue();
+        result.DenyReason.ShouldContain("github_search_repositories");
     }
 
     // -- IsMcpTool detection --
@@ -161,7 +160,7 @@ public sealed class McpSecurityTests
         provider.RegisterMcpServerId("github");
         provider.RegisterMcpServerId("filesystem");
 
-        provider.IsMcpTool(toolName).Should().Be(expected);
+        provider.IsMcpTool(toolName).ShouldBe(expected);
     }
 
     // -- Env var substitution --
@@ -173,7 +172,7 @@ public sealed class McpSecurityTests
         try
         {
             var result = StdioMcpTransport.ResolveEnvValue("${env:MCP_SEC_TEST}");
-            result.Should().Be("my-secret-123");
+            result.ShouldBe("my-secret-123");
         }
         finally
         {
@@ -184,7 +183,7 @@ public sealed class McpSecurityTests
     [Fact]
     public void ResolveEnvValue_PlainValues_NotSubstituted()
     {
-        StdioMcpTransport.ResolveEnvValue("plain-value").Should().Be("plain-value");
+        StdioMcpTransport.ResolveEnvValue("plain-value").ShouldBe("plain-value");
     }
 
     [Fact]
@@ -192,7 +191,7 @@ public sealed class McpSecurityTests
     {
         Environment.SetEnvironmentVariable("MCP_DEFINITELY_MISSING", null);
         StdioMcpTransport.ResolveEnvValue("${env:MCP_DEFINITELY_MISSING:-fallback}")
-            .Should().Be("fallback");
+            .ShouldBe("fallback");
     }
 
     // -- Sensitive env var masking --
@@ -211,21 +210,21 @@ public sealed class McpSecurityTests
     [InlineData("LOG_LEVEL", false)]
     public void IsSensitiveEnvKey_ClassifiesCorrectly(string key, bool expected)
     {
-        StdioMcpTransport.IsSensitiveEnvKey(key).Should().Be(expected);
+        StdioMcpTransport.IsSensitiveEnvKey(key).ShouldBe(expected);
     }
 
     [Fact]
     public void MaskValue_MasksSensitiveValues()
     {
-        StdioMcpTransport.MaskValue("GITHUB_TOKEN", "ghp_abc123").Should().Be("***");
-        StdioMcpTransport.MaskValue("API_KEY", "sk-12345").Should().Be("***");
+        StdioMcpTransport.MaskValue("GITHUB_TOKEN", "ghp_abc123").ShouldBe("***");
+        StdioMcpTransport.MaskValue("API_KEY", "sk-12345").ShouldBe("***");
     }
 
     [Fact]
     public void MaskValue_DoesNotMaskNonSensitiveValues()
     {
-        StdioMcpTransport.MaskValue("NODE_ENV", "production").Should().Be("production");
-        StdioMcpTransport.MaskValue("LOG_LEVEL", "debug").Should().Be("debug");
+        StdioMcpTransport.MaskValue("NODE_ENV", "production").ShouldBe("production");
+        StdioMcpTransport.MaskValue("LOG_LEVEL", "debug").ShouldBe("debug");
     }
 
     // -- InheritEnv config default --
@@ -234,7 +233,7 @@ public sealed class McpSecurityTests
     public void McpServerConfig_InheritEnv_DefaultsToTrue()
     {
         var config = new McpServerConfig();
-        config.InheritEnv.Should().BeTrue();
+        config.InheritEnv.ShouldBeTrue();
     }
 
     [Fact]
@@ -254,7 +253,7 @@ public sealed class McpSecurityTests
         """;
 
         var config = System.Text.Json.JsonSerializer.Deserialize<McpExtensionConfig>(json);
-        config!.Servers["github"].InheritEnv.Should().BeFalse();
+        config!.Servers["github"].InheritEnv.ShouldBeFalse();
     }
 
     // -- MCP server registration --
@@ -267,10 +266,10 @@ public sealed class McpSecurityTests
         provider.RegisterMcpServerId("filesystem");
         provider.RegisterMcpServerId("database");
 
-        provider.McpServerIds.Should().HaveCount(3);
-        provider.McpServerIds.Should().Contain("github");
-        provider.McpServerIds.Should().Contain("filesystem");
-        provider.McpServerIds.Should().Contain("database");
+        provider.McpServerIds.Count().ShouldBe(3);
+        provider.McpServerIds.ShouldContain("github");
+        provider.McpServerIds.ShouldContain("filesystem");
+        provider.McpServerIds.ShouldContain("database");
     }
 
     [Fact]
@@ -280,7 +279,7 @@ public sealed class McpSecurityTests
         provider.RegisterMcpServerId("github");
         provider.RegisterMcpServerId("github");
 
-        provider.McpServerIds.Should().HaveCount(1);
+        provider.McpServerIds.Count().ShouldBe(1);
     }
 
     private sealed class StaticOptionsMonitor<TOptions>(TOptions currentValue) : IOptionsMonitor<TOptions>

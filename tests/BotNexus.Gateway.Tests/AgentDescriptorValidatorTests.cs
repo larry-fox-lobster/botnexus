@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -13,7 +12,7 @@ public sealed class AgentDescriptorValidatorTests
 
         var errors = AgentDescriptorValidator.Validate(descriptor);
 
-        errors.Should().BeEmpty();
+        errors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -23,7 +22,7 @@ public sealed class AgentDescriptorValidatorTests
 
         var errors = AgentDescriptorValidator.Validate(descriptor);
 
-        errors.Should().Contain("AgentId is required.");
+        errors.ShouldContain("AgentId is required.");
     }
 
     [Fact]
@@ -33,7 +32,7 @@ public sealed class AgentDescriptorValidatorTests
 
         var errors = AgentDescriptorValidator.Validate(descriptor);
 
-        errors.Should().Contain("DisplayName is required.");
+        errors.ShouldContain("DisplayName is required.");
     }
 
     [Fact]
@@ -43,7 +42,7 @@ public sealed class AgentDescriptorValidatorTests
 
         var errors = AgentDescriptorValidator.Validate(descriptor);
 
-        errors.Should().Contain("ModelId is required.");
+        errors.ShouldContain("ModelId is required.");
     }
 
     [Fact]
@@ -53,7 +52,7 @@ public sealed class AgentDescriptorValidatorTests
 
         var errors = AgentDescriptorValidator.Validate(descriptor);
 
-        errors.Should().Contain("ApiProvider is required.");
+        errors.ShouldContain("ApiProvider is required.");
     }
 
     [Fact]
@@ -67,7 +66,7 @@ public sealed class AgentDescriptorValidatorTests
 
         var errors = AgentDescriptorValidator.Validate(descriptor);
 
-        errors.Should().NotContain(error => error.Contains("SystemPrompt", StringComparison.Ordinal));
+        errors.ShouldNotContain(error => error.Contains("SystemPrompt", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -81,7 +80,7 @@ public sealed class AgentDescriptorValidatorTests
 
         var errors = AgentDescriptorValidator.Validate(descriptor);
 
-        errors.Should().NotContain(error => error.Contains("SystemPrompt", StringComparison.Ordinal));
+        errors.ShouldNotContain(error => error.Contains("SystemPrompt", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -91,7 +90,7 @@ public sealed class AgentDescriptorValidatorTests
 
         var errors = AgentDescriptorValidator.Validate(descriptor);
 
-        errors.Should().Contain("MaxConcurrentSessions must be >= 0.");
+        errors.ShouldContain("MaxConcurrentSessions must be >= 0.");
     }
 
     [Fact]
@@ -101,7 +100,7 @@ public sealed class AgentDescriptorValidatorTests
 
         var errors = AgentDescriptorValidator.Validate(descriptor);
 
-        errors.Should().BeEmpty();
+        errors.ShouldBeEmpty();
     }
 
     private static AgentDescriptor CreateValidDescriptor()

@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Extensions.Mcp.Protocol;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Mcp.Tests;
 
@@ -25,10 +24,10 @@ public class McpTypesTests
 
         var tool = JsonSerializer.Deserialize<McpToolDefinition>(json);
 
-        tool.Should().NotBeNull();
-        tool!.Name.Should().Be("search_repositories");
-        tool.Description.Should().Be("Search GitHub repositories");
-        tool.InputSchema.GetProperty("type").GetString().Should().Be("object");
+        tool.ShouldNotBeNull();
+        tool!.Name.ShouldBe("search_repositories");
+        tool.Description.ShouldBe("Search GitHub repositories");
+        tool.InputSchema.GetProperty("type").GetString().ShouldBe("object");
     }
 
     [Fact]
@@ -45,11 +44,11 @@ public class McpTypesTests
 
         var result = JsonSerializer.Deserialize<McpToolCallResult>(json);
 
-        result.Should().NotBeNull();
-        result!.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be("text");
-        result.Content[0].Text.Should().Be("Hello, world!");
-        result.IsError.Should().BeFalse();
+        result.ShouldNotBeNull();
+        result!.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe("text");
+        result.Content[0].Text.ShouldBe("Hello, world!");
+        result.IsError.ShouldBeFalse();
     }
 
     [Fact]
@@ -66,8 +65,8 @@ public class McpTypesTests
 
         var result = JsonSerializer.Deserialize<McpToolCallResult>(json);
 
-        result.Should().NotBeNull();
-        result!.IsError.Should().BeTrue();
+        result.ShouldNotBeNull();
+        result!.IsError.ShouldBeTrue();
     }
 
     [Fact]
@@ -88,12 +87,12 @@ public class McpTypesTests
 
         var result = JsonSerializer.Deserialize<McpInitializeResult>(json);
 
-        result.Should().NotBeNull();
-        result!.ProtocolVersion.Should().Be("2024-11-05");
-        result.Capabilities.Tools.Should().NotBeNull();
-        result.Capabilities.Tools!.ListChanged.Should().BeTrue();
-        result.ServerInfo.Should().NotBeNull();
-        result.ServerInfo!.Name.Should().Be("test-server");
+        result.ShouldNotBeNull();
+        result!.ProtocolVersion.ShouldBe("2024-11-05");
+        result.Capabilities.Tools.ShouldNotBeNull();
+        result.Capabilities.Tools!.ListChanged.ShouldBeTrue();
+        result.ServerInfo.ShouldNotBeNull();
+        result.ServerInfo!.Name.ShouldBe("test-server");
     }
 
     [Fact]
@@ -118,10 +117,10 @@ public class McpTypesTests
 
         var result = JsonSerializer.Deserialize<McpToolsListResult>(json);
 
-        result.Should().NotBeNull();
-        result!.Tools.Should().HaveCount(2);
-        result.Tools[0].Name.Should().Be("tool_a");
-        result.Tools[1].Name.Should().Be("tool_b");
+        result.ShouldNotBeNull();
+        result!.Tools.Count().ShouldBe(2);
+        result.Tools[0].Name.ShouldBe("tool_a");
+        result.Tools[1].Name.ShouldBe("tool_b");
     }
 
     [Fact]
@@ -132,8 +131,8 @@ public class McpTypesTests
         var json = JsonSerializer.Serialize(initParams);
         var doc = JsonDocument.Parse(json);
 
-        doc.RootElement.GetProperty("protocolVersion").GetString().Should().Be("2024-11-05");
-        doc.RootElement.GetProperty("clientInfo").GetProperty("name").GetString().Should().Be("BotNexus");
+        doc.RootElement.GetProperty("protocolVersion").GetString().ShouldBe("2024-11-05");
+        doc.RootElement.GetProperty("clientInfo").GetProperty("name").GetString().ShouldBe("BotNexus");
     }
 
     [Fact]
@@ -148,7 +147,7 @@ public class McpTypesTests
         var json = JsonSerializer.Serialize(callParams);
         var doc = JsonDocument.Parse(json);
 
-        doc.RootElement.GetProperty("name").GetString().Should().Be("search");
-        doc.RootElement.GetProperty("arguments").GetProperty("query").GetString().Should().Be("test");
+        doc.RootElement.GetProperty("name").GetString().ShouldBe("search");
+        doc.RootElement.GetProperty("arguments").GetProperty("query").GetString().ShouldBe("test");
     }
 }

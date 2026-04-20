@@ -4,7 +4,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Sessions;
 
@@ -13,15 +12,15 @@ public sealed class SessionModelWave3TypedIdTests
     [Fact]
     public void GatewaySession_UsesTypedAgentIdAndSessionId()
     {
-        typeof(GatewaySession).GetProperty(nameof(GatewaySession.AgentId))!.PropertyType.Should().Be(typeof(AgentId));
-        typeof(GatewaySession).GetProperty(nameof(GatewaySession.SessionId))!.PropertyType.Should().Be(typeof(SessionId));
+        typeof(GatewaySession).GetProperty(nameof(GatewaySession.AgentId))!.PropertyType.ShouldBe(typeof(AgentId));
+        typeof(GatewaySession).GetProperty(nameof(GatewaySession.SessionId))!.PropertyType.ShouldBe(typeof(SessionId));
     }
 
     [Fact]
     public void DefaultAgentSupervisor_UsesAgentSessionKey_NotLegacyMakeKey()
     {
         var makeKeyMethod = typeof(DefaultAgentSupervisor).GetMethod("MakeKey", BindingFlags.NonPublic | BindingFlags.Static);
-        makeKeyMethod.Should().BeNull();
+        makeKeyMethod.ShouldBeNull();
 
         var keyBackedFields = typeof(DefaultAgentSupervisor)
             .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
@@ -29,7 +28,7 @@ public sealed class SessionModelWave3TypedIdTests
             .Select(field => field.FieldType.GetGenericArguments()[0])
             .ToArray();
 
-        keyBackedFields.Should().Contain(typeof(AgentSessionKey));
+        keyBackedFields.ShouldContain(typeof(AgentSessionKey));
     }
 
     [Fact]
@@ -47,24 +46,24 @@ public sealed class SessionModelWave3TypedIdTests
         var listed = await store.ListAsync(agentId);
         var byChannel = await store.ListByChannelAsync(agentId, ChannelKey.From("signalr"));
 
-        loaded.Should().NotBeNull();
-        loaded!.SessionId.Should().Be(sessionId);
-        loaded.AgentId.Should().Be(agentId);
-        listed.Should().ContainSingle();
-        byChannel.Should().ContainSingle();
+        loaded.ShouldNotBeNull();
+        loaded!.SessionId.ShouldBe(sessionId);
+        loaded.AgentId.ShouldBe(agentId);
+        listed.ShouldHaveSingleItem();
+        byChannel.ShouldHaveSingleItem();
 
         string sessionIdString = loaded.SessionId;
         string agentIdString = loaded.AgentId;
-        sessionIdString.Should().Be("typed-session");
-        agentIdString.Should().Be("typed-agent");
+        sessionIdString.ShouldBe("typed-session");
+        agentIdString.ShouldBe("typed-agent");
     }
 
     [Fact]
     public void SessionStoreInterface_UsesTypedIdParameters()
     {
         var getOrCreate = typeof(ISessionStore).GetMethod(nameof(ISessionStore.GetOrCreateAsync));
-        getOrCreate.Should().NotBeNull();
-        getOrCreate!.GetParameters()[0].ParameterType.Should().Be(typeof(SessionId));
-        getOrCreate.GetParameters()[1].ParameterType.Should().Be(typeof(AgentId));
+        getOrCreate.ShouldNotBeNull();
+        getOrCreate!.GetParameters()[0].ParameterType.ShouldBe(typeof(SessionId));
+        getOrCreate.GetParameters()[1].ParameterType.ShouldBe(typeof(AgentId));
     }
 }

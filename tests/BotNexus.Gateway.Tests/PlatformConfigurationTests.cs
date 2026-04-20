@@ -7,7 +7,6 @@ using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Extensions;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -20,9 +19,9 @@ public sealed class PlatformConfigurationTests
     {
         var config = await PlatformConfigLoader.LoadAsync(Path.Combine(Guid.NewGuid().ToString("N"), "missing.json"));
 
-        config.Should().NotBeNull();
-        config.Version.Should().Be(1);
-        config.Gateway.Should().BeNull();
+        config.ShouldNotBeNull();
+        config.Version.ShouldBe(1);
+        config.Gateway.ShouldBeNull();
     }
 
     [Fact]
@@ -48,13 +47,13 @@ public sealed class PlatformConfigurationTests
 
         var config = await PlatformConfigLoader.LoadAsync(configPath);
 
-        config.Gateway?.ListenUrl.Should().Be("http://localhost:18790");
-        config.Gateway?.DefaultAgentId.Should().Be("agent-a");
-        config.Gateway?.LogLevel.Should().Be("Debug");
-        config.Providers.Should().ContainKey("copilot");
-        config.Providers!["copilot"].ApiKey.Should().Be("test-key");
-        config.Providers["copilot"].BaseUrl.Should().Be("https://api.githubcopilot.com");
-        config.Providers["copilot"].DefaultModel.Should().Be("gpt-4.1");
+        config.Gateway?.ListenUrl.ShouldBe("http://localhost:18790");
+        config.Gateway?.DefaultAgentId.ShouldBe("agent-a");
+        config.Gateway?.LogLevel.ShouldBe("Debug");
+        config.Providers.ShouldContainKey("copilot");
+        config.Providers!["copilot"].ApiKey.ShouldBe("test-key");
+        config.Providers["copilot"].BaseUrl.ShouldBe("https://api.githubcopilot.com");
+        config.Providers["copilot"].DefaultModel.ShouldBe("gpt-4.1");
     }
 
     [Fact]
@@ -82,10 +81,10 @@ public sealed class PlatformConfigurationTests
         var config = await PlatformConfigLoader.LoadAsync(configPath, validateOnLoad: false);
         var fileAccess = config.Agents!["agent-a"].FileAccess;
 
-        fileAccess.Should().NotBeNull();
-        fileAccess!.AllowedReadPaths.Should().Equal(@"Q:\repos\botnexus\docs");
-        fileAccess.AllowedWritePaths.Should().Equal(@"Q:\repos\botnexus\artifacts");
-        fileAccess.DeniedPaths.Should().Equal(@"Q:\repos\botnexus\docs\secrets");
+        fileAccess.ShouldNotBeNull();
+        fileAccess!.AllowedReadPaths.ShouldHaveSingleItem().ShouldBe(@"Q:\repos\botnexus\docs");
+        fileAccess.AllowedWritePaths.ShouldHaveSingleItem().ShouldBe(@"Q:\repos\botnexus\artifacts");
+        fileAccess.DeniedPaths.ShouldHaveSingleItem().ShouldBe(@"Q:\repos\botnexus\docs\secrets");
     }
 
     [Fact]
@@ -101,7 +100,7 @@ public sealed class PlatformConfigurationTests
 
         var config = await PlatformConfigLoader.LoadAsync(configPath);
 
-        config.Gateway?.DefaultAgentId.Should().Be("custom-agent");
+        config.Gateway?.DefaultAgentId.ShouldBe("custom-agent");
     }
 
     [Fact]
@@ -117,9 +116,9 @@ public sealed class PlatformConfigurationTests
             }
         });
 
-        errors.Should().Contain(e => e.Contains("listenUrl", StringComparison.Ordinal));
-        errors.Should().Contain(e => e.Contains("logLevel", StringComparison.Ordinal));
-        errors.Should().Contain(e => e.Contains("agentsDirectory", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("listenUrl", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("logLevel", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("agentsDirectory", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -133,7 +132,7 @@ public sealed class PlatformConfigurationTests
             }
         });
 
-        errors.Should().ContainSingle(e => e.Contains("listenUrl", StringComparison.Ordinal));
+        errors.Where(e => e.Contains("listenUrl", StringComparison.Ordinal)).ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -147,7 +146,7 @@ public sealed class PlatformConfigurationTests
             }
         });
 
-        errors.Should().ContainSingle(e => e.Contains("logLevel", StringComparison.Ordinal));
+        errors.Where(e => e.Contains("logLevel", StringComparison.Ordinal)).ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -161,7 +160,7 @@ public sealed class PlatformConfigurationTests
             }
         });
 
-        errors.Should().NotContain(e => e.Contains("providers.copilot must define apiKey or baseUrl", StringComparison.Ordinal),
+        errors.ShouldNotContain(e => e.Contains("providers.copilot must define apiKey or baseUrl", StringComparison.Ordinal),
             "apiKey/baseUrl are optional — auth can come from auth.json or environment");
     }
 
@@ -180,7 +179,7 @@ public sealed class PlatformConfigurationTests
             }
         });
 
-        errors.Should().ContainSingle(e => e.Contains("providers.copilot.baseUrl", StringComparison.Ordinal));
+        errors.Where(e => e.Contains("providers.copilot.baseUrl", StringComparison.Ordinal)).ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -210,8 +209,8 @@ public sealed class PlatformConfigurationTests
             }
         });
 
-        errors.Should().Contain(e => e.Contains("gateway.crossWorld.peers.world-b.endpoint", StringComparison.Ordinal));
-        errors.Should().Contain(e => e.Contains("gateway.crossWorld.inbound.apiKeys.world-b", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("gateway.crossWorld.peers.world-b.endpoint", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("gateway.crossWorld.inbound.apiKeys.world-b", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -223,7 +222,7 @@ public sealed class PlatformConfigurationTests
 
         PlatformConfigLoader.EnsureConfigDirectory(path);
 
-        Directory.Exists(path).Should().BeTrue();
+        Directory.Exists(path).ShouldBeTrue();
         Directory.Delete(path, recursive: true);
     }
 
@@ -232,13 +231,13 @@ public sealed class PlatformConfigurationTests
     {
         var config = new PlatformConfig();
 
-        config.Version.Should().Be(1);
-        config.ApiKey.Should().BeNull();
-        config.Gateway.Should().BeNull();
-        config.Agents.Should().BeNull();
-        config.Channels.Should().BeNull();
-        config.Cron.Should().BeNull();
-        config.Providers.Should().BeNull();
+        config.Version.ShouldBe(1);
+        config.ApiKey.ShouldBeNull();
+        config.Gateway.ShouldBeNull();
+        config.Agents.ShouldBeNull();
+        config.Channels.ShouldBeNull();
+        config.Cron.ShouldBeNull();
+        config.Providers.ShouldBeNull();
     }
 
     [Fact]
@@ -250,7 +249,7 @@ public sealed class PlatformConfigurationTests
 
         var config = await PlatformConfigLoader.LoadAsync(configPath, validateOnLoad: false);
 
-        config.Version.Should().Be(1);
+        config.Version.ShouldBe(1);
     }
 
     [Fact]
@@ -262,7 +261,7 @@ public sealed class PlatformConfigurationTests
 
         var config = PlatformConfigLoader.Load(configPath, validateOnLoad: false);
 
-        config.Version.Should().Be(1);
+        config.Version.ShouldBe(1);
     }
 
     [Fact]
@@ -270,7 +269,7 @@ public sealed class PlatformConfigurationTests
     {
         var warnings = PlatformConfigLoader.ValidateWarnings(new PlatformConfig { Version = 2 });
 
-        warnings.Should().ContainSingle(warning => warning.Contains("version '2'", StringComparison.Ordinal));
+        warnings.Where(warning => warning.Contains("version '2'", StringComparison.Ordinal)).ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -278,7 +277,7 @@ public sealed class PlatformConfigurationTests
     {
         var warnings = PlatformConfigLoader.ValidateWarnings(new PlatformConfig { Version = 1 });
 
-        warnings.Should().BeEmpty();
+        warnings.ShouldBeEmpty();
     }
 
     [Fact]
@@ -299,7 +298,7 @@ public sealed class PlatformConfigurationTests
             Trace.Listeners.Remove(listener);
         }
 
-        listener.Messages.Should().Contain(message => message.Contains("Platform config warning", StringComparison.Ordinal));
+        listener.Messages.ShouldContain(message => message.Contains("Platform config warning", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -320,7 +319,7 @@ public sealed class PlatformConfigurationTests
             Trace.Listeners.Remove(listener);
         }
 
-        listener.Messages.Should().NotContain(message => message.Contains("Platform config warning", StringComparison.Ordinal));
+        listener.Messages.ShouldNotContain(message => message.Contains("Platform config warning", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -333,9 +332,9 @@ public sealed class PlatformConfigurationTests
             DefaultModel = "model-x"
         };
 
-        provider.ApiKey.Should().Be("test-key");
-        provider.BaseUrl.Should().Be("https://example.test");
-        provider.DefaultModel.Should().Be("model-x");
+        provider.ApiKey.ShouldBe("test-key");
+        provider.BaseUrl.ShouldBe("https://example.test");
+        provider.DefaultModel.ShouldBe("model-x");
     }
 
     [Fact]
@@ -355,11 +354,11 @@ public sealed class PlatformConfigurationTests
         var agentSources = provider.GetServices<IAgentConfigurationSource>();
         var configurationWriter = provider.GetRequiredService<IAgentConfigurationWriter>();
 
-        gatewayOptions.DefaultAgentId.Should().Be("config-agent");
-        sessionStore.Should().BeOfType<FileSessionStore>();
-        agentSources.Should().Contain(source => source is FileAgentConfigurationSource);
-        agentSources.Should().Contain(source => source is PlatformConfigAgentSource);
-        configurationWriter.Should().BeOfType<PlatformConfigAgentWriter>();
+        gatewayOptions.DefaultAgentId.ShouldBe("config-agent");
+        sessionStore.ShouldBeOfType<FileSessionStore>();
+        agentSources.ShouldContain(source => source is FileAgentConfigurationSource);
+        agentSources.ShouldContain(source => source is PlatformConfigAgentSource);
+        configurationWriter.ShouldBeOfType<PlatformConfigAgentWriter>();
     }
 
     [Fact]
@@ -376,9 +375,9 @@ public sealed class PlatformConfigurationTests
             }
         });
 
-        errors.Should().Contain(e => e.Contains("gateway.apiKeys.tenant-a.apiKey", StringComparison.Ordinal));
-        errors.Should().Contain(e => e.Contains("gateway.apiKeys.tenant-a.tenantId", StringComparison.Ordinal));
-        errors.Should().Contain(e => e.Contains("gateway.apiKeys.tenant-a.permissions", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("gateway.apiKeys.tenant-a.apiKey", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("gateway.apiKeys.tenant-a.tenantId", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("gateway.apiKeys.tenant-a.permissions", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -392,8 +391,8 @@ public sealed class PlatformConfigurationTests
             }
         });
 
-        errors.Should().Contain(e => e.Contains("agents.assistant.provider", StringComparison.Ordinal));
-        errors.Should().Contain(e => e.Contains("agents.assistant.model", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("agents.assistant.provider", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("agents.assistant.model", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -405,8 +404,8 @@ public sealed class PlatformConfigurationTests
 
         Func<Task> act = async () => await PlatformConfigLoader.LoadAsync(configPath);
 
-        await act.Should().ThrowAsync<OptionsValidationException>()
-            .WithMessage("*gateway.apiKeys.tenant-a.apiKey*");
+        (await act.ShouldThrowAsync<OptionsValidationException>())
+            .Message.ShouldContain("gateway.apiKeys.tenant-a.apiKey");
     }
 
     [Fact]
@@ -420,7 +419,7 @@ public sealed class PlatformConfigurationTests
             }
         });
 
-        errors.Should().ContainSingle(e => e.Contains("gateway.sessionStore.type", StringComparison.Ordinal));
+        errors.Where(e => e.Contains("gateway.sessionStore.type", StringComparison.Ordinal)).ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -434,7 +433,7 @@ public sealed class PlatformConfigurationTests
             }
         });
 
-        errors.Should().ContainSingle(e => e.Contains("gateway.sessionStore.filePath", StringComparison.Ordinal));
+        errors.Where(e => e.Contains("gateway.sessionStore.filePath", StringComparison.Ordinal)).ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -448,7 +447,7 @@ public sealed class PlatformConfigurationTests
             }
         });
 
-        errors.Should().ContainSingle(e => e.Contains("gateway.sessionStore.connectionString", StringComparison.Ordinal));
+        errors.Where(e => e.Contains("gateway.sessionStore.connectionString", StringComparison.Ordinal)).ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -466,9 +465,9 @@ public sealed class PlatformConfigurationTests
             }
         });
 
-        errors.Should().Contain(e => e.Contains("cron.tickIntervalSeconds", StringComparison.Ordinal));
-        errors.Should().Contain(e => e.Contains("cron.jobs.job-1.schedule", StringComparison.Ordinal));
-        errors.Should().Contain(e => e.Contains("cron.jobs.job-1.actionType", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("cron.tickIntervalSeconds", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("cron.jobs.job-1.schedule", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("cron.jobs.job-1.actionType", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -492,7 +491,7 @@ public sealed class PlatformConfigurationTests
 
         using var provider = services.BuildServiceProvider();
         var sessionStore = provider.GetRequiredService<ISessionStore>();
-        sessionStore.Should().BeOfType<InMemorySessionStore>();
+        sessionStore.ShouldBeOfType<InMemorySessionStore>();
     }
 
     [Fact]
@@ -517,7 +516,7 @@ public sealed class PlatformConfigurationTests
 
         using var provider = services.BuildServiceProvider();
         var sessionStore = provider.GetRequiredService<ISessionStore>();
-        sessionStore.Should().BeOfType<FileSessionStore>();
+        sessionStore.ShouldBeOfType<FileSessionStore>();
     }
 
     [Fact]
@@ -542,7 +541,7 @@ public sealed class PlatformConfigurationTests
 
         using var provider = services.BuildServiceProvider();
         var sessionStore = provider.GetRequiredService<ISessionStore>();
-        sessionStore.Should().BeOfType<SqliteSessionStore>();
+        sessionStore.ShouldBeOfType<SqliteSessionStore>();
     }
 
     [Fact]
@@ -563,7 +562,7 @@ public sealed class PlatformConfigurationTests
 
             using var provider = services.BuildServiceProvider();
             var sessionStore = provider.GetRequiredService<ISessionStore>();
-            sessionStore.Should().BeOfType<InMemorySessionStore>();
+            sessionStore.ShouldBeOfType<InMemorySessionStore>();
         }
         finally
         {
@@ -598,11 +597,11 @@ public sealed class PlatformConfigurationTests
         using var provider = services.BuildServiceProvider();
         var compaction = provider.GetRequiredService<IOptions<CompactionOptions>>().Value;
 
-        compaction.PreservedTurns.Should().Be(5);
-        compaction.MaxSummaryChars.Should().Be(2000);
-        compaction.TokenThresholdRatio.Should().Be(0.4);
-        compaction.ContextWindowTokens.Should().Be(64000);
-        compaction.SummarizationModel.Should().Be("gpt-4.1-mini");
+        compaction.PreservedTurns.ShouldBe(5);
+        compaction.MaxSummaryChars.ShouldBe(2000);
+        compaction.TokenThresholdRatio.ShouldBe(0.4);
+        compaction.ContextWindowTokens.ShouldBe(64000);
+        compaction.SummarizationModel.ShouldBe("gpt-4.1-mini");
     }
 
     [Fact]
@@ -615,11 +614,11 @@ public sealed class PlatformConfigurationTests
         var config = await PlatformConfigLoader.LoadAsync(configPath, validateOnLoad: false);
         var errors = PlatformConfigLoader.Validate(config);
 
-        config.Gateway?.ListenUrl.Should().Be("http://localhost:5005");
-        config.Providers.Should().BeNull();
-        config.Channels.Should().BeNull();
-        config.Agents.Should().BeNull();
-        errors.Should().BeEmpty();
+        config.Gateway?.ListenUrl.ShouldBe("http://localhost:5005");
+        config.Providers.ShouldBeNull();
+        config.Channels.ShouldBeNull();
+        config.Agents.ShouldBeNull();
+        errors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -638,10 +637,13 @@ public sealed class PlatformConfigurationTests
         var config = await PlatformConfigLoader.LoadAsync(configPath, validateOnLoad: false);
         var errors = PlatformConfigLoader.Validate(config);
 
-        config.Providers.Should().NotBeNull().And.BeEmpty();
-        config.Channels.Should().NotBeNull().And.BeEmpty();
-        config.Agents.Should().NotBeNull().And.BeEmpty();
-        errors.Should().BeEmpty();
+        config.Providers.ShouldNotBeNull();
+        config.Providers!.ShouldBeEmpty();
+        config.Channels.ShouldNotBeNull();
+        config.Channels!.ShouldBeEmpty();
+        config.Agents.ShouldNotBeNull();
+        config.Agents!.ShouldBeEmpty();
+        errors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -650,7 +652,7 @@ public sealed class PlatformConfigurationTests
         using var fixture = new PlatformConfigFixture();
         using var watcher = PlatformConfigLoader.Watch(fixture.ConfigPath);
 
-        watcher.Should().NotBeNull();
+        watcher.ShouldNotBeNull();
     }
 
     [Fact]
@@ -673,8 +675,8 @@ public sealed class PlatformConfigurationTests
 
         var results = await Task.WhenAll(loads);
 
-        results.Select(config => config.Gateway?.ListenUrl).Should().OnlyContain(value => value == "http://localhost:5005");
-        results.Select(config => config.Gateway?.DefaultAgentId).Should().OnlyContain(value => value == "assistant");
+        results.Select(config => config.Gateway?.ListenUrl).ShouldAllBe(value => value == "http://localhost:5005");
+        results.Select(config => config.Gateway?.DefaultAgentId).ShouldAllBe(value => value == "assistant");
     }
 
     [Fact]
@@ -695,9 +697,9 @@ public sealed class PlatformConfigurationTests
         await File.WriteAllTextAsync(fixture.ConfigPath, JsonSerializer.Serialize(original));
         var reloaded = await PlatformConfigLoader.LoadAsync(fixture.ConfigPath, validateOnLoad: false);
 
-        reloaded.Gateway?.LogLevel.Should().Be("Warning");
-        reloaded.Providers.Should().ContainKey("copilot");
-        reloaded.Providers!["copilot"].ApiKey.Should().Be("updated-key");
+        reloaded.Gateway?.LogLevel.ShouldBe("Warning");
+        reloaded.Providers.ShouldContainKey("copilot");
+        reloaded.Providers!["copilot"].ApiKey.ShouldBe("updated-key");
     }
 
     private sealed class PlatformConfigFixture : IDisposable

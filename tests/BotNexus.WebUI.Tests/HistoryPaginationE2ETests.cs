@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.Playwright;
 
 namespace BotNexus.WebUI.Tests;
@@ -22,7 +21,7 @@ public sealed class HistoryPaginationE2ETests
         await host.OpenAgentTimelineAsync(AgentA);
 
         var dividerCount = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .session-divider").CountAsync();
-        dividerCount.Should().BeGreaterThanOrEqualTo(2);
+        dividerCount.ShouldBeGreaterThanOrEqualTo(2);
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -42,8 +41,8 @@ public sealed class HistoryPaginationE2ETests
 
         var finalMessages = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message").CountAsync();
         var finalDividers = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .session-divider").CountAsync();
-        finalMessages.Should().BeGreaterThan(initialMessages);
-        finalDividers.Should().BeGreaterThanOrEqualTo(initialDividers);
+        finalMessages.ShouldBeGreaterThan(initialMessages);
+        finalDividers.ShouldBeGreaterThanOrEqualTo(initialDividers);
     }
 }
 

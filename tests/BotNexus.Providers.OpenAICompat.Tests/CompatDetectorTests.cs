@@ -1,4 +1,3 @@
-using FluentAssertions;
 using BotNexus.Agent.Providers.Core.Compatibility;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.OpenAICompat;
@@ -27,10 +26,10 @@ public class CompatDetectorTests
         var model = MakeModel("custom", "http://localhost:11434/v1");
         var compat = CompatDetector.Detect(model);
 
-        compat.SupportsStore.Should().BeFalse();
-        compat.SupportsDeveloperRole.Should().BeFalse();
-        compat.SupportsReasoningEffort.Should().BeFalse();
-        compat.MaxTokensField.Should().Be("max_tokens");
+        compat.SupportsStore.ShouldBeFalse();
+        compat.SupportsDeveloperRole.ShouldBeFalse();
+        compat.SupportsReasoningEffort.ShouldBeFalse();
+        compat.MaxTokensField.ShouldBe("max_tokens");
     }
 
     [Fact]
@@ -39,10 +38,10 @@ public class CompatDetectorTests
         var model = MakeModel("ollama", "http://myserver:11434/v1");
         var compat = CompatDetector.Detect(model);
 
-        compat.SupportsStore.Should().BeFalse();
-        compat.SupportsDeveloperRole.Should().BeFalse();
-        compat.MaxTokensField.Should().Be("max_tokens");
-        compat.RequiresToolResultName.Should().BeTrue();
+        compat.SupportsStore.ShouldBeFalse();
+        compat.SupportsDeveloperRole.ShouldBeFalse();
+        compat.MaxTokensField.ShouldBe("max_tokens");
+        compat.RequiresToolResultName.ShouldBeTrue();
     }
 
     [Fact]
@@ -51,9 +50,9 @@ public class CompatDetectorTests
         var model = MakeModel("custom", "http://localhost:8000/v1");
         var compat = CompatDetector.Detect(model);
 
-        compat.SupportsStore.Should().BeFalse();
-        compat.SupportsDeveloperRole.Should().BeFalse();
-        compat.SupportsStrictMode.Should().BeFalse();
+        compat.SupportsStore.ShouldBeFalse();
+        compat.SupportsDeveloperRole.ShouldBeFalse();
+        compat.SupportsStrictMode.ShouldBeFalse();
     }
 
     [Fact]
@@ -62,8 +61,8 @@ public class CompatDetectorTests
         var model = MakeModel("vllm", "http://myserver:9999/v1");
         var compat = CompatDetector.Detect(model);
 
-        compat.SupportsStore.Should().BeFalse();
-        compat.SupportsDeveloperRole.Should().BeFalse();
+        compat.SupportsStore.ShouldBeFalse();
+        compat.SupportsDeveloperRole.ShouldBeFalse();
     }
 
     [Fact]
@@ -72,10 +71,10 @@ public class CompatDetectorTests
         var model = MakeModel("custom", "http://localhost:1234/v1");
         var compat = CompatDetector.Detect(model);
 
-        compat.SupportsStore.Should().BeFalse();
-        compat.SupportsDeveloperRole.Should().BeFalse();
-        compat.MaxTokensField.Should().Be("max_tokens");
-        compat.SupportsStrictMode.Should().BeFalse();
+        compat.SupportsStore.ShouldBeFalse();
+        compat.SupportsDeveloperRole.ShouldBeFalse();
+        compat.MaxTokensField.ShouldBe("max_tokens");
+        compat.SupportsStrictMode.ShouldBeFalse();
     }
 
     [Fact]
@@ -84,10 +83,10 @@ public class CompatDetectorTests
         var model = MakeModel("lmstudio", "http://myserver:5555/v1");
         var compat = CompatDetector.Detect(model);
 
-        compat.SupportsStore.Should().BeFalse();
-        compat.SupportsDeveloperRole.Should().BeFalse();
-        compat.SupportsReasoningEffort.Should().BeFalse();
-        compat.MaxTokensField.Should().Be("max_tokens");
+        compat.SupportsStore.ShouldBeFalse();
+        compat.SupportsDeveloperRole.ShouldBeFalse();
+        compat.SupportsReasoningEffort.ShouldBeFalse();
+        compat.MaxTokensField.ShouldBe("max_tokens");
     }
 
     [Fact]
@@ -96,10 +95,10 @@ public class CompatDetectorTests
         var model = MakeModel("unknown-provider", "http://my-custom-server:9090/v1");
         var compat = CompatDetector.Detect(model);
 
-        compat.SupportsStore.Should().BeFalse();
-        compat.SupportsDeveloperRole.Should().BeFalse();
-        compat.SupportsReasoningEffort.Should().BeFalse();
-        compat.SupportsStrictMode.Should().BeFalse();
+        compat.SupportsStore.ShouldBeFalse();
+        compat.SupportsDeveloperRole.ShouldBeFalse();
+        compat.SupportsReasoningEffort.ShouldBeFalse();
+        compat.SupportsStrictMode.ShouldBeFalse();
     }
 
     [Fact]
@@ -118,10 +117,10 @@ public class CompatDetectorTests
         var model = MakeModel("ollama", "http://localhost:11434/v1", explicit_compat);
         var compat = CompatDetector.Detect(model);
 
-        compat.SupportsStore.Should().BeTrue();
-        compat.SupportsDeveloperRole.Should().BeTrue();
-        compat.SupportsReasoningEffort.Should().BeTrue();
-        compat.MaxTokensField.Should().Be("max_completion_tokens");
-        compat.SupportsStrictMode.Should().BeTrue();
+        compat.SupportsStore.ShouldBeTrue();
+        compat.SupportsDeveloperRole.ShouldBeTrue();
+        compat.SupportsReasoningEffort.ShouldBeTrue();
+        compat.MaxTokensField.ShouldBe("max_completion_tokens");
+        compat.SupportsStrictMode.ShouldBeTrue();
     }
 }

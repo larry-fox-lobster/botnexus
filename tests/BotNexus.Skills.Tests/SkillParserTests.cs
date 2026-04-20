@@ -1,5 +1,4 @@
 using BotNexus.Extensions.Skills;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Skills.Tests;
 
@@ -20,9 +19,9 @@ public sealed class SkillParserTests
 
         var skill = SkillParser.Parse("email-triage", markdown, "/skills/email-triage", SkillSource.Global);
 
-        skill.Name.Should().Be("email-triage");
-        skill.Description.Should().Be("Classify and triage incoming emails");
-        skill.Content.Should().Contain("Instructions for triaging emails.");
+        skill.Name.ShouldBe("email-triage");
+        skill.Description.ShouldBe("Classify and triage incoming emails");
+        skill.Content.ShouldContain("Instructions for triaging emails.");
     }
 
     [Fact]
@@ -41,10 +40,10 @@ public sealed class SkillParserTests
 
         var skill = SkillParser.Parse("data-export", markdown, "/skills/data-export", SkillSource.Agent);
 
-        skill.License.Should().Be("MIT");
-        skill.Compatibility.Should().Be("Requires Python 3.10+");
-        skill.AllowedTools.Should().Be("bash python");
-        skill.Source.Should().Be(SkillSource.Agent);
+        skill.License.ShouldBe("MIT");
+        skill.Compatibility.ShouldBe("Requires Python 3.10+");
+        skill.AllowedTools.ShouldBe("bash python");
+        skill.Source.ShouldBe(SkillSource.Agent);
     }
 
     [Fact]
@@ -63,8 +62,10 @@ public sealed class SkillParserTests
 
         var skill = SkillParser.Parse("my-skill", markdown, "/s", SkillSource.Global);
 
-        skill.Metadata.Should().ContainKey("author").WhoseValue.Should().Be("jon");
-        skill.Metadata.Should().ContainKey("category").WhoseValue.Should().Be("productivity");
+        skill.Metadata.ShouldContainKey("author");
+        skill.Metadata["author"].ShouldBe("jon");
+        skill.Metadata.ShouldContainKey("category");
+        skill.Metadata["category"].ShouldBe("productivity");
     }
 
     [Fact]
@@ -74,9 +75,9 @@ public sealed class SkillParserTests
 
         var skill = SkillParser.Parse("plain-skill", markdown, "/s", SkillSource.Global);
 
-        skill.Name.Should().Be("plain-skill");
-        skill.Description.Should().BeEmpty();
-        skill.Content.Should().Contain("No frontmatter here.");
+        skill.Name.ShouldBe("plain-skill");
+        skill.Description.ShouldBeEmpty();
+        skill.Content.ShouldContain("No frontmatter here.");
     }
 
     [Fact]
@@ -91,8 +92,8 @@ public sealed class SkillParserTests
 
         var skill = SkillParser.Parse("empty", markdown, "/s", SkillSource.Global);
 
-        skill.Description.Should().Be("Empty skill");
-        skill.Content.Should().BeEmpty();
+        skill.Description.ShouldBe("Empty skill");
+        skill.Content.ShouldBeEmpty();
     }
 
     [Theory]
@@ -107,14 +108,14 @@ public sealed class SkillParserTests
     [InlineData("has space", false)]        // space
     public void IsValidName_FollowsSpec(string name, bool expected)
     {
-        SkillParser.IsValidName(name).Should().Be(expected);
+        SkillParser.IsValidName(name).ShouldBe(expected);
     }
 
     [Fact]
     public void IsValidName_ExceedsMaxLength_ReturnsFalse()
     {
         var longName = new string('a', 65);
-        SkillParser.IsValidName(longName).Should().BeFalse();
+        SkillParser.IsValidName(longName).ShouldBeFalse();
     }
 
     [Fact]
@@ -132,6 +133,6 @@ public sealed class SkillParserTests
         // The parser always uses the frontmatter name. Validation that it matches
         // the directory is done at the discovery/validation layer, not the parser.
         var skill = SkillParser.Parse("actual-dir", markdown, "/s/actual-dir", SkillSource.Global);
-        skill.Name.Should().Be("declared-name");
+        skill.Name.ShouldBe("declared-name");
     }
 }

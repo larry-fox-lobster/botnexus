@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.Providers.OpenAI.Tests;
 
@@ -17,7 +16,7 @@ public class StopReasonMappingTests
         var json = $"\"{jsonValue}\"";
         var result = JsonSerializer.Deserialize<StopReason>(json);
 
-        result.Should().Be(expected);
+        result.ShouldBe(expected);
     }
 
     [Theory]
@@ -29,6 +28,6 @@ public class StopReasonMappingTests
     {
         var json = JsonSerializer.Serialize(value);
 
-        json.Should().Be($"\"{expectedJson}\"");
+        json.ShouldBe($"\"{expectedJson}\"");
     }
 }

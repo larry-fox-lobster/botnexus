@@ -1,4 +1,3 @@
-using FluentAssertions;
 using BotNexus.Agent.Providers.Copilot;
 
 namespace BotNexus.Providers.Copilot.Tests;
@@ -14,23 +13,23 @@ public class CopilotOAuthTests
             ExpiresAt: DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds()
         );
 
-        creds.AccessToken.Should().Be("ghu_abc123");
-        creds.RefreshToken.Should().Be("gho_refresh456");
-        creds.ExpiresAt.Should().BeGreaterThan(0);
+        creds.AccessToken.ShouldBe("ghu_abc123");
+        creds.RefreshToken.ShouldBe("gho_refresh456");
+        creds.ExpiresAt.ShouldBeGreaterThan(0);
     }
 
     [Fact]
     public void OAuthCredentials_DefaultApiEndpoint_IsNull()
     {
         var creds = new OAuthCredentials("token", "refresh", 0);
-        creds.ApiEndpoint.Should().BeNull();
+        creds.ApiEndpoint.ShouldBeNull();
     }
 
     [Fact]
     public void OAuthCredentials_WithApiEndpoint_PreservesValue()
     {
         var creds = new OAuthCredentials("token", "refresh", 0, "https://enterprise.copilot.example.com");
-        creds.ApiEndpoint.Should().Be("https://enterprise.copilot.example.com");
+        creds.ApiEndpoint.ShouldBe("https://enterprise.copilot.example.com");
     }
 
     [Fact]
@@ -38,7 +37,7 @@ public class CopilotOAuthTests
     {
         var a = new OAuthCredentials("tok", "ref", 100, "https://api.example.com");
         var b = new OAuthCredentials("tok", "ref", 100, "https://api.example.com");
-        a.Should().Be(b);
+        a.ShouldBe(b);
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public class CopilotOAuthTests
     {
         var a = new OAuthCredentials("tok1", "ref", 100);
         var b = new OAuthCredentials("tok2", "ref", 100);
-        a.Should().NotBe(b);
+        a.ShouldNotBe(b);
     }
 
     [Fact]
@@ -54,7 +53,7 @@ public class CopilotOAuthTests
     {
         var a = new OAuthCredentials("tok", "ref", 100);
         var b = new OAuthCredentials("tok", "ref", 200);
-        a.Should().NotBe(b);
+        a.ShouldNotBe(b);
     }
 
     // --- Expiry detection tests ---
@@ -68,7 +67,7 @@ public class CopilotOAuthTests
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var isExpired = now >= creds.ExpiresAt - 60;
 
-        isExpired.Should().BeTrue("token expired 5 minutes ago");
+        isExpired.ShouldBeTrue("token expired 5 minutes ago");
     }
 
     [Fact]
@@ -80,7 +79,7 @@ public class CopilotOAuthTests
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var isExpired = now >= creds.ExpiresAt - 60;
 
-        isExpired.Should().BeFalse("token is still valid for ~1 hour");
+        isExpired.ShouldBeFalse("token is still valid for ~1 hour");
     }
 
     [Fact]
@@ -92,7 +91,7 @@ public class CopilotOAuthTests
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var isExpired = now >= creds.ExpiresAt - 60;
 
-        isExpired.Should().BeTrue("token expires in 30s, which is within the 60s refresh window");
+        isExpired.ShouldBeTrue("token expires in 30s, which is within the 60s refresh window");
     }
 
     [Fact]
@@ -104,7 +103,7 @@ public class CopilotOAuthTests
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var isExpired = now >= creds.ExpiresAt - 60;
 
-        isExpired.Should().BeTrue("token at exactly 60s boundary should trigger refresh");
+        isExpired.ShouldBeTrue("token at exactly 60s boundary should trigger refresh");
     }
 
     [Fact]
@@ -115,7 +114,7 @@ public class CopilotOAuthTests
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var isExpired = now >= creds.ExpiresAt - 60;
 
-        isExpired.Should().BeTrue("ExpiresAt=0 forces refresh on first use (login flow)");
+        isExpired.ShouldBeTrue("ExpiresAt=0 forces refresh on first use (login flow)");
     }
 
     [Theory]
@@ -128,7 +127,7 @@ public class CopilotOAuthTests
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var isExpired = now >= creds.ExpiresAt - 60;
 
-        isExpired.Should().BeTrue("negative ExpiresAt is always expired");
+        isExpired.ShouldBeTrue("negative ExpiresAt is always expired");
     }
 
     // --- GetApiKeyAsync tests ---
@@ -140,7 +139,7 @@ public class CopilotOAuthTests
 
         var result = await CopilotOAuth.GetApiKeyAsync("unknown-provider", map);
 
-        result.Should().BeNull();
+        result.ShouldBeNull();
     }
 
     [Fact]
@@ -153,7 +152,7 @@ public class CopilotOAuthTests
 
         var result = await CopilotOAuth.GetApiKeyAsync("missing-provider", map);
 
-        result.Should().BeNull();
+        result.ShouldBeNull();
     }
 
     [Fact]
@@ -168,8 +167,8 @@ public class CopilotOAuthTests
 
         var result = await CopilotOAuth.GetApiKeyAsync("provider-a", map);
 
-        result.Should().NotBeNull();
-        result!.Value.ApiKey.Should().Be("token-a");
+        result.ShouldNotBeNull();
+        result!.Value.ApiKey.ShouldBe("token-a");
     }
 
     // --- OAuthCredentials with-expressions (record mutation) ---
@@ -180,9 +179,9 @@ public class CopilotOAuthTests
         var original = new OAuthCredentials("old-token", "refresh", 100);
         var updated = original with { AccessToken = "new-token" };
 
-        updated.AccessToken.Should().Be("new-token");
-        updated.RefreshToken.Should().Be("refresh");
-        updated.ExpiresAt.Should().Be(100);
+        updated.AccessToken.ShouldBe("new-token");
+        updated.RefreshToken.ShouldBe("refresh");
+        updated.ExpiresAt.ShouldBe(100);
     }
 
     [Fact]
@@ -191,7 +190,7 @@ public class CopilotOAuthTests
         var original = new OAuthCredentials("token", "refresh", 100);
         var updated = original with { ApiEndpoint = "https://enterprise.example.com" };
 
-        updated.ApiEndpoint.Should().Be("https://enterprise.example.com");
-        original.ApiEndpoint.Should().BeNull("original should not be mutated");
+        updated.ApiEndpoint.ShouldBe("https://enterprise.example.com");
+        original.ApiEndpoint.ShouldBeNull("original should not be mutated");
     }
 }

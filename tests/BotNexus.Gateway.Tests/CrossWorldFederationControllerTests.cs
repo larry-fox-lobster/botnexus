@@ -5,7 +5,6 @@ using BotNexus.Gateway.Api.Controllers;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Federation;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -78,16 +77,16 @@ public sealed class CrossWorldFederationControllerTests
             },
             CancellationToken.None);
 
-        var ok = response.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var payload = ok.Value.Should().BeOfType<CrossWorldRelayResponse>().Subject;
-        payload.Response.Should().Be("Hello back from world-b");
-        payload.SessionId.Should().NotBeNullOrWhiteSpace();
+        var ok = response.Result.ShouldBeOfType<OkObjectResult>();
+        var payload = ok.Value.ShouldBeOfType<CrossWorldRelayResponse>();
+        payload.Response.ShouldBe("Hello back from world-b");
+        payload.SessionId.ShouldNotBeNullOrWhiteSpace();
 
         var savedSession = await sessions.GetAsync(SessionId.From(payload.SessionId));
-        savedSession.Should().NotBeNull();
-        savedSession!.ChannelType.Should().Be(ChannelKey.From("cross-world"));
-        savedSession.Participants.Should().ContainSingle(p => p.Id == "nova" && p.WorldId == "world-a");
-        savedSession.Participants.Should().ContainSingle(p => p.Id == "leela" && p.WorldId == "world-b");
+        savedSession.ShouldNotBeNull();
+        savedSession!.ChannelType.ShouldBe(ChannelKey.From("cross-world"));
+        savedSession.Participants.Where(p => p.Id == "nova" && p.WorldId == "world-a").ShouldHaveSingleItem();
+        savedSession.Participants.Where(p => p.Id == "leela" && p.WorldId == "world-b").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -145,6 +144,6 @@ public sealed class CrossWorldFederationControllerTests
             },
             CancellationToken.None);
 
-        result.Result.Should().BeOfType<UnauthorizedObjectResult>();
+        result.Result.ShouldBeOfType<UnauthorizedObjectResult>();
     }
 }

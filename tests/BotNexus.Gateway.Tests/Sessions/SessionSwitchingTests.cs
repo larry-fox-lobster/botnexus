@@ -11,7 +11,6 @@ using BotNexus.Gateway.Api;
 using BotNexus.Extensions.Channels.SignalR;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Tests.Helpers;
-using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -62,7 +61,7 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
         }, cts.Token);
 
         await Task.Delay(250, cts.Token);
-        oldSessionEventReceived.Should().BeFalse();
+        oldSessionEventReceived.ShouldBeFalse();
 
         await adapter.SendStreamEventAsync(newSession, new AgentStreamEvent
         {
@@ -70,7 +69,7 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
             ContentDelta = "new-session-event"
         }, cts.Token);
 
-        (await newSessionEvent.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("new-session-event");
+        (await newSessionEvent.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("new-session-event");
     }
 
     [Fact]
@@ -94,7 +93,7 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
             ContentDelta = "new-group-event"
         }, cts.Token);
 
-        (await eventReceived.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("new-group-event");
+        (await eventReceived.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("new-group-event");
     }
 
     [Fact]
@@ -115,7 +114,7 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
         var store = factory.Services.GetRequiredService<ISessionStore>();
         var sessions = await store.ListAsync(TestAgentId, cts.Token);
 
-        sessions.Select(s => s.SessionId.Value).Should().BeEquivalentTo([sessionA, sessionB]);
+        sessions.Select(s => s.SessionId.Value).ShouldBe(new[] { sessionA, sessionB });
     }
 
     [Fact]
@@ -155,10 +154,10 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
             ToolName = "search"
         }, cts.Token);
 
-        (await contentDeltaForA.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("session-a-delta");
-        (await toolStartForA.Task.WaitAsync(cts.Token)).Type.Should().Be(AgentStreamEventType.ToolStart);
+        (await contentDeltaForA.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("session-a-delta");
+        (await toolStartForA.Task.WaitAsync(cts.Token)).Type.ShouldBe(AgentStreamEventType.ToolStart);
         await Task.Delay(250, cts.Token);
-        bReceived.Should().BeFalse();
+        bReceived.ShouldBeFalse();
     }
 
     [Fact]
@@ -183,8 +182,8 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
 
         var status = await connection.InvokeAsync<JsonElement>("GetAgentStatus", TestAgentId, runningSession, cts.Token);
 
-        status.GetProperty("sessionId").GetString().Should().Be(runningSession);
-        supervisor.StopCalled.Should().BeFalse();
+        status.GetProperty("sessionId").GetString().ShouldBe(runningSession);
+        supervisor.StopCalled.ShouldBeFalse();
     }
 
     [Fact]
@@ -203,17 +202,17 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
 
         var store = factory.Services.GetRequiredService<ISessionStore>();
         var first = await store.GetAsync(sessionA, cts.Token);
-        first.Should().NotBeNull();
+        first.ShouldNotBeNull();
         first!.AddEntry(new SessionEntry { Role = MessageRole.User, Content = "hello a" });
         await store.SaveAsync(first, cts.Token);
 
         var aJoin = await connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionA, cts.Token);
         var bJoin = await connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionB, cts.Token);
 
-        aJoin.GetProperty("messageCount").GetInt32().Should().Be(1);
-        aJoin.GetProperty("isResumed").GetBoolean().Should().BeTrue();
-        bJoin.GetProperty("messageCount").GetInt32().Should().Be(0);
-        bJoin.GetProperty("isResumed").GetBoolean().Should().BeFalse();
+        aJoin.GetProperty("messageCount").GetInt32().ShouldBe(1);
+        aJoin.GetProperty("isResumed").GetBoolean().ShouldBeTrue();
+        bJoin.GetProperty("messageCount").GetInt32().ShouldBe(0);
+        bJoin.GetProperty("isResumed").GetBoolean().ShouldBeFalse();
     }
 
     private static WebApplicationFactory<Program> CreateTestFactory(Action<IServiceCollection>? configureServices = null)
@@ -272,7 +271,7 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
         };
 
         var response = await client.PostAsJsonAsync("/api/agents", descriptor, cancellationToken);
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.Created, HttpStatusCode.Conflict);
+        response.StatusCode.ShouldBeOneOf(HttpStatusCode.Created, HttpStatusCode.Conflict);
     }
 
     private static CancellationTokenSource CreateTimeout()

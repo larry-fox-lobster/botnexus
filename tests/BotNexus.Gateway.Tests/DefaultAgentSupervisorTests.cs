@@ -3,7 +3,6 @@ using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Agents;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -38,7 +37,7 @@ public sealed class DefaultAgentSupervisorTests
             .Select(_ => supervisor.GetOrCreateAsync("agent-a", "session-1"));
         var results = await Task.WhenAll(tasks);
 
-        results.Should().OnlyContain(h => ReferenceEquals(h, handle.Object));
+        results.ShouldAllBe(h => ReferenceEquals(h, handle.Object));
         strategy.Verify(s => s.CreateAsync(It.IsAny<AgentDescriptor>(), It.Is<AgentExecutionContext>(c => c.SessionId == "session-1"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -89,10 +88,10 @@ public sealed class DefaultAgentSupervisorTests
         var supervisor = new DefaultAgentSupervisor(registry, [strategy.Object], Mock.Of<ISessionStore>(), NullLogger<DefaultAgentSupervisor>.Instance);
 
         await supervisor.GetOrCreateAsync("agent-a", "session-1");
-        var act = () => supervisor.GetOrCreateAsync("agent-a", "session-2");
+        Func<Task> act = () => supervisor.GetOrCreateAsync("agent-a", "session-2");
 
-        await act.Should().ThrowAsync<AgentConcurrencyLimitExceededException>()
-            .WithMessage("*MaxConcurrentSessions (1)*");
+        (await act.ShouldThrowAsync<AgentConcurrencyLimitExceededException>())
+            .Message.ShouldContain("MaxConcurrentSessions (1)");
     }
 
     [Fact]
@@ -112,11 +111,11 @@ public sealed class DefaultAgentSupervisorTests
         strategy.SetupGet(s => s.Name).Returns("test");
         var supervisor = new DefaultAgentSupervisor(registry, [strategy.Object], Mock.Of<ISessionStore>(), NullLogger<DefaultAgentSupervisor>.Instance);
 
-        var act = () => supervisor.GetOrCreateAsync("agent-a", "session-1");
+        Func<Task> act = () => supervisor.GetOrCreateAsync("agent-a", "session-1");
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*IsolationStrategy 'missing' is not registered*")
-            .WithMessage("*Available*");
+        var ex = await act.ShouldThrowAsync<InvalidOperationException>();
+        ex.Message.ShouldContain("IsolationStrategy 'missing' is not registered");
+        ex.Message.ShouldContain("Available");
     }
 
     [Fact]
@@ -156,10 +155,10 @@ public sealed class DefaultAgentSupervisorTests
 
         await supervisor.GetOrCreateAsync("agent-a", "session-1");
 
-        capturedContext.Should().NotBeNull();
-        capturedContext!.History.Should().HaveCount(2);
-        capturedContext.History[0].Content.Should().Be("hello");
-        capturedContext.History[1].Content.Should().Be("hi there");
+        capturedContext.ShouldNotBeNull();
+        capturedContext!.History.Count().ShouldBe(2);
+        capturedContext.History[0].Content.ShouldBe("hello");
+        capturedContext.History[1].Content.ShouldBe("hi there");
     }
 
     private static Mock<IAgentHandle> CreateHandleMock(string agentId, string sessionId)
@@ -212,12 +211,12 @@ public sealed class DefaultAgentSupervisorTests
             .Select(_ => supervisor.GetOrCreateAsync("agent-fail", "session-1"))
             .ToArray();
 
-        var act = () => Task.WhenAll(tasks);
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Creation failed*");
+        Func<Task> act = () => Task.WhenAll(tasks);
+        (await act.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("Creation failed");
 
         // ALL 5 tasks should have faulted, not just the first
-        tasks.Should().OnlyContain(t => t.IsFaulted);
+        tasks.ShouldAllBe(t => t.IsFaulted);
     }
 
     [Fact]
@@ -249,12 +248,12 @@ public sealed class DefaultAgentSupervisorTests
 
         // First call fails
         var firstAct = () => supervisor.GetOrCreateAsync("agent-retry", "session-1");
-        await firstAct.Should().ThrowAsync<InvalidOperationException>();
+        await firstAct.ShouldThrowAsync<InvalidOperationException>();
 
         // Second call should retry creation (not return cached error)
         var result = await supervisor.GetOrCreateAsync("agent-retry", "session-1");
-        result.Should().BeSameAs(handle.Object);
-        attempt.Should().Be(2, "second attempt should create successfully");
+        result.ShouldBeSameAs(handle.Object);
+        attempt.ShouldBe(2, "second attempt should create successfully");
     }
 
     [Fact]
@@ -287,7 +286,7 @@ public sealed class DefaultAgentSupervisorTests
         await supervisor.GetOrCreateAsync("agent-stop", "session-2");
         await supervisor.GetOrCreateAsync("agent-stop", "session-3");
 
-        handles.Should().HaveCount(3);
+        handles.Count().ShouldBe(3);
 
         await supervisor.StopAllAsync();
 
@@ -330,7 +329,7 @@ public sealed class DefaultAgentSupervisorTests
         await supervisor.GetOrCreateAsync("agent-stop-err", "s3");
 
         // StopAllAsync should not throw even if one dispose fails
-        var act = () => supervisor.StopAllAsync();
-        await act.Should().NotThrowAsync();
+        Func<Task> act = () => supervisor.StopAllAsync();
+        await act.ShouldNotThrowAsync();
     }
 }

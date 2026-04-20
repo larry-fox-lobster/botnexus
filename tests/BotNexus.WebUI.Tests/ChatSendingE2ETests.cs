@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.Playwright;
 
 namespace BotNexus.WebUI.Tests;
@@ -38,7 +37,7 @@ public sealed class ChatSendingE2ETests
         await host.Page.FillAsync("#chat-input", "enter-send");
         await host.Page.PressAsync("#chat-input", "Enter");
         await host.WaitForInvocationCountAsync(1);
-        host.Supervisor.Dispatches.Count(d => d.Kind == DispatchKind.Send).Should().Be(1);
+        host.Supervisor.Dispatches.Count(d => d.Kind == DispatchKind.Send).ShouldBe(1);
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -50,8 +49,10 @@ public sealed class ChatSendingE2ETests
         await host.Page.Locator("#chat-input").PressSequentiallyAsync("line2");
         await Task.Delay(200);
 
-        host.Supervisor.Dispatches.Count(d => d.Kind == DispatchKind.Send).Should().Be(0);
-        (await host.Page.InputValueAsync("#chat-input")).Should().Contain("\n").And.Contain("line2");
+        host.Supervisor.Dispatches.Count(d => d.Kind == DispatchKind.Send).ShouldBe(0);
+        var inputValue = await host.Page.InputValueAsync("#chat-input");
+        inputValue.ShouldContain("\n");
+        inputValue.ShouldContain("line2");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -69,7 +70,7 @@ public sealed class ChatSendingE2ETests
         await host.Page.FillAsync("#chat-input", "clear-me");
         await host.Page.ClickAsync("#btn-send");
         await host.WaitForInvocationCountAsync(1);
-        (await host.Page.InputValueAsync("#chat-input")).Should().BeEmpty();
+        (await host.Page.InputValueAsync("#chat-input")).ShouldBeEmpty();
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -89,7 +90,7 @@ public sealed class ChatSendingE2ETests
         await host.WaitForConsoleMessageAsync("→ SendMessage");
 
         var invocations = host.GetHubInvocationMessages("SendMessage");
-        invocations.Should().Contain(message =>
+        invocations.ShouldContain(message =>
             message.Contains("agent-a", StringComparison.OrdinalIgnoreCase) &&
             message.Contains("signalr", StringComparison.OrdinalIgnoreCase));
     }

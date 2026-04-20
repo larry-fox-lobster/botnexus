@@ -1,5 +1,4 @@
 using BotNexus.Probe.LogIngestion;
-using FluentAssertions;
 using System.Text.Json;
 
 namespace BotNexus.Probe.Tests;
@@ -19,8 +18,8 @@ public sealed class JsonlSessionReaderTests
 
         var docs = await CollectDocumentsAsync(_reader.ReadAsync(temp.File("session.jsonl")));
 
-        docs.Should().HaveCount(2);
-        docs[0].RootElement.GetProperty("role").GetString().Should().Be("user");
+        docs.Count().ShouldBe(2);
+        docs[0].RootElement.GetProperty("role").GetString().ShouldBe("user");
     }
 
     [Fact]
@@ -35,7 +34,7 @@ public sealed class JsonlSessionReaderTests
 
         var docs = await CollectDocumentsAsync(_reader.ReadAsync(temp.File("multi.jsonl")));
 
-        docs.Should().HaveCount(3);
+        docs.Count().ShouldBe(3);
     }
 
     [Fact]
@@ -51,9 +50,9 @@ not-json
 
         var docs = await CollectDocumentsAsync(_reader.ReadAsync(temp.File("broken.jsonl"), warning: warnings.Add));
 
-        docs.Should().HaveCount(2);
-        warnings.Should().ContainSingle();
-        warnings[0].Should().Contain("Skipping malformed JSONL line 2");
+        docs.Count().ShouldBe(2);
+        warnings.ShouldHaveSingleItem();
+        warnings[0].ShouldContain("Skipping malformed JSONL line 2");
     }
 
     [Fact]
@@ -64,7 +63,7 @@ not-json
 
         var docs = await CollectDocumentsAsync(_reader.ReadAsync(temp.File("empty.jsonl")));
 
-        docs.Should().BeEmpty();
+        docs.ShouldBeEmpty();
     }
 
     [Fact]
@@ -93,13 +92,13 @@ not-json
 
         var messages = await CollectMessagesAsync(_reader.ReadMessagesAsync(temp.File("messages.jsonl")));
 
-        messages.Should().ContainSingle();
+        messages.ShouldHaveSingleItem();
         var message = messages[0];
-        message.SessionId.Should().Be("s-42");
-        message.Role.Should().Be("assistant");
-        message.Content.Should().Be("hello");
-        message.AgentId.Should().Be("a-1");
-        message.Timestamp.Should().Be(DateTimeOffset.Parse("2025-02-01T10:00:00Z"));
+        message.SessionId.ShouldBe("s-42");
+        message.Role.ShouldBe("assistant");
+        message.Content.ShouldBe("hello");
+        message.AgentId.ShouldBe("a-1");
+        message.Timestamp.ShouldBe(DateTimeOffset.Parse("2025-02-01T10:00:00Z"));
     }
 
     [Fact]
@@ -111,12 +110,12 @@ not-json
 
         var message = JsonlSessionReader.ToSessionMessage(document.RootElement, "fallback-session");
 
-        message.SessionId.Should().Be("legacy");
-        message.Content.Should().Be("hello");
-        message.AgentId.Should().Be("legacy-agent");
-        message.Role.Should().BeNull();
-        message.Metadata.Should().NotBeNull();
-        message.Metadata!.Should().ContainKey("extra");
+        message.SessionId.ShouldBe("legacy");
+        message.Content.ShouldBe("hello");
+        message.AgentId.ShouldBe("legacy-agent");
+        message.Role.ShouldBeNull();
+        message.Metadata.ShouldNotBeNull();
+        message.Metadata!.ShouldContainKey("extra");
     }
 
     [Fact]
@@ -127,8 +126,8 @@ not-json
 
         var messages = await CollectMessagesAsync(_reader.ReadMessagesAsync(temp.File("fallback-session.jsonl")));
 
-        messages.Should().ContainSingle();
-        messages[0].SessionId.Should().Be("fallback-session");
+        messages.ShouldHaveSingleItem();
+        messages[0].SessionId.ShouldBe("fallback-session");
     }
 
     private static async Task<List<JsonDocument>> CollectDocumentsAsync(IAsyncEnumerable<JsonDocument> source)

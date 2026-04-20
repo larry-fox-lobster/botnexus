@@ -4,7 +4,6 @@ using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Extensions.Channels.SignalR;
-using FluentAssertions;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -99,7 +98,7 @@ public sealed class SignalRHubTests
         dispatcher.Verify(value => value.DispatchAsync(
             It.Is<InboundMessage>(m => m.SessionId == "s1" && m.TargetAgentId == "agent-a" && m.Content == "hello"),
             CancellationToken.None), Times.Once);
-        result.SessionId.Should().Be("s1");
+        result.SessionId.ShouldBe("s1");
     }
 
     [Fact]
@@ -135,14 +134,14 @@ public sealed class SignalRHubTests
 
         var result = await hub.SendMessage("agent-a", "signalr", "hello");
 
-        capturedSession.Should().NotBeNull();
-        capturedSession!.ChannelType.Should().Be(ChannelKey.From("signalr"));
+        capturedSession.ShouldNotBeNull();
+        capturedSession!.ChannelType.ShouldBe(ChannelKey.From("signalr"));
         groups.Verify(value => value.AddToGroupAsync("conn-1", It.Is<string>(g => g.StartsWith("session:")), It.IsAny<CancellationToken>()), Times.Once);
         sessions.Verify(value => value.SaveAsync(It.IsAny<GatewaySession>(), It.IsAny<CancellationToken>()), Times.Once);
-        dispatched.Should().NotBeNull();
-        dispatched!.TargetAgentId.Should().Be("agent-a");
-        dispatched.Content.Should().Be("hello");
-        result.SessionId.Should().NotBeNullOrWhiteSpace();
+        dispatched.ShouldNotBeNull();
+        dispatched!.TargetAgentId.ShouldBe("agent-a");
+        dispatched.Content.ShouldBe("hello");
+        result.SessionId.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -212,7 +211,7 @@ public sealed class SignalRHubTests
 
         var result = await hub.SendMessage("agent-a", "telegram", "hello-telegram");
 
-        result.SessionId.Should().Be("telegram-session");
+        result.SessionId.ShouldBe("telegram-session");
         dispatcher.Verify(value => value.DispatchAsync(
                 It.Is<InboundMessage>(m =>
                     m.SessionId == "telegram-session" &&
@@ -252,10 +251,10 @@ public sealed class SignalRHubTests
         var result = await hub.SendMessage("agent-a", "telegram", "needs-new-session");
 
         var createdSessionId = result.SessionId;
-        createdSessionId.Should().NotBeNullOrWhiteSpace();
-        result.ChannelType.Should().Be("telegram");
-        capturedSession.Should().NotBeNull();
-        capturedSession!.ChannelType.Should().Be(ChannelKey.From("telegram"));
+        createdSessionId.ShouldNotBeNullOrWhiteSpace();
+        result.ChannelType.ShouldBe("telegram");
+        capturedSession.ShouldNotBeNull();
+        capturedSession!.ChannelType.ShouldBe(ChannelKey.From("telegram"));
         dispatcher.Verify(value => value.DispatchAsync(
                 It.Is<InboundMessage>(m =>
                     m.SessionId == createdSessionId &&
@@ -309,8 +308,8 @@ public sealed class SignalRHubTests
 
         Func<Task> act = () => hub.SendMessage(default, ChannelKey.From("signalr"), "hello");
 
-        await act.Should().ThrowAsync<HubException>()
-            .WithMessage("Agent ID is required.");
+        (await act.ShouldThrowAsync<HubException>())
+            .Message.ShouldBe("Agent ID is required.");
     }
 
     [Fact]
@@ -320,8 +319,8 @@ public sealed class SignalRHubTests
 
         Func<Task> act = () => hub.SendMessage(BotNexus.Domain.Primitives.AgentId.From("agent-a"), default, "hello");
 
-        await act.Should().ThrowAsync<HubException>()
-            .WithMessage("Channel type is required.");
+        (await act.ShouldThrowAsync<HubException>())
+            .Message.ShouldBe("Channel type is required.");
     }
 
     [Fact]
@@ -373,10 +372,10 @@ public sealed class SignalRHubTests
 
         var result = await hub.CompactSession("agent-a", "session-1");
 
-        result.Summarized.Should().Be(5);
-        result.Preserved.Should().Be(3);
-        result.TokensBefore.Should().Be(2000);
-        result.TokensAfter.Should().Be(800);
+        result.Summarized.ShouldBe(5);
+        result.Preserved.ShouldBe(3);
+        result.TokensBefore.ShouldBe(2000);
+        result.TokensAfter.ShouldBe(800);
     }
 
     [Fact]
@@ -388,8 +387,8 @@ public sealed class SignalRHubTests
 
         Func<Task> act = () => hub.CompactSession("agent-a", "missing");
 
-        await act.Should().ThrowAsync<HubException>()
-            .WithMessage("Session 'missing' not found.");
+        (await act.ShouldThrowAsync<HubException>())
+            .Message.ShouldBe("Session 'missing' not found.");
     }
 
     private static GatewayHub CreateHub(

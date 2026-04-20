@@ -1,7 +1,6 @@
 using BotNexus.Agent.Core.Types;
 using BotNexus.Memory.Tests.TestInfrastructure;
 using BotNexus.Memory.Tools;
-using FluentAssertions;
 
 namespace BotNexus.Memory.Tests.Tools;
 
@@ -19,9 +18,9 @@ public sealed class MemorySearchToolTests
             new Dictionary<string, object?> { ["query"] = "searchablememorytext" });
 
         var text = GetText(result);
-        text.Should().Contain("Found 1 memory entry:");
-        text.Should().Contain("ID: entry-1");
-        text.Should().Contain("Preview: searchablememorytext");
+        text.ShouldContain("Found 1 memory entry:");
+        text.ShouldContain("ID: entry-1");
+        text.ShouldContain("Preview: searchablememorytext");
     }
 
     [Fact]
@@ -34,7 +33,7 @@ public sealed class MemorySearchToolTests
             "call-2",
             new Dictionary<string, object?> { ["query"] = "nothing-matches-here" });
 
-        GetText(result).Should().Be("No matching memories found.");
+        GetText(result).ShouldBe("No matching memories found.");
     }
 
     private static string GetText(AgentToolResult result)

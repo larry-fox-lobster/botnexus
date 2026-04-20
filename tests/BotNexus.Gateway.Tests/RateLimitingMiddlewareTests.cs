@@ -2,7 +2,6 @@ using System.Net;
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Api;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using System.Reflection;
 
@@ -28,8 +27,8 @@ public sealed class RateLimitingMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        nextCalled.Should().BeTrue();
-        context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+        nextCalled.ShouldBeTrue();
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
     }
 
     [Fact]
@@ -50,9 +49,9 @@ public sealed class RateLimitingMiddlewareTests
         var secondContext = CreateContext("127.0.0.1");
         await middleware.InvokeAsync(secondContext);
 
-        secondContext.Response.StatusCode.Should().Be(StatusCodes.Status429TooManyRequests);
-        secondContext.Response.Headers.RetryAfter.ToString().Should().NotBeNullOrWhiteSpace();
-        nextCallCount.Should().Be(1);
+        secondContext.Response.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
+        secondContext.Response.Headers.RetryAfter.ToString().ShouldNotBeNullOrWhiteSpace();
+        nextCallCount.ShouldBe(1);
     }
 
     [Fact]
@@ -70,7 +69,7 @@ public sealed class RateLimitingMiddlewareTests
         await middleware.InvokeAsync(CreateContext("127.0.0.1"));
         await middleware.InvokeAsync(CreateContext("127.0.0.1"));
 
-        nextCallCount.Should().Be(2);
+        nextCallCount.ShouldBe(2);
     }
 
     [Fact]
@@ -85,8 +84,8 @@ public sealed class RateLimitingMiddlewareTests
         await middleware.InvokeAsync(overLimitContext);
 
         var retryAfterValue = overLimitContext.Response.Headers.RetryAfter.ToString();
-        int.TryParse(retryAfterValue, out var retryAfterSeconds).Should().BeTrue();
-        retryAfterSeconds.Should().BeGreaterThanOrEqualTo(1);
+        int.TryParse(retryAfterValue, out var retryAfterSeconds).ShouldBeTrue();
+        retryAfterSeconds.ShouldBeGreaterThanOrEqualTo(1);
     }
 
     [Fact]
@@ -109,7 +108,7 @@ public sealed class RateLimitingMiddlewareTests
         secondContext.Request.Path = "/health";
         await middleware.InvokeAsync(secondContext);
 
-        nextCallCount.Should().Be(2);
+        nextCallCount.ShouldBe(2);
     }
 
     [Fact]
@@ -128,8 +127,8 @@ public sealed class RateLimitingMiddlewareTests
         context.Request.Path = "/HEALTH";
         await middleware.InvokeAsync(context);
 
-        nextCallCount.Should().Be(1);
-        context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+        nextCallCount.ShouldBe(1);
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
     }
 
     [Fact]
@@ -155,7 +154,7 @@ public sealed class RateLimitingMiddlewareTests
         };
         await middleware.InvokeAsync(secondContext);
 
-        secondContext.Response.StatusCode.Should().Be(StatusCodes.Status429TooManyRequests);
+        secondContext.Response.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
     }
 
     [Fact]
@@ -170,8 +169,8 @@ public sealed class RateLimitingMiddlewareTests
         var secondClientFirstCall = CreateContext("127.0.0.2");
         await middleware.InvokeAsync(secondClientFirstCall);
 
-        firstClientFirstCall.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
-        secondClientFirstCall.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+        firstClientFirstCall.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
+        secondClientFirstCall.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
     }
 
     [Fact]
@@ -197,8 +196,8 @@ public sealed class RateLimitingMiddlewareTests
         };
         await middleware.InvokeAsync(tenantBContext);
 
-        tenantAContext.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
-        tenantBContext.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+        tenantAContext.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
+        tenantBContext.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
     }
 
     [Fact]
@@ -216,8 +215,8 @@ public sealed class RateLimitingMiddlewareTests
         secondContext.Request.Path = "/api/chat";
         await middleware.InvokeAsync(secondContext);
 
-        firstContext.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
-        secondContext.Response.StatusCode.Should().Be(StatusCodes.Status429TooManyRequests);
+        firstContext.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
+        secondContext.Response.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
     }
 
     [Fact]
@@ -232,13 +231,13 @@ public sealed class RateLimitingMiddlewareTests
 
         var secondContext = CreateContext("127.0.0.1");
         await middleware.InvokeAsync(secondContext);
-        secondContext.Response.StatusCode.Should().Be(StatusCodes.Status429TooManyRequests);
+        secondContext.Response.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
 
         await Task.Delay(TimeSpan.FromMilliseconds(1100));
 
         var thirdContext = CreateContext("127.0.0.1");
         await middleware.InvokeAsync(thirdContext);
-        thirdContext.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+        thirdContext.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
     }
 
     [Fact]
@@ -251,15 +250,15 @@ public sealed class RateLimitingMiddlewareTests
         await middleware.InvokeAsync(CreateContext("127.0.0.1"));
 
         var windows = GetClientWindows(middleware);
-        GetWindowCount(windows).Should().Be(1);
+        GetWindowCount(windows).ShouldBe(1);
         var staleWindow = GetWindow(windows, "ip:127.0.0.1");
         SetClientWindowLastAccessed(staleWindow, DateTimeOffset.UtcNow - TimeSpan.FromSeconds(3));
         ResetCleanupGate(middleware);
 
         await middleware.InvokeAsync(CreateContext("127.0.0.2"));
 
-        HasWindow(windows, "ip:127.0.0.2").Should().BeTrue();
-        HasWindow(windows, "ip:127.0.0.1").Should().BeFalse();
+        HasWindow(windows, "ip:127.0.0.2").ShouldBeTrue();
+        HasWindow(windows, "ip:127.0.0.1").ShouldBeFalse();
     }
 
     [Fact]
@@ -279,8 +278,8 @@ public sealed class RateLimitingMiddlewareTests
         await middleware.InvokeAsync(CreateContext("127.0.0.2"));
         await middleware.InvokeAsync(CreateContext("127.0.0.1"));
 
-        HasWindow(windows, "ip:127.0.0.1").Should().BeTrue();
-        GetWindowProperty(activeWindow, "RequestCount").Should().Be(2);
+        HasWindow(windows, "ip:127.0.0.1").ShouldBeTrue();
+        GetWindowProperty(activeWindow, "RequestCount").ShouldBe(2);
     }
 
     [Fact]
@@ -295,8 +294,8 @@ public sealed class RateLimitingMiddlewareTests
         await middleware.InvokeAsync(firstContext);
         await middleware.InvokeAsync(secondContext);
 
-        firstContext.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
-        secondContext.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+        firstContext.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
+        secondContext.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
     }
 
     [Fact]
@@ -311,7 +310,7 @@ public sealed class RateLimitingMiddlewareTests
         await middleware.InvokeAsync(firstContext);
         await middleware.InvokeAsync(secondContext);
 
-        secondContext.Response.StatusCode.Should().Be(StatusCodes.Status429TooManyRequests);
+        secondContext.Response.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
     }
 
     [Fact]
@@ -327,9 +326,9 @@ public sealed class RateLimitingMiddlewareTests
 
         var rateLimit = config.Gateway?.RateLimit;
 
-        rateLimit.Should().NotBeNull();
-        rateLimit!.RequestsPerMinute.Should().Be(75);
-        rateLimit.WindowSeconds.Should().Be(45);
+        rateLimit.ShouldNotBeNull();
+        rateLimit!.RequestsPerMinute.ShouldBe(75);
+        rateLimit.WindowSeconds.ShouldBe(45);
     }
 
     private static PlatformConfig CreateConfig(int requestsPerMinute, int windowSeconds)
@@ -381,7 +380,7 @@ public sealed class RateLimitingMiddlewareTests
         var tryGetValue = windows.GetType().GetMethod("TryGetValue", BindingFlags.Instance | BindingFlags.Public)!;
         var args = new object?[] { key, null };
         var found = (bool)(tryGetValue.Invoke(windows, args) ?? false);
-        found.Should().BeTrue($"expected rate-limit window '{key}' to exist");
+        found.ShouldBeTrue($"expected rate-limit window '{key}' to exist");
         return args[1]!;
     }
 

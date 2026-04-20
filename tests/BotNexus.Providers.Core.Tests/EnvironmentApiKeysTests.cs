@@ -1,4 +1,3 @@
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests;
 
@@ -9,7 +8,7 @@ public class EnvironmentApiKeysTests
     {
         var result = EnvironmentApiKeys.GetApiKey("totally-unknown-provider-xyz");
 
-        result.Should().BeNull();
+        result.ShouldBeNull();
     }
 
     [Fact]
@@ -19,8 +18,8 @@ public class EnvironmentApiKeysTests
         // and returns either null or a string for known providers
         var result = EnvironmentApiKeys.GetApiKey("openai");
 
-        // result is either null (env not set) or a string — both are valid
-        result.Should().Match<string?>(r => r == null || r.Length > 0);
+        // result is either null (env not set) or a non-empty string — both are valid
+        if (result != null) result.Length.ShouldBeGreaterThan(0);
     }
 
     [Fact]
@@ -29,7 +28,7 @@ public class EnvironmentApiKeysTests
         // Verify the anthropic path executes without error
         var result = EnvironmentApiKeys.GetApiKey("anthropic");
 
-        result.Should().Match<string?>(r => r == null || r.Length > 0);
+        if (result != null) result.Length.ShouldBeGreaterThan(0);
     }
 
     [Fact]
@@ -37,6 +36,6 @@ public class EnvironmentApiKeysTests
     {
         var result = EnvironmentApiKeys.GetApiKey("github-copilot");
 
-        result.Should().Match<string?>(r => r == null || r.Length > 0);
+        if (result != null) result.Length.ShouldBeGreaterThan(0);
     }
 }

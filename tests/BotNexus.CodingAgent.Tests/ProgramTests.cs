@@ -1,6 +1,5 @@
 using System.Reflection;
 using BotNexus.CodingAgent.Extensions;
-using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests;
 
@@ -12,11 +11,11 @@ public sealed class ProgramTests
     public void CombinePrompt_WhenStdinAndCliProvided_ConcatenatesInOrder()
     {
         var method = ProgramType.GetMethod("CombinePrompt", BindingFlags.NonPublic | BindingFlags.Static);
-        method.Should().NotBeNull();
+        method.ShouldNotBeNull();
 
         var combined = (string?)method!.Invoke(null, ["from-stdin ", "from-cli"]);
 
-        combined.Should().Be("from-stdin from-cli");
+        combined.ShouldBe("from-stdin from-cli");
     }
 
     [Fact]
@@ -28,10 +27,10 @@ public sealed class ProgramTests
         }
 
         var method = ProgramType.GetMethod("ReadPipedStdinAsync", BindingFlags.NonPublic | BindingFlags.Static);
-        method.Should().NotBeNull();
+        method.ShouldNotBeNull();
 
         var task = (Task<string?>)method!.Invoke(null, null)!;
         var result = await task;
-        result.Should().BeNull();
+        result.ShouldBeNull();
     }
 }

@@ -1,4 +1,3 @@
-using FluentAssertions;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.OpenAICompat;
 
@@ -11,18 +10,18 @@ public class PreConfiguredModelsTests
     {
         var model = PreConfiguredModels.Ollama("llama3.1");
 
-        model.Id.Should().Be("llama3.1");
-        model.Api.Should().Be("openai-compat");
-        model.Provider.Should().Be("ollama");
-        model.BaseUrl.Should().Be("http://localhost:11434/v1");
-        model.Cost.Input.Should().Be(0);
-        model.Cost.Output.Should().Be(0);
-        model.Compat.Should().NotBeNull();
-        model.Compat!.SupportsDeveloperRole.Should().BeFalse();
-        model.Compat.SupportsStore.Should().BeFalse();
-        model.Compat.MaxTokensField.Should().Be("max_tokens");
-        model.Compat.SupportsStrictMode.Should().BeFalse();
-        model.Compat.RequiresToolResultName.Should().BeTrue();
+        model.Id.ShouldBe("llama3.1");
+        model.Api.ShouldBe("openai-compat");
+        model.Provider.ShouldBe("ollama");
+        model.BaseUrl.ShouldBe("http://localhost:11434/v1");
+        model.Cost.Input.ShouldBe(0);
+        model.Cost.Output.ShouldBe(0);
+        model.Compat.ShouldNotBeNull();
+        model.Compat!.SupportsDeveloperRole.ShouldBeFalse();
+        model.Compat.SupportsStore.ShouldBeFalse();
+        model.Compat.MaxTokensField.ShouldBe("max_tokens");
+        model.Compat.SupportsStrictMode.ShouldBeFalse();
+        model.Compat.RequiresToolResultName.ShouldBeTrue();
     }
 
     [Fact]
@@ -30,15 +29,15 @@ public class PreConfiguredModelsTests
     {
         var model = PreConfiguredModels.VLlm("mistral-7b");
 
-        model.Id.Should().Be("mistral-7b");
-        model.Api.Should().Be("openai-compat");
-        model.Provider.Should().Be("vllm");
-        model.BaseUrl.Should().Be("http://localhost:8000/v1");
-        model.Cost.Input.Should().Be(0);
-        model.Compat.Should().NotBeNull();
-        model.Compat!.SupportsDeveloperRole.Should().BeFalse();
-        model.Compat.SupportsStore.Should().BeFalse();
-        model.Compat.SupportsStrictMode.Should().BeFalse();
+        model.Id.ShouldBe("mistral-7b");
+        model.Api.ShouldBe("openai-compat");
+        model.Provider.ShouldBe("vllm");
+        model.BaseUrl.ShouldBe("http://localhost:8000/v1");
+        model.Cost.Input.ShouldBe(0);
+        model.Compat.ShouldNotBeNull();
+        model.Compat!.SupportsDeveloperRole.ShouldBeFalse();
+        model.Compat.SupportsStore.ShouldBeFalse();
+        model.Compat.SupportsStrictMode.ShouldBeFalse();
     }
 
     [Fact]
@@ -46,15 +45,15 @@ public class PreConfiguredModelsTests
     {
         var model = PreConfiguredModels.LMStudio("phi-3");
 
-        model.Id.Should().Be("phi-3");
-        model.Api.Should().Be("openai-compat");
-        model.Provider.Should().Be("lmstudio");
-        model.BaseUrl.Should().Be("http://localhost:1234/v1");
-        model.Cost.Input.Should().Be(0);
-        model.Compat.Should().NotBeNull();
-        model.Compat!.SupportsDeveloperRole.Should().BeFalse();
-        model.Compat.MaxTokensField.Should().Be("max_tokens");
-        model.Compat.SupportsStrictMode.Should().BeFalse();
+        model.Id.ShouldBe("phi-3");
+        model.Api.ShouldBe("openai-compat");
+        model.Provider.ShouldBe("lmstudio");
+        model.BaseUrl.ShouldBe("http://localhost:1234/v1");
+        model.Cost.Input.ShouldBe(0);
+        model.Compat.ShouldNotBeNull();
+        model.Compat!.SupportsDeveloperRole.ShouldBeFalse();
+        model.Compat.MaxTokensField.ShouldBe("max_tokens");
+        model.Compat.SupportsStrictMode.ShouldBeFalse();
     }
 
     [Fact]
@@ -62,7 +61,7 @@ public class PreConfiguredModelsTests
     {
         var model = PreConfiguredModels.VLlm("mistral-7b", baseUrl: "http://gpu-server:8080/v1");
 
-        model.BaseUrl.Should().Be("http://gpu-server:8080/v1");
+        model.BaseUrl.ShouldBe("http://gpu-server:8080/v1");
     }
 
     [Fact]
@@ -70,7 +69,7 @@ public class PreConfiguredModelsTests
     {
         var model = PreConfiguredModels.Ollama("llama3.1", contextWindow: 256000, maxTokens: 64000);
 
-        model.ContextWindow.Should().Be(256000);
-        model.MaxTokens.Should().Be(64000);
+        model.ContextWindow.ShouldBe(256000);
+        model.MaxTokens.ShouldBe(64000);
     }
 }

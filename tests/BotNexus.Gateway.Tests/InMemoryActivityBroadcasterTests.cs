@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Activity;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BotNexus.Gateway.Tests;
@@ -12,9 +11,9 @@ public sealed class InMemoryActivityBroadcasterTests
     {
         var broadcaster = new InMemoryActivityBroadcaster(NullLogger<InMemoryActivityBroadcaster>.Instance);
 
-        var act = () => broadcaster.PublishAsync(CreateActivity()).AsTask();
+        Func<Task> act = () => broadcaster.PublishAsync(CreateActivity()).AsTask();
 
-        await act.Should().NotThrowAsync();
+        await act.ShouldNotThrowAsync();
     }
 
     [Fact]
@@ -28,7 +27,7 @@ public sealed class InMemoryActivityBroadcasterTests
 
         await broadcaster.PublishAsync(CreateActivity(), cts.Token);
 
-        (await moveNext).Should().BeTrue();
+        (await moveNext).ShouldBeTrue();
     }
 
     [Fact]
@@ -44,7 +43,7 @@ public sealed class InMemoryActivityBroadcasterTests
 
         await broadcaster.PublishAsync(CreateActivity(), cts.Token);
 
-        new[] { await firstMoveNext, await secondMoveNext }.Should().OnlyContain(x => x);
+        new[] { await firstMoveNext, await secondMoveNext }.ShouldAllBe(x => x);
     }
 
     [Fact]

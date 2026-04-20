@@ -1,5 +1,4 @@
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.Extensions.Options;
 using System.IO.Abstractions;
 
@@ -28,8 +27,8 @@ public sealed class PlatformConfigWatcherTests : IDisposable
 
         var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(10)));
 
-        completed.Should().Be(callback.Task);
-        (await callback.Task).Gateway?.DefaultAgentId.Should().Be("agent-b");
+        completed.ShouldBe(callback.Task);
+        (await callback.Task).Gateway?.DefaultAgentId.ShouldBe("agent-b");
     }
 
     [Fact]
@@ -45,8 +44,8 @@ public sealed class PlatformConfigWatcherTests : IDisposable
             File.WriteAllText(_configPath, """{"defaultAgentId":"agent-c"}""");
 
             var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(10)));
-            completed.Should().Be(callback.Task);
-            (await callback.Task).Gateway?.DefaultAgentId.Should().Be("agent-c");
+            completed.ShouldBe(callback.Task);
+            (await callback.Task).Gateway?.DefaultAgentId.ShouldBe("agent-c");
         }
         finally
         {
@@ -64,8 +63,8 @@ public sealed class PlatformConfigWatcherTests : IDisposable
 
         var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(10)));
 
-        completed.Should().Be(callback.Task);
-        (await callback.Task).Should().BeOfType<OptionsValidationException>();
+        completed.ShouldBe(callback.Task);
+        (await callback.Task).ShouldBeOfType<OptionsValidationException>();
     }
 
     public void Dispose()

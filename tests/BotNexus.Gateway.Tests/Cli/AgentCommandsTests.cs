@@ -1,4 +1,3 @@
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Cli;
 
@@ -21,9 +20,9 @@ public sealed class AgentCommandsTests
 
         var result = await fixture.RunCliAsync("agent", "list");
 
-        result.ExitCode.Should().Be(0);
-        result.StdOut.Should().Contain("assistant");
-        result.StdOut.Should().Contain("provider=copilot");
+        result.ExitCode.ShouldBe(0);
+        result.StdOut.ShouldContain("assistant");
+        result.StdOut.ShouldContain("provider=copilot");
     }
 
     [Fact]
@@ -34,9 +33,9 @@ public sealed class AgentCommandsTests
         var result = await fixture.RunCliAsync("agent", "add", "reviewer", "--provider", "copilot", "--model", "gpt-5", "--enabled", "true");
         var config = await fixture.LoadConfigAsync();
 
-        result.ExitCode.Should().Be(0);
-        config.Agents.Should().ContainKey("reviewer");
-        config.Agents!["reviewer"].Model.Should().Be("gpt-5");
+        result.ExitCode.ShouldBe(0);
+        config.Agents.ShouldContainKey("reviewer");
+        config.Agents!["reviewer"].Model.ShouldBe("gpt-5");
     }
 
     [Fact]
@@ -55,8 +54,8 @@ public sealed class AgentCommandsTests
 
         var result = await fixture.RunCliAsync("agent", "add", "assistant");
 
-        result.ExitCode.Should().Be(1);
-        result.CombinedOutput.Should().Contain("already exists");
+        result.ExitCode.ShouldBe(1);
+        result.CombinedOutput.ShouldContain("already exists");
     }
 
     [Fact]
@@ -80,8 +79,8 @@ public sealed class AgentCommandsTests
         var result = await fixture.RunCliAsync("agent", "remove", "reviewer");
         var config = await fixture.LoadConfigAsync();
 
-        result.ExitCode.Should().Be(0);
-        config.Agents.Should().NotContainKey("reviewer");
+        result.ExitCode.ShouldBe(0);
+        config.Agents.ShouldNotContainKey("reviewer");
     }
 
     [Fact]
@@ -91,7 +90,7 @@ public sealed class AgentCommandsTests
 
         var result = await fixture.RunCliAsync("agent", "remove", "assistant");
 
-        result.ExitCode.Should().Be(1);
-        result.CombinedOutput.Should().Contain("config file not found");
+        result.ExitCode.ShouldBe(1);
+        result.CombinedOutput.ShouldContain("config file not found");
     }
 }

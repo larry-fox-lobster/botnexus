@@ -1,6 +1,5 @@
 using System.Reflection;
 using BotNexus.Gateway;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -19,13 +18,13 @@ public sealed class HeartbeatAckTests
     {
         var result = InvokeIsHeartbeatAck(response);
 
-        result.Should().Be(expected);
+        result.ShouldBe(expected);
     }
 
     private static bool InvokeIsHeartbeatAck(string? response)
     {
         var method = typeof(GatewayHost).GetMethod("IsHeartbeatAck", BindingFlags.NonPublic | BindingFlags.Static);
-        method.Should().NotBeNull();
+        method.ShouldNotBeNull();
 
         return (bool)method!.Invoke(null, [response])!;
     }

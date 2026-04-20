@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Models;
 
@@ -11,8 +10,8 @@ public class ContentBlockTests
     {
         var block = new TextContent("Hello world");
 
-        block.Text.Should().Be("Hello world");
-        block.TextSignature.Should().BeNull();
+        block.Text.ShouldBe("Hello world");
+        block.TextSignature.ShouldBeNull();
     }
 
     [Fact]
@@ -20,7 +19,7 @@ public class ContentBlockTests
     {
         var block = new TextContent("Hello", "sig123");
 
-        block.TextSignature.Should().Be("sig123");
+        block.TextSignature.ShouldBe("sig123");
     }
 
     [Fact]
@@ -28,9 +27,9 @@ public class ContentBlockTests
     {
         var block = new ThinkingContent("reasoning here");
 
-        block.Thinking.Should().Be("reasoning here");
-        block.ThinkingSignature.Should().BeNull();
-        block.Redacted.Should().BeNull();
+        block.Thinking.ShouldBe("reasoning here");
+        block.ThinkingSignature.ShouldBeNull();
+        block.Redacted.ShouldBeNull();
     }
 
     [Fact]
@@ -38,7 +37,7 @@ public class ContentBlockTests
     {
         var block = new ThinkingContent("reasoning", "sig456");
 
-        block.ThinkingSignature.Should().Be("sig456");
+        block.ThinkingSignature.ShouldBe("sig456");
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public class ContentBlockTests
     {
         var block = new ThinkingContent("redacted data", Redacted: true);
 
-        block.Redacted.Should().BeTrue();
+        block.Redacted.ShouldBe(true);
     }
 
     [Fact]
@@ -54,8 +53,8 @@ public class ContentBlockTests
     {
         var block = new ImageContent("base64data==", "image/png");
 
-        block.Data.Should().Be("base64data==");
-        block.MimeType.Should().Be("image/png");
+        block.Data.ShouldBe("base64data==");
+        block.MimeType.ShouldBe("image/png");
     }
 
     [Fact]
@@ -64,10 +63,10 @@ public class ContentBlockTests
         var args = new Dictionary<string, object?> { ["path"] = "/tmp" };
         var block = new ToolCallContent("tc-1", "read_file", args);
 
-        block.Id.Should().Be("tc-1");
-        block.Name.Should().Be("read_file");
-        block.Arguments.Should().ContainKey("path");
-        block.ThoughtSignature.Should().BeNull();
+        block.Id.ShouldBe("tc-1");
+        block.Name.ShouldBe("read_file");
+        block.Arguments.ShouldContainKey("path");
+        block.ThoughtSignature.ShouldBeNull();
     }
 
     [Fact]
@@ -79,8 +78,8 @@ public class ContentBlockTests
         var json = JsonSerializer.Serialize(original, options);
         var deserialized = JsonSerializer.Deserialize<ContentBlock>(json, options);
 
-        deserialized.Should().BeOfType<TextContent>();
-        ((TextContent)deserialized!).Text.Should().Be("hello");
+        deserialized.ShouldBeOfType<TextContent>();
+        ((TextContent)deserialized!).Text.ShouldBe("hello");
     }
 
     [Fact]
@@ -92,10 +91,10 @@ public class ContentBlockTests
         var json = JsonSerializer.Serialize(original, options);
         var deserialized = JsonSerializer.Deserialize<ContentBlock>(json, options);
 
-        deserialized.Should().BeOfType<ThinkingContent>();
+        deserialized.ShouldBeOfType<ThinkingContent>();
         var thinking = (ThinkingContent)deserialized!;
-        thinking.Thinking.Should().Be("deep thought");
-        thinking.ThinkingSignature.Should().Be("sig");
+        thinking.Thinking.ShouldBe("deep thought");
+        thinking.ThinkingSignature.ShouldBe("sig");
     }
 
     [Fact]
@@ -107,10 +106,10 @@ public class ContentBlockTests
         var json = JsonSerializer.Serialize(original, options);
         var deserialized = JsonSerializer.Deserialize<ContentBlock>(json, options);
 
-        deserialized.Should().BeOfType<ImageContent>();
+        deserialized.ShouldBeOfType<ImageContent>();
         var image = (ImageContent)deserialized!;
-        image.Data.Should().Be("abc123");
-        image.MimeType.Should().Be("image/jpeg");
+        image.Data.ShouldBe("abc123");
+        image.MimeType.ShouldBe("image/jpeg");
     }
 
     [Fact]
@@ -123,7 +122,7 @@ public class ContentBlockTests
         var json = JsonSerializer.Serialize(original, options);
         var deserialized = JsonSerializer.Deserialize<ContentBlock>(json, options);
 
-        deserialized.Should().BeOfType<ToolCallContent>();
-        ((ToolCallContent)deserialized!).Name.Should().Be("my_tool");
+        deserialized.ShouldBeOfType<ToolCallContent>();
+        ((ToolCallContent)deserialized!).Name.ShouldBe("my_tool");
     }
 }

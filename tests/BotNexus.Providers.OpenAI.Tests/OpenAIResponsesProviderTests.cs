@@ -2,7 +2,6 @@ using BotNexus.Agent.Providers.OpenAI;
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BotNexus.Providers.OpenAI.Tests;
@@ -15,7 +14,7 @@ public class OpenAIResponsesProviderTests
         var provider = new OpenAIResponsesProvider(
             new HttpClient(), NullLogger<OpenAIResponsesProvider>.Instance);
 
-        provider.Api.Should().Be("openai-responses");
+        provider.Api.ShouldBe("openai-responses");
     }
 
     [Fact]
@@ -29,7 +28,7 @@ public class OpenAIResponsesProviderTests
 
         var stream = provider.StreamSimple(model, context);
 
-        stream.Should().NotBeNull();
+        stream.ShouldNotBeNull();
     }
 
     [Fact]
@@ -50,8 +49,8 @@ public class OpenAIResponsesProviderTests
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
-        body.RootElement.GetProperty("reasoning").GetProperty("effort").GetString().Should().Be("high");
-        body.RootElement.GetProperty("include")[0].GetString().Should().Be("reasoning.encrypted_content");
+        body.RootElement.GetProperty("reasoning").GetProperty("effort").GetString().ShouldBe("high");
+        body.RootElement.GetProperty("include")[0].GetString().ShouldBe("reasoning.encrypted_content");
     }
 
     [Fact]
@@ -68,7 +67,7 @@ public class OpenAIResponsesProviderTests
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
-        body.RootElement.GetProperty("reasoning").GetProperty("effort").GetString().Should().Be("none");
+        body.RootElement.GetProperty("reasoning").GetProperty("effort").GetString().ShouldBe("none");
     }
 
     [Fact]
@@ -90,7 +89,7 @@ public class OpenAIResponsesProviderTests
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
-        body.RootElement.GetProperty("prompt_cache_retention").GetString().Should().Be("24h");
+        body.RootElement.GetProperty("prompt_cache_retention").GetString().ShouldBe("24h");
     }
 
     [Fact]
@@ -111,7 +110,7 @@ public class OpenAIResponsesProviderTests
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
-        body.RootElement.GetProperty("reasoning").GetProperty("effort").GetString().Should().Be("high");
+        body.RootElement.GetProperty("reasoning").GetProperty("effort").GetString().ShouldBe("high");
     }
 
     [Fact]
@@ -129,9 +128,9 @@ public class OpenAIResponsesProviderTests
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
         var firstInput = body.RootElement.GetProperty("input")[0];
-        firstInput.GetProperty("role").GetString().Should().Be("developer");
-        firstInput.GetProperty("content").GetString().Should().Be("sys prompt");
-        firstInput.TryGetProperty("type", out _).Should().BeFalse();
+        firstInput.GetProperty("role").GetString().ShouldBe("developer");
+        firstInput.GetProperty("content").GetString().ShouldBe("sys prompt");
+        firstInput.TryGetProperty("type", out _).ShouldBeFalse();
     }
 
     [Fact]
@@ -166,7 +165,7 @@ public class OpenAIResponsesProviderTests
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.LastRequestBody!);
-        body.RootElement.TryGetProperty("previous_response_id", out _).Should().BeFalse();
+        body.RootElement.TryGetProperty("previous_response_id", out _).ShouldBeFalse();
     }
 
     [Fact]
@@ -192,8 +191,8 @@ public class OpenAIResponsesProviderTests
         });
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-        handler.LastRequestHeaders.Should().ContainKey("Openai-Intent");
-        handler.LastRequestHeaders["Openai-Intent"].Should().Contain("custom-intent");
+        handler.LastRequestHeaders.ShouldContainKey("Openai-Intent");
+        handler.LastRequestHeaders["Openai-Intent"].ShouldContain("custom-intent");
     }
 
     private static HttpResponseMessage SseResponse(string payload) =>

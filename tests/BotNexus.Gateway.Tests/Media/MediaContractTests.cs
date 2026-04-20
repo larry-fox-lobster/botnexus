@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Abstractions.Media;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Media;
 
@@ -15,9 +14,9 @@ public sealed class MediaContractTests
             ChannelType = "signalr"
         };
 
-        context.SessionId.Should().Be("session-1");
-        context.ChannelType.Should().Be("signalr");
-        context.CancellationToken.Should().Be(CancellationToken.None);
+        context.SessionId.ShouldBe("session-1");
+        context.ChannelType.ShouldBe("signalr");
+        context.CancellationToken.ShouldBe(CancellationToken.None);
     }
 
     [Fact]
@@ -33,8 +32,8 @@ public sealed class MediaContractTests
             ProcessedPart = processedPart
         };
 
-        result.ProcessedPart.Should().BeSameAs(processedPart);
-        result.WasTransformed.Should().BeFalse();
-        result.Metadata.Should().BeNull();
+        result.ProcessedPart.ShouldBeSameAs(processedPart);
+        result.WasTransformed.ShouldBeFalse();
+        result.Metadata.ShouldBeNull();
     }
 }

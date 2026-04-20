@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Abstractions.Hooks;
 using BotNexus.Gateway.Hooks;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -34,10 +33,10 @@ public sealed class HookDispatcherTests
         var evt = new BeforePromptBuildEvent("agent-1", "prompt", []);
         var results = await _dispatcher.DispatchAsync<BeforePromptBuildEvent, BeforePromptBuildResult>(evt);
 
-        executionOrder.Should().ContainInOrder("first", "second");
-        results.Should().HaveCount(2);
-        results[0].PrependSystemContext.Should().Be("A");
-        results[1].AppendSystemContext.Should().Be("B");
+        executionOrder.ToList().ShouldBe(new[] { "first", "second" });
+        results.Count().ShouldBe(2);
+        results[0].PrependSystemContext.ShouldBe("A");
+        results[1].AppendSystemContext.ShouldBe("B");
     }
 
     // ── No handlers ──────────────────────────────────────────────────
@@ -48,7 +47,7 @@ public sealed class HookDispatcherTests
         var evt = new AfterToolCallEvent("agent-1", "tool", "tc-1", null, false);
         var results = await _dispatcher.DispatchAsync<AfterToolCallEvent, AfterToolCallResult>(evt);
 
-        results.Should().BeEmpty();
+        results.ShouldBeEmpty();
     }
 
     // ── Null filtering ───────────────────────────────────────────────
@@ -67,7 +66,7 @@ public sealed class HookDispatcherTests
         var evt = new AfterToolCallEvent("agent-1", "tool", "tc-1", "ok", false);
         var results = await _dispatcher.DispatchAsync<AfterToolCallEvent, AfterToolCallResult>(evt);
 
-        results.Should().HaveCount(1);
+        results.Count().ShouldBe(1);
     }
 
     // ── BeforePromptBuild merging ────────────────────────────────────
@@ -90,7 +89,7 @@ public sealed class HookDispatcherTests
         var evt = new BeforePromptBuildEvent("agent-1", "prompt", []);
         var results = await _dispatcher.DispatchAsync<BeforePromptBuildEvent, BeforePromptBuildResult>(evt);
 
-        results.Should().HaveCount(2);
+        results.Count().ShouldBe(2);
 
         // Consumers can merge: collect all prepend/append values
         var allPrepend = results
@@ -102,8 +101,8 @@ public sealed class HookDispatcherTests
             .Select(r => r.AppendSystemContext)
             .ToList();
 
-        allPrepend.Should().ContainInOrder("Ctx-A", "Ctx-B");
-        allAppend.Should().Equal("Suffix-B");
+        allPrepend.ToList().ShouldBe(new[] { "Ctx-A", "Ctx-B" }, ignoreOrder: false);
+        allAppend.ShouldHaveSingleItem().ShouldBe("Suffix-B");
     }
 
     // ── BeforeToolCall deny ──────────────────────────────────────────
@@ -134,8 +133,8 @@ public sealed class HookDispatcherTests
 
         // Consumer short-circuits: check first result with Denied == true
         var denied = results.FirstOrDefault(r => r.Denied);
-        denied.Should().NotBeNull();
-        denied!.DenyReason.Should().Be("Extension policy blocks this tool.");
+        denied.ShouldNotBeNull();
+        denied!.DenyReason.ShouldBe("Extension policy blocks this tool.");
     }
 
     // ── Test helper ──────────────────────────────────────────────────

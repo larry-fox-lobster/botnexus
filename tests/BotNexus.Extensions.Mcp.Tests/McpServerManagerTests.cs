@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using BotNexus.Extensions.Mcp.Transport;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Mcp.Tests;
 
@@ -19,7 +18,7 @@ public class McpServerManagerTests
         };
 
         var tools = await manager.StartServersAsync(config);
-        tools.Should().BeEmpty();
+        tools.ShouldBeEmpty();
 
         await manager.DisposeAsync();
     }
@@ -49,7 +48,7 @@ public class McpServerManagerTests
     public void GetClients_ReturnsEmptyList_Initially()
     {
         var manager = new McpServerManager();
-        manager.GetClients().Should().BeEmpty();
+        manager.GetClients().ShouldBeEmpty();
     }
 
     [Fact]
@@ -60,8 +59,8 @@ public class McpServerManagerTests
 
         var tools = await manager.StartServersAsync(config);
 
-        tools.Should().BeEmpty();
-        manager.GetClients().Should().BeEmpty();
+        tools.ShouldBeEmpty();
+        manager.GetClients().ShouldBeEmpty();
 
         await manager.DisposeAsync();
     }
@@ -81,8 +80,8 @@ public class McpServerManagerTests
 
         var tools = await manager.StartServersAsync(config);
 
-        tools.Should().BeEmpty();
-        manager.GetClients().Should().BeEmpty();
+        tools.ShouldBeEmpty();
+        manager.GetClients().ShouldBeEmpty();
 
         await manager.DisposeAsync();
     }
@@ -94,7 +93,7 @@ public class McpServerManagerTests
 
         // No servers started, StopAll should be a no-op
         await manager.StopAllAsync();
-        manager.GetClients().Should().BeEmpty();
+        manager.GetClients().ShouldBeEmpty();
 
         await manager.DisposeAsync();
     }
@@ -106,7 +105,7 @@ public class McpServerManagerTests
         await manager.DisposeAsync();
 
         var act = () => manager.GetClients();
-        act.Should().Throw<ObjectDisposedException>();
+        act.ShouldThrow<ObjectDisposedException>();
     }
 
     [Fact]
@@ -117,7 +116,7 @@ public class McpServerManagerTests
 
         var config = new McpExtensionConfig { Servers = new Dictionary<string, McpServerConfig>() };
         var act = () => manager.StartServersAsync(config);
-        await act.Should().ThrowAsync<ObjectDisposedException>();
+        await act.ShouldThrowAsync<ObjectDisposedException>();
     }
 
     // --- Transport creation tests ---
@@ -127,8 +126,8 @@ public class McpServerManagerTests
     {
         var config = new McpServerConfig { Url = "http://localhost:8080/mcp" };
         var transport = McpServerManager.CreateTransport(config);
-        transport.Should().NotBeNull();
-        transport.Should().BeOfType<HttpSseMcpTransport>();
+        transport.ShouldNotBeNull();
+        transport.ShouldBeOfType<HttpSseMcpTransport>();
     }
 
     [Fact]
@@ -136,8 +135,8 @@ public class McpServerManagerTests
     {
         var config = new McpServerConfig { Command = "node", Args = ["server.js"] };
         var transport = McpServerManager.CreateTransport(config);
-        transport.Should().NotBeNull();
-        transport.Should().BeOfType<StdioMcpTransport>();
+        transport.ShouldNotBeNull();
+        transport.ShouldBeOfType<StdioMcpTransport>();
     }
 
     [Fact]
@@ -145,7 +144,7 @@ public class McpServerManagerTests
     {
         var config = new McpServerConfig();
         var transport = McpServerManager.CreateTransport(config);
-        transport.Should().BeNull();
+        transport.ShouldBeNull();
     }
 
     [Fact]
@@ -153,7 +152,7 @@ public class McpServerManagerTests
     {
         var config = new McpServerConfig { Url = "" };
         var transport = McpServerManager.CreateTransport(config);
-        transport.Should().BeNull();
+        transport.ShouldBeNull();
     }
 
     [Fact]
@@ -161,7 +160,7 @@ public class McpServerManagerTests
     {
         var config = new McpServerConfig { Url = "   " };
         var transport = McpServerManager.CreateTransport(config);
-        transport.Should().BeNull();
+        transport.ShouldBeNull();
     }
 
     [Fact]
@@ -175,7 +174,7 @@ public class McpServerManagerTests
             Args = ["server.js"]
         };
         var transport = McpServerManager.CreateTransport(config);
-        transport.Should().BeOfType<HttpSseMcpTransport>();
+        transport.ShouldBeOfType<HttpSseMcpTransport>();
     }
 
     [Fact]
@@ -196,8 +195,8 @@ public class McpServerManagerTests
 
         // Should not throw — bad servers are skipped with warnings
         var tools = await manager.StartServersAsync(config);
-        tools.Should().BeEmpty();
-        manager.GetClients().Should().BeEmpty();
+        tools.ShouldBeEmpty();
+        manager.GetClients().ShouldBeEmpty();
 
         await manager.DisposeAsync();
     }
@@ -221,7 +220,7 @@ public class McpServerManagerTests
         };
 
         var tools = await manager.StartServersAsync(config);
-        tools.Should().BeEmpty("server should time out during init");
+        tools.ShouldBeEmpty("server should time out during init");
 
         await manager.DisposeAsync();
     }

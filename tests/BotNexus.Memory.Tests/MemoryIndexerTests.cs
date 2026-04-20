@@ -3,7 +3,6 @@ using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Memory.Models;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BotNexus.Memory.Tests;
@@ -32,9 +31,11 @@ public sealed class MemoryIndexerTests
             await WaitForAsync(() => store.GetAll().Count == 2);
 
             var entries = store.GetAll().OrderBy(entry => entry.TurnIndex).ToList();
-            entries.Should().HaveCount(2);
-            entries[0].Content.Should().Contain("User: Hello").And.Contain("Assistant: Hi there");
-            entries[1].Content.Should().Contain("User: How are you?").And.Contain("Assistant: Doing great");
+            entries.Count().ShouldBe(2);
+            entries[0].Content.ShouldContain("User: Hello");
+            entries[0].Content.ShouldContain("Assistant: Hi there");
+            entries[1].Content.ShouldContain("User: How are you?");
+            entries[1].Content.ShouldContain("Assistant: Doing great");
         }
         finally
         {
@@ -63,8 +64,9 @@ public sealed class MemoryIndexerTests
             await WaitForAsync(() => store.GetAll().Count == 1);
 
             var indexed = store.GetAll().Single();
-            indexed.Content.Should().Contain("User: Run search").And.Contain("Assistant: Here is what I found");
-            indexed.Content.Should().NotContain("tool output");
+            indexed.Content.ShouldContain("User: Run search");
+            indexed.Content.ShouldContain("Assistant: Here is what I found");
+            indexed.Content.ShouldNotContain("tool output");
         }
         finally
         {
@@ -94,7 +96,7 @@ public sealed class MemoryIndexerTests
             await lifecycle.RaiseAsync(closedEvent);
             await Task.Delay(100);
 
-            store.GetAll().Should().HaveCount(1);
+            store.GetAll().Count().ShouldBe(1);
         }
         finally
         {
@@ -121,7 +123,7 @@ public sealed class MemoryIndexerTests
             await lifecycle.RaiseAsync(new SessionLifecycleEvent("session-4", "agent-a", SessionLifecycleEventType.Expired, session));
             await WaitForAsync(() => store.GetAll().Count == 1);
 
-            store.GetAll().Single().SourceType.Should().Be("conversation");
+            store.GetAll().Single().SourceType.ShouldBe("conversation");
         }
         finally
         {

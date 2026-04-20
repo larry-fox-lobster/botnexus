@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 
 namespace BotNexus.Domain.Tests;
 
@@ -12,7 +11,7 @@ public sealed class InboundMessageContentPartsTests
     {
         var message = CreateMessage();
 
-        message.ContentParts.Should().BeNull();
+        message.ContentParts.ShouldBeNull();
     }
 
     [Fact]
@@ -20,8 +19,8 @@ public sealed class InboundMessageContentPartsTests
     {
         var message = CreateMessage() with { ContentParts = [] };
 
-        message.ContentParts.Should().NotBeNull();
-        message.ContentParts.Should().BeEmpty();
+        message.ContentParts.ShouldNotBeNull();
+        message.ContentParts.ShouldBeEmpty();
     }
 
     [Fact]
@@ -32,11 +31,11 @@ public sealed class InboundMessageContentPartsTests
         var reference = new ReferenceContentPart { MimeType = "image/png", Uri = "https://example.invalid/image.png" };
         var message = CreateMessage() with { ContentParts = [text, binary, reference] };
 
-        message.ContentParts.Should().NotBeNull();
-        message.ContentParts.Should().HaveCount(3);
-        message.ContentParts![0].Should().BeSameAs(text);
-        message.ContentParts[1].Should().BeSameAs(binary);
-        message.ContentParts[2].Should().BeSameAs(reference);
+        message.ContentParts.ShouldNotBeNull();
+        message.ContentParts.Count().ShouldBe(3);
+        message.ContentParts![0].ShouldBeSameAs(text);
+        message.ContentParts[1].ShouldBeSameAs(binary);
+        message.ContentParts[2].ShouldBeSameAs(reference);
     }
 
     [Fact]
@@ -44,10 +43,9 @@ public sealed class InboundMessageContentPartsTests
     {
         var contentProperty = typeof(InboundMessage).GetProperty(nameof(InboundMessage.Content));
 
-        contentProperty.Should().NotBeNull();
+        contentProperty.ShouldNotBeNull();
         contentProperty!.GetCustomAttributes(typeof(RequiredMemberAttribute), inherit: false)
-            .Should()
-            .HaveCount(1);
+            .Length.ShouldBe(1);
     }
 
     [Fact]
@@ -58,8 +56,8 @@ public sealed class InboundMessageContentPartsTests
         var third = new TextContentPart { MimeType = "text/plain", Text = "third" };
         var message = CreateMessage() with { ContentParts = [first, second, third] };
 
-        message.ContentParts.Should().NotBeNull();
-        message.ContentParts!.Should().ContainInOrder(first, second, third);
+        message.ContentParts.ShouldNotBeNull();
+        message.ContentParts!.ToList().ShouldBe(new[] { first, second, third });
     }
 
     private static InboundMessage CreateMessage() => new()

@@ -1,7 +1,6 @@
 using System.Text;
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Api;
-using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.FileProviders;
@@ -32,7 +31,7 @@ public sealed class GatewayAuthMiddlewareRuntimeTests
 
         await middleware.InvokeAsync(context);
 
-        nextCalled.Should().BeTrue();
+        nextCalled.ShouldBeTrue();
     }
 
     [Fact]
@@ -54,10 +53,10 @@ public sealed class GatewayAuthMiddlewareRuntimeTests
 
         await middleware.InvokeAsync(context);
 
-        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
         context.Response.Body.Position = 0;
         var payload = await new StreamReader(context.Response.Body).ReadToEndAsync();
-        payload.Should().Contain("\"error\":\"unauthenticated\"");
+        payload.ShouldContain("\"error\":\"unauthenticated\"");
     }
 
     [Fact]
@@ -89,7 +88,7 @@ public sealed class GatewayAuthMiddlewareRuntimeTests
 
         await middleware.InvokeAsync(context);
 
-        context.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status403Forbidden);
     }
 
     private static IWebHostEnvironment CreateWebHostEnvironment()

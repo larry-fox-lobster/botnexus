@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.Playwright;
 
 namespace BotNexus.WebUI.Tests;
@@ -27,10 +26,10 @@ public sealed class ScrollbackE2ETests
 
         var atBottom = await host.Page.EvaluateAsync<bool>(
             "() => { const el = document.querySelector('.channel-view.active .channel-messages'); return el && el.scrollHeight > el.clientHeight && Math.abs((el.scrollHeight - el.clientHeight) - el.scrollTop) < 4; }");
-        atBottom.Should().BeTrue();
+        atBottom.ShouldBeTrue();
 
         var lastMessage = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message .msg-content").Last.InnerTextAsync();
-        lastMessage.Should().Contain("agent-a-s1-m39");
+        lastMessage.ShouldContain("agent-a-s1-m39");
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -47,7 +46,7 @@ public sealed class ScrollbackE2ETests
             $"() => document.querySelectorAll('.channel-view.active .channel-messages .message').length > {initialCount}");
 
         var finalCount = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message").CountAsync();
-        finalCount.Should().BeGreaterThan(initialCount);
+        finalCount.ShouldBeGreaterThan(initialCount);
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -59,7 +58,7 @@ public sealed class ScrollbackE2ETests
         await host.OpenAgentTimelineAsync(AgentA);
         var dividerCount = await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .session-divider").CountAsync();
 
-        dividerCount.Should().BeGreaterThan(0);
+        dividerCount.ShouldBeGreaterThan(0);
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -103,8 +102,8 @@ public sealed class ScrollbackE2ETests
             }",
             anchor.Text);
 
-        topAfter.Should().NotBe(double.NaN);
-        Math.Abs(topAfter - anchor.Top).Should().BeLessThan(4);
+        topAfter.ShouldNotBe(double.NaN);
+        Math.Abs(topAfter - anchor.Top).ShouldBeLessThan(4);
     }
 
     [PlaywrightFact(Timeout = 90000)]
@@ -127,7 +126,7 @@ public sealed class ScrollbackE2ETests
         await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .history-sentinel")).ToHaveCountAsync(1);
         await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .end-of-history")).ToBeVisibleAsync();
 
-        (await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat}").InnerTextAsync()).Should().NotContain(loadedFromAgentA);
+        (await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat}").InnerTextAsync()).ShouldNotContain(loadedFromAgentA);
     }
 
     private sealed class ScrollAnchor

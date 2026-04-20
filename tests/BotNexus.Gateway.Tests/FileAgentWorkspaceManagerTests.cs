@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using System.IO.Abstractions.TestingHelpers;
 
@@ -24,20 +23,20 @@ public sealed class FileAgentWorkspaceManagerTests : IDisposable
     {
         var workspace = await _workspaceManager.LoadWorkspaceAsync("farnsworth");
 
-        workspace.AgentName.Should().Be("farnsworth");
-        workspace.Soul.Should().Contain("# Soul");
-        workspace.Identity.Should().Contain("# Identity");
-        workspace.User.Should().Contain("# User");
-        workspace.Memory.Should().BeEmpty();
+        workspace.AgentName.ShouldBe("farnsworth");
+        workspace.Soul.ShouldContain("# Soul");
+        workspace.Identity.ShouldContain("# Identity");
+        workspace.User.ShouldContain("# User");
+        workspace.Memory.ShouldBeEmpty();
 
         var workspacePath = _workspaceManager.GetWorkspacePath("farnsworth");
-        _fileSystem.File.Exists(Path.Combine(workspacePath, "AGENTS.md")).Should().BeTrue();
-        _fileSystem.File.Exists(Path.Combine(workspacePath, "SOUL.md")).Should().BeTrue();
-        _fileSystem.File.Exists(Path.Combine(workspacePath, "TOOLS.md")).Should().BeTrue();
-        _fileSystem.File.Exists(Path.Combine(workspacePath, "BOOTSTRAP.md")).Should().BeTrue();
-        _fileSystem.File.Exists(Path.Combine(workspacePath, "IDENTITY.md")).Should().BeTrue();
-        _fileSystem.File.Exists(Path.Combine(workspacePath, "USER.md")).Should().BeTrue();
-        _fileSystem.File.Exists(Path.Combine(workspacePath, "MEMORY.md")).Should().BeFalse();
+        _fileSystem.File.Exists(Path.Combine(workspacePath, "AGENTS.md")).ShouldBeTrue();
+        _fileSystem.File.Exists(Path.Combine(workspacePath, "SOUL.md")).ShouldBeTrue();
+        _fileSystem.File.Exists(Path.Combine(workspacePath, "TOOLS.md")).ShouldBeTrue();
+        _fileSystem.File.Exists(Path.Combine(workspacePath, "BOOTSTRAP.md")).ShouldBeTrue();
+        _fileSystem.File.Exists(Path.Combine(workspacePath, "IDENTITY.md")).ShouldBeTrue();
+        _fileSystem.File.Exists(Path.Combine(workspacePath, "USER.md")).ShouldBeTrue();
+        _fileSystem.File.Exists(Path.Combine(workspacePath, "MEMORY.md")).ShouldBeFalse();
     }
 
     [Fact]
@@ -49,8 +48,8 @@ public sealed class FileAgentWorkspaceManagerTests : IDisposable
         var memoryPath = Path.Combine(_workspaceManager.GetWorkspacePath("farnsworth"), "MEMORY.md");
         var content = await _fileSystem.File.ReadAllTextAsync(memoryPath);
 
-        content.Should().Contain("first line");
-        content.Should().Contain("second line");
+        content.ShouldContain("first line");
+        content.ShouldContain("second line");
     }
 
     public void Dispose()

@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Domain.Primitives;
-using FluentAssertions;
 
 namespace BotNexus.Domain.Tests;
 
@@ -10,7 +9,7 @@ public sealed class AgentIdTests
     public void AgentId_From_WhenValueIsValid_ShouldCreateInstance()
     {
         var result = AgentId.From(" agent-1 ");
-        result.Value.Should().Be("agent-1");
+        result.Value.ShouldBe("agent-1");
     }
 
     [Theory]
@@ -19,8 +18,8 @@ public sealed class AgentIdTests
     [InlineData(" ")]
     public void AgentId_From_WhenValueIsEmpty_ShouldThrowArgumentException(string? value)
     {
-        var action = () => AgentId.From(value!);
-        action.Should().Throw<ArgumentException>();
+        Action action = () => AgentId.From(value!);
+        action.ShouldThrow<ArgumentException>();
     }
 
     [Fact]
@@ -28,7 +27,7 @@ public sealed class AgentIdTests
     {
         var left = AgentId.From("agent-1");
         var right = AgentId.From("agent-1");
-        left.Should().Be(right);
+        left.ShouldBe(right);
     }
 
     [Fact]
@@ -36,7 +35,7 @@ public sealed class AgentIdTests
     {
         var left = AgentId.From("agent-1");
         var right = AgentId.From("agent-2");
-        left.Should().NotBe(right);
+        left.ShouldNotBe(right);
     }
 
     [Fact]
@@ -44,21 +43,21 @@ public sealed class AgentIdTests
     {
         var id = AgentId.From("agent-1");
         string value = id;
-        value.Should().Be("agent-1");
+        value.ShouldBe("agent-1");
     }
 
     [Fact]
     public void AgentId_ExplicitConversion_WhenConvertedFromString_ShouldCreateInstance()
     {
         var id = (AgentId)"agent-1";
-        id.Value.Should().Be("agent-1");
+        id.Value.ShouldBe("agent-1");
     }
 
     [Fact]
     public void AgentId_ToString_WhenCalled_ShouldReturnValue()
     {
         var id = AgentId.From("agent-1");
-        id.ToString().Should().Be("agent-1");
+        id.ToString().ShouldBe("agent-1");
     }
 
     [Fact]
@@ -66,6 +65,6 @@ public sealed class AgentIdTests
     {
         var original = AgentId.From("agent-1");
         var roundTrip = JsonSerializer.Deserialize<AgentId>(JsonSerializer.Serialize(original));
-        roundTrip.Should().Be(original);
+        roundTrip.ShouldBe(original);
     }
 }

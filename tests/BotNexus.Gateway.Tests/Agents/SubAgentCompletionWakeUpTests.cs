@@ -6,7 +6,6 @@ using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -55,8 +54,8 @@ public sealed class SubAgentCompletionWakeUpTests
                 It.IsAny<AgentMessage>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
-        capturedMessage.Should().NotBeNull();
-        capturedMessage!.SubAgentId.Should().Be(spawned.SubAgentId);
+        capturedMessage.ShouldNotBeNull();
+        capturedMessage!.SubAgentId.ShouldBe(spawned.SubAgentId);
         dispatcher.Verify(d => d.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -69,9 +68,9 @@ public sealed class SubAgentCompletionWakeUpTests
             .Setup(d => d.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("dispatch failed"));
 
-        var act = () => manager.OnCompletedAsync(spawned.SubAgentId, "Done");
+        Func<Task> act = () => manager.OnCompletedAsync(spawned.SubAgentId, "Done");
 
-        await act.Should().NotThrowAsync();
+        await act.ShouldNotThrowAsync();
     }
 
     [Fact]

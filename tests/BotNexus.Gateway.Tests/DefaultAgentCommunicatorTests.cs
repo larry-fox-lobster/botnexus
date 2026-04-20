@@ -5,7 +5,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -31,7 +30,7 @@ public sealed class DefaultAgentCommunicatorTests
 
         await communicator.CallSubAgentAsync("parent-agent", "parent-session", "child-agent", "hello");
 
-        capturedSessionId!.Value.Value.Should().Be("parent-session::subagent::child-agent");
+        capturedSessionId!.Value.Value.ShouldBe("parent-session::subagent::child-agent");
     }
 
     [Fact]
@@ -56,7 +55,7 @@ public sealed class DefaultAgentCommunicatorTests
 
         var result = await communicator.CallCrossAgentAsync("caller-agent", string.Empty, "target-agent", "hello");
 
-        result.Content.Should().Be("ok");
+        result.Content.ShouldBe("ok");
         registry.Verify(r => r.Contains("target-agent"), Times.Once);
         registry.Verify(r => r.Get("target-agent"), Times.Once);
         strategy.VerifyAll();
@@ -81,10 +80,10 @@ public sealed class DefaultAgentCommunicatorTests
 
         communicator = new DefaultAgentCommunicator(registry.Object, supervisor.Object, NullLogger<DefaultAgentCommunicator>.Instance);
 
-        var act = () => communicator.CallCrossAgentAsync("agent-a", string.Empty, "agent-b", "hello");
+        Func<Task> act = () => communicator.CallCrossAgentAsync("agent-a", string.Empty, "agent-b", "hello");
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Recursive cross-agent call detected*");
+        (await act.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("Recursive cross-agent call detected");
     }
 
     [Fact]
@@ -95,10 +94,10 @@ public sealed class DefaultAgentCommunicatorTests
         var supervisor = new Mock<IAgentSupervisor>(MockBehavior.Strict);
         var communicator = new DefaultAgentCommunicator(registry.Object, supervisor.Object, NullLogger<DefaultAgentCommunicator>.Instance);
 
-        var act = () => communicator.CallCrossAgentAsync("source-agent", string.Empty, "missing-agent", "hello");
+        Func<Task> act = () => communicator.CallCrossAgentAsync("source-agent", string.Empty, "missing-agent", "hello");
 
-        await act.Should().ThrowAsync<KeyNotFoundException>()
-            .WithMessage("*missing-agent*");
+        (await act.ShouldThrowAsync<KeyNotFoundException>())
+            .Message.ShouldContain("missing-agent");
         supervisor.VerifyNoOtherCalls();
     }
 
@@ -113,10 +112,10 @@ public sealed class DefaultAgentCommunicatorTests
             .ThrowsAsync(new InvalidOperationException("failed to create handle"));
         var communicator = new DefaultAgentCommunicator(registry.Object, supervisor.Object, NullLogger<DefaultAgentCommunicator>.Instance);
 
-        var act = () => communicator.CallCrossAgentAsync("source-agent", string.Empty, "target-agent", "hello");
+        Func<Task> act = () => communicator.CallCrossAgentAsync("source-agent", string.Empty, "target-agent", "hello");
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*failed to create handle*");
+        (await act.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("failed to create handle");
     }
 
     [Fact]
@@ -135,7 +134,7 @@ public sealed class DefaultAgentCommunicatorTests
 
         await communicator.CallCrossAgentAsync("caller-agent", string.Empty, "target-agent", "hello");
 
-        capturedSessionId!.Value.Value.Should().StartWith("xagent::caller-agent::target-agent");
+        capturedSessionId!.Value.Value.ShouldStartWith("xagent::caller-agent::target-agent");
     }
 
     [Fact]
@@ -163,10 +162,10 @@ public sealed class DefaultAgentCommunicatorTests
 
         var results = await Task.WhenAll(calls);
 
-        seenSessionIds.Should().HaveCount(20);
-        seenSessionIds.Distinct(StringComparer.Ordinal).Should().HaveCount(20);
-        seenSessionIds.Should().OnlyContain(sessionId => sessionId.StartsWith("xagent::caller-agent::target-agent", StringComparison.Ordinal));
-        results.Select(response => response.Content).Distinct(StringComparer.Ordinal).Should().HaveCount(20);
+        seenSessionIds.Count().ShouldBe(20);
+        seenSessionIds.Distinct(StringComparer.Ordinal).Count().ShouldBe(20);
+        seenSessionIds.ShouldAllBe(sessionId => sessionId.StartsWith("xagent::caller-agent::target-agent", StringComparison.Ordinal));
+        results.Select(response => response.Content).Distinct(StringComparer.Ordinal).Count().ShouldBe(20);
     }
 
     [Fact]
@@ -191,10 +190,10 @@ public sealed class DefaultAgentCommunicatorTests
             new TestOptionsMonitor<GatewayOptions>(new GatewayOptions { MaxCallChainDepth = 1 }),
             NullLogger<DefaultAgentCommunicator>.Instance);
 
-        var act = () => communicator.CallCrossAgentAsync("agent-a", string.Empty, "agent-b", "hello");
+        Func<Task> act = () => communicator.CallCrossAgentAsync("agent-a", string.Empty, "agent-b", "hello");
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*exceeded maximum configured depth*");
+        (await act.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("exceeded maximum configured depth");
     }
 
     [Fact]
@@ -224,7 +223,7 @@ public sealed class DefaultAgentCommunicatorTests
 
         var result = await communicator.CallCrossAgentAsync("agent-a", string.Empty, "agent-b", "hello");
 
-        result.Content.Should().Be("ok");
+        result.Content.ShouldBe("ok");
     }
 
     [Fact]
@@ -253,10 +252,10 @@ public sealed class DefaultAgentCommunicatorTests
             NullLogger<DefaultAgentCommunicator>.Instance);
 
         var overDepth = () => communicator.CallCrossAgentAsync("agent-a", string.Empty, "agent-b", "first");
-        await overDepth.Should().ThrowAsync<InvalidOperationException>();
+        await overDepth.ShouldThrowAsync<InvalidOperationException>();
 
         var successful = await communicator.CallCrossAgentAsync("agent-a", string.Empty, "agent-d", "second");
-        successful.Content.Should().Be("ok");
+        successful.Content.ShouldBe("ok");
     }
 
     [Fact]
@@ -283,10 +282,11 @@ public sealed class DefaultAgentCommunicatorTests
             new TestOptionsMonitor<GatewayOptions>(new GatewayOptions { CrossAgentTimeoutSeconds = 1 }),
             NullLogger<DefaultAgentCommunicator>.Instance);
 
-        var act = () => communicator.CallCrossAgentAsync("source-agent", string.Empty, "target-agent", "hello");
+        Func<Task> act = () => communicator.CallCrossAgentAsync("source-agent", string.Empty, "target-agent", "hello");
 
-        await act.Should().ThrowAsync<TimeoutException>()
-            .WithMessage("*source-agent*target-agent*");
+        var ex = await act.ShouldThrowAsync<TimeoutException>();
+        ex.Message.ShouldContain("source-agent");
+        ex.Message.ShouldContain("target-agent");
     }
 
     [Fact]
@@ -311,7 +311,7 @@ public sealed class DefaultAgentCommunicatorTests
 
         var response = await communicator.CallCrossAgentAsync("source-agent", string.Empty, "target-agent", "hello");
 
-        response.Content.Should().Be("done");
+        response.Content.ShouldBe("done");
     }
 
     [Fact]
@@ -351,10 +351,10 @@ public sealed class DefaultAgentCommunicatorTests
         using var cts = new CancellationTokenSource();
         cts.CancelAfter(TimeSpan.FromMilliseconds(100));
 
-        var act = () => communicator.CallCrossAgentAsync("source-agent", string.Empty, "target-agent", "hello", cts.Token);
+        Func<Task> act = () => communicator.CallCrossAgentAsync("source-agent", string.Empty, "target-agent", "hello", cts.Token);
 
-        await act.Should().ThrowAsync<OperationCanceledException>();
-        tokenWasCanceled.Should().BeTrue();
+        await act.ShouldThrowAsync<OperationCanceledException>();
+        tokenWasCanceled.ShouldBeTrue();
     }
 
     private static AgentDescriptor CreateDescriptor(string agentId)

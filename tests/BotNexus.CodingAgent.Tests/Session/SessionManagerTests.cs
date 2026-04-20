@@ -1,7 +1,6 @@
 using System.Text.Json;
 using BotNexus.Agent.Core.Types;
 using BotNexus.CodingAgent.Session;
-using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.CodingAgent.Tests.Session;
@@ -23,16 +22,16 @@ public sealed class SessionManagerTests
     {
         var session = await _manager.CreateSessionAsync(_workingDirectory, "my-session");
 
-        session.Name.Should().Be("my-session");
-        session.WorkingDirectory.Should().Be(Path.GetFullPath(_workingDirectory));
+        session.Name.ShouldBe("my-session");
+        session.WorkingDirectory.ShouldBe(Path.GetFullPath(_workingDirectory));
 
         var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{session.Id}.jsonl");
-        _fileSystem.File.Exists(sessionPath).Should().BeTrue();
+        _fileSystem.File.Exists(sessionPath).ShouldBeTrue();
 
         var lines = await _fileSystem.File.ReadAllLinesAsync(sessionPath);
-        lines.Should().HaveCount(1);
-        lines[0].Should().Contain("\"type\":\"session_header\"");
-        lines[0].Should().Contain($"\"sessionId\":\"{session.Id}\"");
+        lines.Count().ShouldBe(1);
+        lines[0].ShouldContain("\"type\":\"session_header\"");
+        lines[0].ShouldContain($"\"sessionId\":\"{session.Id}\"");
     }
 
     [Fact]
@@ -43,11 +42,11 @@ public sealed class SessionManagerTests
         var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{session.Id}.jsonl");
         var header = (await _fileSystem.File.ReadAllLinesAsync(sessionPath)).Single();
 
-        session.ParentSessionId.Should().Be(parentSessionId);
-        session.Version.Should().Be(2);
-        header.Should().Contain("\"type\":\"session_header\"");
-        header.Should().Contain("\"version\":2");
-        header.Should().Contain($"\"parentSessionId\":\"{parentSessionId}\"");
+        session.ParentSessionId.ShouldBe(parentSessionId);
+        session.Version.ShouldBe(2);
+        header.ShouldContain("\"type\":\"session_header\"");
+        header.ShouldContain("\"version\":2");
+        header.ShouldContain($"\"parentSessionId\":\"{parentSessionId}\"");
     }
 
     [Fact]
@@ -65,9 +64,9 @@ public sealed class SessionManagerTests
         var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{created.Id}.jsonl");
         var fileContent = await _fileSystem.File.ReadAllTextAsync(sessionPath);
 
-        fileContent.Should().Contain("\"type\":\"message\"");
-        fileContent.Should().Contain("\"type\":\"tool_result\"");
-        fileContent.Should().Contain("\"type\":\"metadata\"");
+        fileContent.ShouldContain("\"type\":\"message\"");
+        fileContent.ShouldContain("\"type\":\"tool_result\"");
+        fileContent.ShouldContain("\"type\":\"metadata\"");
     }
 
     [Fact]
@@ -85,9 +84,9 @@ public sealed class SessionManagerTests
         var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{created.Id}.jsonl");
         var fileContent = await _fileSystem.File.ReadAllTextAsync(sessionPath);
 
-        fileContent.Should().Contain("\"type\":\"message\"");
-        fileContent.Should().Contain("\"type\":\"compaction_summary\"");
-        fileContent.Should().Contain("\"summary\":\"[Session context summary: compacted]\"");
+        fileContent.ShouldContain("\"type\":\"message\"");
+        fileContent.ShouldContain("\"type\":\"compaction_summary\"");
+        fileContent.ShouldContain("\"summary\":\"[Session context summary: compacted]\"");
     }
 
     [Fact]
@@ -100,10 +99,10 @@ public sealed class SessionManagerTests
         var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{created.Id}.jsonl");
         var fileContent = await _fileSystem.File.ReadAllTextAsync(sessionPath);
 
-        fileContent.Should().Contain("\"key\":\"thinking_level_change\"");
-        fileContent.Should().Contain("\"value\":\"off \\u2192 low\"");
-        fileContent.Should().Contain("\"key\":\"model_change\"");
-        fileContent.Should().Contain("\"value\":\"gpt-4.1 \\u2192 claude-sonnet-4.5\"");
+        fileContent.ShouldContain("\"key\":\"thinking_level_change\"");
+        fileContent.ShouldContain("\"value\":\"off \\u2192 low\"");
+        fileContent.ShouldContain("\"key\":\"model_change\"");
+        fileContent.ShouldContain("\"value\":\"gpt-4.1 \\u2192 claude-sonnet-4.5\"");
     }
 
     [Fact]
@@ -118,9 +117,9 @@ public sealed class SessionManagerTests
         var sessionPath = Path.Combine(_workingDirectory, ".botnexus-agent", "sessions", $"{created.Id}.jsonl");
         var fileContent = await _fileSystem.File.ReadAllTextAsync(sessionPath);
 
-        resumed.Messages.Should().ContainSingle();
-        fileContent.Should().Contain("\"key\":\"thinking_level_change\"");
-        fileContent.Should().Contain("\"value\":\"low \\u2192 high\"");
+        resumed.Messages.ShouldHaveSingleItem();
+        fileContent.ShouldContain("\"key\":\"thinking_level_change\"");
+        fileContent.ShouldContain("\"value\":\"low \\u2192 high\"");
     }
 
     [Fact]
@@ -130,8 +129,8 @@ public sealed class SessionManagerTests
 
         var (session, resumedMessages) = await _manager.ResumeSessionAsync(created.Id, _workingDirectory);
 
-        session.Id.Should().Be(created.Id);
-        resumedMessages.Should().BeEmpty();
+        session.Id.ShouldBe(created.Id);
+        resumedMessages.ShouldBeEmpty();
     }
 
     [Fact]
@@ -144,8 +143,10 @@ public sealed class SessionManagerTests
 
         var sessions = await _manager.ListSessionsAsync(_workingDirectory);
 
-        sessions.Should().HaveCount(2);
-        sessions.Select(session => session.Id).Should().Contain([first.Id, second.Id]);
+        sessions.Count().ShouldBe(2);
+        var sessionIds = sessions.Select(session => session.Id).ToList();
+        sessionIds.ShouldContain(first.Id);
+        sessionIds.ShouldContain(second.Id);
     }
 
     [Fact]
@@ -156,7 +157,7 @@ public sealed class SessionManagerTests
 
         await _manager.DeleteSessionAsync(session.Id, _workingDirectory);
 
-        _fileSystem.File.Exists(sessionPath).Should().BeFalse();
+        _fileSystem.File.Exists(sessionPath).ShouldBeFalse();
     }
 
     [Fact]
@@ -172,19 +173,19 @@ public sealed class SessionManagerTests
             .First(entry => entry.GetProperty("type").GetString() == "message")
             .GetProperty("entryId")
             .GetString();
-        rootEntryId.Should().NotBeNullOrWhiteSpace();
+        rootEntryId.ShouldNotBeNullOrWhiteSpace();
 
         await _manager.SaveSessionAsync(session with { ActiveLeafId = rootEntryId }, [new UserMessage("root"), new AssistantAgentMessage("branch")]);
 
         var branches = await _manager.ListBranchesAsync(session.Id, _workingDirectory);
-        branches.Should().HaveCount(2);
+        branches.Count().ShouldBe(2);
 
         var inactiveBranch = branches.Single(branch => !branch.IsActive);
         var switched = await _manager.SwitchBranchAsync(session.Id, _workingDirectory, inactiveBranch.LeafEntryId, "alternate");
-        switched.ActiveLeafId.Should().Be(inactiveBranch.LeafEntryId);
+        switched.ActiveLeafId.ShouldBe(inactiveBranch.LeafEntryId);
 
         var resumed = await _manager.ResumeSessionAsync(session.Id, _workingDirectory);
-        resumed.Session.ActiveLeafId.Should().Be(inactiveBranch.LeafEntryId);
+        resumed.Session.ActiveLeafId.ShouldBe(inactiveBranch.LeafEntryId);
     }
 
     [Fact]
@@ -212,9 +213,9 @@ public sealed class SessionManagerTests
             JsonSerializer.Serialize(new { Type = "user", Payload = userPayload }) + Environment.NewLine);
 
         var resumed = await _manager.ResumeSessionAsync(sessionId, _workingDirectory);
-        resumed.Messages.Should().ContainSingle();
-        resumed.Messages[0].Should().BeOfType<UserMessage>();
-        ((UserMessage)resumed.Messages[0]).Content.Should().Be("legacy hello");
+        resumed.Messages.ShouldHaveSingleItem();
+        resumed.Messages[0].ShouldBeOfType<UserMessage>();
+        ((UserMessage)resumed.Messages[0]).Content.ShouldBe("legacy hello");
     }
 
     [Fact]
@@ -227,7 +228,7 @@ public sealed class SessionManagerTests
         await _fileSystem.File.WriteAllLinesAsync(sessionPath, lines);
 
         var resumed = await _manager.ResumeSessionAsync(created.Id, _workingDirectory);
-        resumed.Session.Version.Should().Be(1);
+        resumed.Session.Version.ShouldBe(1);
 
         await _manager.SaveSessionAsync(resumed.Session, [new UserMessage("after-upgrade")]);
 
@@ -235,7 +236,7 @@ public sealed class SessionManagerTests
             .Select(line => JsonDocument.Parse(line).RootElement)
             .Where(entry => entry.GetProperty("type").GetString() == "session_header")
             .ToList();
-        headers.Should().NotBeEmpty();
-        headers.Last().GetProperty("version").GetInt32().Should().Be(2);
+        headers.ShouldNotBeEmpty();
+        headers.Last().GetProperty("version").GetInt32().ShouldBe(2);
     }
 }

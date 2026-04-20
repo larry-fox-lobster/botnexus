@@ -7,7 +7,6 @@ using BotNexus.Agent.Core.Tools;
 using BotNexus.AgentCore.Tests.TestUtils;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.AgentCore.Tests.Loop;
 
@@ -28,8 +27,9 @@ public class ToolExecutorTests
             return Task.CompletedTask;
         }, CancellationToken.None);
 
-        results.Should().HaveCount(2);
-        events.Select(evt => evt.Type).Should().Equal(
+        results.Count().ShouldBe(2);
+        events.Select(evt => evt.Type).ShouldBe(new[]
+        {
             AgentEventType.ToolExecutionStart,
             AgentEventType.ToolExecutionEnd,
             AgentEventType.MessageStart,
@@ -37,7 +37,8 @@ public class ToolExecutorTests
             AgentEventType.ToolExecutionStart,
             AgentEventType.ToolExecutionEnd,
             AgentEventType.MessageStart,
-            AgentEventType.MessageEnd);
+            AgentEventType.MessageEnd
+        });
     }
 
     [Fact]
@@ -52,8 +53,8 @@ public class ToolExecutorTests
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
         stopwatch.Stop();
 
-        results.Should().HaveCount(2);
-        stopwatch.ElapsedMilliseconds.Should().BeLessThan(1500);
+        results.Count().ShouldBe(2);
+        stopwatch.ElapsedMilliseconds.ShouldBeLessThan(1500);
     }
 
     [Fact]
@@ -80,7 +81,7 @@ public class ToolExecutorTests
 
         _ = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        beforeOrder.Should().Equal("t1", "t2", "t3");
+        beforeOrder.ShouldBe(new[] { "t1", "t2", "t3" });
     }
 
     [Fact]
@@ -92,9 +93,9 @@ public class ToolExecutorTests
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        results.Should().ContainSingle();
-        results[0].IsError.Should().BeTrue();
-        results[0].Result.Content[0].Value.Should().Contain("not registered");
+        results.ShouldHaveSingleItem();
+        results[0].IsError.ShouldBeTrue();
+        results[0].Result.Content[0].Value.ShouldContain("not registered");
     }
 
     [Fact]
@@ -116,12 +117,12 @@ public class ToolExecutorTests
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        results.Should().ContainSingle();
-        results[0].IsError.Should().BeTrue();
-        results[0].Result.Content[0].Value.Should().Contain("Invalid arguments for 'validator_tool'");
-        results[0].Result.Content[0].Value.Should().Contain("Missing required property 'path'");
-        tool.PrepareCallCount.Should().Be(0);
-        tool.ExecuteCount.Should().Be(0);
+        results.ShouldHaveSingleItem();
+        results[0].IsError.ShouldBeTrue();
+        results[0].Result.Content[0].Value.ShouldContain("Invalid arguments for 'validator_tool'");
+        results[0].Result.Content[0].Value.ShouldContain("Missing required property 'path'");
+        tool.PrepareCallCount.ShouldBe(0);
+        tool.ExecuteCount.ShouldBe(0);
     }
 
     [Theory]
@@ -139,9 +140,9 @@ public class ToolExecutorTests
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        results.Should().ContainSingle();
-        results[0].IsError.Should().BeFalse();
-        results[0].Result.Content[0].Value.Should().Be("first");
+        results.ShouldHaveSingleItem();
+        results[0].IsError.ShouldBeFalse();
+        results[0].Result.Content[0].Value.ShouldBe("first");
     }
 
     [Fact]
@@ -154,9 +155,9 @@ public class ToolExecutorTests
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        results.Should().ContainSingle();
-        results[0].IsError.Should().BeFalse();
-        results[0].Result.Content[0].Value.Should().Be("first");
+        results.ShouldHaveSingleItem();
+        results[0].IsError.ShouldBeFalse();
+        results[0].Result.Content[0].Value.ShouldBe("first");
     }
 
     [Theory]
@@ -171,9 +172,9 @@ public class ToolExecutorTests
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        results.Should().ContainSingle();
-        results[0].IsError.Should().BeTrue();
-        results[0].Result.Content[0].Value.Should().Contain("not registered");
+        results.ShouldHaveSingleItem();
+        results[0].IsError.ShouldBeTrue();
+        results[0].Result.Content[0].Value.ShouldContain("not registered");
     }
 
     [Fact]
@@ -187,10 +188,10 @@ public class ToolExecutorTests
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        results.Should().ContainSingle();
-        results[0].IsError.Should().BeTrue();
-        results[0].Result.Content[0].Value.Should().Contain("blocked");
-        tool.ExecuteCount.Should().Be(0);
+        results.ShouldHaveSingleItem();
+        results[0].IsError.ShouldBeTrue();
+        results[0].Result.Content[0].Value.ShouldContain("blocked");
+        tool.ExecuteCount.ShouldBe(0);
     }
 
     [Fact]
@@ -204,10 +205,10 @@ public class ToolExecutorTests
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        results.Should().ContainSingle();
-        results[0].IsError.Should().BeTrue();
-        results[0].Result.Content[0].Value.Should().Contain("BeforeToolCall hook failed: before hook exploded");
-        tool.ExecuteCount.Should().Be(0);
+        results.ShouldHaveSingleItem();
+        results[0].IsError.ShouldBeTrue();
+        results[0].Result.Content[0].Value.ShouldContain("BeforeToolCall hook failed: before hook exploded");
+        tool.ExecuteCount.ShouldBe(0);
     }
 
     [Fact]
@@ -222,9 +223,9 @@ public class ToolExecutorTests
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        results.Should().ContainSingle();
-        results[0].IsError.Should().BeFalse();
-        results[0].Result.Content.Should().ContainSingle().Which.Value.Should().Be("modified");
+        results.ShouldHaveSingleItem();
+        results[0].IsError.ShouldBeFalse();
+        results[0].Result.Content.ShouldHaveSingleItem().Value.ShouldBe("modified");
     }
 
     [Fact]
@@ -238,9 +239,9 @@ public class ToolExecutorTests
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        results.Should().ContainSingle();
-        results[0].IsError.Should().BeFalse();
-        results[0].Result.Content[0].Value.Should().Be("first");
+        results.ShouldHaveSingleItem();
+        results[0].IsError.ShouldBeFalse();
+        results[0].Result.Content[0].Value.ShouldBe("first");
     }
 
     [Fact]
@@ -255,7 +256,7 @@ public class ToolExecutorTests
 
         var action = () => ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, cts.Token);
 
-        await action.Should().ThrowAsync<OperationCanceledException>();
+        await action.ShouldThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -268,9 +269,9 @@ public class ToolExecutorTests
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        results.Should().ContainSingle();
-        results[0].IsError.Should().BeTrue();
-        results[0].Result.Content[0].Value.Should().Be("boom");
+        results.ShouldHaveSingleItem();
+        results[0].IsError.ShouldBeTrue();
+        results[0].Result.Content[0].Value.ShouldBe("boom");
     }
 
     [Fact]
@@ -288,13 +289,18 @@ public class ToolExecutorTests
             return Task.CompletedTask;
         }, CancellationToken.None);
 
-        results.Should().HaveCount(2);
-        events.Select(evt => evt.Type).Should().ContainInOrder(
+        results.Count().ShouldBe(2);
+        events.Select(evt => evt.Type).ToList().ShouldBe(new[]
+        {
             AgentEventType.ToolExecutionStart,
             AgentEventType.ToolExecutionEnd,
             AgentEventType.MessageStart,
             AgentEventType.MessageEnd,
-            AgentEventType.ToolExecutionStart);
+            AgentEventType.ToolExecutionStart,
+            AgentEventType.ToolExecutionEnd,
+            AgentEventType.MessageStart,
+            AgentEventType.MessageEnd
+        });
     }
 
     [Fact]
@@ -315,10 +321,10 @@ public class ToolExecutorTests
         var starts = events.OfType<ToolExecutionStartEvent>().ToDictionary(evt => evt.ToolCallId, evt => events.IndexOf(evt));
         var ends = events.OfType<ToolExecutionEndEvent>().ToDictionary(evt => evt.ToolCallId, evt => events.IndexOf(evt));
 
-        starts.Keys.Should().BeEquivalentTo(ends.Keys);
+        starts.Keys.ShouldBe(ends.Keys);
         foreach (var toolCallId in starts.Keys)
         {
-            starts[toolCallId].Should().BeLessThan(ends[toolCallId]);
+            starts[toolCallId].ShouldBeLessThan(ends[toolCallId]);
         }
     }
 

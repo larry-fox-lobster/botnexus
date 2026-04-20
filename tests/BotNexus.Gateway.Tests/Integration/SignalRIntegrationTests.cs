@@ -13,7 +13,6 @@ using BotNexus.Gateway.Api;
 using BotNexus.Extensions.Channels.SignalR;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Tests.Helpers;
-using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -46,10 +45,10 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await connection.StartAsync(cts.Token);
         var connected = await connectedTcs.Task.WaitAsync(cts.Token);
 
-        connected.GetProperty("connectionId").GetString().Should().Be(connection.ConnectionId);
+        connected.GetProperty("connectionId").GetString().ShouldBe(connection.ConnectionId);
         connected.GetProperty("agents").EnumerateArray()
             .Select(agent => agent.GetProperty("agentId").GetString())
-            .Should().Contain(TestAgentId);
+            .ShouldContain(TestAgentId);
     }
 
     [Fact]
@@ -71,7 +70,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         var result = await connection.InvokeAsync<JsonElement>("SubscribeAll", cts.Token);
         var sessions = result.GetProperty("sessions").EnumerateArray().ToList();
 
-        sessions.Should().ContainSingle(s => s.GetProperty("sessionId").GetString() == "manifest-1");
+        sessions.Where(s => s.GetProperty("sessionId").GetString() == "manifest-1").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -103,8 +102,8 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await adapter.SendStreamEventAsync(sessionA, new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "all-a" }, cts.Token);
         await adapter.SendStreamEventAsync(sessionB, new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "all-b" }, cts.Token);
 
-        (await eventA.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("all-a");
-        (await eventB.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("all-b");
+        (await eventA.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("all-a");
+        (await eventB.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("all-b");
     }
 
     [Fact]
@@ -121,9 +120,9 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
 
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         var subscribed = await connection.InvokeAsync<JsonElement>("SubscribeAll", cts.Token);
-        subscribed.GetProperty("sessions").EnumerateArray().Should()
-            .Contain(item => item.GetProperty("sessionId").GetString() == sessionTarget)
-            .And.Contain(item => item.GetProperty("sessionId").GetString() == sessionOther);
+        var sessionsArr = subscribed.GetProperty("sessions").EnumerateArray().ToList();
+        sessionsArr.ShouldContain(item => item.GetProperty("sessionId").GetString() == sessionTarget);
+        sessionsArr.ShouldContain(item => item.GetProperty("sessionId").GetString() == sessionOther);
 
         var targetReceived = new TaskCompletionSource<AgentStreamEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
         var otherReceived = new TaskCompletionSource<AgentStreamEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -139,8 +138,8 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await adapter.SendStreamEventAsync(sessionTarget, new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "target-only" }, cts.Token);
         await adapter.SendStreamEventAsync(sessionOther, new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "other-should-not-arrive" }, cts.Token);
 
-        (await targetReceived.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("target-only");
-        (await otherReceived.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("other-should-not-arrive");
+        (await targetReceived.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("target-only");
+        (await otherReceived.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("other-should-not-arrive");
     }
 
     [Fact]
@@ -157,7 +156,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await connection.StartAsync(cts.Token);
         var connected = await connectedTcs.Task.WaitAsync(cts.Token);
 
-        connected.GetProperty("capabilities").GetProperty("multiSession").GetBoolean().Should().BeTrue();
+        connected.GetProperty("capabilities").GetProperty("multiSession").GetBoolean().ShouldBeTrue();
     }
 
     [Fact]
@@ -173,11 +172,11 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
 
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         var joinResult = await connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, joinedSession, cts.Token);
-        joinResult.GetProperty("sessionId").GetString().Should().Be(joinedSession);
+        joinResult.GetProperty("sessionId").GetString().ShouldBe(joinedSession);
 
         var subscribeAllResult = await connection.InvokeAsync<JsonElement>("SubscribeAll", cts.Token);
         subscribeAllResult.GetProperty("sessions").EnumerateArray()
-            .Should().Contain(item => item.GetProperty("sessionId").GetString() == subscribedSession);
+            .ShouldContain(item => item.GetProperty("sessionId").GetString() == subscribedSession);
 
         var joinedTcs = new TaskCompletionSource<AgentStreamEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
         var subscribedTcs = new TaskCompletionSource<AgentStreamEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -193,8 +192,8 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await adapter.SendStreamEventAsync(joinedSession, new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "legacy-join-event" }, cts.Token);
         await adapter.SendStreamEventAsync(subscribedSession, new AgentStreamEvent { Type = AgentStreamEventType.ContentDelta, ContentDelta = "subscribe-all-event" }, cts.Token);
 
-        (await joinedTcs.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("legacy-join-event");
-        (await subscribedTcs.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("subscribe-all-event");
+        (await joinedTcs.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("legacy-join-event");
+        (await subscribedTcs.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("subscribe-all-event");
     }
 
     [Fact]
@@ -208,9 +207,9 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         const string sessionId = "session-join-1";
         var result = await connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionId, cts.Token);
 
-        result.GetProperty("sessionId").GetString().Should().Be(sessionId);
-        result.GetProperty("agentId").GetString().Should().Be(TestAgentId);
-        result.GetProperty("messageCount").GetInt32().Should().Be(0);
+        result.GetProperty("sessionId").GetString().ShouldBe(sessionId);
+        result.GetProperty("agentId").GetString().ShouldBe(TestAgentId);
+        result.GetProperty("messageCount").GetInt32().ShouldBe(0);
     }
 
     [Fact]
@@ -223,8 +222,8 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         var result = await connection.InvokeCoreAsync<JsonElement>("JoinSession", [TestAgentId, null], cts.Token);
 
-        result.GetProperty("sessionId").GetString().Should().NotBeNullOrWhiteSpace();
-        result.GetProperty("agentId").GetString().Should().Be(TestAgentId);
+        result.GetProperty("sessionId").GetString().ShouldNotBeNullOrWhiteSpace();
+        result.GetProperty("agentId").GetString().ShouldBe(TestAgentId);
     }
 
     [Fact]
@@ -239,8 +238,8 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionId, cts.Token);
         var secondJoin = await connection.InvokeAsync<JsonElement>("JoinSession", TestAgentId, sessionId, cts.Token);
 
-        secondJoin.GetProperty("sessionId").GetString().Should().Be(sessionId);
-        secondJoin.GetProperty("messageCount").GetInt32().Should().Be(0);
+        secondJoin.GetProperty("sessionId").GetString().ShouldBe(sessionId);
+        secondJoin.GetProperty("messageCount").GetInt32().ShouldBe(0);
     }
 
     [Fact]
@@ -258,14 +257,13 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         var result = await connection.InvokeAsync<JsonElement>("SendMessage", TestAgentId, "signalr", "hello", cts.Token);
         var sessionId = result.GetProperty("sessionId").GetString();
-        sessionId.Should().NotBeNullOrWhiteSpace();
+        sessionId.ShouldNotBeNullOrWhiteSpace();
 
-        dispatcher.Messages.Should().ContainSingle()
-            .Which.Should().Match<InboundMessage>(m =>
-                m.TargetAgentId == TestAgentId &&
-                m.SessionId == sessionId &&
-                m.Content == "hello" &&
-                Equals(m.Metadata["messageType"], "message"));
+        var msg = dispatcher.Messages.ShouldHaveSingleItem();
+        msg.TargetAgentId.ShouldBe(TestAgentId);
+        msg.SessionId.ShouldBe(sessionId);
+        msg.Content.ShouldBe("hello");
+        msg.Metadata["messageType"].ShouldBe("message");
     }
 
     [Fact]
@@ -281,9 +279,9 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await RegisterAgentAsync(factory, cts.Token);
 
         await using var connection = await CreateStartedConnection(factory, cts.Token);
-        var act = async () => await connection.InvokeCoreAsync("SendMessage", [TestAgentId, null, "no-session"], cts.Token);
+        Func<Task> act = async () => await connection.InvokeCoreAsync("SendMessage", [TestAgentId, null, "no-session"], cts.Token);
 
-        await act.Should().ThrowAsync<HubException>();
+        await act.ShouldThrowAsync<HubException>();
     }
 
     [Fact]
@@ -320,8 +318,8 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         await connection.InvokeAsync("SendMessage", TestAgentId, "telegram", "latest", cts.Token);
 
-        dispatcher.Messages.Should().ContainSingle();
-        dispatcher.Messages[0].SessionId.Should().Be(sessionB);
+        dispatcher.Messages.ShouldHaveSingleItem();
+        dispatcher.Messages[0].SessionId.ShouldBe(sessionB);
     }
 
     [Fact]
@@ -360,7 +358,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
             connection.InvokeAsync("SendMessage", TestAgentId, "signalr", "before-switch", cts.Token),
             connection.InvokeAsync("SendMessage", TestAgentId, "telegram", "after-switch", cts.Token));
 
-        dispatcher.Messages.Should().ContainSingle(m => m.SessionId == sessionB && m.Content == "after-switch");
+        dispatcher.Messages.Where(m => m.SessionId == sessionB && m.Content == "after-switch").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -397,9 +395,9 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         await connection.InvokeAsync("SendMessage", TestAgentId, "telegram", "send-during-join", cts.Token);
 
-        dispatcher.Messages.Should().ContainSingle();
-        dispatcher.Messages[0].SessionId.Should().Be(sessionB);
-        dispatcher.Messages[0].Content.Should().Be("send-during-join");
+        dispatcher.Messages.ShouldHaveSingleItem();
+        dispatcher.Messages[0].SessionId.ShouldBe(sessionB);
+        dispatcher.Messages[0].Content.ShouldBe("send-during-join");
     }
 
     [Fact]
@@ -436,9 +434,9 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         await connection.InvokeAsync("SendMessage", TestAgentId, "telegram", "immediate-after-join", cts.Token);
 
-        dispatcher.Messages.Should().ContainSingle();
-        dispatcher.Messages[0].SessionId.Should().Be(sessionB);
-        dispatcher.Messages[0].Content.Should().Be("immediate-after-join");
+        dispatcher.Messages.ShouldHaveSingleItem();
+        dispatcher.Messages[0].SessionId.ShouldBe(sessionB);
+        dispatcher.Messages[0].Content.ShouldBe("immediate-after-join");
     }
 
     [Fact]
@@ -479,15 +477,15 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await connection.InvokeAsync("SendMessage", agentA, "signalr", "message-for-a", cts.Token);
         await connection.InvokeAsync("SendMessage", agentB, "signalr", "message-for-b", cts.Token);
 
-        dispatcher.Messages.Should().HaveCount(2);
-        dispatcher.Messages.Should().ContainSingle(m =>
+        dispatcher.Messages.Count().ShouldBe(2);
+        dispatcher.Messages.Where(m =>
             m.TargetAgentId == agentA &&
             m.SessionId == sessionA &&
-            m.Content == "message-for-a");
-        dispatcher.Messages.Should().ContainSingle(m =>
+            m.Content == "message-for-a").ShouldHaveSingleItem();
+        dispatcher.Messages.Where(m =>
             m.TargetAgentId == agentB &&
             m.SessionId == sessionB &&
-            m.Content == "message-for-b");
+            m.Content == "message-for-b").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -530,15 +528,15 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await connection.InvokeAsync("SendMessage", agentA, "signalr", "message-for-a", cts.Token);
         await connection.InvokeAsync("SendMessage", agentB, "signalr", "message-for-b", cts.Token);
 
-        dispatcher.Messages.Should().HaveCount(2);
-        dispatcher.Messages.Should().ContainSingle(m =>
+        dispatcher.Messages.Count().ShouldBe(2);
+        dispatcher.Messages.Where(m =>
             m.TargetAgentId == agentA &&
             m.SessionId == sessionA &&
-            m.Content == "message-for-a");
-        dispatcher.Messages.Should().ContainSingle(m =>
+            m.Content == "message-for-a").ShouldHaveSingleItem();
+        dispatcher.Messages.Where(m =>
             m.TargetAgentId == agentB &&
             m.SessionId == sessionB &&
-            m.Content == "message-for-b");
+            m.Content == "message-for-b").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -569,10 +567,10 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
 
         var result = await connection.InvokeAsync<JsonElement>("SendMessage", TestAgentId, "signalr", "after-leave", cts.Token);
 
-        result.GetProperty("sessionId").GetString().Should().NotBeNullOrWhiteSpace();
-        dispatcher.Messages.Should().ContainSingle();
-        dispatcher.Messages[0].Content.Should().Be("after-leave");
-        dispatcher.Messages[0].SessionId.Should().NotBeNullOrWhiteSpace();
+        result.GetProperty("sessionId").GetString().ShouldNotBeNullOrWhiteSpace();
+        dispatcher.Messages.ShouldHaveSingleItem();
+        dispatcher.Messages[0].Content.ShouldBe("after-leave");
+        dispatcher.Messages[0].SessionId.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -621,11 +619,11 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
             ContentDelta = "event-b"
         }, cts.Token);
 
-        (await receivedA.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("event-a");
-        (await receivedB.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("event-b");
+        (await receivedA.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("event-a");
+        (await receivedB.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("event-b");
         await Task.Delay(250, cts.Token);
-        crossReceivedA.Should().BeFalse();
-        crossReceivedB.Should().BeFalse();
+        crossReceivedA.ShouldBeFalse();
+        crossReceivedB.ShouldBeFalse();
     }
 
     [Fact]
@@ -654,8 +652,8 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
             ContentDelta = "group-message"
         }, cts.Token);
 
-        (await receivedA.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("group-message");
-        (await receivedB.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("group-message");
+        (await receivedA.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("group-message");
+        (await receivedB.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("group-message");
     }
 
     [Fact]
@@ -674,9 +672,9 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         const string sessionId = "steer-session";
         await connection.InvokeAsync("Steer", TestAgentId, sessionId, "course correction", cts.Token);
 
-        dispatcher.Messages.Should().ContainSingle();
-        dispatcher.Messages[0].Metadata["messageType"].Should().Be("steer");
-        dispatcher.Messages[0].Metadata["control"].Should().Be("steer");
+        dispatcher.Messages.ShouldHaveSingleItem();
+        dispatcher.Messages[0].Metadata["messageType"].ShouldBe("steer");
+        dispatcher.Messages[0].Metadata["control"].ShouldBe("steer");
     }
 
     [Fact]
@@ -695,9 +693,9 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         const string sessionId = "followup-session";
         await connection.InvokeAsync("FollowUp", TestAgentId, sessionId, "next step", cts.Token);
 
-        dispatcher.Messages.Should().ContainSingle();
-        dispatcher.Messages[0].Content.Should().Be("next step");
-        dispatcher.Messages[0].Metadata["messageType"].Should().Be("message");
+        dispatcher.Messages.ShouldHaveSingleItem();
+        dispatcher.Messages[0].Content.ShouldBe("next step");
+        dispatcher.Messages[0].Metadata["messageType"].ShouldBe("message");
     }
 
     [Fact]
@@ -716,12 +714,12 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await connection.InvokeAsync("ResetSession", TestAgentId, sessionId, cts.Token);
 
         var resetPayload = await resetTcs.Task.WaitAsync(cts.Token);
-        resetPayload.GetProperty("sessionId").GetString().Should().Be(sessionId);
-        resetPayload.GetProperty("agentId").GetString().Should().Be(TestAgentId);
+        resetPayload.GetProperty("sessionId").GetString().ShouldBe(sessionId);
+        resetPayload.GetProperty("agentId").GetString().ShouldBe(TestAgentId);
 
         var store = factory.Services.GetRequiredService<ISessionStore>();
         var session = await store.GetAsync(sessionId, cts.Token);
-        session.Should().BeNull();
+        session.ShouldBeNull();
     }
 
     [Fact]
@@ -739,8 +737,8 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         await connection.InvokeAsync("Abort", TestAgentId, "abort-session", cts.Token);
 
-        supervisor.Handle.AbortCalled.Should().BeTrue();
-        supervisor.GetOrCreateCalled.Should().BeTrue();
+        supervisor.Handle.AbortCalled.ShouldBeTrue();
+        supervisor.GetOrCreateCalled.ShouldBeTrue();
     }
 
     [Fact]
@@ -765,8 +763,8 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         }, cts.Token);
 
         var payload = await deltaTcs.Task.WaitAsync(cts.Token);
-        payload.Type.Should().Be(AgentStreamEventType.ContentDelta);
-        payload.ContentDelta.Should().Be("delta-text");
+        payload.Type.ShouldBe(AgentStreamEventType.ContentDelta);
+        payload.ContentDelta.ShouldBe("delta-text");
     }
 
     [Fact]
@@ -795,9 +793,9 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
             ContentDelta = "session-a-only"
         }, cts.Token);
 
-        (await aTcs.Task.WaitAsync(cts.Token)).ContentDelta.Should().Be("session-a-only");
+        (await aTcs.Task.WaitAsync(cts.Token)).ContentDelta.ShouldBe("session-a-only");
         await Task.Delay(250, cts.Token);
-        bReceived.Should().BeFalse();
+        bReceived.ShouldBeFalse();
     }
 
     [Fact]
@@ -864,7 +862,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
             };
 
             var payload = await handlers[method].Task.WaitAsync(cts.Token);
-            payload.Type.Should().Be(expected);
+            payload.Type.ShouldBe(expected);
         }
 
         foreach (var subscription in subscriptions)
@@ -881,10 +879,10 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         var agents = await connection.InvokeAsync<JsonElement>("GetAgents", cts.Token);
 
-        agents.ValueKind.Should().Be(JsonValueKind.Array);
+        agents.ValueKind.ShouldBe(JsonValueKind.Array);
         agents.EnumerateArray()
             .Select(agent => agent.GetProperty("agentId").GetString())
-            .Should().Contain(TestAgentId);
+            .ShouldContain(TestAgentId);
     }
 
     [Fact]
@@ -897,7 +895,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         var status = await connection.InvokeAsync<object?>("GetAgentStatus", TestAgentId, "unknown-session", cts.Token);
 
-        status.Should().BeNull();
+        status.ShouldBeNull();
     }
 
     private static WebApplicationFactory<Program> CreateTestFactory(Action<IServiceCollection>? configureServices = null)
@@ -956,7 +954,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         };
 
         var response = await client.PostAsJsonAsync("/api/agents", descriptor, CancellationToken.None);
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.Created, HttpStatusCode.Conflict);
+        response.StatusCode.ShouldBeOneOf(HttpStatusCode.Created, HttpStatusCode.Conflict);
     }
 
     private static async Task SeedSessionAsync(WebApplicationFactory<Program> factory, GatewaySession session, CancellationToken cancellationToken)
@@ -1001,8 +999,8 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         public Task<IAgentHandle> GetOrCreateAsync(AgentId requestedAgentId, SessionId requestedSessionId, CancellationToken cancellationToken = default)
         {
             GetOrCreateCalled = true;
-            requestedAgentId.Should().Be(agentId);
-            requestedSessionId.Should().Be(sessionId);
+            requestedAgentId.Value.ShouldBe(agentId);
+            requestedSessionId.Value.ShouldBe(sessionId);
             return Task.FromResult<IAgentHandle>(Handle);
         }
 

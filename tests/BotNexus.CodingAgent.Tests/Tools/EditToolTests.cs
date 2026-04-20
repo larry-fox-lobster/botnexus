@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Tools;
-using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.CodingAgent.Tests.Tools;
@@ -36,7 +35,7 @@ public sealed class EditToolTests
             }
         });
 
-        (await _fileSystem.File.ReadAllTextAsync(filePath)).Should().Be("before updated after");
+        (await _fileSystem.File.ReadAllTextAsync(filePath)).ShouldBe("before updated after");
     }
 
     [Fact]
@@ -58,8 +57,8 @@ public sealed class EditToolTests
             }
         });
 
-        await action.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*found 0*");
+        (await action.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("found 0");
     }
 
     [Fact]
@@ -81,8 +80,8 @@ public sealed class EditToolTests
             }
         });
 
-        await action.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*found 2*");
+        (await action.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("found 2");
     }
 
     [Fact]
@@ -104,8 +103,8 @@ public sealed class EditToolTests
             }
         });
 
-        result.Content[0].Value.Should().Contain("Successfully replaced 1 block(s) in 'context.txt'.");
-        result.Content[0].Value.Should().Contain("hello planet world");
+        result.Content[0].Value.ShouldContain("Successfully replaced 1 block(s) in 'context.txt'.");
+        result.Content[0].Value.ShouldContain("hello planet world");
     }
 
     [Fact]
@@ -132,7 +131,7 @@ public sealed class EditToolTests
             }
         });
 
-        (await _fileSystem.File.ReadAllTextAsync(filePath)).Should().Be("alpha BETA gamma DELTA");
+        (await _fileSystem.File.ReadAllTextAsync(filePath)).ShouldBe("alpha BETA gamma DELTA");
     }
 
     [Fact]
@@ -154,8 +153,8 @@ public sealed class EditToolTests
             }
         });
 
-        await action.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Edit produced no change*");
+        (await action.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldStartWith("Edit produced no change");
     }
 
     [Fact]
@@ -177,7 +176,7 @@ public sealed class EditToolTests
             }
         });
 
-        (await _fileSystem.File.ReadAllTextAsync(filePath)).Should().Contain("Console.WriteLine(\"updated\");");
+        (await _fileSystem.File.ReadAllTextAsync(filePath)).ShouldContain("Console.WriteLine(\"updated\");");
     }
 
     [Fact]
@@ -199,7 +198,7 @@ public sealed class EditToolTests
             }
         });
 
-        (await _fileSystem.File.ReadAllTextAsync(filePath)).Should().Contain("before updated after");
+        (await _fileSystem.File.ReadAllTextAsync(filePath)).ShouldContain("before updated after");
     }
 
     [Fact]
@@ -224,8 +223,8 @@ public sealed class EditToolTests
 
         var outputLines = result.Content[0].Value
             .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-        outputLines.Should().HaveCountLessThanOrEqualTo(12);
-        outputLines.Should().Contain(line => line.StartsWith("@@ -", StringComparison.Ordinal) && line.EndsWith(" @@", StringComparison.Ordinal));
+        outputLines.Count().ShouldBeLessThanOrEqualTo(12);
+        outputLines.ShouldContain(line => line.StartsWith("@@ -", StringComparison.Ordinal) && line.EndsWith(" @@", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -249,8 +248,8 @@ public sealed class EditToolTests
         var preparedArgs = await _tool.PrepareArgumentsAsync(rawArgs);
         var result = await _tool.ExecuteAsync("test-call", preparedArgs);
 
-        result.Content[0].Value.Should().Contain("Successfully replaced");
-        (await _fileSystem.File.ReadAllTextAsync(filePath)).Should().Be("goodbye world");
+        result.Content[0].Value.ShouldContain("Successfully replaced");
+        (await _fileSystem.File.ReadAllTextAsync(filePath)).ShouldBe("goodbye world");
     }
 
     [Fact]
@@ -272,8 +271,8 @@ public sealed class EditToolTests
 
         var result = await _tool.ExecuteAsync("test-call", rawArgs);
 
-        result.Content[0].Value.Should().Contain("Successfully replaced");
-        (await _fileSystem.File.ReadAllTextAsync(filePath)).Should().Be("goodbye world");
+        result.Content[0].Value.ShouldContain("Successfully replaced");
+        (await _fileSystem.File.ReadAllTextAsync(filePath)).ShouldBe("goodbye world");
     }
 
 }

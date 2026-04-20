@@ -1,6 +1,5 @@
 using BotNexus.Memory;
 using BotNexus.Memory.Tests.TestInfrastructure;
-using FluentAssertions;
 using Microsoft.Data.Sqlite;
 
 namespace BotNexus.Memory.Tests;
@@ -26,8 +25,8 @@ public sealed class MemoryIsolationTests
             var agentASearch = await storeA.SearchAsync("bananaonlymemory");
             var agentBSearch = await storeB.SearchAsync("bananaonlymemory");
 
-            agentASearch.Should().BeEmpty();
-            agentBSearch.Should().ContainSingle(entry => entry.Id == "b-1");
+            agentASearch.ShouldBeEmpty();
+            agentBSearch.ShouldHaveSingleItem().Id.ShouldBe("b-1");
         }
         finally
         {

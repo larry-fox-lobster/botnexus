@@ -3,7 +3,6 @@ using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Routing;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -20,7 +19,7 @@ public sealed class DefaultMessageRouterTests
 
         var route = await router.ResolveAsync(CreateMessage(targetAgentId: "agent-b"));
 
-        route.Should().Equal("agent-b");
+        route.ShouldHaveSingleItem().ShouldBe("agent-b");
     }
 
     [Fact]
@@ -33,7 +32,7 @@ public sealed class DefaultMessageRouterTests
 
         var route = await router.ResolveAsync(CreateMessage(sessionId: "s1"));
 
-        route.Should().Equal("agent-b");
+        route.ShouldHaveSingleItem().ShouldBe("agent-b");
     }
 
     [Fact]
@@ -44,7 +43,7 @@ public sealed class DefaultMessageRouterTests
 
         var route = await router.ResolveAsync(CreateMessage());
 
-        route.Should().Equal("agent-a");
+        route.ShouldHaveSingleItem().ShouldBe("agent-a");
     }
 
     [Fact]
@@ -54,7 +53,7 @@ public sealed class DefaultMessageRouterTests
 
         var route = await router.ResolveAsync(CreateMessage());
 
-        route.Should().BeEmpty();
+        route.ShouldBeEmpty();
     }
 
     [Fact]
@@ -65,7 +64,7 @@ public sealed class DefaultMessageRouterTests
 
         var route = await router.ResolveAsync(CreateMessage(targetAgentId: "missing"));
 
-        route.Should().BeEmpty();
+        route.ShouldBeEmpty();
     }
 
     private static DefaultAgentRegistry CreateRegistryWithAgents(params string[] agentIds)

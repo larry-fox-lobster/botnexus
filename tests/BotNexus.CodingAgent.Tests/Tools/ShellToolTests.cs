@@ -1,5 +1,4 @@
 using BotNexus.Tools;
-using FluentAssertions;
 using System.Diagnostics;
 using System.Reflection;
 
@@ -17,8 +16,8 @@ public sealed class ShellToolTests
             ["command"] = "echo hello-shell"
         });
 
-        result.Content.Should().ContainSingle();
-        result.Content[0].Value.Should().Contain("hello-shell");
+        result.Content.ShouldHaveSingleItem();
+        result.Content[0].Value.ShouldContain("hello-shell");
     }
 
     [Fact]
@@ -29,10 +28,10 @@ public sealed class ShellToolTests
             ["command"] = "exit 7"
         });
 
-        result.Content[0].Value.Should().BeEmpty();
-        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
-        result.Details.As<ShellTool.ShellToolDetails>().IsError.Should().BeTrue();
-        result.Details.As<ShellTool.ShellToolDetails>().ExitCode.Should().Be(7);
+        result.Content[0].Value.ShouldBeEmpty();
+        var details = result.Details.ShouldBeOfType<ShellTool.ShellToolDetails>();
+        details.IsError.ShouldBeTrue();
+        details.ExitCode.ShouldBe(7);
     }
 
     [Fact]
@@ -44,9 +43,9 @@ public sealed class ShellToolTests
             ["timeout"] = 1
         });
 
-        result.Content[0].Value.Should().Contain("timed out");
-        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
-        result.Details.As<ShellTool.ShellToolDetails>().TimedOut.Should().BeTrue();
+        result.Content[0].Value.ShouldContain("timed out");
+        var details = result.Details.ShouldBeOfType<ShellTool.ShellToolDetails>();
+        details.TimedOut.ShouldBeTrue();
     }
 
     [Fact]
@@ -61,11 +60,11 @@ public sealed class ShellToolTests
             },
             cancellationSource.Token);
 
-        result.Content[0].Value.Should().Contain("cancelled");
-        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
-        result.Details.As<ShellTool.ShellToolDetails>().ExitCode.Should().Be(-1);
-        result.Details.As<ShellTool.ShellToolDetails>().TimedOut.Should().BeFalse();
-        result.Details.As<ShellTool.ShellToolDetails>().IsError.Should().BeTrue();
+        result.Content[0].Value.ShouldContain("cancelled");
+        var details = result.Details.ShouldBeOfType<ShellTool.ShellToolDetails>();
+        details.ExitCode.ShouldBe(-1);
+        details.TimedOut.ShouldBeFalse();
+        details.IsError.ShouldBeTrue();
     }
 
     [Fact]
@@ -77,8 +76,8 @@ public sealed class ShellToolTests
 
         var output = InvokeBuildOutput(lines, includeTruncationNotes: true);
 
-        output.Should().Contain("line-1600");
-        output.Should().NotContain("line-0001");
+        output.ShouldContain("line-1600");
+        output.ShouldNotContain("line-0001");
     }
 
     [Fact]
@@ -91,7 +90,7 @@ public sealed class ShellToolTests
         var output = InvokeBuildOutput(lines, includeTruncationNotes: true);
         var firstLine = output.Split(Environment.NewLine, StringSplitOptions.None)[0];
 
-        firstLine.Should().StartWith("[output truncated — showing last ");
+        firstLine.ShouldStartWith("[output truncated — showing last ");
     }
 
     [Fact]
@@ -106,7 +105,7 @@ public sealed class ShellToolTests
 
         var output = InvokeBuildOutput(lines, includeTruncationNotes: true);
 
-        output.Should().Be($"alpha{Environment.NewLine}beta{Environment.NewLine}gamma");
+        output.ShouldBe($"alpha{Environment.NewLine}beta{Environment.NewLine}gamma");
     }
 
     [Fact]
@@ -118,8 +117,8 @@ public sealed class ShellToolTests
             ["command"] = "sleep 2"
         });
 
-        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
-        result.Details.As<ShellTool.ShellToolDetails>().TimedOut.Should().BeTrue();
+        result.Details.ShouldBeOfType<ShellTool.ShellToolDetails>()
+            .TimedOut.ShouldBeTrue();
     }
 
     [Fact]
@@ -132,8 +131,8 @@ public sealed class ShellToolTests
             ["timeout"] = 1
         });
 
-        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
-        result.Details.As<ShellTool.ShellToolDetails>().TimedOut.Should().BeTrue();
+        result.Details.ShouldBeOfType<ShellTool.ShellToolDetails>()
+            .TimedOut.ShouldBeTrue();
     }
 
     [Fact]
@@ -145,10 +144,10 @@ public sealed class ShellToolTests
             ["command"] = "sleep 1; echo done"
         });
 
-        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
-        result.Details.As<ShellTool.ShellToolDetails>().TimedOut.Should().BeFalse();
-        result.Details.As<ShellTool.ShellToolDetails>().ExitCode.Should().Be(0);
-        result.Content[0].Value.Should().Contain("done");
+        var details = result.Details.ShouldBeOfType<ShellTool.ShellToolDetails>();
+        details.TimedOut.ShouldBeFalse();
+        details.ExitCode.ShouldBe(0);
+        result.Content[0].Value.ShouldContain("done");
     }
 
     [Fact]
@@ -163,9 +162,9 @@ public sealed class ShellToolTests
             ["command"] = $"echo $$ > '{commandPath}'; sleep 30"
         }, cts.Token);
 
-        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
-        result.Details.As<ShellTool.ShellToolDetails>().ExitCode.Should().Be(-1);
-        result.Details.As<ShellTool.ShellToolDetails>().IsError.Should().BeTrue();
+        var details = result.Details.ShouldBeOfType<ShellTool.ShellToolDetails>();
+        details.ExitCode.ShouldBe(-1);
+        details.IsError.ShouldBeTrue();
 
         if (File.Exists(pidFile))
         {
@@ -183,7 +182,7 @@ public sealed class ShellToolTests
                     processIsRunning = false;
                 }
 
-                processIsRunning.Should().BeFalse();
+                processIsRunning.ShouldBeFalse();
             }
         }
     }
@@ -199,16 +198,16 @@ public sealed class ShellToolTests
         }, cts.Token);
         cts.Cancel();
 
-        result.Details.Should().BeOfType<ShellTool.ShellToolDetails>();
-        result.Details.As<ShellTool.ShellToolDetails>().ExitCode.Should().Be(0);
-        result.Details.As<ShellTool.ShellToolDetails>().IsError.Should().BeFalse();
-        result.Content[0].Value.Should().Contain("done");
+        var details = result.Details.ShouldBeOfType<ShellTool.ShellToolDetails>();
+        details.ExitCode.ShouldBe(0);
+        details.IsError.ShouldBeFalse();
+        result.Content[0].Value.ShouldContain("done");
     }
 
     [Fact]
     public void Definition_DescribesBashExecution()
     {
-        _tool.Definition.Description.Should().Contain("bash command");
+        _tool.Definition.Description.ShouldContain("bash command");
     }
 
     [Fact]
@@ -229,12 +228,12 @@ public sealed class ShellToolTests
         }
 
         var method = typeof(ShellTool).GetMethod("FindBashExecutable", BindingFlags.NonPublic | BindingFlags.Static);
-        method.Should().NotBeNull();
+        method.ShouldNotBeNull();
 
         var path = method!.Invoke(null, null) as string;
 
-        path.Should().NotBeNullOrWhiteSpace();
-        File.Exists(path).Should().BeTrue();
+        path.ShouldNotBeNullOrWhiteSpace();
+        File.Exists(path).ShouldBeTrue();
     }
 
     [Theory]
@@ -246,8 +245,8 @@ public sealed class ShellToolTests
     {
         var field = toolType.GetField("MaxOutputBytes", BindingFlags.NonPublic | BindingFlags.Static);
 
-        field.Should().NotBeNull();
-        field!.GetRawConstantValue().Should().Be(expectedBytes);
+        field.ShouldNotBeNull();
+        field!.GetRawConstantValue().ShouldBe(expectedBytes);
     }
 
     private static string? FindOnPath(string executable)
@@ -290,7 +289,7 @@ public sealed class ShellToolTests
     private static string InvokeBuildOutput(IReadOnlyList<(long Seq, string Line)> buffer, bool includeTruncationNotes)
     {
         var method = typeof(ShellTool).GetMethod("BuildOutput", BindingFlags.NonPublic | BindingFlags.Static);
-        method.Should().NotBeNull();
+        method.ShouldNotBeNull();
 
         return method!.Invoke(null, [buffer, includeTruncationNotes]) as string
             ?? throw new InvalidOperationException("Failed to invoke ShellTool.BuildOutput.");
@@ -308,9 +307,9 @@ public sealed class ShellToolTests
             ["command"] = "Write-Output 'hello-pwsh'"
         });
 
-        result.Content.Should().ContainSingle();
-        result.Content[0].Value.Should().Contain("hello-pwsh");
-        result.Details.As<ShellTool.ShellToolDetails>().ExitCode.Should().Be(0);
+        result.Content.ShouldHaveSingleItem();
+        result.Content[0].Value.ShouldContain("hello-pwsh");
+        result.Details.ShouldBeOfType<ShellTool.ShellToolDetails>().ExitCode.ShouldBe(0);
     }
 
     [Fact]
@@ -320,13 +319,13 @@ public sealed class ShellToolTests
 
         if (OperatingSystem.IsWindows())
         {
-            tool.Name.Should().Be("shell");
-            tool.Label.Should().Contain("PowerShell");
+            tool.Name.ShouldBe("shell");
+            tool.Label.ShouldContain("PowerShell");
         }
         else
         {
             // On non-Windows, pwsh preference is ignored — still bash.
-            tool.Name.Should().Be("bash");
+            tool.Name.ShouldBe("bash");
         }
     }
 
@@ -334,13 +333,13 @@ public sealed class ShellToolTests
     public void ShellPreference_Auto_KeepsBashName()
     {
         var tool = new ShellTool(shellPreference: ShellPreference.Auto);
-        tool.Name.Should().Be("bash");
+        tool.Name.ShouldBe("bash");
     }
 
     [Fact]
     public void ShellPreference_Bash_KeepsBashName()
     {
         var tool = new ShellTool(shellPreference: ShellPreference.Bash);
-        tool.Name.Should().Be("bash");
+        tool.Name.ShouldBe("bash");
     }
 }

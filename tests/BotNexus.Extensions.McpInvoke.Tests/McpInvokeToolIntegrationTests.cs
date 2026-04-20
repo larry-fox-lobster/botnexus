@@ -4,7 +4,6 @@ using BotNexus.Agent.Core.Tools;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Extensions.Mcp;
 using BotNexus.Extensions.Mcp.Protocol;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.McpInvoke.Tests;
 
@@ -89,15 +88,15 @@ public class McpInvokeToolIntegrationTests
         };
         var result = await tool.ExecuteAsync("test-call", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
         
         var text = result.Content[0].Value;
-        text.Should().Contain("Tools on 'test-server'");
-        text.Should().Contain("search");
-        text.Should().Contain("Search for things");
-        text.Should().Contain("create");
-        text.Should().Contain("Create a resource");
+        text.ShouldContain("Tools on 'test-server'");
+        text.ShouldContain("search");
+        text.ShouldContain("Search for things");
+        text.ShouldContain("create");
+        text.ShouldContain("Create a resource");
 
         await tool.DisposeAsync();
     }
@@ -125,9 +124,9 @@ public class McpInvokeToolIntegrationTests
         };
         var result = await tool.ExecuteAsync("test-call", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[0].Value.Should().Be("Search results here");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[0].Value.ShouldBe("Search results here");
 
         await tool.DisposeAsync();
     }
@@ -154,9 +153,9 @@ public class McpInvokeToolIntegrationTests
         };
         var result = await tool.ExecuteAsync("test-call", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Image);
-        result.Content[0].Value.Should().Be("data:image/png;base64,abc123");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Image);
+        result.Content[0].Value.ShouldBe("data:image/png;base64,abc123");
 
         await tool.DisposeAsync();
     }
@@ -182,11 +181,11 @@ public class McpInvokeToolIntegrationTests
         };
         var result = await tool.ExecuteAsync("test-call", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[0].Value.Should().Contain("MCP error");
-        result.Content[0].Value.Should().Contain("-32000");
-        result.Content[0].Value.Should().Contain("Tool execution failed");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[0].Value.ShouldContain("MCP error");
+        result.Content[0].Value.ShouldContain("-32000");
+        result.Content[0].Value.ShouldContain("Tool execution failed");
 
         await tool.DisposeAsync();
     }
@@ -218,13 +217,13 @@ public class McpInvokeToolIntegrationTests
         };
         var result = await tool.ExecuteAsync("test-call", args);
 
-        result.Content.Should().HaveCount(3);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[0].Value.Should().Be("First block");
-        result.Content[1].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[1].Value.Should().Be("Second block");
-        result.Content[2].Type.Should().Be(AgentToolContentType.Image);
-        result.Content[2].Value.Should().Be("data:image/png;base64,img1");
+        result.Content.Count().ShouldBe(3);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[0].Value.ShouldBe("First block");
+        result.Content[1].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[1].Value.ShouldBe("Second block");
+        result.Content[2].Type.ShouldBe(AgentToolContentType.Image);
+        result.Content[2].Value.ShouldBe("data:image/png;base64,img1");
 
         await tool.DisposeAsync();
     }
@@ -251,9 +250,9 @@ public class McpInvokeToolIntegrationTests
         };
         var result = await tool.ExecuteAsync("test-call", args);
 
-        result.Content.Should().HaveCount(1);
-        result.Content[0].Type.Should().Be(AgentToolContentType.Text);
-        result.Content[0].Value.Should().Be("[no content]");
+        result.Content.Count().ShouldBe(1);
+        result.Content[0].Type.ShouldBe(AgentToolContentType.Text);
+        result.Content[0].Value.ShouldBe("[no content]");
 
         await tool.DisposeAsync();
     }
@@ -278,10 +277,10 @@ public class McpInvokeToolIntegrationTests
         await tool.ExecuteAsync("call-1", args);
         await tool.ExecuteAsync("call-2", args);
 
-        transport.SentRequests.Should().HaveCount(3);
-        transport.SentRequests[0].Method.Should().Be("initialize");
-        transport.SentRequests[1].Method.Should().Be("tools/list");
-        transport.SentRequests[2].Method.Should().Be("tools/list");
+        transport.SentRequests.Count().ShouldBe(3);
+        transport.SentRequests[0].Method.ShouldBe("initialize");
+        transport.SentRequests[1].Method.ShouldBe("tools/list");
+        transport.SentRequests[2].Method.ShouldBe("tools/list");
 
         await tool.DisposeAsync();
     }
@@ -304,6 +303,6 @@ public class McpInvokeToolIntegrationTests
 
         await tool.DisposeAsync();
 
-        transport.SentRequests.Should().HaveCount(2);
+        transport.SentRequests.Count().ShouldBe(2);
     }
 }

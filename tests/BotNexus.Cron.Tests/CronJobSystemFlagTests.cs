@@ -1,7 +1,6 @@
 using System.Text.Json;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Cron.Tools;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -24,7 +23,7 @@ public sealed class CronJobSystemFlagTests
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        job.System.Should().BeFalse();
+        job.System.ShouldBeFalse();
     }
 
     [Fact]
@@ -41,7 +40,7 @@ public sealed class CronJobSystemFlagTests
             System = true
         };
 
-        job.System.Should().BeTrue();
+        job.System.ShouldBeTrue();
     }
 
     [Fact]
@@ -59,9 +58,9 @@ public sealed class CronJobSystemFlagTests
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?> { ["action"] = "list" });
         var jobs = JsonSerializer.Deserialize<List<CronJobDto>>(ReadText(result), JsonOptions);
 
-        jobs.Should().NotBeNull();
-        jobs!.Should().ContainSingle(job => job.Id == "job-1");
-        jobs.Should().NotContain(job => job.Id == "heartbeat:agent-a");
+        jobs.ShouldNotBeNull();
+        jobs!.ShouldHaveSingleItem().Id.ShouldBe("job-1");
+        jobs.ShouldNotContain(job => job.Id == "heartbeat:agent-a");
     }
 
     private static CronScheduler CreateScheduler()

@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Anthropic.Tests;
 
@@ -21,9 +20,9 @@ public class AnthropicToolConverterTests
 
         var tool = new Tool("execute", "Execute a command", parameters);
 
-        tool.Name.Should().Be("execute");
-        tool.Description.Should().Be("Execute a command");
-        tool.Parameters.GetProperty("type").GetString().Should().Be("object");
+        tool.Name.ShouldBe("execute");
+        tool.Description.ShouldBe("Execute a command");
+        tool.Parameters.GetProperty("type").GetString().ShouldBe("object");
     }
 
     [Fact]
@@ -53,6 +52,6 @@ public class AnthropicToolConverterTests
             .GetProperty("items")
             .GetProperty("type")
             .GetString()
-            .Should().Be("array");
+            .ShouldBe("array");
     }
 }

@@ -3,7 +3,6 @@ using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Moq;
 
 namespace BotNexus.Gateway.Tests.Agents;
@@ -31,8 +30,8 @@ public sealed class DefaultSubAgentManagerTests
 
         await manager.SpawnAsync(CreateSpawnRequest());
 
-        capturedSessionId.Should().NotBeNull();
-        capturedSessionId!.Value.Value.Should().StartWith("parent-session::subagent::");
+        capturedSessionId.ShouldNotBeNull();
+        capturedSessionId!.Value.Value.ShouldStartWith("parent-session::subagent::");
     }
 
     [Fact]
@@ -48,11 +47,11 @@ public sealed class DefaultSubAgentManagerTests
 
         var result = await manager.SpawnAsync(CreateSpawnRequest());
 
-        result.SubAgentId.Should().NotBeNullOrWhiteSpace();
-        result.ParentSessionId.Should().Be("parent-session");
-        result.ChildSessionId.Value.Should().StartWith("parent-session::subagent::");
-        result.Task.Should().Be("Investigate timeout");
-        result.Status.Should().Be(SubAgentStatus.Running);
+        result.SubAgentId.ShouldNotBeNullOrWhiteSpace();
+        result.ParentSessionId.Value.ShouldBe("parent-session");
+        result.ChildSessionId.Value.ShouldStartWith("parent-session::subagent::");
+        result.Task.ShouldBe("Investigate timeout");
+        result.Status.ShouldBe(SubAgentStatus.Running);
     }
 
     [Fact]
@@ -69,10 +68,10 @@ public sealed class DefaultSubAgentManagerTests
             new SubAgentOptions { MaxConcurrentPerSession = 1 });
 
         _ = await manager.SpawnAsync(CreateSpawnRequest());
-        var act = () => manager.SpawnAsync(CreateSpawnRequest());
+        Func<Task> act = () => manager.SpawnAsync(CreateSpawnRequest());
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*concurrent*");
+        (await act.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("concurrent");
     }
 
     [Fact]
@@ -92,8 +91,8 @@ public sealed class DefaultSubAgentManagerTests
 
         var result = await manager.ListAsync(SessionId.From("parent-a"));
 
-        result.Should().HaveCount(2);
-        result.Should().OnlyContain(info => info.ParentSessionId == "parent-a");
+        result.Count().ShouldBe(2);
+        result.ShouldAllBe(info => info.ParentSessionId == "parent-a");
     }
 
     [Fact]
@@ -103,7 +102,7 @@ public sealed class DefaultSubAgentManagerTests
 
         var result = await manager.ListAsync(SessionId.From("missing-parent"));
 
-        result.Should().BeEmpty();
+        result.ShouldBeEmpty();
     }
 
     [Fact]
@@ -124,9 +123,9 @@ public sealed class DefaultSubAgentManagerTests
         var killed = await manager.KillAsync(spawned.SubAgentId, SessionId.From("parent-session"));
         var updated = await manager.GetAsync(spawned.SubAgentId);
 
-        killed.Should().BeTrue();
-        updated.Should().NotBeNull();
-        updated!.Status.Should().Be(SubAgentStatus.Killed);
+        killed.ShouldBeTrue();
+        updated.ShouldNotBeNull();
+        updated!.Status.ShouldBe(SubAgentStatus.Killed);
         supervisor.Verify(s => s.StopAsync("parent-agent", spawned.ChildSessionId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -138,7 +137,7 @@ public sealed class DefaultSubAgentManagerTests
 
         var result = await manager.KillAsync("missing-sub-agent", SessionId.From("parent-session"));
 
-        result.Should().BeFalse();
+        result.ShouldBeFalse();
     }
 
     [Fact]
@@ -155,7 +154,7 @@ public sealed class DefaultSubAgentManagerTests
 
         var result = await manager.KillAsync(spawned.SubAgentId, SessionId.From("other-parent-session"));
 
-        result.Should().BeFalse();
+        result.ShouldBeFalse();
         supervisor.Verify(s => s.StopAsync(It.IsAny<AgentId>(), It.IsAny<SessionId>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -178,10 +177,10 @@ public sealed class DefaultSubAgentManagerTests
         await manager.OnCompletedAsync(spawned.SubAgentId, "all done");
         var updated = await manager.GetAsync(spawned.SubAgentId);
 
-        updated.Should().NotBeNull();
-        updated!.Status.Should().Be(SubAgentStatus.Completed);
-        updated.CompletedAt.Should().NotBeNull();
-        updated.ResultSummary.Should().Be("all done");
+        updated.ShouldNotBeNull();
+        updated!.Status.ShouldBe(SubAgentStatus.Completed);
+        updated.CompletedAt.ShouldNotBeNull();
+        updated.ResultSummary.ShouldBe("all done");
         parentHandle.Verify(
             handle => handle.FollowUpAsync(
                 It.Is<string>(message => message.Contains(spawned.SubAgentId, StringComparison.Ordinal) &&
@@ -209,9 +208,9 @@ public sealed class DefaultSubAgentManagerTests
         }, TimeSpan.FromSeconds(3));
 
         var updated = await manager.GetAsync(spawned.SubAgentId);
-        updated.Should().NotBeNull();
-        updated!.Status.Should().Be(SubAgentStatus.TimedOut);
-        updated.CompletedAt.Should().NotBeNull();
+        updated.ShouldNotBeNull();
+        updated!.Status.ShouldBe(SubAgentStatus.TimedOut);
+        updated.CompletedAt.ShouldNotBeNull();
     }
 
     private static SubAgentSpawnRequest CreateSpawnRequest(

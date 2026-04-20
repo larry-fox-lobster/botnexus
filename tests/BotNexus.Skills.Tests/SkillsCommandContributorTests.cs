@@ -2,7 +2,6 @@ using System.Reflection;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Gateway.Abstractions.Extensions;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -17,7 +16,7 @@ public sealed class SkillsCommandContributorTests
 
         var command = contributor.GetCommands().Single(value => value.Name == "/skills");
 
-        command.SubCommands!.Select(value => value.Name).Should().BeEquivalentTo(["list", "info", "add", "remove", "reload"]);
+        command.SubCommands!.Select(value => value.Name).ShouldBe(new[] { "list", "info", "add", "remove", "reload" });
     }
 
     [Fact]
@@ -27,7 +26,7 @@ public sealed class SkillsCommandContributorTests
 
         var result = await ExecuteAsync(contributor, skillTool, "list");
 
-        result.Body.Should().MatchRegex("(?is).*loaded.*available.*denied.*");
+        result.Body.ShouldMatch("(?is).*loaded.*available.*denied.*");
     }
 
     [Fact]
@@ -37,7 +36,7 @@ public sealed class SkillsCommandContributorTests
 
         var result = await ExecuteAsync(contributor, skillTool, "info", "available-skill");
 
-        result.Body.Should().Contain("available-skill");
+        result.Body.ShouldContain("available-skill");
     }
 
     [Fact]
@@ -47,7 +46,7 @@ public sealed class SkillsCommandContributorTests
 
         var result = await ExecuteAsync(contributor, skillTool, "info", "missing-skill");
 
-        result.IsError.Should().BeTrue();
+        result.IsError.ShouldBeTrue();
     }
 
     [Fact]
@@ -57,7 +56,7 @@ public sealed class SkillsCommandContributorTests
 
         var result = await ExecuteAsync(contributor, skillTool, "add", "available-skill");
 
-        (result.IsError is false && result.Body.Contains("available-skill", StringComparison.OrdinalIgnoreCase)).Should().BeTrue();
+        (result.IsError is false && result.Body.Contains("available-skill", StringComparison.OrdinalIgnoreCase)).ShouldBeTrue();
     }
 
     [Fact]
@@ -68,7 +67,7 @@ public sealed class SkillsCommandContributorTests
 
         var result = await ExecuteAsync(contributor, skillTool, "add", "available-skill");
 
-        result.IsError.Should().BeTrue();
+        result.IsError.ShouldBeTrue();
     }
 
     [Fact]
@@ -78,7 +77,7 @@ public sealed class SkillsCommandContributorTests
 
         var result = await ExecuteAsync(contributor, skillTool, "add", "denied-skill");
 
-        result.IsError.Should().BeTrue();
+        result.IsError.ShouldBeTrue();
     }
 
     [Fact]
@@ -89,7 +88,7 @@ public sealed class SkillsCommandContributorTests
 
         var result = await ExecuteAsync(contributor, skillTool, "remove", "available-skill");
 
-        (result.IsError is false && !skillTool.SessionLoadedSkills.Contains("available-skill")).Should().BeTrue();
+        (result.IsError is false && !skillTool.SessionLoadedSkills.Contains("available-skill")).ShouldBeTrue();
     }
 
     [Fact]
@@ -99,7 +98,7 @@ public sealed class SkillsCommandContributorTests
 
         var result = await ExecuteAsync(contributor, skillTool, "remove", "available-skill");
 
-        result.IsError.Should().BeTrue();
+        result.IsError.ShouldBeTrue();
     }
 
     [Fact]
@@ -109,7 +108,7 @@ public sealed class SkillsCommandContributorTests
 
         var result = await ExecuteAsync(contributor, skillTool, "reload");
 
-        result.Body.Should().MatchRegex("(?is).*reload.*");
+        result.Body.ShouldMatch("(?is).*reload.*");
     }
 
     [Fact]
@@ -119,7 +118,7 @@ public sealed class SkillsCommandContributorTests
 
         var result = await ExecuteAsync(contributor, skillTool, subCommand: null);
 
-        result.Body.Should().MatchRegex("(?is).*available.*");
+        result.Body.ShouldMatch("(?is).*available.*");
     }
 
     private static (ICommandContributor Contributor, SkillTool SkillTool) CreateContributorWithSkillTool()

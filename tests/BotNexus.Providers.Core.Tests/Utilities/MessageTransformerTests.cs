@@ -1,6 +1,5 @@
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Utilities;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Utilities;
 
@@ -47,8 +46,8 @@ public class MessageTransformerTests
 
         var result = MessageTransformer.TransformMessages(messages, model);
 
-        result.Should().HaveCount(1);
-        result[0].Should().BeOfType<UserMessage>();
+        result.Count().ShouldBe(1);
+        result[0].ShouldBeOfType<UserMessage>();
     }
 
     [Fact]
@@ -64,10 +63,10 @@ public class MessageTransformerTests
         var result = MessageTransformer.TransformMessages(messages, model);
 
         var assistantResult = result[0] as AssistantMessage;
-        assistantResult.Should().NotBeNull();
-        assistantResult!.Content[0].Should().BeOfType<TextContent>();
+        assistantResult.ShouldNotBeNull();
+        assistantResult!.Content[0].ShouldBeOfType<TextContent>();
         var text = (TextContent)assistantResult.Content[0];
-        text.Text.Should().Be("deep thought");
+        text.Text.ShouldBe("deep thought");
     }
 
     [Fact]
@@ -83,7 +82,7 @@ public class MessageTransformerTests
         var result = MessageTransformer.TransformMessages(messages, model);
 
         var assistantResult = result[0] as AssistantMessage;
-        assistantResult!.Content[0].Should().BeOfType<ThinkingContent>();
+        assistantResult!.Content[0].ShouldBeOfType<ThinkingContent>();
     }
 
     [Fact]
@@ -100,10 +99,10 @@ public class MessageTransformerTests
 
         var assistantResult = result[0] as AssistantMessage;
         var normalizedTc = assistantResult!.Content[0] as ToolCallContent;
-        normalizedTc!.Id.Should().Be("normalized-tc-original");
+        normalizedTc!.Id.ShouldBe("normalized-tc-original");
 
         var toolResultMsg = result[1] as ToolResultMessage;
-        toolResultMsg!.ToolCallId.Should().Be("normalized-tc-original");
+        toolResultMsg!.ToolCallId.ShouldBe("normalized-tc-original");
     }
 
     [Fact]
@@ -117,11 +116,11 @@ public class MessageTransformerTests
         var result = MessageTransformer.TransformMessages(messages, model);
 
         // Should have: assistant, synthetic tool result, user message
-        result.Should().HaveCount(3);
+        result.Count().ShouldBe(3);
         var synthetic = result[1] as ToolResultMessage;
-        synthetic.Should().NotBeNull();
-        synthetic!.ToolCallId.Should().Be("tc-orphan");
-        synthetic.IsError.Should().BeTrue();
+        synthetic.ShouldNotBeNull();
+        synthetic!.ToolCallId.ShouldBe("tc-orphan");
+        synthetic.IsError.ShouldBeTrue();
     }
 
     [Fact]
@@ -133,8 +132,8 @@ public class MessageTransformerTests
 
         var result = MessageTransformer.TransformMessages(messages, model);
 
-        result.Should().HaveCount(1);
-        result[0].Should().BeOfType<UserMessage>();
+        result.Count().ShouldBe(1);
+        result[0].ShouldBeOfType<UserMessage>();
     }
 
     [Fact]
@@ -146,8 +145,8 @@ public class MessageTransformerTests
 
         var result = MessageTransformer.TransformMessages(messages, model);
 
-        result.Should().HaveCount(1);
-        result[0].Should().BeOfType<UserMessage>();
+        result.Count().ShouldBe(1);
+        result[0].ShouldBeOfType<UserMessage>();
     }
 
     [Fact]
@@ -163,7 +162,7 @@ public class MessageTransformerTests
             (id, _, _) => id.Replace("!", "").Replace("@", "").Replace("#", ""));
 
         var trMsg = result[1] as ToolResultMessage;
-        trMsg!.ToolCallId.Should().Be("abc");
+        trMsg!.ToolCallId.ShouldBe("abc");
     }
 
     [Fact]
@@ -182,10 +181,10 @@ public class MessageTransformerTests
             return id;
         });
 
-        seenModel.Should().NotBeNull();
-        seenModel!.Provider.Should().Be("openai");
-        seenModel.Api.Should().Be("openai-completions");
-        seenSource.Should().Be("anthropic");
+        seenModel.ShouldNotBeNull();
+        seenModel!.Provider.ShouldBe("openai");
+        seenModel.Api.ShouldBe("openai-completions");
+        seenSource.ShouldBe("anthropic");
     }
 
     [Fact]
@@ -200,7 +199,9 @@ public class MessageTransformerTests
         var baseline = MessageTransformer.TransformMessages(messages, targetModel);
         var withNullNormalizer = MessageTransformer.TransformMessages(messages, targetModel, null);
 
-        withNullNormalizer.Should().BeEquivalentTo(baseline);
+        withNullNormalizer.Count.ShouldBe(baseline.Count);
+        for (var i = 0; i < baseline.Count; i++)
+            withNullNormalizer[i].GetType().ShouldBe(baseline[i].GetType());
     }
 
     [Fact]
@@ -216,7 +217,7 @@ public class MessageTransformerTests
         var result = MessageTransformer.TransformMessages(messages, model);
 
         var transformedAssistant = (AssistantMessage)result[0];
-        transformedAssistant.Content.Should().BeEmpty();
+        transformedAssistant.Content.ShouldBeEmpty();
     }
 
     [Fact]
@@ -231,9 +232,9 @@ public class MessageTransformerTests
         var result = MessageTransformer.TransformMessages([assistant], model);
 
         var transformedAssistant = (AssistantMessage)result[0];
-        transformedAssistant.Content.Should().ContainSingle();
-        transformedAssistant.Content[0].Should().BeOfType<ThinkingContent>();
-        ((ThinkingContent)transformedAssistant.Content[0]).Redacted.Should().BeTrue();
+        transformedAssistant.Content.ShouldHaveSingleItem();
+        transformedAssistant.Content[0].ShouldBeOfType<ThinkingContent>();
+        ((ThinkingContent)transformedAssistant.Content[0]).Redacted.ShouldBe(true);
     }
 
     [Fact]
@@ -244,9 +245,9 @@ public class MessageTransformerTests
 
         var result = MessageTransformer.TransformMessages([orphan, MakeUser("continue")], model);
 
-        result.Should().HaveCount(2);
-        result[0].Should().Be(orphan);
-        result[1].Should().BeOfType<UserMessage>();
+        result.Count().ShouldBe(2);
+        result[0].ShouldBe(orphan);
+        result[1].ShouldBeOfType<UserMessage>();
     }
 
     [Fact]
@@ -258,9 +259,9 @@ public class MessageTransformerTests
 
         var result = MessageTransformer.TransformMessages([MakeUser("hi"), system, assistant, MakeUser("next")], model);
 
-        result.Should().HaveCount(4);
-        result[1].Should().Be(system);
-        result[2].Should().BeOfType<AssistantMessage>();
+        result.Count().ShouldBe(4);
+        result[1].ShouldBe(system);
+        result[2].ShouldBeOfType<AssistantMessage>();
     }
 
     [Fact]
@@ -276,6 +277,6 @@ public class MessageTransformerTests
 
         var transformedAssistant = (AssistantMessage)result[0];
         var toolCall = transformedAssistant.Content.OfType<ToolCallContent>().Single();
-        toolCall.ThoughtSignature.Should().BeNull();
+        toolCall.ThoughtSignature.ShouldBeNull();
     }
 }

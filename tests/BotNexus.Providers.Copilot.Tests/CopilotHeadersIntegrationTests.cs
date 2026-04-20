@@ -1,4 +1,3 @@
-using FluentAssertions;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Utilities;
 
@@ -16,7 +15,7 @@ public class CopilotHeadersIntegrationTests
 
         var initiator = CopilotHeaders.InferInitiator(messages);
 
-        initiator.Should().Be("user");
+        initiator.ShouldBe("user");
     }
 
     [Fact]
@@ -40,7 +39,7 @@ public class CopilotHeadersIntegrationTests
 
         var initiator = CopilotHeaders.InferInitiator(messages);
 
-        initiator.Should().Be("agent");
+        initiator.ShouldBe("agent");
     }
 
     [Fact]
@@ -61,9 +60,9 @@ public class CopilotHeadersIntegrationTests
         var hasImages = CopilotHeaders.HasVisionInput(messages);
         var headers = CopilotHeaders.BuildDynamicHeaders(messages, hasImages);
 
-        hasImages.Should().BeTrue();
-        headers.Should().ContainKey("Copilot-Vision-Request");
-        headers["Copilot-Vision-Request"].Should().Be("true");
+        hasImages.ShouldBeTrue();
+        headers.ShouldContainKey("Copilot-Vision-Request");
+        headers["Copilot-Vision-Request"].ShouldBe("true");
     }
 
     [Fact]
@@ -88,10 +87,10 @@ public class CopilotHeadersIntegrationTests
         foreach (var (key, value) in modelHeaders)
             merged[key] = value;
 
-        merged.Should().ContainKey("X-Initiator");
-        merged.Should().ContainKey("X-Custom-Header");
-        merged.Should().ContainKey("Openai-Organization");
-        merged["X-Initiator"].Should().Be("user");
-        merged["X-Custom-Header"].Should().Be("custom-value");
+        merged.ShouldContainKey("X-Initiator");
+        merged.ShouldContainKey("X-Custom-Header");
+        merged.ShouldContainKey("Openai-Organization");
+        merged["X-Initiator"].ShouldBe("user");
+        merged["X-Custom-Header"].ShouldBe("custom-value");
     }
 }

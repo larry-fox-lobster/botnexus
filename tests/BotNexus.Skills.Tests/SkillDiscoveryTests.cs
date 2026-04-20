@@ -1,5 +1,4 @@
 using BotNexus.Extensions.Skills;
-using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.Extensions.Skills.Tests;
@@ -17,8 +16,8 @@ public sealed class SkillDiscoveryTests
 
         var skills = SkillDiscovery.Discover(globalDir, agentSkillsDir: null, workspaceSkillsDir: null, _fileSystem);
 
-        skills.Should().ContainSingle(s => s.Name == "email-triage");
-        skills[0].Source.Should().Be(SkillSource.Global);
+        skills.Where(s => s.Name == "email-triage").ShouldHaveSingleItem();
+        skills[0].Source.ShouldBe(SkillSource.Global);
     }
 
     [Fact]
@@ -31,9 +30,9 @@ public sealed class SkillDiscoveryTests
 
         var skills = SkillDiscovery.Discover(globalDir, agentDir, workspaceSkillsDir: null, _fileSystem);
 
-        skills.Should().ContainSingle(s => s.Name == "email-triage");
-        skills[0].Source.Should().Be(SkillSource.Agent);
-        skills[0].Description.Should().Be("Agent version");
+        skills.Where(s => s.Name == "email-triage").ShouldHaveSingleItem();
+        skills[0].Source.ShouldBe(SkillSource.Agent);
+        skills[0].Description.ShouldBe("Agent version");
     }
 
     [Fact]
@@ -48,9 +47,9 @@ public sealed class SkillDiscoveryTests
 
         var skills = SkillDiscovery.Discover(globalDir, agentDir, wsDir, _fileSystem);
 
-        skills.Should().ContainSingle(s => s.Name == "email-triage");
-        skills[0].Source.Should().Be(SkillSource.Workspace);
-        skills[0].Description.Should().Be("Workspace");
+        skills.Where(s => s.Name == "email-triage").ShouldHaveSingleItem();
+        skills[0].Source.ShouldBe(SkillSource.Workspace);
+        skills[0].Description.ShouldBe("Workspace");
     }
 
     [Fact]
@@ -63,28 +62,28 @@ public sealed class SkillDiscoveryTests
 
         var skills = SkillDiscovery.Discover(globalDir, agentDir, null, _fileSystem);
 
-        skills.Should().HaveCount(2);
-        skills.Should().Contain(s => s.Name == "email-triage");
-        skills.Should().Contain(s => s.Name == "calendar");
+        skills.Count().ShouldBe(2);
+        skills.ShouldContain(s => s.Name == "email-triage");
+        skills.ShouldContain(s => s.Name == "calendar");
     }
 
     [Fact]
     public void Discover_NullPaths_ReturnsEmpty()
     {
-        SkillDiscovery.Discover(null, null, null, _fileSystem).Should().BeEmpty();
+        SkillDiscovery.Discover(null, null, null, _fileSystem).ShouldBeEmpty();
     }
 
     [Fact]
     public void Discover_NonexistentPaths_ReturnsEmpty()
     {
-        SkillDiscovery.Discover(@"C:\nonexistent", null, null, _fileSystem).Should().BeEmpty();
+        SkillDiscovery.Discover(@"C:\nonexistent", null, null, _fileSystem).ShouldBeEmpty();
     }
 
     [Fact]
     public void Discover_MissingSkillMd_SkipsDirectory()
     {
         _fileSystem.Directory.CreateDirectory(Path.Combine(TempDir, "skills", "empty-skill"));
-        SkillDiscovery.Discover(Path.Combine(TempDir, "skills"), null, null, _fileSystem).Should().BeEmpty();
+        SkillDiscovery.Discover(Path.Combine(TempDir, "skills"), null, null, _fileSystem).ShouldBeEmpty();
     }
 
     [Fact]
@@ -96,7 +95,7 @@ public sealed class SkillDiscoveryTests
         var skills = SkillDiscovery.Discover(dir, null, null, _fileSystem);
 
         // Name validation should skip this skill (uppercase in directory name)
-        skills.Should().BeEmpty();
+        skills.ShouldBeEmpty();
     }
 
     [Fact]
@@ -114,7 +113,7 @@ public sealed class SkillDiscoveryTests
 
         var skills = SkillDiscovery.Discover(Path.Combine(TempDir, "skills"), null, null, _fileSystem);
 
-        skills.Should().BeEmpty();
+        skills.ShouldBeEmpty();
     }
 
     [Fact]
@@ -131,7 +130,7 @@ public sealed class SkillDiscoveryTests
 
         var skills = SkillDiscovery.Discover(Path.Combine(TempDir, "skills"), null, null, _fileSystem);
 
-        skills.Should().BeEmpty();
+        skills.ShouldBeEmpty();
     }
 
     [Fact]
@@ -151,7 +150,7 @@ public sealed class SkillDiscoveryTests
 
         var skills = SkillDiscovery.Discover(Path.Combine(TempDir, "skills"), null, null, _fileSystem);
 
-        skills.Should().BeEmpty();
+        skills.ShouldBeEmpty();
     }
 
     private void CreateSkill(string parentDir, string skillName, string description)

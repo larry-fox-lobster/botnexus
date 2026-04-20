@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Domain.Primitives;
-using FluentAssertions;
 
 namespace BotNexus.Domain.Tests;
 
@@ -10,7 +9,7 @@ public sealed class ToolNameTests
     public void ToolName_From_WhenValueIsValid_ShouldCreateInstance()
     {
         var result = ToolName.From(" tool.exec ");
-        result.Value.Should().Be("tool.exec");
+        result.Value.ShouldBe("tool.exec");
     }
 
     [Theory]
@@ -19,8 +18,8 @@ public sealed class ToolNameTests
     [InlineData(" ")]
     public void ToolName_From_WhenValueIsEmpty_ShouldThrowArgumentException(string? value)
     {
-        var action = () => ToolName.From(value!);
-        action.Should().Throw<ArgumentException>();
+        Action action = () => ToolName.From(value!);
+        action.ShouldThrow<ArgumentException>();
     }
 
     [Fact]
@@ -28,7 +27,7 @@ public sealed class ToolNameTests
     {
         var left = ToolName.From("TOOL.EXEC");
         var right = ToolName.From("tool.exec");
-        left.Should().Be(right);
+        left.ShouldBe(right);
     }
 
     [Fact]
@@ -36,7 +35,7 @@ public sealed class ToolNameTests
     {
         var left = ToolName.From("tool.exec");
         var right = ToolName.From("tool.search");
-        left.Should().NotBe(right);
+        left.ShouldNotBe(right);
     }
 
     [Fact]
@@ -44,21 +43,21 @@ public sealed class ToolNameTests
     {
         var toolName = ToolName.From("tool.exec");
         string value = toolName;
-        value.Should().Be("tool.exec");
+        value.ShouldBe("tool.exec");
     }
 
     [Fact]
     public void ToolName_ExplicitConversion_WhenConvertedFromString_ShouldCreateInstance()
     {
         var toolName = (ToolName)"tool.exec";
-        toolName.Value.Should().Be("tool.exec");
+        toolName.Value.ShouldBe("tool.exec");
     }
 
     [Fact]
     public void ToolName_ToString_WhenCalled_ShouldReturnValue()
     {
         var toolName = ToolName.From("tool.exec");
-        toolName.ToString().Should().Be("tool.exec");
+        toolName.ToString().ShouldBe("tool.exec");
     }
 
     [Fact]
@@ -66,6 +65,6 @@ public sealed class ToolNameTests
     {
         var original = ToolName.From("tool.exec");
         var roundTrip = JsonSerializer.Deserialize<ToolName>(JsonSerializer.Serialize(original));
-        roundTrip.Should().Be(original);
+        roundTrip.ShouldBe(original);
     }
 }

@@ -1,7 +1,6 @@
 using System.Text.Json;
 using BotNexus.Agent.Providers.Core.Compatibility;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.Providers.OpenAI.Tests;
 
@@ -22,10 +21,10 @@ public class ToolConverterTests
 
         var tool = new Tool("read_file", "Read a file from disk", parameters);
 
-        tool.Name.Should().Be("read_file");
-        tool.Description.Should().Be("Read a file from disk");
-        tool.Parameters.GetProperty("type").GetString().Should().Be("object");
-        tool.Parameters.GetProperty("required").GetArrayLength().Should().Be(1);
+        tool.Name.ShouldBe("read_file");
+        tool.Description.ShouldBe("Read a file from disk");
+        tool.Parameters.GetProperty("type").GetString().ShouldBe("object");
+        tool.Parameters.GetProperty("required").GetArrayLength().ShouldBe(1);
     }
 
     [Fact]
@@ -33,7 +32,7 @@ public class ToolConverterTests
     {
         var compat = new OpenAICompletionsCompat { SupportsStrictMode = true };
 
-        compat.SupportsStrictMode.Should().BeTrue();
+        compat.SupportsStrictMode.ShouldBeTrue();
     }
 
     [Fact]
@@ -41,6 +40,6 @@ public class ToolConverterTests
     {
         var compat = new OpenAICompletionsCompat { SupportsStrictMode = false };
 
-        compat.SupportsStrictMode.Should().BeFalse();
+        compat.SupportsStrictMode.ShouldBeFalse();
     }
 }

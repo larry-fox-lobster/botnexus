@@ -3,7 +3,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -24,7 +23,7 @@ public sealed class SessionWarmupServiceTests
         var sessions = await service.GetAvailableSessionsAsync(CancellationToken.None);
 
         store.Verify(value => value.ListAsync(BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
-        sessions.Should().ContainSingle(summary => summary.SessionId == "startup-1");
+        sessions.Where(summary => summary.SessionId == "startup-1").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -46,8 +45,9 @@ public sealed class SessionWarmupServiceTests
         var sessions = await service.GetAvailableSessionsAsync(CancellationToken.None);
         var ids = sessions.Select(summary => summary.SessionId).ToList();
 
-        ids.Should().Contain(["active-recent", "sealed-recent"]);
-        ids.Should().NotContain("active-old");
+        ids.ShouldContain("active-recent");
+        ids.ShouldContain("sealed-recent");
+        ids.ShouldNotContain("active-old");
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public sealed class SessionWarmupServiceTests
         await service.StartAsync(CancellationToken.None);
         var sessions = await service.GetAvailableSessionsAsync("agent-a", CancellationToken.None);
 
-        sessions.Select(summary => summary.SessionId).Should().ContainSingle().Which.Should().Be("user-agent");
+        sessions.Select(summary => summary.SessionId).ShouldHaveSingleItem().ShouldBe("user-agent");
     }
 
     [Fact]
@@ -87,8 +87,10 @@ public sealed class SessionWarmupServiceTests
             .Select(summary => summary.SessionId)
             .ToList();
 
-        visibleIds.Should().Contain("user-agent");
-        visibleIds.Should().NotContain(["soul", "cron", "sub-agent"]);
+        visibleIds.ShouldContain("user-agent");
+        visibleIds.ShouldNotContain("soul");
+        visibleIds.ShouldNotContain("cron");
+        visibleIds.ShouldNotContain("sub-agent");
     }
 
     [Fact]
@@ -106,8 +108,8 @@ public sealed class SessionWarmupServiceTests
             .Select(summary => summary.SessionId)
             .ToList();
 
-        visibleIds.Should().Contain("user-agent");
-        visibleIds.Should().NotContain("cron-leak");
+        visibleIds.ShouldContain("user-agent");
+        visibleIds.ShouldNotContain("cron-leak");
     }
 
     [Fact]
@@ -123,7 +125,7 @@ public sealed class SessionWarmupServiceTests
         await service.StartAsync(CancellationToken.None);
         var sessions = await service.GetAvailableSessionsAsync("agent-a", CancellationToken.None);
 
-        sessions.Select(summary => summary.SessionId).Should().ContainSingle().Which.Should().Be("active-new");
+        sessions.Select(summary => summary.SessionId).ShouldHaveSingleItem().ShouldBe("active-new");
     }
 
     [Fact]
@@ -139,7 +141,7 @@ public sealed class SessionWarmupServiceTests
         await service.StartAsync(CancellationToken.None);
         var sessions = await service.GetAvailableSessionsAsync("agent-a", CancellationToken.None);
 
-        sessions.Select(summary => summary.SessionId).Should().ContainSingle().Which.Should().Be("sealed-newest");
+        sessions.Select(summary => summary.SessionId).ShouldHaveSingleItem().ShouldBe("sealed-newest");
     }
 
     [Fact]
@@ -163,8 +165,8 @@ public sealed class SessionWarmupServiceTests
         await service.StartAsync(CancellationToken.None);
         var available = await service.GetAvailableSessionsAsync(CancellationToken.None);
 
-        available.Count(summary => summary.AgentId == "agent-a").Should().BeLessThanOrEqualTo(3);
-        available.Count(summary => summary.AgentId == "agent-b").Should().BeLessThanOrEqualTo(3);
+        available.Count(summary => summary.AgentId == "agent-a").ShouldBeLessThanOrEqualTo(3);
+        available.Count(summary => summary.AgentId == "agent-b").ShouldBeLessThanOrEqualTo(3);
     }
 
     [Fact]
@@ -183,7 +185,8 @@ public sealed class SessionWarmupServiceTests
         await service.StartAsync(CancellationToken.None);
         var sessions = await service.GetAvailableSessionsAsync("agent-a", CancellationToken.None);
 
-        sessions.Select(summary => summary.SessionId).Should().Contain(["telegram-older", "telegram-newer"]);
+        sessions.Select(summary => summary.SessionId).ShouldContain("telegram-older");
+        sessions.Select(summary => summary.SessionId).ShouldContain("telegram-newer");
     }
 
     [Fact]
@@ -198,7 +201,8 @@ public sealed class SessionWarmupServiceTests
         await service.StartAsync(CancellationToken.None);
         var available = await service.GetAvailableSessionsAsync(CancellationToken.None);
 
-        available.Select(summary => summary.SessionId).Should().Contain(["session-a", "session-b"]);
+        available.Select(summary => summary.SessionId).ShouldContain("session-a");
+        available.Select(summary => summary.SessionId).ShouldContain("session-b");
     }
 
     [Fact]
@@ -213,8 +217,8 @@ public sealed class SessionWarmupServiceTests
         await service.StartAsync(CancellationToken.None);
         var available = await service.GetAvailableSessionsAsync("agent-a", CancellationToken.None);
 
-        available.Should().ContainSingle(summary => summary.SessionId == "agent-a-session");
-        available.Should().OnlyContain(summary => summary.AgentId == "agent-a");
+        available.Where(summary => summary.SessionId == "agent-a-session").ShouldHaveSingleItem();
+        available.ShouldAllBe(summary => summary.AgentId == "agent-a");
     }
 
     [Fact]
@@ -229,7 +233,7 @@ public sealed class SessionWarmupServiceTests
         await service.StartAsync(CancellationToken.None);
         var available = await service.GetAvailableSessionsAsync(CancellationToken.None);
 
-        available.Should().BeEmpty();
+        available.ShouldBeEmpty();
         store.Verify(value => value.ListAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

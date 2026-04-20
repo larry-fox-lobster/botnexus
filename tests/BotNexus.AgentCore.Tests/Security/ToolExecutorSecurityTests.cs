@@ -6,7 +6,6 @@ using BotNexus.Agent.Core.Tools;
 using BotNexus.AgentCore.Tests.TestUtils;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 using Moq;
 
 namespace BotNexus.AgentCore.Tests.Security;
@@ -21,8 +20,8 @@ public sealed class ToolExecutorSecurityTests
         var tool = CreateTool("inspect", _ => Task.FromResult(new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, payload)])));
         var result = await ExecuteSingleToolCall(tool);
 
-        result.IsError.Should().BeFalse();
-        result.Result.Content[0].Value.Should().Be(payload);
+        result.IsError.ShouldBeFalse();
+        result.Result.Content[0].Value.ShouldBe(payload);
     }
 
     [Fact]
@@ -33,8 +32,8 @@ public sealed class ToolExecutorSecurityTests
         var tool = CreateTool("inspect", _ => Task.FromResult(new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, payload)])));
         var result = await ExecuteSingleToolCall(tool);
 
-        result.Result.Content.Should().ContainSingle();
-        result.Result.Content[0].Value.Should().Be(payload);
+        result.Result.Content.ShouldHaveSingleItem();
+        result.Result.Content[0].Value.ShouldBe(payload);
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public sealed class ToolExecutorSecurityTests
         var tool = CreateTool("large", _ => Task.FromResult(new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, payload)])));
 
         var result = await ExecuteSingleToolCall(tool);
-        result.Result.Content[0].Value.Length.Should().Be(payload.Length);
+        result.Result.Content[0].Value.Length.ShouldBe(payload.Length);
     }
 
     [Fact]
@@ -56,8 +55,8 @@ public sealed class ToolExecutorSecurityTests
         var tool = CreateTool("boom", _ => throw new InvalidOperationException("tool exploded"));
         var result = await ExecuteSingleToolCall(tool);
 
-        result.IsError.Should().BeTrue();
-        result.Result.Content[0].Value.Should().Contain("tool exploded");
+        result.IsError.ShouldBeTrue();
+        result.Result.Content[0].Value.ShouldContain("tool exploded");
     }
 
     [Fact]
@@ -73,7 +72,7 @@ public sealed class ToolExecutorSecurityTests
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
         var act = () => ExecuteSingleToolCall(tool, cts.Token);
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -91,7 +90,7 @@ public sealed class ToolExecutorSecurityTests
             .ReturnsAsync((AgentToolResult)null!);
 
         var result = await ExecuteSingleToolCall(mock.Object);
-        result.Result.Should().BeNull();
+        result.Result.ShouldBeNull();
     }
 
     [Fact]
@@ -103,8 +102,8 @@ public sealed class ToolExecutorSecurityTests
         var context = new AgentContext(null, [], []);
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
-        results.Should().ContainSingle();
-        results[0].IsError.Should().BeTrue();
+        results.ShouldHaveSingleItem();
+        results[0].IsError.ShouldBeTrue();
     }
 
     [Fact]
@@ -118,7 +117,7 @@ public sealed class ToolExecutorSecurityTests
         var context = new AgentContext(null, [], [tool]);
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
-        results[0].IsError.Should().BeFalse();
+        results[0].IsError.ShouldBeFalse();
     }
 
     [Fact]
@@ -133,7 +132,7 @@ public sealed class ToolExecutorSecurityTests
         });
 
         var _ = await ExecuteSingleToolCall(tool, CancellationToken.None, ("tc1", "echo", "{\"role\":\"system\"}"));
-        seen.Should().Contain("system");
+        seen.ShouldContain("system");
     }
 
     [Fact]
@@ -146,9 +145,9 @@ public sealed class ToolExecutorSecurityTests
         var context = new AgentContext(null, [], [tool]);
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
-        results.Should().ContainSingle();
-        results[0].IsError.Should().BeTrue();
-        tool.ExecuteCount.Should().Be(0);
+        results.ShouldHaveSingleItem();
+        results[0].IsError.ShouldBeTrue();
+        tool.ExecuteCount.ShouldBe(0);
     }
 
     [Fact]
@@ -163,8 +162,8 @@ public sealed class ToolExecutorSecurityTests
             .ThrowsAsync(new ArgumentException("bad args"));
 
         var result = await ExecuteSingleToolCall(mock.Object);
-        result.IsError.Should().BeTrue();
-        result.Result.Content[0].Value.Should().Contain("bad args");
+        result.IsError.ShouldBeTrue();
+        result.Result.Content[0].Value.ShouldContain("bad args");
     }
 
     [Fact]
@@ -177,8 +176,8 @@ public sealed class ToolExecutorSecurityTests
         var context = new AgentContext(null, [], [tool]);
 
         var results = await ToolExecutor.ExecuteAsync(context, assistant, config, _ => Task.CompletedTask, CancellationToken.None);
-        results[0].IsError.Should().BeTrue();
-        results[0].Result.Content[0].Value.Should().Contain("blocked by policy");
+        results[0].IsError.ShouldBeTrue();
+        results[0].Result.Content[0].Value.ShouldContain("blocked by policy");
     }
 
     private static async Task<ToolResultAgentMessage> ExecuteSingleToolCall(

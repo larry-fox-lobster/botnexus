@@ -1,5 +1,4 @@
 using BotNexus.Extensions.Skills;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Skills.Tests;
 
@@ -22,10 +21,10 @@ public sealed class SkillPromptBuilderTests
 
         var prompt = SkillPromptBuilder.Build(loaded, []);
 
-        prompt.Should().Contain("## Skill: email-triage");
-        prompt.Should().Contain("Classify emails by category.");
-        prompt.Should().Contain("<!-- SKILLS_CONTEXT -->");
-        prompt.Should().Contain("<!-- END_SKILLS_CONTEXT -->");
+        prompt.ShouldContain("## Skill: email-triage");
+        prompt.ShouldContain("Classify emails by category.");
+        prompt.ShouldContain("<!-- SKILLS_CONTEXT -->");
+        prompt.ShouldContain("<!-- END_SKILLS_CONTEXT -->");
     }
 
     [Fact]
@@ -35,15 +34,15 @@ public sealed class SkillPromptBuilderTests
 
         var prompt = SkillPromptBuilder.Build([], available);
 
-        prompt.Should().Contain("Skills Available (not loaded)");
-        prompt.Should().Contain("pptx");
-        prompt.Should().Contain("Create PowerPoint presentations");
+        prompt.ShouldContain("Skills Available (not loaded)");
+        prompt.ShouldContain("pptx");
+        prompt.ShouldContain("Create PowerPoint presentations");
     }
 
     [Fact]
     public void Build_NoSkills_ReturnsEmpty()
     {
-        SkillPromptBuilder.Build([], []).Should().BeEmpty();
+        SkillPromptBuilder.Build([], []).ShouldBeEmpty();
     }
 
     [Fact]
@@ -53,10 +52,10 @@ public sealed class SkillPromptBuilderTests
 
         var prompt = SkillPromptBuilder.Build(loaded, []);
 
-        prompt.Should().Contain("## Skill: email-triage");
-        prompt.Should().Contain("Email content");
-        prompt.Should().Contain("## Skill: calendar");
-        prompt.Should().Contain("Calendar content");
+        prompt.ShouldContain("## Skill: email-triage");
+        prompt.ShouldContain("Email content");
+        prompt.ShouldContain("## Skill: calendar");
+        prompt.ShouldContain("Calendar content");
     }
 
     [Fact]
@@ -66,8 +65,8 @@ public sealed class SkillPromptBuilderTests
 
         var prompt = SkillPromptBuilder.Build(loaded, []);
 
-        prompt.Should().Contain("email-triage");
-        prompt.Should().Contain("Email triage and classification");
+        prompt.ShouldContain("email-triage");
+        prompt.ShouldContain("Email triage and classification");
     }
 
     [Fact]
@@ -78,8 +77,8 @@ public sealed class SkillPromptBuilderTests
 
         var prompt = SkillPromptBuilder.Build(loaded, available);
 
-        prompt.Should().Contain("## Skill: email-triage");
-        prompt.Should().Contain("Skills Available (not loaded)");
-        prompt.Should().Contain("calendar");
+        prompt.ShouldContain("## Skill: email-triage");
+        prompt.ShouldContain("Skills Available (not loaded)");
+        prompt.ShouldContain("calendar");
     }
 }

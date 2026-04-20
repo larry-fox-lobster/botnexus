@@ -2,7 +2,6 @@ using BotNexus.Agent.Core.Configuration;
 using BotNexus.AgentCore.Tests.TestUtils;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Agent.Providers.Core.Streaming;
-using FluentAssertions;
 using System.Reflection;
 
 namespace BotNexus.AgentCore.Tests;
@@ -22,8 +21,8 @@ public class AgentTests
 
         var agent = new BotNexus.Agent.Core.Agent(options);
 
-        agent.Should().NotBeNull();
-        agent.Status.Should().Be(AgentStatus.Idle);
+        agent.ShouldNotBeNull();
+        agent.Status.ShouldBe(AgentStatus.Idle);
     }
 
     [Fact]
@@ -37,10 +36,10 @@ public class AgentTests
             Messages: [new UserMessage("history")]);
         var agent = new BotNexus.Agent.Core.Agent(TestHelpers.CreateTestOptions(initialState, model));
 
-        agent.State.SystemPrompt.Should().Be("System prompt");
-        agent.State.Model.Should().Be(model);
-        agent.State.Tools.Should().ContainSingle(tool => tool.Name == "calculate");
-        agent.State.Messages.OfType<UserMessage>().Should().ContainSingle(message => message.Content == "history");
+        agent.State.SystemPrompt.ShouldBe("System prompt");
+        agent.State.Model.ShouldBe(model);
+        agent.State.Tools.ShouldHaveSingleItem().Name.ShouldBe("calculate");
+        agent.State.Messages.OfType<UserMessage>().ShouldHaveSingleItem().Content.ShouldBe("history");
     }
 
     [Fact]
@@ -54,11 +53,11 @@ public class AgentTests
 
         agent.Reset();
 
-        agent.State.Messages.Should().BeEmpty();
-        agent.State.ErrorMessage.Should().BeNull();
-        agent.State.StreamingMessage.Should().BeNull();
-        agent.State.PendingToolCalls.Should().BeEmpty();
-        agent.Status.Should().Be(AgentStatus.Idle);
+        agent.State.Messages.ShouldBeEmpty();
+        agent.State.ErrorMessage.ShouldBeNull();
+        agent.State.StreamingMessage.ShouldBeNull();
+        agent.State.PendingToolCalls.ShouldBeEmpty();
+        agent.Status.ShouldBe(AgentStatus.Idle);
     }
 
     [Fact]
@@ -74,13 +73,13 @@ public class AgentTests
         });
 
         await agent.PromptAsync("first");
-        callbackCount.Should().BeGreaterThan(0);
+        callbackCount.ShouldBeGreaterThan(0);
 
         var firstRunCount = callbackCount;
         subscription.Dispose();
         await agent.PromptAsync("second");
 
-        callbackCount.Should().Be(firstRunCount);
+        callbackCount.ShouldBe(firstRunCount);
     }
 
     [Fact]
@@ -92,11 +91,11 @@ public class AgentTests
 
         var firstRun = agent.PromptAsync("first");
         var started = SpinWait.SpinUntil(() => agent.Status == AgentStatus.Running, TimeSpan.FromSeconds(10));
-        started.Should().BeTrue();
+        started.ShouldBeTrue();
 
-        var secondPrompt = () => agent.PromptAsync("second");
-        await secondPrompt.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Agent is already running.");
+        Func<Task> secondPrompt = () => agent.PromptAsync("second");
+        var ex = await secondPrompt.ShouldThrowAsync<InvalidOperationException>();
+        ex.Message.ShouldBe("Agent is already running.");
 
         release.TrySetResult();
         await firstRun;
@@ -113,8 +112,10 @@ public class AgentTests
 
         var produced = await agent.PromptAsync("base prompt");
 
-        produced.OfType<UserMessage>().Select(message => message.Content)
-            .Should().Contain(["base prompt", "steer message", "follow-up message"]);
+        var contents = produced.OfType<UserMessage>().Select(message => message.Content);
+        contents.ShouldContain("base prompt");
+        contents.ShouldContain("steer message");
+        contents.ShouldContain("follow-up message");
     }
 
     [Fact]
@@ -128,9 +129,9 @@ public class AgentTests
         agent.FollowUp(new UserMessage("follow-up message"));
 
         var firstContinue = await agent.ContinueAsync();
-        firstContinue.OfType<UserMessage>().Select(message => message.Content)
-            .Should().Contain("steer message")
-            .And.Contain("follow-up message");
+        var firstContents = firstContinue.OfType<UserMessage>().Select(message => message.Content);
+        firstContents.ShouldContain("steer message");
+        firstContents.ShouldContain("follow-up message");
     }
 
     [Fact]
@@ -145,7 +146,7 @@ public class AgentTests
         var produced = await agent.PromptAsync("base prompt");
 
         produced.OfType<UserMessage>().Select(message => message.Content)
-            .Should().BeEquivalentTo(["base prompt"]);
+            .ShouldBe(new[] { "base prompt" });
     }
 
     [Fact]
@@ -155,10 +156,10 @@ public class AgentTests
         var agent = new BotNexus.Agent.Core.Agent(TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api")));
         agent.Steer(new UserMessage("steer message"));
 
-        agent.HasQueuedMessages.Should().BeTrue();
+        agent.HasQueuedMessages.ShouldBeTrue();
 
         _ = await agent.PromptAsync("base prompt");
-        agent.HasQueuedMessages.Should().BeFalse();
+        agent.HasQueuedMessages.ShouldBeFalse();
     }
 
     [Fact]
@@ -172,16 +173,16 @@ public class AgentTests
         agent.SteeringMode = QueueMode.OneAtATime;
 
         var drainMethod = typeof(BotNexus.Agent.Core.Agent).GetMethod("DrainQueuedMessages", BindingFlags.NonPublic | BindingFlags.Instance);
-        drainMethod.Should().NotBeNull();
+        drainMethod.ShouldNotBeNull();
         var firstDrain = (IReadOnlyList<AgentMessage>)drainMethod!.Invoke(agent, null)!;
-        firstDrain.Should().ContainSingle();
+        firstDrain.ShouldHaveSingleItem();
 
         agent.Steer(new UserMessage("steer three"));
         agent.Steer(new UserMessage("steer four"));
 
         agent.SteeringMode = QueueMode.All;
         var secondDrain = (IReadOnlyList<AgentMessage>)drainMethod.Invoke(agent, null)!;
-        secondDrain.Should().HaveCount(3);
+        secondDrain.Count().ShouldBe(3);
     }
 
     [Fact]
@@ -205,16 +206,16 @@ public class AgentTests
 
         var runResult = await agent.PromptAsync("boom");
 
-        var failure = agent.State.Messages.Last().Should().BeOfType<AssistantAgentMessage>().Subject;
-        failure.Content.Should().BeEmpty();
-        failure.FinishReason.Should().Be(BotNexus.Agent.Providers.Core.Models.StopReason.Error);
-        failure.ErrorMessage.Should().Be("provider exploded");
-        runResult.Should().ContainSingle().Which.Should().BeEquivalentTo(failure);
-        agent.State.ErrorMessage.Should().Be("provider exploded");
-        agentEnd.Should().NotBeNull();
-        agentEnd!.Messages.Should().ContainSingle()
-            .Which.Should().BeOfType<AssistantAgentMessage>()
-            .Which.ErrorMessage.Should().Be("provider exploded");
+        var failure = agent.State.Messages.Last().ShouldBeOfType<AssistantAgentMessage>();
+        failure.Content.ShouldBeEmpty();
+        failure.FinishReason.ShouldBe(BotNexus.Agent.Providers.Core.Models.StopReason.Error);
+        failure.ErrorMessage.ShouldBe("provider exploded");
+        runResult.ShouldHaveSingleItem().ShouldBe(failure);
+        agent.State.ErrorMessage.ShouldBe("provider exploded");
+        agentEnd.ShouldNotBeNull();
+        agentEnd!.Messages.ShouldHaveSingleItem()
+            .ShouldBeOfType<AssistantAgentMessage>()
+            .ErrorMessage.ShouldBe("provider exploded");
     }
 
     [Fact]
@@ -235,17 +236,17 @@ public class AgentTests
         });
 
         var runTask = agent.PromptAsync("cancel me");
-        SpinWait.SpinUntil(() => agent.Status == AgentStatus.Running, TimeSpan.FromSeconds(10)).Should().BeTrue();
+        SpinWait.SpinUntil(() => agent.Status == AgentStatus.Running, TimeSpan.FromSeconds(10)).ShouldBeTrue();
         await agent.AbortAsync();
         release.TrySetResult();
 
         var result = await runTask;
-        result.Should().ContainSingle();
-        var aborted = result[0].Should().BeOfType<AssistantAgentMessage>().Subject;
-        aborted.FinishReason.Should().Be(BotNexus.Agent.Providers.Core.Models.StopReason.Aborted);
-        agentEnd.Should().NotBeNull();
-        agentEnd!.Messages.Should().ContainSingle().Which.Should().BeOfType<AssistantAgentMessage>()
-            .Which.FinishReason.Should().Be(BotNexus.Agent.Providers.Core.Models.StopReason.Aborted);
+        result.ShouldHaveSingleItem();
+        var aborted = result[0].ShouldBeOfType<AssistantAgentMessage>();
+        aborted.FinishReason.ShouldBe(BotNexus.Agent.Providers.Core.Models.StopReason.Aborted);
+        agentEnd.ShouldNotBeNull();
+        agentEnd!.Messages.ShouldHaveSingleItem().ShouldBeOfType<AssistantAgentMessage>()
+            .FinishReason.ShouldBe(BotNexus.Agent.Providers.Core.Models.StopReason.Aborted);
     }
 
     [Fact]
@@ -261,7 +262,7 @@ public class AgentTests
 
         var continued = await agent.ContinueAsync();
         continued.OfType<UserMessage>().Select(message => message.Content)
-            .Should().Contain("steer message");
+            .ShouldContain("steer message");
     }
 
     [Fact]
@@ -288,9 +289,10 @@ public class AgentTests
 
         var continued = await agent.ContinueAsync();
 
-        continued.OfType<UserMessage>().Select(message => message.Content)
-            .Should().Contain(["follow-up message", "steer from delegate"]);
-        continued.OfType<AssistantAgentMessage>().Should().ContainSingle();
+        var continuedContents = continued.OfType<UserMessage>().Select(message => message.Content);
+        continuedContents.ShouldContain("follow-up message");
+        continuedContents.ShouldContain("steer from delegate");
+        continued.OfType<AssistantAgentMessage>().ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -301,12 +303,12 @@ public class AgentTests
         var agent = new BotNexus.Agent.Core.Agent(TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api")));
 
         var runTask = agent.PromptAsync("run");
-        SpinWait.SpinUntil(() => agent.State.IsRunning, TimeSpan.FromSeconds(10)).Should().BeTrue();
-        agent.State.IsStreaming.Should().BeFalse();
+        SpinWait.SpinUntil(() => agent.State.IsRunning, TimeSpan.FromSeconds(10)).ShouldBeTrue();
+        agent.State.IsStreaming.ShouldBeFalse();
 
         release.TrySetResult();
         await runTask;
-        agent.State.IsRunning.Should().BeFalse();
+        agent.State.IsRunning.ShouldBeFalse();
     }
 
     [Fact]
@@ -317,12 +319,12 @@ public class AgentTests
         var agent = new BotNexus.Agent.Core.Agent(TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api")));
 
         var runTask = agent.PromptAsync("stream");
-        SpinWait.SpinUntil(() => agent.State.StreamingMessage is not null, TimeSpan.FromSeconds(10)).Should().BeTrue();
-        agent.State.Messages.Last().Should().BeOfType<UserMessage>();
+        SpinWait.SpinUntil(() => agent.State.StreamingMessage is not null, TimeSpan.FromSeconds(10)).ShouldBeTrue();
+        agent.State.Messages.Last().ShouldBeOfType<UserMessage>();
 
         release.TrySetResult();
         await runTask;
-        agent.State.Messages.Last().Should().BeOfType<AssistantAgentMessage>();
+        agent.State.Messages.Last().ShouldBeOfType<AssistantAgentMessage>();
     }
 
     [Fact]
@@ -348,8 +350,8 @@ public class AgentTests
 
         var result = await agent.PromptAsync("hello");
 
-        result.OfType<AssistantAgentMessage>().Should().ContainSingle();
-        diagnostics.Should().Contain(message => message.Contains("Listener threw: listener failed", StringComparison.Ordinal));
+        result.OfType<AssistantAgentMessage>().ShouldHaveSingleItem();
+        diagnostics.ShouldContain(message => message.Contains("Listener threw: listener failed", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -375,12 +377,12 @@ public class AgentTests
         });
 
         var runTask = agent.PromptAsync("cancel me");
-        SpinWait.SpinUntil(() => agent.Status == AgentStatus.Running, TimeSpan.FromSeconds(10)).Should().BeTrue();
+        SpinWait.SpinUntil(() => agent.Status == AgentStatus.Running, TimeSpan.FromSeconds(10)).ShouldBeTrue();
         await agent.AbortAsync();
         release.TrySetResult();
         await runTask;
 
-        diagnostics.Should().ContainSingle(message => message.Contains("Listener threw: listener failed", StringComparison.Ordinal));
+        diagnostics.ShouldHaveSingleItem().ShouldContain("Listener threw: listener failed");
     }
 
     [Fact]
@@ -396,7 +398,7 @@ public class AgentTests
 
         var result = await agent.PromptAsync("hello");
 
-        result.OfType<AssistantAgentMessage>().Should().ContainSingle();
+        result.OfType<AssistantAgentMessage>().ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -412,7 +414,7 @@ public class AgentTests
 
         var result = await agent.PromptAsync("hello");
 
-        result.OfType<AssistantAgentMessage>().Should().ContainSingle();
+        result.OfType<AssistantAgentMessage>().ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -423,10 +425,10 @@ public class AgentTests
         var agent = new BotNexus.Agent.Core.Agent(TestHelpers.CreateTestOptions(model: TestHelpers.CreateTestModel("test-api")));
 
         var runTask = agent.PromptAsync("running");
-        SpinWait.SpinUntil(() => agent.Status == AgentStatus.Running, TimeSpan.FromSeconds(10)).Should().BeTrue();
+        SpinWait.SpinUntil(() => agent.Status == AgentStatus.Running, TimeSpan.FromSeconds(10)).ShouldBeTrue();
 
         agent.Reset();
-        runTask.IsCompleted.Should().BeFalse();
+        runTask.IsCompleted.ShouldBeFalse();
 
         release.TrySetResult();
         await runTask;

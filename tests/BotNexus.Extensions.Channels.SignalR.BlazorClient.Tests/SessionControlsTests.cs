@@ -35,8 +35,8 @@ public sealed class SessionControlsTests : IDisposable
         var cut = RenderSessionControls(state);
 
         var sessionId = cut.Find(".session-id");
-        sessionId.TextContent.Should().Contain("abcdef12");
-        sessionId.TextContent.Should().Contain("…");
+        sessionId.TextContent.ShouldContain("abcdef12");
+        sessionId.TextContent.ShouldContain("…");
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public sealed class SessionControlsTests : IDisposable
 
         var cut = RenderSessionControls(state);
 
-        cut.Find(".session-id").GetAttribute("title").Should().Be("Click to copy: abcdef1234567890");
+        cut.Find(".session-id").GetAttribute("title").ShouldBe("Click to copy: abcdef1234567890");
     }
 
     [Fact]
@@ -56,8 +56,8 @@ public sealed class SessionControlsTests : IDisposable
 
         var cut = RenderSessionControls(state);
 
-        cut.FindAll(".session-id").Should().BeEmpty();
-        cut.FindAll(".reset-btn").Should().BeEmpty();
+        cut.FindAll(".session-id").ShouldBeEmpty();
+        cut.FindAll(".reset-btn").ShouldBeEmpty();
     }
 
     // ── Reset button ─────────────────────────────────────────────────────
@@ -70,8 +70,8 @@ public sealed class SessionControlsTests : IDisposable
         var cut = RenderSessionControls(state);
 
         var resetBtn = cut.Find(".reset-btn");
-        resetBtn.Should().NotBeNull();
-        resetBtn.TextContent.Should().Contain("Reset");
+        resetBtn.ShouldNotBeNull();
+        resetBtn.TextContent.ShouldContain("Reset");
     }
 
     // ── Reset confirmation dialog ────────────────────────────────────────
@@ -83,7 +83,7 @@ public sealed class SessionControlsTests : IDisposable
 
         var cut = RenderSessionControls(state);
 
-        cut.FindAll(".reset-confirm-overlay").Should().BeEmpty();
+        cut.FindAll(".reset-confirm-overlay").ShouldBeEmpty();
     }
 
     [Fact]
@@ -95,9 +95,9 @@ public sealed class SessionControlsTests : IDisposable
 
         cut.Find(".reset-btn").Click();
 
-        cut.Find(".reset-confirm-dialog").Should().NotBeNull();
-        cut.Markup.Should().Contain("Reset session for");
-        cut.Markup.Should().Contain("Nova");
+        cut.Find(".reset-confirm-dialog").ShouldNotBeNull();
+        cut.Markup.ShouldContain("Reset session for");
+        cut.Markup.ShouldContain("Nova");
     }
 
     [Fact]
@@ -108,8 +108,8 @@ public sealed class SessionControlsTests : IDisposable
 
         cut.Find(".reset-btn").Click();
 
-        cut.Find(".cancel-btn").Should().NotBeNull();
-        cut.Find(".confirm-btn").Should().NotBeNull();
+        cut.Find(".cancel-btn").ShouldNotBeNull();
+        cut.Find(".confirm-btn").ShouldNotBeNull();
     }
 
     [Fact]
@@ -120,11 +120,11 @@ public sealed class SessionControlsTests : IDisposable
 
         // Open the dialog
         cut.Find(".reset-btn").Click();
-        cut.FindAll(".reset-confirm-overlay").Should().NotBeEmpty();
+        cut.FindAll(".reset-confirm-overlay").ShouldNotBeEmpty();
 
         // Cancel
         cut.Find(".cancel-btn").Click();
-        cut.FindAll(".reset-confirm-overlay").Should().BeEmpty();
+        cut.FindAll(".reset-confirm-overlay").ShouldBeEmpty();
     }
 
     [Fact]
@@ -135,11 +135,11 @@ public sealed class SessionControlsTests : IDisposable
 
         // Open the dialog
         cut.Find(".reset-btn").Click();
-        cut.FindAll(".reset-confirm-overlay").Should().NotBeEmpty();
+        cut.FindAll(".reset-confirm-overlay").ShouldNotBeEmpty();
 
         // Click overlay background
         cut.Find(".reset-confirm-overlay").Click();
-        cut.FindAll(".reset-confirm-overlay").Should().BeEmpty();
+        cut.FindAll(".reset-confirm-overlay").ShouldBeEmpty();
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class SessionControlsTests : IDisposable
 
         cut.Find(".reset-btn").Click();
 
-        cut.Markup.Should().Contain("clear all messages");
+        cut.Markup.ShouldContain("clear all messages");
     }
 
     // ── Short session IDs ────────────────────────────────────────────────
@@ -163,7 +163,7 @@ public sealed class SessionControlsTests : IDisposable
         var cut = RenderSessionControls(state);
 
         var sessionId = cut.Find(".session-id");
-        sessionId.TextContent.Should().Contain("abc");
+        sessionId.TextContent.ShouldContain("abc");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

@@ -1,6 +1,5 @@
 using BotNexus.CodingAgent.Cli;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests.Cli;
 
@@ -18,8 +17,8 @@ public sealed class CommandParserTests
     {
         var options = _parser.Parse(["--thinking", level]);
 
-        options.ThinkingSpecified.Should().BeTrue();
-        options.ThinkingLevel.Should().Be(expected);
+        options.ThinkingSpecified.ShouldBeTrue();
+        options.ThinkingLevel.ShouldBe(expected);
     }
 
     [Fact]
@@ -27,8 +26,8 @@ public sealed class CommandParserTests
     {
         var options = _parser.Parse(["--thinking", "off"]);
 
-        options.ThinkingSpecified.Should().BeTrue();
-        options.ThinkingLevel.Should().BeNull();
+        options.ThinkingSpecified.ShouldBeTrue();
+        options.ThinkingLevel.ShouldBeNull();
     }
 
     [Fact]
@@ -36,8 +35,8 @@ public sealed class CommandParserTests
     {
         var options = _parser.Parse([]);
 
-        options.ThinkingSpecified.Should().BeFalse();
-        options.ThinkingLevel.Should().BeNull();
+        options.ThinkingSpecified.ShouldBeFalse();
+        options.ThinkingLevel.ShouldBeNull();
     }
 
     [Fact]
@@ -45,7 +44,7 @@ public sealed class CommandParserTests
     {
         var action = () => _parser.Parse(["--thinking", "turbo"]);
 
-        action.Should().Throw<ArgumentException>()
-            .WithMessage("Invalid value for --thinking*");
+        action.ShouldThrow<ArgumentException>()
+            .Message.ShouldStartWith("Invalid value for --thinking");
     }
 }

@@ -5,7 +5,6 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Moq;
 
 namespace BotNexus.Gateway.Tests.Configuration;
@@ -112,33 +111,37 @@ public sealed class WorldDescriptorBuilderTests
             registry.Object,
             [new StubIsolationStrategy("in-process"), new StubIsolationStrategy("sandbox")]);
 
-        world.Identity.Id.Should().Be("local-dev");
-        world.HostedAgents.Select(agent => agent.Value).Should().Contain(["assistant", "runtime-agent"]);
-        world.HostedAgents.Select(agent => agent.Value).Should().NotContain("disabled-agent");
+        world.Identity.Id.ShouldBe("local-dev");
+        world.HostedAgents.Select(agent => agent.Value).ShouldContain("assistant");
+        world.HostedAgents.Select(agent => agent.Value).ShouldContain("runtime-agent");
+        world.HostedAgents.Select(agent => agent.Value).ShouldNotContain("disabled-agent");
 
         world.AvailableStrategies.Select(strategy => strategy.Value)
-            .Should().Contain(["in-process", "sandbox", "container", "remote"]);
+            .ShouldContain("in-process");
+        world.AvailableStrategies.Select(strategy => strategy.Value).ShouldContain("sandbox");
+        world.AvailableStrategies.Select(strategy => strategy.Value).ShouldContain("container");
+        world.AvailableStrategies.Select(strategy => strategy.Value).ShouldContain("remote");
 
-        world.Locations.Should().Contain(location => location.Name == "agents-directory" && location.Type == LocationType.FileSystem);
-        world.Locations.Should().Contain(location => location.Name == "sessions-directory" && location.Type == LocationType.FileSystem);
-        world.Locations.Should().Contain(location =>
+        world.Locations.ShouldContain(location => location.Name == "agents-directory" && location.Type == LocationType.FileSystem);
+        world.Locations.ShouldContain(location => location.Name == "sessions-directory" && location.Type == LocationType.FileSystem);
+        world.Locations.ShouldContain(location =>
             location.Name == "provider:copilot"
             && location.Type == LocationType.FileSystem
             && location.Description == "declared takes precedence"
             && location.Properties["source"] == "declared");
-        world.Locations.Should().Contain(location => location.Name == "mcp:assistant:github" && location.Type == LocationType.McpServer);
-        world.Locations.Should().Contain(location => location.Name == "agent:assistant:workspace" && location.Type == LocationType.FileSystem);
-        world.Locations.Should().Contain(location =>
+        world.Locations.ShouldContain(location => location.Name == "mcp:assistant:github" && location.Type == LocationType.McpServer);
+        world.Locations.ShouldContain(location => location.Name == "agent:assistant:workspace" && location.Type == LocationType.FileSystem);
+        world.Locations.ShouldContain(location =>
             location.Name == "repo-root"
             && location.Type == LocationType.FileSystem
             && location.Path == Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "repo"));
 
-        var permission = world.CrossWorldPermissions.Should().ContainSingle().Subject;
-        permission.TargetWorldId.Should().Be("prod");
-        permission.AllowInbound.Should().BeTrue();
-        permission.AllowOutbound.Should().BeFalse();
-        permission.AllowedAgents.Should().ContainSingle();
-        permission.AllowedAgents![0].Value.Should().Be("assistant");
+        var permission = world.CrossWorldPermissions.ShouldHaveSingleItem();
+        permission.TargetWorldId.ShouldBe("prod");
+        permission.AllowInbound.ShouldBeTrue();
+        permission.AllowOutbound.ShouldBeFalse();
+        permission.AllowedAgents.ShouldHaveSingleItem();
+        permission.AllowedAgents![0].Value.ShouldBe("assistant");
     }
 
     private sealed class StubIsolationStrategy(string name) : IIsolationStrategy

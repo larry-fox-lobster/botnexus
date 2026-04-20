@@ -1,5 +1,4 @@
 using BotNexus.Agent.Providers.Core.Utilities;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Utilities;
 
@@ -10,7 +9,7 @@ public class UnicodeSanitizerTests
     {
         var result = UnicodeSanitizer.SanitizeSurrogates("Hello, world!");
 
-        result.Should().Be("Hello, world!");
+        result.ShouldBe("Hello, world!");
     }
 
     [Fact]
@@ -20,9 +19,9 @@ public class UnicodeSanitizerTests
         var input = "before\uD800after";
         var result = UnicodeSanitizer.SanitizeSurrogates(input);
 
-        result.Should().NotContain("\uFFFD");
-        result.Should().NotContain("\uD800");
-        result.Should().Be("beforeafter");
+        result.ShouldNotContain("\uFFFD");
+        result.ShouldNotContain("\uD800");
+        result.ShouldBe("beforeafter");
     }
 
     [Fact]
@@ -32,8 +31,8 @@ public class UnicodeSanitizerTests
         var input = "before\uDC00after";
         var result = UnicodeSanitizer.SanitizeSurrogates(input);
 
-        result.Should().NotContain("\uFFFD");
-        result.Should().Be("beforeafter");
+        result.ShouldNotContain("\uFFFD");
+        result.ShouldBe("beforeafter");
     }
 
     [Fact]
@@ -43,18 +42,18 @@ public class UnicodeSanitizerTests
         var input = "smile \uD83D\uDE00 emoji";
         var result = UnicodeSanitizer.SanitizeSurrogates(input);
 
-        result.Should().Be(input);
+        result.ShouldBe(input);
     }
 
     [Fact]
     public void EmptyInput_ReturnsEmpty()
     {
-        UnicodeSanitizer.SanitizeSurrogates("").Should().Be("");
+        UnicodeSanitizer.SanitizeSurrogates("").ShouldBe("");
     }
 
     [Fact]
     public void NullInput_ReturnsNull()
     {
-        UnicodeSanitizer.SanitizeSurrogates(null!).Should().BeNull();
+        UnicodeSanitizer.SanitizeSurrogates(null!).ShouldBeNull();
     }
 }

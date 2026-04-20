@@ -2,7 +2,6 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -28,7 +27,7 @@ public sealed class AgentConfigurationHostedServiceTests
 
         await service.StartAsync(CancellationToken.None);
 
-        registry.GetAll().Select(d => d.AgentId.Value).Should().BeEquivalentTo(["agent-a", "agent-b"]);
+        registry.GetAll().Select(d => d.AgentId.Value).ShouldBe(new[] { "agent-a", "agent-b" });
     }
 
     [Fact]
@@ -44,9 +43,9 @@ public sealed class AgentConfigurationHostedServiceTests
 
         await service.StartAsync(CancellationToken.None);
 
-        registry.Contains("code-agent").Should().BeTrue();
-        registry.Contains("config-agent").Should().BeTrue();
-        registry.RegisterOperations.Should().ContainSingle(o => o == "config-agent");
+        registry.Contains("code-agent").ShouldBeTrue();
+        registry.Contains("config-agent").ShouldBeTrue();
+        registry.RegisterOperations.Where(o => o == "config-agent").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -63,7 +62,7 @@ public sealed class AgentConfigurationHostedServiceTests
         var service = new AgentConfigurationHostedService([source.Object], registry, NullLogger<AgentConfigurationHostedService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
-        callback.Should().NotBeNull();
+        callback.ShouldNotBeNull();
 
         callback!(
         [
@@ -71,12 +70,15 @@ public sealed class AgentConfigurationHostedServiceTests
             CreateDescriptor("agent-c")
         ]);
 
-        registry.Contains("agent-a").Should().BeTrue();
-        registry.Get("agent-a")!.DisplayName.Should().Be("Agent A v2");
-        registry.Contains("agent-b").Should().BeFalse();
-        registry.Contains("agent-c").Should().BeTrue();
-        registry.UnregisterOperations.Should().Contain(["agent-b", "agent-a"]);
-        registry.RegisterOperations.Should().Contain(["agent-a", "agent-b", "agent-a", "agent-c"]);
+        registry.Contains("agent-a").ShouldBeTrue();
+        registry.Get("agent-a")!.DisplayName.ShouldBe("Agent A v2");
+        registry.Contains("agent-b").ShouldBeFalse();
+        registry.Contains("agent-c").ShouldBeTrue();
+        registry.UnregisterOperations.ShouldContain("agent-b");
+        registry.UnregisterOperations.ShouldContain("agent-a");
+        registry.RegisterOperations.ShouldContain("agent-a");
+        registry.RegisterOperations.ShouldContain("agent-b");
+        registry.RegisterOperations.ShouldContain("agent-c");
     }
 
     [Fact]
@@ -105,7 +107,7 @@ public sealed class AgentConfigurationHostedServiceTests
 
         await service.StartAsync(CancellationToken.None);
 
-        registry.RegisterOperations.Should().BeEmpty();
+        registry.RegisterOperations.ShouldBeEmpty();
     }
 
     private static AgentDescriptor CreateDescriptor(string agentId, string? displayName = null)

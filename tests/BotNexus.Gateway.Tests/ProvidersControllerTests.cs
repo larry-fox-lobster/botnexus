@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Api.Controllers;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 
@@ -18,8 +17,8 @@ public sealed class ProvidersControllerTests
         var result = controller.GetProviders();
 
         var providers = (result.Result as OkObjectResult)?.Value as IEnumerable<ProviderInfo>;
-        providers.Should().NotBeNull();
-        providers!.Should().BeEmpty();
+        providers.ShouldNotBeNull();
+        providers!.ShouldBeEmpty();
     }
 
     [Fact]
@@ -32,8 +31,8 @@ public sealed class ProvidersControllerTests
         var result = controller.GetProviders();
 
         var providers = (result.Result as OkObjectResult)?.Value as IEnumerable<ProviderInfo>;
-        providers.Should().NotBeNull();
-        providers!.Select(p => p.Name).Should().BeEquivalentTo(["openai", "anthropic"]);
+        providers.ShouldNotBeNull();
+        providers!.Select(p => p.Name).ShouldBe(new[] { "openai", "anthropic" });
     }
 
     [Fact]
@@ -46,8 +45,8 @@ public sealed class ProvidersControllerTests
         var result = controller.GetProviders();
 
         var providers = (result.Result as OkObjectResult)?.Value as IEnumerable<ProviderInfo>;
-        providers.Should().NotBeNull();
-        providers!.Select(p => p.Name).Should().Equal("anthropic", "github-copilot", "openai");
+        providers.ShouldNotBeNull();
+        providers!.Select(p => p.Name).ShouldBe(new[] { "anthropic", "github-copilot", "openai" });
     }
 
 }

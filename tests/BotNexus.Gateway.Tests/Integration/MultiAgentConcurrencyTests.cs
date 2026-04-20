@@ -11,7 +11,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Api;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Tests.Helpers;
-using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -76,8 +75,8 @@ public sealed class MultiAgentConcurrencyTests : IAsyncDisposable
         var slowSessionId = slowResult.GetProperty("sessionId").GetString();
         var fastSessionId = fastResult.GetProperty("sessionId").GetString();
 
-        slowSessionId.Should().NotBeNullOrWhiteSpace();
-        fastSessionId.Should().NotBeNullOrWhiteSpace();
+        slowSessionId.ShouldNotBeNullOrWhiteSpace();
+        fastSessionId.ShouldNotBeNullOrWhiteSpace();
 
         // Assert - Wait for both responses with timeout
         var deadline = DateTimeOffset.UtcNow.AddSeconds(10);
@@ -86,14 +85,14 @@ public sealed class MultiAgentConcurrencyTests : IAsyncDisposable
             await Task.Delay(50, cts.Token);
         }
 
-        responses.Should().ContainKey(slowSessionId!);
-        responses.Should().ContainKey(fastSessionId!);
+        responses.ShouldContainKey(slowSessionId!);
+        responses.ShouldContainKey(fastSessionId!);
 
-        responses[slowSessionId!].Content.Should().Be("slow-response");
-        responses[fastSessionId!].Content.Should().Be("fast-response");
+        responses[slowSessionId!].Content.ShouldBe("slow-response");
+        responses[fastSessionId!].Content.ShouldBe("fast-response");
 
         // CRITICAL: fast agent should respond before slow agent
-        responses[fastSessionId!].ReceivedAt.Should().BeBefore(responses[slowSessionId!].ReceivedAt);
+        responses[fastSessionId!].ReceivedAt.ShouldBeLessThan(responses[slowSessionId!].ReceivedAt);
     }
 
     /// <summary>
@@ -148,14 +147,14 @@ public sealed class MultiAgentConcurrencyTests : IAsyncDisposable
             await Task.Delay(50, cts.Token);
         }
 
-        responses.Should().HaveCount(3);
-        responses.Should().ContainKey(slowSessionId);
-        responses.Should().ContainKey(mediumSessionId);
-        responses.Should().ContainKey(fastSessionId);
+        responses.Count().ShouldBe(3);
+        responses.ShouldContainKey(slowSessionId);
+        responses.ShouldContainKey(mediumSessionId);
+        responses.ShouldContainKey(fastSessionId);
 
         // Verify responses came in the right order (fastest first)
-        responses[fastSessionId].ReceivedAt.Should().BeBefore(responses[mediumSessionId].ReceivedAt);
-        responses[mediumSessionId].ReceivedAt.Should().BeBefore(responses[slowSessionId].ReceivedAt);
+        responses[fastSessionId].ReceivedAt.ShouldBeLessThan(responses[mediumSessionId].ReceivedAt);
+        responses[mediumSessionId].ReceivedAt.ShouldBeLessThan(responses[slowSessionId].ReceivedAt);
     }
 
     /// <summary>
@@ -212,12 +211,12 @@ public sealed class MultiAgentConcurrencyTests : IAsyncDisposable
             await Task.Delay(50, cts.Token);
         }
 
-        responses.Should().HaveCount(2);
-        responses[sessionA].Content.Should().Be("response-a");
-        responses[sessionB].Content.Should().Be("response-b");
+        responses.Count().ShouldBe(2);
+        responses[sessionA].Content.ShouldBe("response-a");
+        responses[sessionB].Content.ShouldBe("response-b");
 
         // Assert agent-b responded before agent-a (proves no serialization)
-        responses[sessionB].ReceivedAt.Should().BeBefore(responses[sessionA].ReceivedAt);
+        responses[sessionB].ReceivedAt.ShouldBeLessThan(responses[sessionA].ReceivedAt);
     }
 
     /// <summary>
@@ -262,7 +261,7 @@ public sealed class MultiAgentConcurrencyTests : IAsyncDisposable
 
         // Wait for first response
         await WaitForResponseCount(responses, 1, cts.Token);
-        responses.Should().ContainSingle(r => r.SessionId == firstSessionId && r.Content == "reset-response");
+        responses.Where(r => r.SessionId == firstSessionId && r.Content == "reset-response").ShouldHaveSingleItem();
 
         // Reset session
         await connection.InvokeAsync("ResetSession", "agent-reset", firstSessionId, cts.Token);
@@ -272,10 +271,10 @@ public sealed class MultiAgentConcurrencyTests : IAsyncDisposable
         var secondSessionId = secondResult.GetProperty("sessionId").GetString()!;
 
         // Assert - Should create new session and respond
-        secondSessionId.Should().NotBe(firstSessionId);
+        secondSessionId.ShouldNotBe(firstSessionId);
         
         await WaitForResponseCount(responses, 2, cts.Token);
-        responses.Should().Contain(r => r.SessionId == secondSessionId && r.Content == "reset-response");
+        responses.ShouldContain(r => r.SessionId == secondSessionId && r.Content == "reset-response");
     }
 
     /// <summary>
@@ -337,12 +336,12 @@ public sealed class MultiAgentConcurrencyTests : IAsyncDisposable
             await Task.Delay(50, cts.Token);
         }
 
-        responses.Should().HaveCount(agentCount);
+        responses.Count().ShouldBe(agentCount);
         
         foreach (var (agentId, sessionId) in results)
         {
-            responses.Should().ContainKey(sessionId);
-            responses[sessionId].Should().Be($"response-{agentId}");
+            responses.ShouldContainKey(sessionId);
+            responses[sessionId].ShouldBe($"response-{agentId}");
         }
     }
 
@@ -539,7 +538,7 @@ public sealed class MultiAgentConcurrencyTests : IAsyncDisposable
         };
 
         var response = await client.PostAsJsonAsync("/api/agents", descriptor, cancellationToken);
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.Created, HttpStatusCode.Conflict);
+        response.StatusCode.ShouldBeOneOf(HttpStatusCode.Created, HttpStatusCode.Conflict);
     }
 
     /// <summary>

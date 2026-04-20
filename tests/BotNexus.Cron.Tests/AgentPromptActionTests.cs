@@ -1,7 +1,6 @@
 using BotNexus.Cron.Actions;
 using BotNexus.Gateway.Abstractions.Triggers;
 using BotNexus.Domain.Primitives;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 
@@ -32,9 +31,9 @@ public sealed class AgentPromptActionTests
 
         await action.ExecuteAsync(context);
 
-        capturedAgentId.Should().Be(AgentId.From("agent-a"));
-        capturedPrompt.Should().Be("Ping from cron");
-        context.SessionId.Should().Be(createdSession.Value);
+        capturedAgentId.ShouldBe(AgentId.From("agent-a"));
+        capturedPrompt.ShouldBe("Ping from cron");
+        context.SessionId.ShouldBe(createdSession.Value);
         trigger.Verify(value => value.CreateSessionAsync(It.IsAny<AgentId>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -46,8 +45,8 @@ public sealed class AgentPromptActionTests
         var context = CreateContext(services);
 
         var act = () => action.ExecuteAsync(context);
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Cron internal trigger is not registered*");
+        var ex = await act.ShouldThrowAsync<InvalidOperationException>();
+        ex.Message.ShouldContain("Cron internal trigger is not registered");
     }
 
     private static IServiceProvider BuildServices(IInternalTrigger trigger)

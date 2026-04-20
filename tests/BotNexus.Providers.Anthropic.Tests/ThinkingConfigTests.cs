@@ -1,6 +1,5 @@
 using BotNexus.Agent.Providers.Anthropic;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Anthropic.Tests;
 
@@ -15,9 +14,9 @@ public class ThinkingConfigTests
             Effort = "high"
         };
 
-        opts.ThinkingEnabled.Should().BeTrue();
-        opts.Effort.Should().Be("high");
-        opts.ThinkingBudgetTokens.Should().BeNull();
+        opts.ThinkingEnabled.ShouldBeTrue();
+        opts.Effort.ShouldBe("high");
+        opts.ThinkingBudgetTokens.ShouldBeNull();
     }
 
     [Fact]
@@ -29,9 +28,9 @@ public class ThinkingConfigTests
             ThinkingBudgetTokens = 10000
         };
 
-        opts.ThinkingEnabled.Should().BeTrue();
-        opts.ThinkingBudgetTokens.Should().Be(10000);
-        opts.Effort.Should().BeNull();
+        opts.ThinkingEnabled.ShouldBeTrue();
+        opts.ThinkingBudgetTokens.ShouldBe(10000);
+        opts.Effort.ShouldBeNull();
     }
 
     [Fact]
@@ -42,7 +41,7 @@ public class ThinkingConfigTests
             ThinkingEnabled = false
         };
 
-        opts.ThinkingEnabled.Should().BeFalse();
+        opts.ThinkingEnabled.ShouldBeFalse();
     }
 
     [Fact]
@@ -50,7 +49,7 @@ public class ThinkingConfigTests
     {
         var opts = new AnthropicOptions();
 
-        opts.InterleavedThinking.Should().BeTrue();
+        opts.InterleavedThinking.ShouldBeTrue();
     }
 
     [Fact]
@@ -58,7 +57,7 @@ public class ThinkingConfigTests
     {
         var opts = new AnthropicOptions { ToolChoice = "auto" };
 
-        opts.ToolChoice.Should().Be("auto");
+        opts.ToolChoice.ShouldBe("auto");
     }
 
     [Fact]
@@ -73,8 +72,8 @@ public class ThinkingConfigTests
             ExtraHigh = 64000
         };
 
-        budgets.Minimal.Should().Be(1024);
-        budgets.High.Should().Be(32000);
-        budgets.ExtraHigh.Should().Be(64000);
+        budgets.Minimal.ShouldBe(1024);
+        budgets.High.ShouldBe(32000);
+        budgets.ExtraHigh.ShouldBe(64000);
     }
 }

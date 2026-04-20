@@ -4,7 +4,6 @@ using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Agents;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -58,10 +57,10 @@ public sealed class CrossAgentCallingTests
             });
         communicator = new DefaultAgentCommunicator(registry.Object, supervisor.Object, NullLogger<DefaultAgentCommunicator>.Instance);
 
-        var act = () => communicator.CallCrossAgentAsync("agent-a", string.Empty, "agent-b", "hello");
+        Func<Task> act = () => communicator.CallCrossAgentAsync("agent-a", string.Empty, "agent-b", "hello");
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Recursive cross-agent call detected*");
+        (await act.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("Recursive cross-agent call detected");
     }
 
     [Fact]
@@ -71,9 +70,9 @@ public sealed class CrossAgentCallingTests
         registry.Setup(r => r.Contains("missing-agent")).Returns(false);
         var communicator = new DefaultAgentCommunicator(registry.Object, Mock.Of<IAgentSupervisor>(), NullLogger<DefaultAgentCommunicator>.Instance);
 
-        var act = () => communicator.CallCrossAgentAsync("caller-agent", string.Empty, "missing-agent", "hello");
+        Func<Task> act = () => communicator.CallCrossAgentAsync("caller-agent", string.Empty, "missing-agent", "hello");
 
-        await act.Should().ThrowAsync<KeyNotFoundException>();
+        await act.ShouldThrowAsync<KeyNotFoundException>();
     }
 
     [Fact]
@@ -86,10 +85,10 @@ public sealed class CrossAgentCallingTests
             .ThrowsAsync(new InvalidOperationException("create failed"));
         var communicator = new DefaultAgentCommunicator(registry.Object, supervisor.Object, NullLogger<DefaultAgentCommunicator>.Instance);
 
-        var act = () => communicator.CallCrossAgentAsync("caller-agent", string.Empty, "target-agent", "hello");
+        Func<Task> act = () => communicator.CallCrossAgentAsync("caller-agent", string.Empty, "target-agent", "hello");
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*create failed*");
+        (await act.ShouldThrowAsync<InvalidOperationException>())
+            .Message.ShouldContain("create failed");
     }
 
     [Fact]
@@ -107,7 +106,7 @@ public sealed class CrossAgentCallingTests
 
         await communicator.CallCrossAgentAsync("caller-agent", string.Empty, "target-agent", "hello");
 
-        capturedSessionId!.Value.Value.Should().StartWith("xagent::caller-agent::target-agent");
+        capturedSessionId!.Value.Value.ShouldStartWith("xagent::caller-agent::target-agent");
     }
 
     [Fact]
@@ -132,7 +131,7 @@ public sealed class CrossAgentCallingTests
         await Task.WhenAll(Enumerable.Range(0, 16)
             .Select(i => communicator.CallCrossAgentAsync("caller-agent", string.Empty, "target-agent", $"message-{i}")));
 
-        seenSessions.Distinct(StringComparer.Ordinal).Should().HaveCount(16);
+        seenSessions.Distinct(StringComparer.Ordinal).Count().ShouldBe(16);
     }
 
     private static AgentDescriptor CreateDescriptor(string agentId)

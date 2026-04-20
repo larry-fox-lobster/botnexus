@@ -3,7 +3,6 @@ using BotNexus.Agent.Core.Tools;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Tools;
-using FluentAssertions;
 using Microsoft.Extensions.Options;
 
 namespace BotNexus.Gateway.Tests.Tools;
@@ -15,8 +14,8 @@ public sealed class DelayToolTests
     {
         var tool = CreateDelayTool();
 
-        tool.Name.Should().Be("delay");
-        tool.Label.Should().Be("Delay / Wait");
+        tool.Name.ShouldBe("delay");
+        tool.Label.ShouldBe("Delay / Wait");
     }
 
     [Fact]
@@ -27,7 +26,7 @@ public sealed class DelayToolTests
 
         await ExecuteAsync(tool, new Dictionary<string, object?> { ["seconds"] = 2 });
 
-        stopwatch.ElapsedMilliseconds.Should().BeGreaterThanOrEqualTo(1900);
+        stopwatch.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(1900);
     }
 
     [Fact]
@@ -38,9 +37,9 @@ public sealed class DelayToolTests
 
         var result = await ExecuteAsync(tool, new Dictionary<string, object?> { ["seconds"] = 9999 });
 
-        stopwatch.ElapsedMilliseconds.Should().BeGreaterThanOrEqualTo(1900);
-        stopwatch.ElapsedMilliseconds.Should().BeLessThan(4000);
-        ReadText(result).Should().Contain("Waited 2 seconds");
+        stopwatch.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(1900);
+        stopwatch.ElapsedMilliseconds.ShouldBeLessThan(4000);
+        ReadText(result).ShouldContain("Waited 2 seconds");
     }
 
     [Fact]
@@ -53,9 +52,9 @@ public sealed class DelayToolTests
             var stopwatch = Stopwatch.StartNew();
             var result = await ExecuteAsync(tool, new Dictionary<string, object?> { ["seconds"] = seconds });
 
-            stopwatch.ElapsedMilliseconds.Should().BeGreaterThanOrEqualTo(900);
-            stopwatch.ElapsedMilliseconds.Should().BeLessThan(3000);
-            ReadText(result).Should().Contain("Waited 1 seconds");
+            stopwatch.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(900);
+            stopwatch.ElapsedMilliseconds.ShouldBeLessThan(3000);
+            ReadText(result).ShouldContain("Waited 1 seconds");
         }
     }
 
@@ -66,7 +65,7 @@ public sealed class DelayToolTests
 
         var result = await ExecuteAsync(tool, new Dictionary<string, object?> { ["seconds"] = 1 });
 
-        ReadText(result).Should().Contain("Waited 1 seconds");
+        ReadText(result).ShouldContain("Waited 1 seconds");
     }
 
     [Fact]
@@ -76,13 +75,12 @@ public sealed class DelayToolTests
         using var cts = new CancellationTokenSource();
         cts.CancelAfter(TimeSpan.FromMilliseconds(500));
 
-        var act = () => ExecuteAsync(
+        var result = await ExecuteAsync(
             tool,
             new Dictionary<string, object?> { ["seconds"] = 10 },
             cts.Token);
 
-        var result = await act.Should().NotThrowAsync();
-        ReadText(result.Subject).ToLowerInvariant().Should().Contain("cancel");
+        ReadText(result).ToLowerInvariant().ShouldContain("cancel");
     }
 
     [Fact]
@@ -96,7 +94,7 @@ public sealed class DelayToolTests
             ["reason"] = "waiting for build output"
         });
 
-        ReadText(result).Should().Contain("waiting for build output");
+        ReadText(result).ShouldContain("waiting for build output");
     }
 
     [Fact]
@@ -107,9 +105,9 @@ public sealed class DelayToolTests
 
         var result = await ExecuteAsync(tool, new Dictionary<string, object?> { ["seconds"] = 30 });
 
-        stopwatch.ElapsedMilliseconds.Should().BeGreaterThanOrEqualTo(2900);
-        stopwatch.ElapsedMilliseconds.Should().BeLessThan(5000);
-        ReadText(result).Should().Contain("Waited 3 seconds");
+        stopwatch.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(2900);
+        stopwatch.ElapsedMilliseconds.ShouldBeLessThan(5000);
+        ReadText(result).ShouldContain("Waited 3 seconds");
     }
 
     [Fact]
@@ -117,9 +115,9 @@ public sealed class DelayToolTests
     {
         var tool = CreateDelayTool();
 
-        var act = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?>());
+        Func<Task> act = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?>());
 
-        await act.Should().ThrowAsync<ArgumentException>();
+        await act.ShouldThrowAsync<ArgumentException>();
     }
 
     private static async Task<AgentToolResult> ExecuteAsync(

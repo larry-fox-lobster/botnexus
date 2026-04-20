@@ -1,6 +1,5 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using FluentAssertions;
 using Microsoft.Playwright;
 
 namespace BotNexus.WebUI.Tests;
@@ -37,7 +36,7 @@ public sealed class AgentConfigE2ETests
         await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .message.system-msg")).ToContainTextAsync("Agent settings saved.");
 
         var agent = await host.ApiClient.GetFromJsonAsync<JsonElement>($"/api/agents/{AgentA}");
-        agent.GetProperty("displayName").GetString().Should().Be(displayName);
+        agent.GetProperty("displayName").GetString().ShouldBe(displayName);
     }
 
     [PlaywrightFact(Timeout = 90000)]

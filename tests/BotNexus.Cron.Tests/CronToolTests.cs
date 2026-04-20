@@ -1,7 +1,6 @@
 using System.Text.Json;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Cron.Tools;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -26,8 +25,8 @@ public sealed class CronToolTests
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?> { ["action"] = "list" });
         var jobs = JsonSerializer.Deserialize<List<CronJobDto>>(ReadText(result), JsonOptions);
 
-        jobs.Should().NotBeNull();
-        jobs!.Should().ContainSingle(job => job.Id == "job-1");
+        jobs.ShouldNotBeNull();
+        jobs!.ShouldHaveSingleItem().Id.ShouldBe("job-1");
     }
 
     [Fact]
@@ -49,11 +48,11 @@ public sealed class CronToolTests
             ["message"] = "Summarize status"
         });
 
-        created.Should().NotBeNull();
-        created!.ActionType.Should().Be("agent-prompt");
-        created.CreatedBy.Should().Be("agent-a");
-        created.AgentId.Should().Be("agent-a");
-        ReadText(result).Should().Contain("Daily summary");
+        created.ShouldNotBeNull();
+        created!.ActionType.ShouldBe("agent-prompt");
+        created.CreatedBy.ShouldBe("agent-a");
+        created.AgentId.ShouldBe("agent-a");
+        ReadText(result).ShouldContain("Daily summary");
     }
 
     [Fact]
@@ -73,7 +72,7 @@ public sealed class CronToolTests
             ["jobId"] = "job-1"
         });
 
-        ReadText(result).Should().Contain("Deleted cron job 'job-1'");
+        ReadText(result).ShouldContain("Deleted cron job 'job-1'");
         store.Verify(value => value.DeleteAsync("job-1", It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -92,7 +91,7 @@ public sealed class CronToolTests
             ["jobId"] = "job-1"
         });
 
-        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        await act.ShouldThrowAsync<UnauthorizedAccessException>();
     }
 
     [Fact]
@@ -120,10 +119,10 @@ public sealed class CronToolTests
             ["schedule"] = "* * * * *"
         });
 
-        saved.Should().NotBeNull();
-        saved!.Schedule.Should().Be("* * * * *");
-        saved.NextRunAt.Should().NotBeNull();
-        saved.NextRunAt!.Value.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(2),
+        saved.ShouldNotBeNull();
+        saved!.Schedule.ShouldBe("* * * * *");
+        saved.NextRunAt.ShouldNotBeNull();
+        saved.NextRunAt!.Value.ShouldBe(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(2),
             "NextRunAt should be recomputed for the new schedule");
     }
 
@@ -153,9 +152,9 @@ public sealed class CronToolTests
             ["name"] = "Updated name"
         });
 
-        saved.Should().NotBeNull();
-        saved!.Name.Should().Be("Updated name");
-        saved.NextRunAt.Should().Be(originalNext, "NextRunAt should not change when schedule is unchanged");
+        saved.ShouldNotBeNull();
+        saved!.Name.ShouldBe("Updated name");
+        saved.NextRunAt.ShouldBe(originalNext, "NextRunAt should not change when schedule is unchanged");
     }
 
     [Fact]
@@ -178,14 +177,14 @@ public sealed class CronToolTests
             ["message"] = "Evening check"
         });
 
-        created.Should().NotBeNull();
-        created!.TimeZone.Should().Be("America/Los_Angeles");
-        created.NextRunAt.Should().NotBeNull();
+        created.ShouldNotBeNull();
+        created!.TimeZone.ShouldBe("America/Los_Angeles");
+        created.NextRunAt.ShouldNotBeNull();
 
         // NextRunAt should reflect Pacific interpretation: 22:00 Pacific = 05:00 or 06:00 UTC
         var pacificTz = TimeZoneInfo.FindSystemTimeZoneById("America/Los_Angeles");
         var localNext = TimeZoneInfo.ConvertTime(created.NextRunAt!.Value, pacificTz);
-        localNext.Hour.Should().Be(22, "schedule should be interpreted in Pacific time");
+        localNext.Hour.ShouldBe(22, "schedule should be interpreted in Pacific time");
     }
 
     [Fact]
@@ -213,13 +212,13 @@ public sealed class CronToolTests
             ["timeZone"] = "America/New_York"
         });
 
-        saved.Should().NotBeNull();
-        saved!.TimeZone.Should().Be("America/New_York");
-        saved.NextRunAt.Should().NotBeNull();
+        saved.ShouldNotBeNull();
+        saved!.TimeZone.ShouldBe("America/New_York");
+        saved.NextRunAt.ShouldNotBeNull();
         // NextRunAt should be recomputed with the new timezone
         var etTz = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
         var localNext = TimeZoneInfo.ConvertTime(saved.NextRunAt!.Value, etTz);
-        localNext.Hour.Should().Be(12, "schedule should be interpreted in Eastern time");
+        localNext.Hour.ShouldBe(12, "schedule should be interpreted in Eastern time");
     }
 
     [Fact]
@@ -241,9 +240,9 @@ public sealed class CronToolTests
             ["message"] = "test"
         });
 
-        created.Should().NotBeNull();
-        created!.NextRunAt.Should().BeNull("invalid schedule should not compute a NextRunAt");
-        created.Schedule.Should().Be("not valid cron");
+        created.ShouldNotBeNull();
+        created!.NextRunAt.ShouldBeNull("invalid schedule should not compute a NextRunAt");
+        created.Schedule.ShouldBe("not valid cron");
     }
 
     [Fact]
@@ -271,8 +270,8 @@ public sealed class CronToolTests
             ["schedule"] = "garbage"
         });
 
-        saved.Should().NotBeNull();
-        saved!.NextRunAt.Should().BeNull("invalid schedule should null out NextRunAt");
+        saved.ShouldNotBeNull();
+        saved!.NextRunAt.ShouldBeNull("invalid schedule should null out NextRunAt");
     }
 
     private static CronScheduler CreateScheduler()

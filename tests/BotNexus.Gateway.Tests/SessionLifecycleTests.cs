@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using System.IO.Abstractions;
@@ -15,8 +14,8 @@ public sealed class SessionLifecycleTests
     {
         var session = new GatewaySession { SessionId = BotNexus.Domain.Primitives.SessionId.From("s1"), AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a") };
 
-        session.Status.Should().Be(SessionStatus.Active);
-        session.ExpiresAt.Should().BeNull();
+        session.Status.ShouldBe(SessionStatus.Active);
+        session.ExpiresAt.ShouldBeNull();
     }
 
     [Fact]
@@ -31,8 +30,8 @@ public sealed class SessionLifecycleTests
         await service.RunCleanupOnceAsync();
 
         var updated = await store.GetAsync("s1");
-        updated!.Status.Should().Be(SessionStatus.Expired);
-        updated.ExpiresAt.Should().NotBeNull();
+        updated!.Status.ShouldBe(SessionStatus.Expired);
+        updated.ExpiresAt.ShouldNotBeNull();
     }
 
     [Fact]
@@ -60,7 +59,7 @@ public sealed class SessionLifecycleTests
                 return current?.Status == SessionStatus.Expired;
             });
 
-            expired.Should().BeTrue();
+            expired.ShouldBeTrue();
         }
         finally
         {
@@ -80,8 +79,8 @@ public sealed class SessionLifecycleTests
         await service.RunCleanupOnceAsync();
 
         var updated = await store.GetAsync("s1");
-        updated!.Status.Should().Be(SessionStatus.Active);
-        updated.ExpiresAt.Should().BeNull();
+        updated!.Status.ShouldBe(SessionStatus.Active);
+        updated.ExpiresAt.ShouldBeNull();
     }
 
     [Fact]
@@ -101,7 +100,7 @@ public sealed class SessionLifecycleTests
 
         await service.RunCleanupOnceAsync();
 
-        (await store.GetAsync("closed")).Should().BeNull();
+        (await store.GetAsync("closed")).ShouldBeNull();
     }
 
     [Fact]
@@ -116,8 +115,8 @@ public sealed class SessionLifecycleTests
 
         var reloaded = await fixture.CreateStore().GetAsync("s1");
 
-        reloaded!.Status.Should().Be(SessionStatus.Suspended);
-        reloaded.ExpiresAt.Should().BeCloseTo(session.ExpiresAt!.Value, TimeSpan.FromSeconds(1));
+        reloaded!.Status.ShouldBe(SessionStatus.Suspended);
+        reloaded.ExpiresAt!.Value.ShouldBe(session.ExpiresAt!.Value, TimeSpan.FromSeconds(1));
     }
 
     private static SessionCleanupService CreateService(InMemorySessionStore store, SessionCleanupOptions options)

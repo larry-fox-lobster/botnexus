@@ -6,7 +6,6 @@ using System.Text.Json.Nodes;
 using BotNexus.Agent.Providers.Core.Compatibility;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.OpenAI;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BotNexus.Providers.OpenAI.Tests;
@@ -19,7 +18,7 @@ public class OpenAICompletionsProviderTests
         var provider = new OpenAICompletionsProvider(
             new HttpClient(), NullLogger<OpenAICompletionsProvider>.Instance);
 
-        provider.Api.Should().Be("openai-completions");
+        provider.Api.ShouldBe("openai-completions");
     }
 
     [Fact]
@@ -36,7 +35,7 @@ public class OpenAICompletionsProviderTests
         // StreamSimple returns an LlmStream immediately (HTTP call is async in background)
         var stream = provider.StreamSimple(model, context);
 
-        stream.Should().NotBeNull();
+        stream.ShouldNotBeNull();
     }
 
     [Fact]
@@ -45,7 +44,7 @@ public class OpenAICompletionsProviderTests
         var convertTools = typeof(OpenAICompletionsProvider).GetMethod(
             "ConvertTools",
             BindingFlags.NonPublic | BindingFlags.Static);
-        convertTools.Should().NotBeNull();
+        convertTools.ShouldNotBeNull();
 
         var tool = new Tool(
             "read_file",
@@ -55,8 +54,8 @@ public class OpenAICompletionsProviderTests
 
         var converted = convertTools!.Invoke(null, [new List<Tool> { tool }, compat]) as JsonArray;
 
-        converted.Should().NotBeNull();
-        converted![0]!["function"]!["strict"]!.GetValue<bool>().Should().BeFalse();
+        converted.ShouldNotBeNull();
+        converted![0]!["function"]!["strict"]!.GetValue<bool>().ShouldBeFalse();
     }
 
     [Fact]
@@ -65,7 +64,7 @@ public class OpenAICompletionsProviderTests
         var convertMessages = typeof(OpenAICompletionsProvider).GetMethod(
             "ConvertMessages",
             BindingFlags.NonPublic | BindingFlags.Static);
-        convertMessages.Should().NotBeNull();
+        convertMessages.ShouldNotBeNull();
 
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var model = new LlmModel(
@@ -99,12 +98,11 @@ public class OpenAICompletionsProviderTests
             null,
             [null, model, messages, new OpenAICompletionsCompat()]) as JsonArray;
 
-        converted.Should().NotBeNull();
+        converted.ShouldNotBeNull();
         converted!
             .Select(node => node?["role"]?.GetValue<string>())
             .Where(role => role is not null)
-            .Should()
-            .NotContain("assistant");
+            .ShouldNotContain("assistant");
     }
 
     [Fact]
@@ -113,12 +111,12 @@ public class OpenAICompletionsProviderTests
         var mapStopReason = typeof(OpenAICompletionsProvider).GetMethod(
             "MapStopReason",
             BindingFlags.NonPublic | BindingFlags.Static);
-        mapStopReason.Should().NotBeNull();
+        mapStopReason.ShouldNotBeNull();
 
         var mapped = ((StopReason StopReason, string? ErrorMessage))mapStopReason!.Invoke(null, ["content_filter"])!;
 
-        mapped.StopReason.Should().Be(StopReason.Error);
-        mapped.ErrorMessage.Should().Be("Content filtered by provider");
+        mapped.StopReason.ShouldBe(StopReason.Error);
+        mapped.ErrorMessage.ShouldBe("Content filtered by provider");
     }
 
     [Fact]
@@ -127,7 +125,7 @@ public class OpenAICompletionsProviderTests
         var convertMessages = typeof(OpenAICompletionsProvider).GetMethod(
             "ConvertMessages",
             BindingFlags.NonPublic | BindingFlags.Static);
-        convertMessages.Should().NotBeNull();
+        convertMessages.ShouldNotBeNull();
 
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var model = new LlmModel(
@@ -149,8 +147,8 @@ public class OpenAICompletionsProviderTests
             null,
             [null, model, new Message[] { userWithOnlyImage }, new OpenAICompletionsCompat()]) as JsonArray;
 
-        converted.Should().NotBeNull();
-        converted.Should().BeEmpty();
+        converted.ShouldNotBeNull();
+        converted.ShouldBeEmpty();
     }
 
     [Fact]
@@ -159,7 +157,7 @@ public class OpenAICompletionsProviderTests
         var convertMessages = typeof(OpenAICompletionsProvider).GetMethod(
             "ConvertMessages",
             BindingFlags.NonPublic | BindingFlags.Static);
-        convertMessages.Should().NotBeNull();
+        convertMessages.ShouldNotBeNull();
 
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var model = new LlmModel(
@@ -188,9 +186,9 @@ public class OpenAICompletionsProviderTests
             null,
             ["sys \uD800 prompt", model, messages, new OpenAICompletionsCompat()]) as JsonArray;
 
-        converted.Should().NotBeNull();
-        converted![0]!["content"]!.GetValue<string>().Should().Be("sys  prompt");
-        converted[1]!["content"]!.GetValue<string>().Should().Be("hello  world");
-        converted[2]!["content"]!.GetValue<string>().Should().Be("tool  output");
+        converted.ShouldNotBeNull();
+        converted![0]!["content"]!.GetValue<string>().ShouldBe("sys  prompt");
+        converted[1]!["content"]!.GetValue<string>().ShouldBe("hello  world");
+        converted[2]!["content"]!.GetValue<string>().ShouldBe("tool  output");
     }
 }

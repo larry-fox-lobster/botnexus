@@ -1,6 +1,5 @@
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Registry;
 
@@ -40,8 +39,8 @@ public class ModelRegistryTests : IDisposable
 
         var result = _registry.GetModel("test", "test-model");
 
-        result.Should().NotBeNull();
-        result!.Id.Should().Be("test-model");
+        result.ShouldNotBeNull();
+        result!.Id.ShouldBe("test-model");
     }
 
     [Fact]
@@ -49,7 +48,7 @@ public class ModelRegistryTests : IDisposable
     {
         var result = _registry.GetModel("nonexistent", "test-model");
 
-        result.Should().BeNull();
+        result.ShouldBeNull();
     }
 
     [Fact]
@@ -60,7 +59,7 @@ public class ModelRegistryTests : IDisposable
 
         var result = _registry.GetModel("test", "nonexistent");
 
-        result.Should().BeNull();
+        result.ShouldBeNull();
     }
 
     [Fact]
@@ -71,8 +70,8 @@ public class ModelRegistryTests : IDisposable
 
         var providers = _registry.GetProviders();
 
-        providers.Should().Contain("provider-a");
-        providers.Should().Contain("provider-b");
+        providers.ShouldContain("provider-a");
+        providers.ShouldContain("provider-b");
     }
 
     [Fact]
@@ -83,7 +82,7 @@ public class ModelRegistryTests : IDisposable
 
         var models = _registry.GetModels("prov");
 
-        models.Should().HaveCount(2);
+        models.Count().ShouldBe(2);
     }
 
     [Fact]
@@ -91,7 +90,7 @@ public class ModelRegistryTests : IDisposable
     {
         var models = _registry.GetModels("unknown");
 
-        models.Should().BeEmpty();
+        models.ShouldBeEmpty();
     }
 
     [Fact]
@@ -109,9 +108,9 @@ public class ModelRegistryTests : IDisposable
 
         var cost = ModelRegistry.CalculateCost(model, usage);
 
-        cost.Input.Should().Be(1000 * 3.0m / 1_000_000m);
-        cost.Output.Should().Be(500 * 15.0m / 1_000_000m);
-        cost.Total.Should().Be(cost.Input + cost.Output);
+        cost.Input.ShouldBe(1000 * 3.0m / 1_000_000m);
+        cost.Output.ShouldBe(500 * 15.0m / 1_000_000m);
+        cost.Total.ShouldBe(cost.Input + cost.Output);
     }
 
     [Fact]
@@ -121,7 +120,7 @@ public class ModelRegistryTests : IDisposable
 
         var result = ModelRegistry.SupportsExtraHigh(model);
 
-        result.Should().BeTrue();
+        result.ShouldBeTrue();
     }
 
     [Fact]
@@ -131,7 +130,7 @@ public class ModelRegistryTests : IDisposable
 
         var result = ModelRegistry.SupportsExtraHigh(model);
 
-        result.Should().BeFalse();
+        result.ShouldBeFalse();
     }
 
     [Fact]
@@ -141,7 +140,7 @@ public class ModelRegistryTests : IDisposable
 
         var result = ModelRegistry.SupportsExtraHigh(model);
 
-        result.Should().BeTrue();
+        result.ShouldBeTrue();
     }
 
     [Fact]
@@ -152,7 +151,7 @@ public class ModelRegistryTests : IDisposable
 
         var result = ModelRegistry.ModelsAreEqual(first, second);
 
-        result.Should().BeTrue();
+        result.ShouldBeTrue();
     }
 
     [Fact]
@@ -163,7 +162,7 @@ public class ModelRegistryTests : IDisposable
 
         var result = ModelRegistry.ModelsAreEqual(first, second);
 
-        result.Should().BeFalse();
+        result.ShouldBeFalse();
     }
 
     [Fact]
@@ -174,7 +173,7 @@ public class ModelRegistryTests : IDisposable
 
         var result = ModelRegistry.ModelsAreEqual(first, second);
 
-        result.Should().BeFalse();
+        result.ShouldBeFalse();
     }
 
     [Fact]
@@ -185,7 +184,7 @@ public class ModelRegistryTests : IDisposable
 
         var result = ModelRegistry.ModelsAreEqual(first, second);
 
-        result.Should().BeTrue();
+        result.ShouldBeTrue();
     }
 
     [Fact]
@@ -196,6 +195,6 @@ public class ModelRegistryTests : IDisposable
 
         var result = ModelRegistry.ModelsAreEqual(first, second);
 
-        result.Should().BeFalse();
+        result.ShouldBeFalse();
     }
 }

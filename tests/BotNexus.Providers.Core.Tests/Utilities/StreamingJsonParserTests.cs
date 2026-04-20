@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Agent.Providers.Core.Utilities;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Utilities;
 
@@ -11,8 +10,9 @@ public class StreamingJsonParserTests
     {
         var result = StreamingJsonParser.Parse("{\"name\": \"test\", \"value\": 42}");
 
-        result.Should().ContainKey("name").WhoseValue.Should().Be("test");
-        result.Should().ContainKey("value");
+        result.ShouldContainKey("name");
+        result["name"].ShouldBe("test");
+        result.ShouldContainKey("value");
     }
 
     [Fact]
@@ -20,7 +20,8 @@ public class StreamingJsonParserTests
     {
         var result = StreamingJsonParser.Parse("{\"name\": \"partial");
 
-        result.Should().ContainKey("name").WhoseValue.Should().Be("partial");
+        result.ShouldContainKey("name");
+        result["name"].ShouldBe("partial");
     }
 
     [Fact]
@@ -28,7 +29,8 @@ public class StreamingJsonParserTests
     {
         var result = StreamingJsonParser.Parse("{\"key\": \"value\"");
 
-        result.Should().ContainKey("key").WhoseValue.Should().Be("value");
+        result.ShouldContainKey("key");
+        result["key"].ShouldBe("value");
     }
 
     [Fact]
@@ -36,7 +38,7 @@ public class StreamingJsonParserTests
     {
         var result = StreamingJsonParser.Parse("");
 
-        result.Should().BeEmpty();
+        result.ShouldBeEmpty();
     }
 
     [Fact]
@@ -44,7 +46,7 @@ public class StreamingJsonParserTests
     {
         var result = StreamingJsonParser.Parse("   ");
 
-        result.Should().BeEmpty();
+        result.ShouldBeEmpty();
     }
 
     [Fact]
@@ -52,10 +54,10 @@ public class StreamingJsonParserTests
     {
         var result = StreamingJsonParser.Parse("{\"outer\": {\"inner\": \"value\"}}");
 
-        result.Should().ContainKey("outer");
+        result.ShouldContainKey("outer");
         var outer = result["outer"] as Dictionary<string, object?>;
-        outer.Should().NotBeNull();
-        outer!["inner"].Should().Be("value");
+        outer.ShouldNotBeNull();
+        outer!["inner"].ShouldBe("value");
     }
 
     [Fact]
@@ -63,12 +65,12 @@ public class StreamingJsonParserTests
     {
         var result = StreamingJsonParser.Parse("{\"items\": [1, 2, 3]}");
 
-        result.Should().ContainKey("items");
+        result.ShouldContainKey("items");
         var items = result["items"];
-        items.Should().BeOfType<JsonElement>();
+        items.ShouldBeOfType<JsonElement>();
         var element = (JsonElement)items!;
-        element.ValueKind.Should().Be(JsonValueKind.Array);
-        element.GetArrayLength().Should().Be(3);
+        element.ValueKind.ShouldBe(JsonValueKind.Array);
+        element.GetArrayLength().ShouldBe(3);
     }
 
     [Fact]
@@ -76,15 +78,15 @@ public class StreamingJsonParserTests
     {
         var result = StreamingJsonParser.Parse("{\"command\": [\"echo\", \"hello\"]}");
 
-        result.Should().ContainKey("command");
+        result.ShouldContainKey("command");
         var command = result["command"];
-        command.Should().BeOfType<JsonElement>();
+        command.ShouldBeOfType<JsonElement>();
         var element = (JsonElement)command!;
-        element.ValueKind.Should().Be(JsonValueKind.Array);
-        element.GetArrayLength().Should().Be(2);
+        element.ValueKind.ShouldBe(JsonValueKind.Array);
+        element.GetArrayLength().ShouldBe(2);
         var items = element.EnumerateArray().ToList();
-        items[0].GetString().Should().Be("echo");
-        items[1].GetString().Should().Be("hello");
+        items[0].GetString().ShouldBe("echo");
+        items[1].GetString().ShouldBe("hello");
     }
 
     [Fact]
@@ -92,16 +94,16 @@ public class StreamingJsonParserTests
     {
         var result = StreamingJsonParser.Parse("{\"edits\": [{\"oldText\": \"a\", \"newText\": \"b\"}]}");
 
-        result.Should().ContainKey("edits");
+        result.ShouldContainKey("edits");
         var edits = result["edits"];
-        edits.Should().BeOfType<JsonElement>();
+        edits.ShouldBeOfType<JsonElement>();
         var element = (JsonElement)edits!;
-        element.ValueKind.Should().Be(JsonValueKind.Array);
-        element.GetArrayLength().Should().Be(1);
+        element.ValueKind.ShouldBe(JsonValueKind.Array);
+        element.GetArrayLength().ShouldBe(1);
         var first = element[0];
-        first.ValueKind.Should().Be(JsonValueKind.Object);
-        first.GetProperty("oldText").GetString().Should().Be("a");
-        first.GetProperty("newText").GetString().Should().Be("b");
+        first.ValueKind.ShouldBe(JsonValueKind.Object);
+        first.GetProperty("oldText").GetString().ShouldBe("a");
+        first.GetProperty("newText").GetString().ShouldBe("b");
     }
 
     [Fact]
@@ -109,10 +111,10 @@ public class StreamingJsonParserTests
     {
         var result = StreamingJsonParser.Parse("{\"outer\": {\"inner\": \"value\"}}");
 
-        result.Should().ContainKey("outer");
+        result.ShouldContainKey("outer");
         var outer = result["outer"] as Dictionary<string, object?>;
-        outer.Should().NotBeNull();
-        outer!["inner"].Should().Be("value");
+        outer.ShouldNotBeNull();
+        outer!["inner"].ShouldBe("value");
     }
 
     [Fact]
@@ -120,12 +122,12 @@ public class StreamingJsonParserTests
     {
         var result = StreamingJsonParser.Parse("{\"items\": [1, \"two\", true, null]}");
 
-        result.Should().ContainKey("items");
+        result.ShouldContainKey("items");
         var items = result["items"];
-        items.Should().BeOfType<JsonElement>();
+        items.ShouldBeOfType<JsonElement>();
         var element = (JsonElement)items!;
-        element.ValueKind.Should().Be(JsonValueKind.Array);
-        element.GetArrayLength().Should().Be(4);
+        element.ValueKind.ShouldBe(JsonValueKind.Array);
+        element.GetArrayLength().ShouldBe(4);
     }
 
     [Fact]
@@ -133,12 +135,12 @@ public class StreamingJsonParserTests
     {
         var result = StreamingJsonParser.Parse("{\"items\": [1, 2");
 
-        result.Should().ContainKey("items");
+        result.ShouldContainKey("items");
         var items = result["items"];
-        items.Should().BeOfType<JsonElement>();
+        items.ShouldBeOfType<JsonElement>();
         var element = (JsonElement)items!;
-        element.ValueKind.Should().Be(JsonValueKind.Array);
-        element.GetArrayLength().Should().BeGreaterThanOrEqualTo(2);
+        element.ValueKind.ShouldBe(JsonValueKind.Array);
+        element.GetArrayLength().ShouldBeGreaterThanOrEqualTo(2);
     }
 
     [Fact]
@@ -146,7 +148,7 @@ public class StreamingJsonParserTests
     {
         var result = StreamingJsonParser.Parse("{\"a\": 1, \"b\": 2,}");
 
-        result.Should().ContainKey("a");
-        result.Should().ContainKey("b");
+        result.ShouldContainKey("a");
+        result.ShouldContainKey("b");
     }
 }

@@ -1,6 +1,5 @@
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 
 namespace BotNexus.Domain.Tests;
 
@@ -11,8 +10,8 @@ public sealed class SessionEntryContentPartsTests
     {
         var entry = CreateEntry();
 
-        entry.OriginalContentParts.Should().BeNull();
-        entry.ProcessedContentParts.Should().BeNull();
+        entry.OriginalContentParts.ShouldBeNull();
+        entry.ProcessedContentParts.ShouldBeNull();
     }
 
     [Fact]
@@ -32,8 +31,8 @@ public sealed class SessionEntryContentPartsTests
             ProcessedContentParts = processed
         };
 
-        entry.OriginalContentParts.Should().BeEquivalentTo(original);
-        entry.ProcessedContentParts.Should().BeEquivalentTo(processed);
+        entry.OriginalContentParts.ShouldBe(original);
+        entry.ProcessedContentParts.ShouldBe(processed);
     }
 
     [Fact]
@@ -45,8 +44,8 @@ public sealed class SessionEntryContentPartsTests
         };
         var entry = CreateEntry() with { OriginalContentParts = original };
 
-        entry.OriginalContentParts.Should().BeEquivalentTo(original);
-        entry.ProcessedContentParts.Should().BeNull();
+        entry.OriginalContentParts.ShouldBe(original);
+        entry.ProcessedContentParts.ShouldBeNull();
     }
 
     [Fact]
@@ -66,11 +65,11 @@ public sealed class SessionEntryContentPartsTests
             ProcessedContentParts = processed
         };
 
-        entry.OriginalContentParts.Should().HaveCount(1);
-        entry.ProcessedContentParts.Should().HaveCount(1);
-        entry.OriginalContentParts![0].Should().NotBeSameAs(entry.ProcessedContentParts![0]);
-        entry.OriginalContentParts[0].Should().BeOfType<BinaryContentPart>();
-        entry.ProcessedContentParts[0].Should().BeOfType<TextContentPart>();
+        entry.OriginalContentParts.Count().ShouldBe(1);
+        entry.ProcessedContentParts.Count().ShouldBe(1);
+        entry.OriginalContentParts![0].ShouldNotBeSameAs(entry.ProcessedContentParts![0]);
+        entry.OriginalContentParts[0].ShouldBeOfType<BinaryContentPart>();
+        entry.ProcessedContentParts[0].ShouldBeOfType<TextContentPart>();
     }
 
     private static SessionEntry CreateEntry() => new()

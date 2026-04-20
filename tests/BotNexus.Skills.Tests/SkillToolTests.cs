@@ -1,6 +1,5 @@
 using BotNexus.Extensions.Skills;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 using System.Reflection;
 
 namespace BotNexus.Extensions.Skills.Tests;
@@ -40,10 +39,10 @@ public sealed class SkillToolTests
         var result = await tool.ExecuteAsync("call-1", Args("list"));
         var text = ResultText(result);
 
-        text.Should().Contain("email-triage");
-        text.Should().Contain("calendar");
-        text.Should().Contain("Loaded Skills");
-        text.Should().Contain("Available Skills");
+        text.ShouldContain("email-triage");
+        text.ShouldContain("calendar");
+        text.ShouldContain("Loaded Skills");
+        text.ShouldContain("Available Skills");
     }
 
     [Fact]
@@ -57,13 +56,13 @@ public sealed class SkillToolTests
         var text = ResultText(result);
 
         // AutoLoaded skills appear under "Loaded"
-        text.Should().Contain("Loaded Skills");
-        text.Should().Contain("git-workflow");
-        text.Should().Contain("testing");
+        text.ShouldContain("Loaded Skills");
+        text.ShouldContain("git-workflow");
+        text.ShouldContain("testing");
 
         // Non-autoloaded skill appears under "Available"
-        text.Should().Contain("Available Skills");
-        text.Should().Contain("docs");
+        text.ShouldContain("Available Skills");
+        text.ShouldContain("docs");
     }
 
     [Fact]
@@ -76,8 +75,8 @@ public sealed class SkillToolTests
         var result = await tool.ExecuteAsync("call-1", Args("list"));
         var text = ResultText(result);
 
-        text.Should().Contain("public-skill");
-        text.Should().NotContain("secret-skill");
+        text.ShouldContain("public-skill");
+        text.ShouldNotContain("secret-skill");
     }
 
     [Fact]
@@ -90,9 +89,9 @@ public sealed class SkillToolTests
         var result = await tool.ExecuteAsync("call-1", Args("list"));
         var text = ResultText(result);
 
-        text.Should().Contain("alpha");
-        text.Should().Contain("gamma");
-        text.Should().NotContain("beta");
+        text.ShouldContain("alpha");
+        text.ShouldContain("gamma");
+        text.ShouldNotContain("beta");
     }
 
     [Fact]
@@ -105,7 +104,7 @@ public sealed class SkillToolTests
         var result = await tool.ExecuteAsync("call-1", Args("list"));
         var text = ResultText(result);
 
-        text.Should().Contain("No skills available.");
+        text.ShouldContain("No skills available.");
     }
 
     // ──────────────────────────── load ────────────────────────────
@@ -119,8 +118,8 @@ public sealed class SkillToolTests
         var result = await tool.ExecuteAsync("call-1", Args("load", "git-workflow"));
         var text = ResultText(result);
 
-        text.Should().Contain("git-workflow");
-        text.Should().Contain("Use feature branches.");
+        text.ShouldContain("git-workflow");
+        text.ShouldContain("Use feature branches.");
     }
 
     [Fact]
@@ -133,7 +132,7 @@ public sealed class SkillToolTests
         var result = await tool.ExecuteAsync("call-1", Args("load", "forbidden"));
         var text = ResultText(result);
 
-        text.Should().Contain("not available");
+        text.ShouldContain("not available");
     }
 
     [Fact]
@@ -144,7 +143,7 @@ public sealed class SkillToolTests
         var result = await tool.ExecuteAsync("call-1", Args("load", "no-such-skill"));
         var text = ResultText(result);
 
-        text.Should().Contain("not found");
+        text.ShouldContain("not found");
     }
 
     [Fact]
@@ -155,7 +154,7 @@ public sealed class SkillToolTests
         var result = await tool.ExecuteAsync("call-1", Args("load"));
         var text = ResultText(result);
 
-        text.Should().Contain("skillName is required");
+        text.ShouldContain("skillName is required");
     }
 
     [Fact]
@@ -166,15 +165,15 @@ public sealed class SkillToolTests
 
         // Initially nothing loaded
         var listBefore = ResultText(await tool.ExecuteAsync("c1", Args("list")));
-        listBefore.Should().NotContain("Loaded Skills");
+        listBefore.ShouldNotContain("Loaded Skills");
 
         // Load one skill
         await tool.ExecuteAsync("c2", Args("load", "calendar"));
 
         // Now it should appear as loaded
         var listAfter = ResultText(await tool.ExecuteAsync("c3", Args("list")));
-        listAfter.Should().Contain("Loaded Skills");
-        listAfter.Should().Contain("calendar");
+        listAfter.ShouldContain("Loaded Skills");
+        listAfter.ShouldContain("calendar");
     }
 
     [Fact]
@@ -186,16 +185,16 @@ public sealed class SkillToolTests
         await tool.ExecuteAsync("c1", Args("load", "a"));
         await tool.ExecuteAsync("c2", Args("load", "b"));
 
-        tool.SessionLoadedSkills.Should().Contain("a");
-        tool.SessionLoadedSkills.Should().Contain("b");
-        tool.SessionLoadedSkills.Should().NotContain("c");
+        tool.SessionLoadedSkills.ShouldContain("a");
+        tool.SessionLoadedSkills.ShouldContain("b");
+        tool.SessionLoadedSkills.ShouldNotContain("c");
 
         var text = ResultText(await tool.ExecuteAsync("c3", Args("list")));
-        text.Should().Contain("Loaded Skills");
-        text.Should().Contain("a");
-        text.Should().Contain("b");
-        text.Should().Contain("Available Skills");
-        text.Should().Contain("c");
+        text.ShouldContain("Loaded Skills");
+        text.ShouldContain("a");
+        text.ShouldContain("b");
+        text.ShouldContain("Available Skills");
+        text.ShouldContain("c");
     }
 
     [Fact]
@@ -206,7 +205,7 @@ public sealed class SkillToolTests
 
         var result = InvokeTryUnload(tool, "calendar");
 
-        result.Should().BeTrue();
+        result.ShouldBeTrue();
     }
 
     [Fact]
@@ -216,7 +215,7 @@ public sealed class SkillToolTests
 
         var result = InvokeTryUnload(tool, "calendar");
 
-        result.Should().BeFalse();
+        result.ShouldBeFalse();
     }
 
     [Fact]
@@ -226,7 +225,7 @@ public sealed class SkillToolTests
 
         var result = InvokeDiscoveryPaths(tool);
 
-        result.Should().Be(("global-path", "agent-path", "workspace-path"));
+        result.ShouldBe(("global-path", "agent-path", "workspace-path"));
     }
 
     [Fact]
@@ -237,27 +236,27 @@ public sealed class SkillToolTests
 
         var result = InvokeConfig(tool);
 
-        result.Should().BeSameAs(config);
+        result.ShouldBeSameAs(config);
     }
 
     private static bool InvokeTryUnload(SkillTool tool, string skillName)
     {
         var method = tool.GetType().GetMethod("TryUnload", BindingFlags.Public | BindingFlags.Instance);
-        method.Should().NotBeNull("SkillTool must expose TryUnload for /skills remove.");
+        method.ShouldNotBeNull("SkillTool must expose TryUnload for /skills remove.");
         return (bool)method!.Invoke(tool, [skillName])!;
     }
 
     private static (string? Global, string? Agent, string? Workspace) InvokeDiscoveryPaths(SkillTool tool)
     {
         var property = tool.GetType().GetProperty("DiscoveryPaths", BindingFlags.Public | BindingFlags.Instance);
-        property.Should().NotBeNull("SkillTool must expose DiscoveryPaths for /skills command output.");
+        property.ShouldNotBeNull("SkillTool must expose DiscoveryPaths for /skills command output.");
         return ((string? Global, string? Agent, string? Workspace))property!.GetValue(tool)!;
     }
 
     private static SkillsConfig? InvokeConfig(SkillTool tool)
     {
         var property = tool.GetType().GetProperty("Config", BindingFlags.Public | BindingFlags.Instance);
-        property.Should().NotBeNull("SkillTool must expose Config for /skills command output.");
+        property.ShouldNotBeNull("SkillTool must expose Config for /skills command output.");
         return (SkillsConfig?)property!.GetValue(tool);
     }
 }

@@ -1,5 +1,4 @@
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests;
 
@@ -10,7 +9,7 @@ public sealed class GatewayOptionsTests
     {
         var options = new GatewayOptions();
 
-        options.DefaultAgentId.Should().BeNull();
+        options.DefaultAgentId.ShouldBeNull();
     }
 
     [Fact]
@@ -21,7 +20,7 @@ public sealed class GatewayOptionsTests
             DefaultAgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a")
         };
 
-        options.DefaultAgentId.Should().Be("agent-a");
+        options.DefaultAgentId.ShouldBe("agent-a");
     }
 
     [Fact]
@@ -29,7 +28,7 @@ public sealed class GatewayOptionsTests
     {
         var options = new GatewayOptions();
 
-        options.MaxCallChainDepth.Should().Be(10);
+        options.MaxCallChainDepth.ShouldBe(10);
     }
 
     [Fact]
@@ -37,6 +36,6 @@ public sealed class GatewayOptionsTests
     {
         var options = new GatewayOptions();
 
-        options.CrossAgentTimeoutSeconds.Should().Be(120);
+        options.CrossAgentTimeoutSeconds.ShouldBe(120);
     }
 }

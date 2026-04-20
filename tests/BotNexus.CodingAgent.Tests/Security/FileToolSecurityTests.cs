@@ -1,6 +1,5 @@
 using System.Text;
 using BotNexus.Tools;
-using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests.Security;
 
@@ -26,7 +25,7 @@ public sealed class FileToolSecurityTests : IDisposable
     public async Task ReadTool_PathTraversal_IsBlocked()
     {
         var act = () => _readTool.ExecuteAsync("t1", new Dictionary<string, object?> { ["path"] = "..\\..\\etc\\passwd" });
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.ShouldThrowAsync<InvalidOperationException>();
     }
 
     [Fact]
@@ -34,7 +33,7 @@ public sealed class FileToolSecurityTests : IDisposable
     public async Task WriteTool_PathTraversal_IsBlocked()
     {
         var act = () => _writeTool.ExecuteAsync("t1", new Dictionary<string, object?> { ["path"] = "..\\outside\\malicious.txt", ["content"] = "x" });
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.ShouldThrowAsync<InvalidOperationException>();
     }
 
     [Fact]
@@ -53,7 +52,7 @@ public sealed class FileToolSecurityTests : IDisposable
                     new Dictionary<string, object?> { ["oldText"] = "content", ["newText"] = "updated" }
                 }
             });
-            await act.Should().ThrowAsync<InvalidOperationException>();
+            await act.ShouldThrowAsync<InvalidOperationException>();
         }
         finally
         {
@@ -70,7 +69,7 @@ public sealed class FileToolSecurityTests : IDisposable
     {
         var escaped = OperatingSystem.IsWindows() ? @"C:\Windows\System32\config\SAM" : "/etc/passwd";
         var act = () => _readTool.ExecuteAsync("t1", new Dictionary<string, object?> { ["path"] = escaped });
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.ShouldThrowAsync<InvalidOperationException>();
     }
 
     [Fact]
@@ -78,7 +77,7 @@ public sealed class FileToolSecurityTests : IDisposable
     public async Task PathWithNullByte_IsRejected()
     {
         var act = () => _writeTool.ExecuteAsync("t1", new Dictionary<string, object?> { ["path"] = "file\0.txt", ["content"] = "x" });
-        await act.Should().ThrowAsync<Exception>();
+        await act.ShouldThrowAsync<Exception>();
     }
 
     [Fact]
@@ -91,7 +90,7 @@ public sealed class FileToolSecurityTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(_workingDirectory, composed), "ok");
 
         var act = () => _readTool.ExecuteAsync("t1", new Dictionary<string, object?> { ["path"] = decomposed });
-        await act.Should().ThrowAsync<FileNotFoundException>();
+        await act.ShouldThrowAsync<FileNotFoundException>();
     }
 
     [Fact]
@@ -100,7 +99,7 @@ public sealed class FileToolSecurityTests : IDisposable
     {
         await File.WriteAllTextAsync(Path.Combine(_workingDirectory, "safe.txt"), "ok");
         var act = () => _globTool.ExecuteAsync("t1", new Dictionary<string, object?> { ["pattern"] = "**/../../../etc/*" });
-        await act.Should().ThrowAsync<ArgumentException>();
+        await act.ShouldThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -109,7 +108,7 @@ public sealed class FileToolSecurityTests : IDisposable
     {
         var veryLongPath = $"{new string('a', 32_768)}.txt";
         var act = () => _writeTool.ExecuteAsync("t1", new Dictionary<string, object?> { ["path"] = veryLongPath, ["content"] = "x" });
-        await act.Should().ThrowAsync<Exception>();
+        await act.ShouldThrowAsync<Exception>();
     }
 
     [Fact]
@@ -121,8 +120,8 @@ public sealed class FileToolSecurityTests : IDisposable
         var result = await _writeTool.ExecuteAsync("t1", new Dictionary<string, object?> { ["path"] = "large.txt", ["content"] = largeContent });
 
         var written = await File.ReadAllTextAsync(Path.Combine(_workingDirectory, "large.txt"), Encoding.UTF8);
-        written.Length.Should().Be(largeContent.Length);
-        result.Content[0].Value.Should().Contain("Wrote 'large.txt'");
+        written.Length.ShouldBe(largeContent.Length);
+        result.Content[0].Value.ShouldContain("Wrote 'large.txt'");
     }
 
     public void Dispose()

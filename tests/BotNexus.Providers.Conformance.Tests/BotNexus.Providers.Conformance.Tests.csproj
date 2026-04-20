@@ -6,9 +6,7 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>false</IsTestProject>
   </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="FluentAssertions" Version="8.9.0" />
-    <PackageReference Include="xunit" Version="2.9.3" />
+  <ItemGroup>    <PackageReference Include="xunit" Version="2.9.3" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

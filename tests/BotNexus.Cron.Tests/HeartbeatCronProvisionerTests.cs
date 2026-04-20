@@ -1,7 +1,6 @@
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -28,10 +27,10 @@ public sealed class HeartbeatCronProvisionerTests
 
         await provisioner.StartAsync(CancellationToken.None);
 
-        created.Should().NotBeNull();
-        created!.Id.Should().Be("heartbeat:agent-a");
-        created.Schedule.Should().Be("*/30 * * * *");
-        created.System.Should().BeTrue();
+        created.ShouldNotBeNull();
+        created!.Id.ShouldBe("heartbeat:agent-a");
+        created.Schedule.ShouldBe("*/30 * * * *");
+        created.System.ShouldBeTrue();
     }
 
     [Fact]
@@ -84,8 +83,8 @@ public sealed class HeartbeatCronProvisionerTests
 
         await provisioner.StartAsync(CancellationToken.None);
 
-        updated.Should().NotBeNull();
-        updated!.Schedule.Should().Be("*/15 * * * *");
+        updated.ShouldNotBeNull();
+        updated!.Schedule.ShouldBe("*/15 * * * *");
     }
 
     [Fact]
@@ -139,8 +138,8 @@ public sealed class HeartbeatCronProvisionerTests
 
         await provisioner.StartAsync(CancellationToken.None);
 
-        created.Should().NotBeNull();
-        created!.Schedule.Should().Be("0 * * * *");
+        created.ShouldNotBeNull();
+        created!.Schedule.ShouldBe("0 * * * *");
     }
 
     private static AgentDescriptor CreateDescriptor(string agentId, HeartbeatAgentConfig? heartbeat)

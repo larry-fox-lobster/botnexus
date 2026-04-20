@@ -1,7 +1,6 @@
 using System.Net;
 using BotNexus.Extensions.WebTools.Search;
 using BotNexus.Extensions.WebTools.Tests.Helpers;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.WebTools.Tests.Search;
 
@@ -26,10 +25,10 @@ public class BraveSearchProviderTests
 
         var results = await provider.SearchAsync("query", 5, CancellationToken.None);
 
-        results.Should().HaveCount(2);
-        results[0].Title.Should().Be("A");
-        results[0].Url.Should().Be("https://example.com/a");
-        results[0].Snippet.Should().Be("Alpha");
+        results.Count().ShouldBe(2);
+        results[0].Title.ShouldBe("A");
+        results[0].Url.ShouldBe("https://example.com/a");
+        results[0].Snippet.ShouldBe("Alpha");
     }
 
     [Fact]
@@ -41,7 +40,8 @@ public class BraveSearchProviderTests
 
         var act = () => provider.SearchAsync("query", 5, CancellationToken.None);
 
-        await act.Should().ThrowAsync<HttpRequestException>().WithMessage("*401*");
+        var ex = await act.ShouldThrowAsync<HttpRequestException>();
+        ex.Message.ShouldContain("401");
     }
 
     [Fact]
@@ -53,7 +53,8 @@ public class BraveSearchProviderTests
 
         var act = () => provider.SearchAsync("query", 5, CancellationToken.None);
 
-        await act.Should().ThrowAsync<HttpRequestException>().WithMessage("*429*");
+        var ex = await act.ShouldThrowAsync<HttpRequestException>();
+        ex.Message.ShouldContain("429");
     }
 
     [Fact]
@@ -65,7 +66,7 @@ public class BraveSearchProviderTests
 
         var act = () => provider.SearchAsync("query", 5, CancellationToken.None);
 
-        await act.Should().ThrowAsync<System.Text.Json.JsonException>();
+        await act.ShouldThrowAsync<System.Text.Json.JsonException>();
     }
 
     [Theory]
@@ -78,7 +79,7 @@ public class BraveSearchProviderTests
         var provider = new BraveSearchProvider(new HttpClient(handler), apiKey!);
 
         var results = await provider.SearchAsync("query", 5, CancellationToken.None);
-        results.Should().BeEmpty();
-        handler.Requests.Should().ContainSingle();
+        results.ShouldBeEmpty();
+        handler.Requests.ShouldHaveSingleItem();
     }
 }

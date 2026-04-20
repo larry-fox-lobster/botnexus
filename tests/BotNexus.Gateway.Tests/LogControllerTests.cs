@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Api.Controllers;
 using BotNexus.Gateway.Api.Logging;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
@@ -22,9 +21,9 @@ public sealed class LogControllerTests
         var result = controller.GetRecent(limit: 1);
 
         var entries = (result.Result as OkObjectResult)?.Value as IReadOnlyList<RecentLogEntry>;
-        entries.Should().NotBeNull();
-        entries!.Should().ContainSingle();
-        entries[0].Message.Should().Contain("second");
+        entries.ShouldNotBeNull();
+        entries!.ShouldHaveSingleItem();
+        entries[0].Message.ShouldContain("second");
     }
 
     [Fact]
@@ -47,7 +46,7 @@ public sealed class LogControllerTests
         var result = controller.GetRecent(limit: 1000);
 
         var entries = (result.Result as OkObjectResult)?.Value as IReadOnlyList<RecentLogEntry>;
-        entries.Should().NotBeNull();
-        entries!.Count.Should().Be(500);
+        entries.ShouldNotBeNull();
+        entries!.Count.ShouldBe(500);
     }
 }

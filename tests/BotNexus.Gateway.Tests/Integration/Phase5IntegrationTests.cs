@@ -20,7 +20,6 @@ using BotNexus.Gateway.Agents;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Security;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -49,13 +48,13 @@ public sealed class Phase5IntegrationTests
         await using var host = await GatewayApiHarness.StartAsync("phase5-key");
 
         var unauthenticated = await host.Client.GetAsync("/api/agents");
-        unauthenticated.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        unauthenticated.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/agents");
         request.Headers.Add("X-Api-Key", "phase5-key");
         var authenticated = await host.Client.SendAsync(request);
 
-        authenticated.StatusCode.Should().Be(HttpStatusCode.OK);
+        authenticated.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -75,9 +74,9 @@ public sealed class Phase5IntegrationTests
         await cleanup.RunCleanupOnceAsync();
 
         var reloaded = await store.GetAsync("phase5-session");
-        reloaded.Should().NotBeNull();
-        reloaded!.Status.Should().Be(GatewaySessionStatus.Expired);
-        reloaded.ExpiresAt.Should().NotBeNull();
+        reloaded.ShouldNotBeNull();
+        reloaded!.Status.ShouldBe(GatewaySessionStatus.Expired);
+        reloaded.ExpiresAt.ShouldNotBeNull();
     }
 
     [Fact]
@@ -86,11 +85,11 @@ public sealed class Phase5IntegrationTests
         IChannelManager manager = new ChannelManager([new TuiChannelAdapter(NullLogger<TuiChannelAdapter>.Instance)]);
 
         var adapter = manager.Get("tui");
-        adapter.Should().NotBeNull();
-        adapter!.SupportsSteering.Should().BeTrue();
-        adapter.SupportsFollowUp.Should().BeFalse();
-        adapter.SupportsThinkingDisplay.Should().BeTrue();
-        adapter.SupportsToolDisplay.Should().BeTrue();
+        adapter.ShouldNotBeNull();
+        adapter!.SupportsSteering.ShouldBeTrue();
+        adapter.SupportsFollowUp.ShouldBeFalse();
+        adapter.SupportsThinkingDisplay.ShouldBeTrue();
+        adapter.SupportsToolDisplay.ShouldBeTrue();
     }
 
     [Fact]
@@ -117,16 +116,16 @@ public sealed class Phase5IntegrationTests
                 """);
 
             var validResult = await controller.Validate(validPath, CancellationToken.None);
-            var validPayload = validResult.Result.Should().BeOfType<OkObjectResult>().Subject.Value
-                .Should().BeOfType<ConfigValidationResponse>().Subject;
-            validPayload.IsValid.Should().BeTrue();
-            validPayload.Errors.Should().BeEmpty();
+            var validPayload = validResult.Result.ShouldBeOfType<OkObjectResult>().Value
+                .ShouldBeOfType<ConfigValidationResponse>();
+            validPayload.IsValid.ShouldBeTrue();
+            validPayload.Errors.ShouldBeEmpty();
 
             var missingResult = await controller.Validate(missingPath, CancellationToken.None);
-            var missingPayload = missingResult.Result.Should().BeOfType<OkObjectResult>().Subject.Value
-                .Should().BeOfType<ConfigValidationResponse>().Subject;
-            missingPayload.IsValid.Should().BeFalse();
-            missingPayload.Errors.Should().NotBeEmpty();
+            var missingPayload = missingResult.Result.ShouldBeOfType<OkObjectResult>().Value
+                .ShouldBeOfType<ConfigValidationResponse>();
+            missingPayload.IsValid.ShouldBeFalse();
+            missingPayload.Errors.ShouldNotBeEmpty();
         }
         finally
         {
@@ -185,8 +184,8 @@ public sealed class Phase5IntegrationTests
         if (ShouldSkipForLiveIssue(activity))
             return;
 
-        channel.StreamDeltas.Should().NotBeEmpty();
-        string.Concat(channel.StreamDeltas).Should().NotBeNullOrWhiteSpace();
+        channel.StreamDeltas.ShouldNotBeEmpty();
+        string.Concat(channel.StreamDeltas).ShouldNotBeNullOrWhiteSpace();
     }
 
     private static bool ShouldRunLiveIntegration()

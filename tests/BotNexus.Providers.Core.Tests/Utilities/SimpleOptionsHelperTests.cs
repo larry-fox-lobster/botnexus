@@ -1,6 +1,5 @@
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Utilities;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Utilities;
 
@@ -30,9 +29,9 @@ public class SimpleOptionsHelperTests
 
         var result = SimpleOptionsHelper.BuildBaseOptions(model, simple, "api-key-123");
 
-        result.Temperature.Should().Be(0.7f);
-        result.MaxTokens.Should().Be(4096);
-        result.ApiKey.Should().Be("api-key-123");
+        result.Temperature.ShouldBe(0.7f);
+        result.MaxTokens.ShouldBe(4096);
+        result.ApiKey.ShouldBe("api-key-123");
     }
 
     [Fact]
@@ -42,10 +41,10 @@ public class SimpleOptionsHelperTests
 
         var result = SimpleOptionsHelper.BuildBaseOptions(model, null, "key");
 
-        result.Temperature.Should().BeNull();
-        result.MaxTokens.Should().Be(16384);
-        result.Transport.Should().Be(Transport.Sse);
-        result.CacheRetention.Should().Be(CacheRetention.Short);
+        result.Temperature.ShouldBeNull();
+        result.MaxTokens.ShouldBe(16384);
+        result.Transport.ShouldBe(Transport.Sse);
+        result.CacheRetention.ShouldBe(CacheRetention.Short);
     }
 
     [Fact]
@@ -59,7 +58,7 @@ public class SimpleOptionsHelperTests
 
         var result = SimpleOptionsHelper.BuildBaseOptions(model, simple, null!);
 
-        result.ApiKey.Should().Be("fallback-key");
+        result.ApiKey.ShouldBe("fallback-key");
     }
 
     [Fact]
@@ -73,7 +72,7 @@ public class SimpleOptionsHelperTests
 
         var result = SimpleOptionsHelper.BuildBaseOptions(model, simple, string.Empty);
 
-        result.ApiKey.Should().Be("fallback-key");
+        result.ApiKey.ShouldBe("fallback-key");
     }
 
     [Theory]
@@ -85,7 +84,7 @@ public class SimpleOptionsHelperTests
 
         var result = SimpleOptionsHelper.BuildBaseOptions(model, null, "key");
 
-        result.MaxTokens.Should().Be(expectedMaxTokens);
+        result.MaxTokens.ShouldBe(expectedMaxTokens);
     }
 
     [Fact]
@@ -93,22 +92,22 @@ public class SimpleOptionsHelperTests
     {
         var result = SimpleOptionsHelper.ClampReasoning(ThinkingLevel.ExtraHigh);
 
-        result.Should().Be(ThinkingLevel.High);
+        result.ShouldBe(ThinkingLevel.High);
     }
 
     [Fact]
     public void ClampReasoning_PassesThroughOtherLevels()
     {
-        SimpleOptionsHelper.ClampReasoning(ThinkingLevel.Medium).Should().Be(ThinkingLevel.Medium);
-        SimpleOptionsHelper.ClampReasoning(ThinkingLevel.Low).Should().Be(ThinkingLevel.Low);
-        SimpleOptionsHelper.ClampReasoning(ThinkingLevel.High).Should().Be(ThinkingLevel.High);
-        SimpleOptionsHelper.ClampReasoning(ThinkingLevel.Minimal).Should().Be(ThinkingLevel.Minimal);
+        SimpleOptionsHelper.ClampReasoning(ThinkingLevel.Medium).ShouldBe(ThinkingLevel.Medium);
+        SimpleOptionsHelper.ClampReasoning(ThinkingLevel.Low).ShouldBe(ThinkingLevel.Low);
+        SimpleOptionsHelper.ClampReasoning(ThinkingLevel.High).ShouldBe(ThinkingLevel.High);
+        SimpleOptionsHelper.ClampReasoning(ThinkingLevel.Minimal).ShouldBe(ThinkingLevel.Minimal);
     }
 
     [Fact]
     public void ClampReasoning_Null_ReturnsNull()
     {
-        SimpleOptionsHelper.ClampReasoning(null).Should().BeNull();
+        SimpleOptionsHelper.ClampReasoning(null).ShouldBeNull();
     }
 
     [Fact]
@@ -119,8 +118,8 @@ public class SimpleOptionsHelperTests
         var (maxTokens, thinkingBudget) = SimpleOptionsHelper.AdjustMaxTokensForThinking(
             model, requestedMaxTokens: 8000, thinkingBudget: 4000);
 
-        maxTokens.Should().Be(12000);
-        thinkingBudget.Should().Be(4000);
+        maxTokens.ShouldBe(12000);
+        thinkingBudget.ShouldBe(4000);
     }
 
     [Fact]
@@ -131,8 +130,8 @@ public class SimpleOptionsHelperTests
         var (maxTokens, thinkingBudget) = SimpleOptionsHelper.AdjustMaxTokensForThinking(
             model, requestedMaxTokens: 2000, thinkingBudget: 4000);
 
-        maxTokens.Should().Be(6000);
-        thinkingBudget.Should().Be(4000);
+        maxTokens.ShouldBe(6000);
+        thinkingBudget.ShouldBe(4000);
     }
 
     [Fact]
@@ -143,7 +142,7 @@ public class SimpleOptionsHelperTests
         var (maxTokens, _) = SimpleOptionsHelper.AdjustMaxTokensForThinking(
             model, requestedMaxTokens: 20000, thinkingBudget: 4000);
 
-        maxTokens.Should().BeLessThanOrEqualTo(8192);
+        maxTokens.ShouldBeLessThanOrEqualTo(8192);
     }
 
     [Fact]
@@ -156,7 +155,7 @@ public class SimpleOptionsHelperTests
 
         var result = SimpleOptionsHelper.GetBudgetForLevel(ThinkingLevel.Medium, budgets);
 
-        result.Should().Be(8000);
+        result.ShouldBe(8000);
     }
 
     [Fact]
@@ -164,7 +163,7 @@ public class SimpleOptionsHelperTests
     {
         var result = SimpleOptionsHelper.GetBudgetForLevel(ThinkingLevel.Medium, null);
 
-        result.Should().BeNull();
+        result.ShouldBeNull();
     }
 
     [Theory]
@@ -176,6 +175,6 @@ public class SimpleOptionsHelperTests
     {
         var result = SimpleOptionsHelper.GetDefaultThinkingBudget(level);
 
-        result.Should().Be(expectedBudget);
+        result.ShouldBe(expectedBudget);
     }
 }

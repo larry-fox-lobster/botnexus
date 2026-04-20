@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FluentAssertions;
 using BotNexus.Agent.Providers.Core.Compatibility;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Utilities;
@@ -33,11 +32,11 @@ public class CopilotMessageConverterTests
 
         var transformed = MessageTransformer.TransformMessages(messages, TestModel);
 
-        transformed.Should().HaveCount(1);
-        transformed[0].Should().BeOfType<UserMessage>();
+        transformed.Count().ShouldBe(1);
+        transformed[0].ShouldBeOfType<UserMessage>();
         var user = (UserMessage)transformed[0];
-        user.Content.IsText.Should().BeTrue();
-        user.Content.Text.Should().Be("Hello world");
+        user.Content.IsText.ShouldBeTrue();
+        user.Content.Text.ShouldBe("Hello world");
     }
 
     [Fact]
@@ -50,10 +49,10 @@ public class CopilotMessageConverterTests
             Messages: [new UserMessage("Hi", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())]
         );
 
-        context.SystemPrompt.Should().Be("You are a helpful assistant.");
+        context.SystemPrompt.ShouldBe("You are a helpful assistant.");
         // With no compat or compat.SupportsDeveloperRole=false, system role is "system"
         var role = TestModel.Compat?.SupportsDeveloperRole is true ? "developer" : "system";
-        role.Should().Be("system");
+        role.ShouldBe("system");
     }
 
     [Fact]
@@ -75,9 +74,9 @@ public class CopilotMessageConverterTests
         var messages = new List<Message> { assistant };
         var transformed = MessageTransformer.TransformMessages(messages, TestModel);
 
-        transformed.Should().HaveCount(1); // no synthetic tool result at end-of-context
+        transformed.Count().ShouldBe(1); // no synthetic tool result at end-of-context
         var result = (AssistantMessage)transformed[0];
-        result.Content.OfType<ToolCallContent>().Should().Contain(tc => tc.Id == "call_123" && tc.Name == "get_weather");
+        result.Content.OfType<ToolCallContent>().ShouldContain(tc => tc.Id == "call_123" && tc.Name == "get_weather");
     }
 
     [Fact]
@@ -107,10 +106,10 @@ public class CopilotMessageConverterTests
         var messages = new List<Message> { assistant, toolResult };
         var transformed = MessageTransformer.TransformMessages(messages, TestModel);
 
-        transformed.Should().HaveCount(2);
+        transformed.Count().ShouldBe(2);
         var result = (ToolResultMessage)transformed[1];
-        result.ToolCallId.Should().Be("call_456");
-        result.ToolName.Should().Be("search");
+        result.ToolCallId.ShouldBe("call_456");
+        result.ToolName.ShouldBe("search");
     }
 
     [Fact]
@@ -124,8 +123,8 @@ public class CopilotMessageConverterTests
         var hasImages = CopilotHeaders.HasVisionInput(messages);
         var headers = CopilotHeaders.BuildDynamicHeaders(messages, hasImages);
 
-        headers.Should().ContainKey("X-Initiator");
-        headers["X-Initiator"].Should().Be("user");
-        headers.Should().NotContainKey("Copilot-Vision-Request");
+        headers.ShouldContainKey("X-Initiator");
+        headers["X-Initiator"].ShouldBe("user");
+        headers.ShouldNotContainKey("Copilot-Vision-Request");
     }
 }

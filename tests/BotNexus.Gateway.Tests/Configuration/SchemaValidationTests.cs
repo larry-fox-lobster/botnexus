@@ -1,5 +1,4 @@
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.Extensions.Options;
 
 namespace BotNexus.Gateway.Tests.Configuration;
@@ -67,7 +66,7 @@ public sealed class SchemaValidationTests
 
         var errors = PlatformConfigLoader.Validate(config);
 
-        errors.Should().BeEmpty();
+        errors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -87,10 +86,10 @@ public sealed class SchemaValidationTests
 
         var errors = PlatformConfigLoader.Validate(config);
 
-        errors.Should().NotContain(error => error.Contains("providers.copilot must define apiKey or baseUrl", StringComparison.Ordinal),
+        errors.ShouldNotContain(error => error.Contains("providers.copilot must define apiKey or baseUrl", StringComparison.Ordinal),
             "apiKey/baseUrl are optional — auth can come from auth.json or environment");
-        errors.Should().Contain(error => error.Contains("agents.assistant.provider", StringComparison.Ordinal));
-        errors.Should().Contain(error => error.Contains("agents.assistant.model", StringComparison.Ordinal));
+        errors.ShouldContain(error => error.Contains("agents.assistant.provider", StringComparison.Ordinal));
+        errors.ShouldContain(error => error.Contains("agents.assistant.model", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -116,8 +115,8 @@ public sealed class SchemaValidationTests
 
             Func<Task> act = () => PlatformConfigLoader.LoadAsync(configPath);
 
-            await act.Should().ThrowAsync<OptionsValidationException>()
-                .WithMessage("*Invalid JSON*");
+            (await act.ShouldThrowAsync<OptionsValidationException>())
+                .Message.ShouldContain("Invalid JSON");
         }
         finally
         {
@@ -154,10 +153,10 @@ public sealed class SchemaValidationTests
             var config = await PlatformConfigLoader.LoadAsync(configPath, validateOnLoad: false);
             var errors = PlatformConfigLoader.Validate(config);
 
-            config.Gateway?.ListenUrl.Should().Be("http://localhost:5005");
-            config.Providers.Should().ContainKey("copilot");
-            config.Providers!["copilot"].ApiKey.Should().Be("provider-key");
-            errors.Should().NotBeNull();
+            config.Gateway?.ListenUrl.ShouldBe("http://localhost:5005");
+            config.Providers.ShouldContainKey("copilot");
+            config.Providers!["copilot"].ApiKey.ShouldBe("provider-key");
+            errors.ShouldNotBeNull();
         }
         finally
         {
@@ -180,9 +179,9 @@ public sealed class SchemaValidationTests
             var config = await PlatformConfigLoader.LoadAsync(configPath, validateOnLoad: false);
             var errors = PlatformConfigLoader.Validate(config);
 
-            errors.Should().BeEmpty();
-            config.Gateway?.ListenUrl.Should().Be("http://localhost:5005");
-            config.Gateway?.DefaultAgentId.Should().Be("assistant");
+            errors.ShouldBeEmpty();
+            config.Gateway?.ListenUrl.ShouldBe("http://localhost:5005");
+            config.Gateway?.DefaultAgentId.ShouldBe("assistant");
         }
         finally
         {

@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Microsoft.Playwright;
 
 namespace BotNexus.WebUI.Tests;
@@ -27,7 +26,7 @@ public sealed class StreamingDisplayE2ETests
 
         await host.SendMessageAsync("progressive");
         await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .delta-content")).ToContainTextAsync("hello ");
-        (await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .delta-content").InnerTextAsync()).Should().NotContain("world");
+        (await host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .delta-content").InnerTextAsync()).ShouldNotContain("world");
         await Assertions.Expect(host.Page.Locator($"{WebUiE2ETestHost.ActiveChat} .delta-content")).ToContainTextAsync("hello world");
     }
 

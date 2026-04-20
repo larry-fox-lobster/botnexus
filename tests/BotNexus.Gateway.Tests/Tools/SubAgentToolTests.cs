@@ -5,7 +5,6 @@ using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Tools;
-using FluentAssertions;
 using Moq;
 
 namespace BotNexus.Gateway.Tests.Tools;
@@ -17,8 +16,8 @@ public sealed class SubAgentToolTests
     {
         var tool = new SubAgentSpawnTool(new Mock<ISubAgentManager>().Object, "parent-agent", "parent-session");
 
-        tool.Name.Should().Be("spawn_subagent");
-        tool.Label.Should().Be("Spawn Sub-Agent");
+        tool.Name.ShouldBe("spawn_subagent");
+        tool.Label.ShouldBe("Spawn Sub-Agent");
     }
 
     [Fact]
@@ -26,10 +25,10 @@ public sealed class SubAgentToolTests
     {
         var tool = new SubAgentSpawnTool(new Mock<ISubAgentManager>().Object, "parent-agent", "parent-session");
 
-        var act = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?>());
+        Func<Task> act = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?>());
 
-        await act.Should().ThrowAsync<ArgumentException>()
-            .WithMessage("*task*");
+        (await act.ShouldThrowAsync<ArgumentException>())
+            .Message.ShouldContain("task");
     }
 
     [Fact]
@@ -44,16 +43,16 @@ public sealed class SubAgentToolTests
 
         await tool.ExecuteAsync("call-1", new Dictionary<string, object?> { ["task"] = "Investigate issue" });
 
-        captured.Should().NotBeNull();
-        captured!.ParentAgentId.Should().Be("parent-agent");
-        captured.ParentSessionId.Should().Be("parent-session");
-        captured.Task.Should().Be("Investigate issue");
-        captured.ModelOverride.Should().BeNull();
-        captured.ToolIds.Should().BeNull();
-        captured.SystemPromptOverride.Should().BeNull();
-        captured.MaxTurns.Should().Be(30);
-        captured.TimeoutSeconds.Should().Be(600);
-        captured.Archetype.Should().Be(SubAgentArchetype.General);
+        captured.ShouldNotBeNull();
+        captured!.ParentAgentId.Value.ShouldBe("parent-agent");
+        captured.ParentSessionId.Value.ShouldBe("parent-session");
+        captured.Task.ShouldBe("Investigate issue");
+        captured.ModelOverride.ShouldBeNull();
+        captured.ToolIds.ShouldBeNull();
+        captured.SystemPromptOverride.ShouldBeNull();
+        captured.MaxTurns.ShouldBe(30);
+        captured.TimeoutSeconds.ShouldBe(600);
+        captured.Archetype.ShouldBe(SubAgentArchetype.General);
     }
 
     [Fact]
@@ -77,13 +76,13 @@ public sealed class SubAgentToolTests
             ["archetype"] = "reviewer"
         });
 
-        captured.Should().NotBeNull();
-        captured!.ModelOverride.Should().Be("gpt-5-mini");
-        captured.ToolIds.Should().BeEquivalentTo(["read", "write"]);
-        captured.SystemPromptOverride.Should().Be("Focus on failures");
-        captured.MaxTurns.Should().Be(12);
-        captured.TimeoutSeconds.Should().Be(45);
-        captured.Archetype.Should().Be(SubAgentArchetype.Reviewer);
+        captured.ShouldNotBeNull();
+        captured!.ModelOverride.ShouldBe("gpt-5-mini");
+        captured.ToolIds.ShouldBe(new[] { "read", "write" });
+        captured.SystemPromptOverride.ShouldBe("Focus on failures");
+        captured.MaxTurns.ShouldBe(12);
+        captured.TimeoutSeconds.ShouldBe(45);
+        captured.Archetype.ShouldBe(SubAgentArchetype.Reviewer);
     }
 
     [Fact]
@@ -100,10 +99,10 @@ public sealed class SubAgentToolTests
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?> { ["task"] = "Investigate issue" });
         using var document = JsonDocument.Parse(ReadText(result));
 
-        document.RootElement.GetProperty("subAgentId").GetString().Should().Be("sub-123");
-        document.RootElement.GetProperty("sessionId").GetString().Should().Be("parent-session::subagent::sub-123");
-        document.RootElement.GetProperty("status").GetInt32().Should().Be((int)SubAgentStatus.Running);
-        document.RootElement.GetProperty("name").GetString().Should().Be("Research Task");
+        document.RootElement.GetProperty("subAgentId").GetString().ShouldBe("sub-123");
+        document.RootElement.GetProperty("sessionId").GetString().ShouldBe("parent-session::subagent::sub-123");
+        document.RootElement.GetProperty("status").GetInt32().ShouldBe((int)SubAgentStatus.Running);
+        document.RootElement.GetProperty("name").GetString().ShouldBe("Research Task");
     }
 
     [Fact]
@@ -111,8 +110,8 @@ public sealed class SubAgentToolTests
     {
         var tool = new SubAgentListTool(new Mock<ISubAgentManager>().Object, "parent-session");
 
-        tool.Name.Should().Be("list_subagents");
-        tool.Label.Should().Be("List Sub-Agents");
+        tool.Name.ShouldBe("list_subagents");
+        tool.Label.ShouldBe("List Sub-Agents");
     }
 
     [Fact]
@@ -126,7 +125,7 @@ public sealed class SubAgentToolTests
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?>());
         using var document = JsonDocument.Parse(ReadText(result));
 
-        document.RootElement.GetProperty("subAgents").GetArrayLength().Should().Be(0);
+        document.RootElement.GetProperty("subAgents").GetArrayLength().ShouldBe(0);
     }
 
     [Fact]
@@ -145,9 +144,9 @@ public sealed class SubAgentToolTests
         using var document = JsonDocument.Parse(ReadText(result));
         var subAgents = document.RootElement.GetProperty("subAgents");
 
-        subAgents.GetArrayLength().Should().Be(2);
-        subAgents[0].GetProperty("subAgentId").GetString().Should().Be("sub-1");
-        subAgents[1].GetProperty("subAgentId").GetString().Should().Be("sub-2");
+        subAgents.GetArrayLength().ShouldBe(2);
+        subAgents[0].GetProperty("subAgentId").GetString().ShouldBe("sub-1");
+        subAgents[1].GetProperty("subAgentId").GetString().ShouldBe("sub-2");
     }
 
     [Fact]
@@ -155,8 +154,8 @@ public sealed class SubAgentToolTests
     {
         var tool = new SubAgentManageTool(new Mock<ISubAgentManager>().Object, "parent-session");
 
-        tool.Name.Should().Be("manage_subagent");
-        tool.Label.Should().Be("Manage Sub-Agent");
+        tool.Name.ShouldBe("manage_subagent");
+        tool.Label.ShouldBe("Manage Sub-Agent");
     }
 
     [Theory]
@@ -165,9 +164,9 @@ public sealed class SubAgentToolTests
     {
         var tool = new SubAgentManageTool(new Mock<ISubAgentManager>().Object, "parent-session");
 
-        var act = () => tool.PrepareArgumentsAsync(args);
+        Func<Task> act = () => tool.PrepareArgumentsAsync(args);
 
-        await act.Should().ThrowAsync<ArgumentException>();
+        await act.ShouldThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -188,9 +187,9 @@ public sealed class SubAgentToolTests
         });
         using var document = JsonDocument.Parse(ReadText(result));
 
-        document.RootElement.GetProperty("subAgentId").GetString().Should().Be("sub-123");
-        document.RootElement.GetProperty("status").GetInt32().Should().Be((int)SubAgentStatus.Completed);
-        document.RootElement.GetProperty("resultSummary").GetString().Should().Be("Done");
+        document.RootElement.GetProperty("subAgentId").GetString().ShouldBe("sub-123");
+        document.RootElement.GetProperty("status").GetInt32().ShouldBe((int)SubAgentStatus.Completed);
+        document.RootElement.GetProperty("resultSummary").GetString().ShouldBe("Done");
     }
 
     [Fact]
@@ -209,8 +208,8 @@ public sealed class SubAgentToolTests
         using var document = JsonDocument.Parse(ReadText(result));
 
         manager.Verify(m => m.KillAsync("sub-123", "parent-session", It.IsAny<CancellationToken>()), Times.Once);
-        document.RootElement.GetProperty("subAgentId").GetString().Should().Be("sub-123");
-        document.RootElement.GetProperty("killed").GetBoolean().Should().BeTrue();
+        document.RootElement.GetProperty("subAgentId").GetString().ShouldBe("sub-123");
+        document.RootElement.GetProperty("killed").GetBoolean().ShouldBeTrue();
     }
 
     [Fact]
@@ -228,8 +227,8 @@ public sealed class SubAgentToolTests
         });
         using var document = JsonDocument.Parse(ReadText(result));
 
-        document.RootElement.GetProperty("subAgentId").GetString().Should().Be("missing-sub-agent");
-        document.RootElement.GetProperty("killed").GetBoolean().Should().BeFalse();
+        document.RootElement.GetProperty("subAgentId").GetString().ShouldBe("missing-sub-agent");
+        document.RootElement.GetProperty("killed").GetBoolean().ShouldBeFalse();
     }
 
     public static IEnumerable<object[]> InvalidManageArgs()

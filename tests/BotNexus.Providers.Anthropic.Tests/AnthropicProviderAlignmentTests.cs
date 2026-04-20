@@ -4,7 +4,6 @@ using System.Text.Json;
 using BotNexus.Agent.Providers.Anthropic;
 using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Anthropic.Tests;
 
@@ -28,11 +27,11 @@ public class AnthropicProviderAlignmentTests
         var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-        handler.RequestCount.Should().Be(1);
-        handler.RequestBody.Should().NotBeNull();
+        handler.RequestCount.ShouldBe(1);
+        handler.RequestBody.ShouldNotBeNull();
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
-        body.RootElement.GetProperty("max_tokens").GetInt32().Should().Be(model.MaxTokens / 3);
+        body.RootElement.GetProperty("max_tokens").GetInt32().ShouldBe(model.MaxTokens / 3);
     }
 
     [Theory]
@@ -60,7 +59,7 @@ public class AnthropicProviderAlignmentTests
         var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
         var result = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-        result.StopReason.Should().Be(expected);
+        result.StopReason.ShouldBe(expected);
     }
 
     [Fact]
@@ -83,11 +82,11 @@ public class AnthropicProviderAlignmentTests
         var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
         var result = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-        result.Usage.Input.Should().Be(11);
-        result.Usage.Output.Should().Be(5);
-        result.Usage.CacheRead.Should().Be(7);
-        result.Usage.CacheWrite.Should().Be(13);
-        result.Usage.TotalTokens.Should().Be(36);
+        result.Usage.Input.ShouldBe(11);
+        result.Usage.Output.ShouldBe(5);
+        result.Usage.CacheRead.ShouldBe(7);
+        result.Usage.CacheWrite.ShouldBe(13);
+        result.Usage.TotalTokens.ShouldBe(36);
     }
 
     [Fact]
@@ -107,9 +106,9 @@ public class AnthropicProviderAlignmentTests
         var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-        handler.RequestCount.Should().Be(1);
-        handler.LastRequestUri.Should().NotBeNull();
-        handler.LastRequestUri!.AbsoluteUri.Should().Be($"{model.BaseUrl}/v1/messages");
+        handler.RequestCount.ShouldBe(1);
+        handler.LastRequestUri.ShouldNotBeNull();
+        handler.LastRequestUri!.AbsoluteUri.ShouldBe($"{model.BaseUrl}/v1/messages");
     }
 
     [Fact]
@@ -138,10 +137,10 @@ public class AnthropicProviderAlignmentTests
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
         var messages = body.RootElement.GetProperty("messages");
-        messages.GetArrayLength().Should().Be(1);
-        messages[0].GetProperty("role").GetString().Should().Be("user");
-        messages[0].GetProperty("content").GetArrayLength().Should().Be(1);
-        messages[0].GetProperty("content")[0].GetProperty("type").GetString().Should().Be("image");
+        messages.GetArrayLength().ShouldBe(1);
+        messages[0].GetProperty("role").GetString().ShouldBe("user");
+        messages[0].GetProperty("content").GetArrayLength().ShouldBe(1);
+        messages[0].GetProperty("content")[0].GetProperty("type").GetString().ShouldBe("image");
     }
 
     [Fact]
@@ -186,13 +185,13 @@ public class AnthropicProviderAlignmentTests
         var assistantMsg = body.RootElement.GetProperty("messages")[1];
         var content = assistantMsg.GetProperty("content");
 
-        content.GetArrayLength().Should().Be(3);
-        content[0].GetProperty("type").GetString().Should().Be("text");
-        content[0].GetProperty("text").GetString().Should().Be("unsigned thinking");
-        content[1].GetProperty("type").GetString().Should().Be("thinking");
-        content[1].GetProperty("signature").GetString().Should().Be("sig-123");
-        content[2].GetProperty("type").GetString().Should().Be("text");
-        content[2].GetProperty("text").GetString().Should().Be("visible");
+        content.GetArrayLength().ShouldBe(3);
+        content[0].GetProperty("type").GetString().ShouldBe("text");
+        content[0].GetProperty("text").GetString().ShouldBe("unsigned thinking");
+        content[1].GetProperty("type").GetString().ShouldBe("thinking");
+        content[1].GetProperty("signature").GetString().ShouldBe("sig-123");
+        content[2].GetProperty("type").GetString().ShouldBe("text");
+        content[2].GetProperty("text").GetString().ShouldBe("visible");
     }
 
     [Fact]
@@ -231,7 +230,7 @@ public class AnthropicProviderAlignmentTests
         using var body = JsonDocument.Parse(handler.RequestBody!);
         var redacted = body.RootElement.GetProperty("messages")[1].GetProperty("content")[0];
 
-        redacted.GetProperty("data").GetString().Should().Be("sig-redacted");
+        redacted.GetProperty("data").GetString().ShouldBe("sig-redacted");
     }
 
     [Fact]
@@ -269,8 +268,8 @@ public class AnthropicProviderAlignmentTests
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
         var toolUse = body.RootElement.GetProperty("messages")[1].GetProperty("content")[0];
-        toolUse.GetProperty("type").GetString().Should().Be("tool_use");
-        toolUse.GetProperty("signature").GetString().Should().Be("sig-tool");
+        toolUse.GetProperty("type").GetString().ShouldBe("tool_use");
+        toolUse.GetProperty("signature").GetString().ShouldBe("sig-tool");
     }
 
     [Fact]
@@ -296,7 +295,7 @@ public class AnthropicProviderAlignmentTests
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
-        body.RootElement.GetProperty("thinking").GetProperty("type").GetString().Should().Be("disabled");
+        body.RootElement.GetProperty("thinking").GetProperty("type").GetString().ShouldBe("disabled");
     }
 
     [Fact]
@@ -317,7 +316,7 @@ public class AnthropicProviderAlignmentTests
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
-        body.RootElement.GetProperty("thinking").GetProperty("type").GetString().Should().Be("disabled");
+        body.RootElement.GetProperty("thinking").GetProperty("type").GetString().ShouldBe("disabled");
     }
 
     [Fact]
@@ -344,7 +343,7 @@ public class AnthropicProviderAlignmentTests
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
-        body.RootElement.GetProperty("thinking").GetProperty("type").GetString().Should().Be("adaptive");
+        body.RootElement.GetProperty("thinking").GetProperty("type").GetString().ShouldBe("adaptive");
     }
 
     [Fact]
@@ -371,7 +370,7 @@ public class AnthropicProviderAlignmentTests
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
-        body.RootElement.TryGetProperty("temperature", out _).Should().BeFalse();
+        body.RootElement.TryGetProperty("temperature", out _).ShouldBeFalse();
     }
 
     [Fact]
@@ -391,10 +390,10 @@ public class AnthropicProviderAlignmentTests
         var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-        handler.RequestHeaders.Should().ContainKey("accept");
-        handler.RequestHeaders["accept"].Should().Contain("application/json");
-        handler.RequestHeaders.Should().ContainKey("anthropic-dangerous-direct-browser-access");
-        handler.RequestHeaders["anthropic-dangerous-direct-browser-access"].Should().Contain("true");
+        handler.RequestHeaders.ShouldContainKey("accept");
+        handler.RequestHeaders["accept"].ShouldContain("application/json");
+        handler.RequestHeaders.ShouldContainKey("anthropic-dangerous-direct-browser-access");
+        handler.RequestHeaders["anthropic-dangerous-direct-browser-access"].ShouldContain("true");
     }
 
     [Fact]
@@ -430,8 +429,8 @@ public class AnthropicProviderAlignmentTests
         var stream = provider.Stream(model, context, new StreamOptions { ApiKey = "test-key" });
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-        handler.RequestHeaders.Should().ContainKey("X-Initiator");
-        handler.RequestHeaders["X-Initiator"].Should().Contain("agent");
+        handler.RequestHeaders.ShouldContainKey("X-Initiator");
+        handler.RequestHeaders["X-Initiator"].ShouldContain("agent");
     }
 
     [Fact]
@@ -453,7 +452,7 @@ public class AnthropicProviderAlignmentTests
         _ = await stream.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
-        body.RootElement.GetProperty("tool_choice").GetProperty("type").GetString().Should().Be("any");
+        body.RootElement.GetProperty("tool_choice").GetProperty("type").GetString().ShouldBe("any");
     }
 
     [Fact]
@@ -484,8 +483,8 @@ public class AnthropicProviderAlignmentTests
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
         var toolChoice = body.RootElement.GetProperty("tool_choice");
-        toolChoice.GetProperty("type").GetString().Should().Be("auto");
-        toolChoice.GetProperty("disable_parallel_tool_use").GetBoolean().Should().BeTrue();
+        toolChoice.GetProperty("type").GetString().ShouldBe("auto");
+        toolChoice.GetProperty("disable_parallel_tool_use").GetBoolean().ShouldBeTrue();
     }
 
     [Fact]
@@ -513,8 +512,7 @@ public class AnthropicProviderAlignmentTests
             .GetProperty("content")[0]
             .GetProperty("text")
             .GetString()
-            .Should()
-            .Be("hello  world");
+            .ShouldBe("hello  world");
     }
 
     [Fact]
@@ -552,7 +550,7 @@ public class AnthropicProviderAlignmentTests
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
         var toolUse = body.RootElement.GetProperty("messages")[1].GetProperty("content")[0];
-        toolUse.GetProperty("signature").GetString().Should().Be("sig-tool-123");
+        toolUse.GetProperty("signature").GetString().ShouldBe("sig-tool-123");
     }
 
     [Fact]
@@ -590,7 +588,7 @@ public class AnthropicProviderAlignmentTests
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
         var toolUse = body.RootElement.GetProperty("messages")[1].GetProperty("content")[0];
-        toolUse.TryGetProperty("signature", out _).Should().BeFalse();
+        toolUse.TryGetProperty("signature", out _).ShouldBeFalse();
     }
 
     [Theory]
@@ -620,14 +618,14 @@ public class AnthropicProviderAlignmentTests
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
         var toolChoice = body.RootElement.GetProperty("tool_choice");
-        toolChoice.GetProperty("type").GetString().Should().Be(expectedType);
+        toolChoice.GetProperty("type").GetString().ShouldBe(expectedType);
         if (expectedName is null)
         {
-            toolChoice.TryGetProperty("name", out _).Should().BeFalse();
+            toolChoice.TryGetProperty("name", out _).ShouldBeFalse();
         }
         else
         {
-            toolChoice.GetProperty("name").GetString().Should().Be(expectedName);
+            toolChoice.GetProperty("name").GetString().ShouldBe(expectedName);
         }
     }
 
@@ -657,8 +655,8 @@ public class AnthropicProviderAlignmentTests
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
         var toolChoice = body.RootElement.GetProperty("tool_choice");
-        toolChoice.GetProperty("type").GetString().Should().Be("auto");
-        toolChoice.GetProperty("disable_parallel_tool_use").GetBoolean().Should().BeTrue();
+        toolChoice.GetProperty("type").GetString().ShouldBe("auto");
+        toolChoice.GetProperty("disable_parallel_tool_use").GetBoolean().ShouldBeTrue();
     }
 
     [Fact]
@@ -689,10 +687,10 @@ public class AnthropicProviderAlignmentTests
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
         var toolChoice = body.RootElement.GetProperty("tool_choice");
-        toolChoice.GetProperty("type").GetString().Should().Be("tool");
-        toolChoice.GetProperty("name").GetString().Should().Be("Read");
-        toolChoice.GetProperty("disable_parallel_tool_use").GetBoolean().Should().BeTrue();
-        toolChoice.GetProperty("extra").GetInt32().Should().Be(123);
+        toolChoice.GetProperty("type").GetString().ShouldBe("tool");
+        toolChoice.GetProperty("name").GetString().ShouldBe("Read");
+        toolChoice.GetProperty("disable_parallel_tool_use").GetBoolean().ShouldBeTrue();
+        toolChoice.GetProperty("extra").GetInt32().ShouldBe(123);
     }
 
     [Fact]
@@ -737,9 +735,9 @@ public class AnthropicProviderAlignmentTests
             eventTypes.Add(evt.Type);
         }
 
-        eventTypes.IndexOf("start").Should().BeLessThan(eventTypes.IndexOf("text_start"));
-        eventTypes.IndexOf("text_start").Should().BeLessThan(eventTypes.IndexOf("text_end"));
-        eventTypes.IndexOf("toolcall_start").Should().BeLessThan(eventTypes.IndexOf("toolcall_end"));
+        eventTypes.IndexOf("start").ShouldBeLessThan(eventTypes.IndexOf("text_start"));
+        eventTypes.IndexOf("text_start").ShouldBeLessThan(eventTypes.IndexOf("text_end"));
+        eventTypes.IndexOf("toolcall_start").ShouldBeLessThan(eventTypes.IndexOf("toolcall_end"));
     }
 
     [Fact]
@@ -747,8 +745,8 @@ public class AnthropicProviderAlignmentTests
     {
         var act = () => _ = new AnthropicProvider(null!);
 
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("httpClient");
+        act.ShouldThrow<ArgumentNullException>()
+            .ParamName.ShouldBe("httpClient");
     }
 
     private static HttpResponseMessage SseResponse(string payload) =>
@@ -760,7 +758,7 @@ public class AnthropicProviderAlignmentTests
     private static void SetToolChoice(AnthropicOptions options, object? value)
     {
         var property = typeof(AnthropicOptions).GetProperty("ToolChoice");
-        property.Should().NotBeNull();
+        property.ShouldNotBeNull();
         property!.SetValue(options, value);
     }
 

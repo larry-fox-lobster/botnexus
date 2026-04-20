@@ -4,7 +4,6 @@ using BotNexus.CodingAgent;
 using BotNexus.CodingAgent.Hooks;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Tools;
-using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests.Security;
 
@@ -38,7 +37,7 @@ public sealed class ShellToolSecurityTests : IDisposable
         var context = CreateShellContext("echo `whoami`");
         var hookResult = await _hooks.ValidateAsync(context, _config);
 
-        hookResult.Should().BeNull();
+        hookResult.ShouldBeNull();
     }
 
     [Fact]
@@ -49,7 +48,7 @@ public sealed class ShellToolSecurityTests : IDisposable
         var context = CreateShellContext("echo $(cat /etc/passwd)");
         var hookResult = await _hooks.ValidateAsync(context, _config);
 
-        hookResult.Should().BeNull();
+        hookResult.ShouldBeNull();
     }
 
     [Fact]
@@ -59,8 +58,8 @@ public sealed class ShellToolSecurityTests : IDisposable
         var context = CreateShellContext("echo hello | rm -rf /");
         var hookResult = await _hooks.ValidateAsync(context, _config);
 
-        hookResult.Should().NotBeNull();
-        hookResult!.Block.Should().BeTrue();
+        hookResult.ShouldNotBeNull();
+        hookResult!.Block.ShouldBeTrue();
     }
 
     [Fact]
@@ -70,8 +69,8 @@ public sealed class ShellToolSecurityTests : IDisposable
         var context = CreateShellContext("echo hello; rm -rf /");
         var hookResult = await _hooks.ValidateAsync(context, _config);
 
-        hookResult.Should().NotBeNull();
-        hookResult!.Block.Should().BeTrue();
+        hookResult.ShouldNotBeNull();
+        hookResult!.Block.ShouldBeTrue();
     }
 
     [Fact]
@@ -82,7 +81,7 @@ public sealed class ShellToolSecurityTests : IDisposable
         var command = OperatingSystem.IsWindows() ? "echo $env:USERPROFILE" : "echo $HOME";
         var result = await _tool.ExecuteAsync("t1", new Dictionary<string, object?> { ["command"] = command });
 
-        result.Content[0].Value.Should().NotBeNull();
+        result.Content[0].Value.ShouldNotBeNull();
     }
 
     [Fact]
@@ -91,7 +90,7 @@ public sealed class ShellToolSecurityTests : IDisposable
     {
         var longPayload = new string('a', 100_000);
         var act = () => _tool.ExecuteAsync("t1", new Dictionary<string, object?> { ["command"] = $"echo {longPayload}" });
-        await act.Should().ThrowAsync<Exception>();
+        await act.ShouldThrowAsync<Exception>();
     }
 
     [Fact]
@@ -99,7 +98,7 @@ public sealed class ShellToolSecurityTests : IDisposable
     public async Task CommandWithNullByte_IsHandledGracefully()
     {
         var result = await _tool.ExecuteAsync("t1", new Dictionary<string, object?> { ["command"] = "echo test\0value" });
-        result.Content.Should().ContainSingle();
+        result.Content.ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -113,7 +112,7 @@ public sealed class ShellToolSecurityTests : IDisposable
         // On Windows the embedded CRLF can cause the shell process to hang,
         // producing a timeout message instead — both are valid current behavior.
         var output = result.Content[0].Value;
-        (output!.Contains("first") || output.Contains("timed out")).Should().BeTrue(
+        (output!.Contains("first") || output.Contains("timed out")).ShouldBeTrue(
             $"expected output to contain 'first' or 'timed out' but was: {output}");
     }
 

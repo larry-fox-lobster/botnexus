@@ -1,6 +1,5 @@
 using BotNexus.Extensions.Mcp.Protocol;
 using BotNexus.Extensions.Mcp.Transport;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Mcp.Tests.Transport;
 
@@ -15,7 +14,7 @@ public sealed class StdioTransportRobustnessTests
         await transport.ConnectAsync();
 
         var act = () => transport.ReceiveAsync(new CancellationTokenSource(TimeSpan.FromSeconds(2)).Token);
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await act.ShouldThrowAsync<OperationCanceledException>();
         await transport.DisposeAsync();
     }
 
@@ -28,7 +27,7 @@ public sealed class StdioTransportRobustnessTests
         await transport.ConnectAsync();
 
         var response = await transport.ReceiveAsync(new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token);
-        response.Id.Should().NotBeNull();
+        response.Id.ShouldNotBeNull();
         await transport.DisposeAsync();
     }
 
@@ -42,7 +41,7 @@ public sealed class StdioTransportRobustnessTests
         await connectTask;
 
         var response = await transport.ReceiveAsync(new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token);
-        response.Id.Should().NotBeNull();
+        response.Id.ShouldNotBeNull();
         await transport.DisposeAsync();
     }
 
@@ -53,7 +52,7 @@ public sealed class StdioTransportRobustnessTests
     {
         var transport = new StdioMcpTransport("powershell", ["-NoProfile", "-Command", "Write-Output '{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}'; exit 7"]);
         var act = () => transport.ConnectAsync();
-        await act.Should().NotThrowAsync();
+        await act.ShouldNotThrowAsync();
         await transport.DisposeAsync();
     }
 
@@ -67,7 +66,7 @@ public sealed class StdioTransportRobustnessTests
         await Task.Delay(50);
 
         var act = () => transport.SendAsync(new JsonRpcRequest { Id = 1, Method = "tools/list" });
-        await act.Should().NotThrowAsync();
+        await act.ShouldNotThrowAsync();
         await transport.DisposeAsync();
     }
 
@@ -81,7 +80,7 @@ public sealed class StdioTransportRobustnessTests
         await Task.Delay(50);
 
         var act = () => transport.SendNotificationAsync(new JsonRpcNotification { Method = "notifications/initialized" });
-        await act.Should().NotThrowAsync();
+        await act.ShouldNotThrowAsync();
         await transport.DisposeAsync();
     }
 }

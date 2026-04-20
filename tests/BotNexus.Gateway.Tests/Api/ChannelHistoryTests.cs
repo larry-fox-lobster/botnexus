@@ -4,7 +4,6 @@ using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Api;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -27,10 +26,10 @@ public sealed class ChannelHistoryTests
 
         using var payload = await GetHistoryJsonAsync(client, "web", "agent-a");
 
-        payload.RootElement.GetProperty("messages").GetArrayLength().Should().Be(50);
-        payload.RootElement.GetProperty("messages")[0].GetProperty("content").GetString().Should().Be("m-10");
-        payload.RootElement.GetProperty("messages")[49].GetProperty("content").GetString().Should().Be("m-59");
-        payload.RootElement.GetProperty("hasMore").GetBoolean().Should().BeTrue();
+        payload.RootElement.GetProperty("messages").GetArrayLength().ShouldBe(50);
+        payload.RootElement.GetProperty("messages")[0].GetProperty("content").GetString().ShouldBe("m-10");
+        payload.RootElement.GetProperty("messages")[49].GetProperty("content").GetString().ShouldBe("m-59");
+        payload.RootElement.GetProperty("hasMore").GetBoolean().ShouldBeTrue();
     }
 
     [Fact]
@@ -42,13 +41,13 @@ public sealed class ChannelHistoryTests
 
         using var first = await GetHistoryJsonAsync(client, "web", "agent-a");
         var cursor = first.RootElement.GetProperty("nextCursor").GetString();
-        cursor.Should().NotBeNullOrWhiteSpace();
+        cursor.ShouldNotBeNullOrWhiteSpace();
 
         using var second = await GetHistoryJsonAsync(client, "web", "agent-a", cursor!, limit: 50);
 
-        second.RootElement.GetProperty("messages").GetArrayLength().Should().Be(20);
-        second.RootElement.GetProperty("messages")[0].GetProperty("content").GetString().Should().Be("m-0");
-        second.RootElement.GetProperty("messages")[19].GetProperty("content").GetString().Should().Be("m-19");
+        second.RootElement.GetProperty("messages").GetArrayLength().ShouldBe(20);
+        second.RootElement.GetProperty("messages")[0].GetProperty("content").GetString().ShouldBe("m-0");
+        second.RootElement.GetProperty("messages")[19].GetProperty("content").GetString().ShouldBe("m-19");
     }
 
     [Fact]
@@ -64,8 +63,9 @@ public sealed class ChannelHistoryTests
         var messages = payload.RootElement.GetProperty("messages");
         var sessionIds = messages.EnumerateArray().Select(m => m.GetProperty("sessionId").GetString()).Distinct().ToArray();
 
-        messages.GetArrayLength().Should().Be(50);
-        sessionIds.Should().Contain(["s-old", "s-new"]);
+        messages.GetArrayLength().ShouldBe(50);
+        sessionIds.ShouldContain("s-old");
+        sessionIds.ShouldContain("s-new");
     }
 
     [Fact]
@@ -80,11 +80,11 @@ public sealed class ChannelHistoryTests
         using var payload = await GetHistoryJsonAsync(client, "web", "agent-a", limit: 50);
         var boundaries = payload.RootElement.GetProperty("sessionBoundaries");
 
-        boundaries.GetArrayLength().Should().BeGreaterThan(0);
+        boundaries.GetArrayLength().ShouldBeGreaterThan(0);
         var firstBoundary = boundaries[0];
-        firstBoundary.GetProperty("insertBeforeIndex").GetInt32().Should().BeGreaterThanOrEqualTo(0);
-        firstBoundary.GetProperty("sessionId").GetString().Should().NotBeNullOrWhiteSpace();
-        firstBoundary.GetProperty("startedAt").GetString().Should().NotBeNullOrWhiteSpace();
+        firstBoundary.GetProperty("insertBeforeIndex").GetInt32().ShouldBeGreaterThanOrEqualTo(0);
+        firstBoundary.GetProperty("sessionId").GetString().ShouldNotBeNullOrWhiteSpace();
+        firstBoundary.GetProperty("startedAt").GetString().ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public sealed class ChannelHistoryTests
             .Distinct()
             .ToArray();
 
-        sessionIds.Should().NotContain("s-empty");
+        sessionIds.ShouldNotContain("s-empty");
     }
 
     [Fact]
@@ -116,8 +116,8 @@ public sealed class ChannelHistoryTests
 
         using var payload = await GetHistoryJsonAsync(client, "web", "agent-a", limit: 50);
 
-        payload.RootElement.GetProperty("hasMore").GetBoolean().Should().BeFalse();
-        payload.RootElement.GetProperty("nextCursor").ValueKind.Should().Be(JsonValueKind.Null);
+        payload.RootElement.GetProperty("hasMore").GetBoolean().ShouldBeFalse();
+        payload.RootElement.GetProperty("nextCursor").ValueKind.ShouldBe(JsonValueKind.Null);
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public sealed class ChannelHistoryTests
 
         using var payload = await GetHistoryJsonAsync(client, "web", "agent-a", limit: 10);
 
-        payload.RootElement.GetProperty("messages").GetArrayLength().Should().BeLessThanOrEqualTo(10);
+        payload.RootElement.GetProperty("messages").GetArrayLength().ShouldBeLessThanOrEqualTo(10);
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public sealed class ChannelHistoryTests
 
         using var payload = await GetHistoryJsonAsync(client, "web", "agent-a", limit: 999);
 
-        payload.RootElement.GetProperty("messages").GetArrayLength().Should().Be(200);
+        payload.RootElement.GetProperty("messages").GetArrayLength().ShouldBe(200);
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public sealed class ChannelHistoryTests
             .Select(m => m.GetProperty("timestamp").GetDateTimeOffset())
             .ToArray();
 
-        timestamps.Should().BeInAscendingOrder();
+        timestamps.ShouldBeInOrder(SortDirection.Ascending);
     }
 
     [Fact]
@@ -169,7 +169,7 @@ public sealed class ChannelHistoryTests
 
         var response = await client.GetAsync("/api/channels/web/agents/agent-a/history?cursor=not-a-valid-cursor");
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
     private static InMemorySessionStore CreateStoreWithSingleSession(
@@ -229,7 +229,7 @@ public sealed class ChannelHistoryTests
 
         var query = queryParts.Count == 0 ? string.Empty : $"?{string.Join("&", queryParts)}";
         var response = await client.GetAsync($"/api/channels/{channelType}/agents/{agentId}/history{query}");
-        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         var stream = await response.Content.ReadAsStreamAsync();
         return await JsonDocument.ParseAsync(stream);
     }

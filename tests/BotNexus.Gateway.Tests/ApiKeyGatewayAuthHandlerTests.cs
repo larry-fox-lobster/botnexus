@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Security;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BotNexus.Gateway.Tests;
@@ -15,8 +14,8 @@ public sealed class ApiKeyGatewayAuthHandlerTests
 
         var result = await handler.AuthenticateAsync(CreateContext());
 
-        result.IsAuthenticated.Should().BeTrue();
-        result.Identity!.CallerId.Should().Be("gateway-dev");
+        result.IsAuthenticated.ShouldBeTrue();
+        result.Identity!.CallerId.ShouldBe("gateway-dev");
     }
 
     [Fact]
@@ -26,8 +25,8 @@ public sealed class ApiKeyGatewayAuthHandlerTests
 
         var result = await handler.AuthenticateAsync(CreateContext());
 
-        result.IsAuthenticated.Should().BeFalse();
-        result.FailureReason.Should().StartWith("Missing API key");
+        result.IsAuthenticated.ShouldBeFalse();
+        result.FailureReason.ShouldStartWith("Missing API key");
     }
 
     [Fact]
@@ -37,8 +36,8 @@ public sealed class ApiKeyGatewayAuthHandlerTests
 
         var result = await handler.AuthenticateAsync(CreateContext(new Dictionary<string, string> { ["X-Api-Key"] = "wrong" }));
 
-        result.IsAuthenticated.Should().BeFalse();
-        result.FailureReason.Should().Be("Invalid API key.");
+        result.IsAuthenticated.ShouldBeFalse();
+        result.FailureReason.ShouldBe("Invalid API key.");
     }
 
     [Fact]
@@ -48,8 +47,8 @@ public sealed class ApiKeyGatewayAuthHandlerTests
 
         var result = await handler.AuthenticateAsync(CreateContext(new Dictionary<string, string> { ["Authorization"] = "Bearer secret" }));
 
-        result.IsAuthenticated.Should().BeTrue();
-        result.Identity!.CallerId.Should().Be("gateway-api-key");
+        result.IsAuthenticated.ShouldBeTrue();
+        result.Identity!.CallerId.ShouldBe("gateway-api-key");
     }
 
     [Fact]
@@ -76,11 +75,11 @@ public sealed class ApiKeyGatewayAuthHandlerTests
 
         var result = await handler.AuthenticateAsync(CreateContext(new Dictionary<string, string> { ["X-Api-Key"] = "tenant-a-secret" }));
 
-        result.IsAuthenticated.Should().BeTrue();
-        result.Identity!.CallerId.Should().Be("caller-a");
-        result.Identity.TenantId.Should().Be("tenant-a");
-        result.Identity.Permissions.Should().Contain("chat:send");
-        result.Identity.AllowedAgents.Should().ContainSingle().Which.Should().Be("assistant-a");
+        result.IsAuthenticated.ShouldBeTrue();
+        result.Identity!.CallerId.ShouldBe("caller-a");
+        result.Identity.TenantId.ShouldBe("tenant-a");
+        result.Identity.Permissions.ShouldContain("chat:send");
+        result.Identity.AllowedAgents.ShouldHaveSingleItem().ShouldBe("assistant-a");
     }
 
     [Fact]
@@ -90,8 +89,8 @@ public sealed class ApiKeyGatewayAuthHandlerTests
 
         var result = await handler.AuthenticateAsync(CreateContext(new Dictionary<string, string> { ["x-api-key"] = "secret" }));
 
-        result.IsAuthenticated.Should().BeTrue();
-        result.Identity!.CallerId.Should().Be("gateway-api-key");
+        result.IsAuthenticated.ShouldBeTrue();
+        result.Identity!.CallerId.ShouldBe("gateway-api-key");
     }
 
     private static GatewayAuthContext CreateContext(IReadOnlyDictionary<string, string>? headers = null)

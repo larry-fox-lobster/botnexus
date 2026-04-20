@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Streaming;
-using FluentAssertions;
 using Moq;
 
 namespace BotNexus.Gateway.Tests;
@@ -27,13 +26,13 @@ public sealed class StreamingSessionHelperTests
             session,
             store.Object);
 
-        session.History.Should().HaveCount(3);
-        session.History[0].Role.Should().Be(MessageRole.Tool);
-        session.History[0].Content.Should().Be("Tool 'clock' started.");
-        session.History[1].Role.Should().Be(MessageRole.Tool);
-        session.History[1].Content.Should().Be("12:00");
-        session.History[2].Role.Should().Be(MessageRole.Assistant);
-        session.History[2].Content.Should().Be("Hello world");
+        session.History.Count().ShouldBe(3);
+        session.History[0].Role.ShouldBe(MessageRole.Tool);
+        session.History[0].Content.ShouldBe("Tool 'clock' started.");
+        session.History[1].Role.ShouldBe(MessageRole.Tool);
+        session.History[1].Content.ShouldBe("12:00");
+        session.History[2].Role.ShouldBe(MessageRole.Assistant);
+        session.History[2].Content.ShouldBe("Hello world");
         store.Verify(s => s.SaveAsync(session, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -58,10 +57,10 @@ public sealed class StreamingSessionHelperTests
                 return ValueTask.CompletedTask;
             }));
 
-        session.History.Should().ContainSingle();
-        session.History[0].Role.Should().Be(MessageRole.Assistant);
-        session.History[0].Content.Should().Be("Final answer.");
-        callbackTypes.Should().Contain(AgentStreamEventType.ThinkingDelta);
+        session.History.ShouldHaveSingleItem();
+        session.History[0].Role.ShouldBe(MessageRole.Assistant);
+        session.History[0].Content.ShouldBe("Final answer.");
+        callbackTypes.ShouldContain(AgentStreamEventType.ThinkingDelta);
     }
 
     [Fact]
@@ -75,7 +74,7 @@ public sealed class StreamingSessionHelperTests
             session,
             store.Object);
 
-        session.History.Should().BeEmpty();
+        session.History.ShouldBeEmpty();
     }
 
     private static async IAsyncEnumerable<AgentStreamEvent> ToAsyncEnumerable(IEnumerable<AgentStreamEvent> events)

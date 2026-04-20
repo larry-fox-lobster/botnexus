@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Configuration;
 
@@ -21,9 +20,9 @@ public sealed class ConfigPathResolverTests
 
         var result = await fixture.RunCliAsync("config", "get", "gateway");
 
-        result.ExitCode.Should().Be(0);
-        result.StdOut.Should().Contain("\"listenUrl\": \"http://localhost:5005\"");
-        result.StdOut.Should().Contain("\"defaultAgentId\": \"assistant\"");
+        result.ExitCode.ShouldBe(0);
+        result.StdOut.ShouldContain("\"listenUrl\": \"http://localhost:5005\"");
+        result.StdOut.ShouldContain("\"defaultAgentId\": \"assistant\"");
     }
 
     [Fact]
@@ -39,8 +38,8 @@ public sealed class ConfigPathResolverTests
 
         var result = await fixture.RunCliAsync("config", "get", "gateway.listenUrl");
 
-        result.ExitCode.Should().Be(0);
-        result.StdOut.Trim().Should().Be("http://localhost:5005");
+        result.ExitCode.ShouldBe(0);
+        result.StdOut.Trim().ShouldBe("http://localhost:5005");
     }
 
     [Fact]
@@ -58,8 +57,8 @@ public sealed class ConfigPathResolverTests
 
         var result = await fixture.RunCliAsync("config", "get", "providers.copilot.apiKey");
 
-        result.ExitCode.Should().Be(0);
-        result.StdOut.Trim().Should().Be("abc123");
+        result.ExitCode.ShouldBe(0);
+        result.StdOut.Trim().ShouldBe("abc123");
     }
 
     [Fact]
@@ -79,9 +78,9 @@ public sealed class ConfigPathResolverTests
 
         var setResult = await fixture.RunCliAsync("config", "set", "agents.assistant.enabled", "false");
 
-        setResult.ExitCode.Should().Be(0);
+        setResult.ExitCode.ShouldBe(0);
         var config = await fixture.LoadConfigAsync();
-        config.Agents!["assistant"].Enabled.Should().BeFalse();
+        config.Agents!["assistant"].Enabled.ShouldBeFalse();
     }
 
     [Fact]
@@ -95,9 +94,9 @@ public sealed class ConfigPathResolverTests
 
         var setResult = await fixture.RunCliAsync("config", "set", "providers.copilot", "{\"apiKey\":\"token-1\"}");
 
-        setResult.ExitCode.Should().Be(0);
+        setResult.ExitCode.ShouldBe(0);
         var config = await fixture.LoadConfigAsync();
-        config.Providers!["copilot"].ApiKey.Should().Be("token-1");
+        config.Providers!["copilot"].ApiKey.ShouldBe("token-1");
     }
 
     [Fact]
@@ -115,9 +114,9 @@ public sealed class ConfigPathResolverTests
             "gateway.cors.allowedOrigins",
             "[\"https://one.test\",\"https://two.test\"]");
 
-        setResult.ExitCode.Should().Be(0);
+        setResult.ExitCode.ShouldBe(0);
         var config = await fixture.LoadConfigAsync();
-        config.Gateway?.Cors?.AllowedOrigins.Should().Equal("https://one.test", "https://two.test");
+        config.Gateway?.Cors?.AllowedOrigins.ShouldBe(new[] { "https://one.test", "https://two.test" });
     }
 
     [Fact]
@@ -134,9 +133,9 @@ public sealed class ConfigPathResolverTests
         var setResult = await fixture.RunCliAsync("config", "set", "gateway.defaultAgentId", "null");
         var getResult = await fixture.RunCliAsync("config", "get", "gateway.defaultAgentId");
 
-        setResult.ExitCode.Should().Be(0);
-        getResult.ExitCode.Should().Be(0);
-        getResult.StdOut.Trim().Should().Be("null");
+        setResult.ExitCode.ShouldBe(0);
+        getResult.ExitCode.ShouldBe(0);
+        getResult.StdOut.Trim().ShouldBe("null");
     }
 
     [Fact]
@@ -146,8 +145,8 @@ public sealed class ConfigPathResolverTests
 
         var result = await fixture.RunCliAsync("config", "get", "gateway.missing");
 
-        result.ExitCode.Should().Be(1);
-        result.CombinedOutput.Should().Contain("Property 'missing' does not exist");
+        result.ExitCode.ShouldBe(1);
+        result.CombinedOutput.ShouldContain("Property 'missing' does not exist");
     }
 
     [Fact]
@@ -167,8 +166,8 @@ public sealed class ConfigPathResolverTests
 
         var result = await fixture.RunCliAsync("config", "set", "agents.assistant.enabled", "not-a-bool");
 
-        result.ExitCode.Should().Be(1);
-        result.CombinedOutput.Should().Contain("is not a valid boolean");
+        result.ExitCode.ShouldBe(1);
+        result.CombinedOutput.ShouldContain("is not a valid boolean");
     }
 
     [Fact]
@@ -186,8 +185,8 @@ public sealed class ConfigPathResolverTests
 
         var result = await fixture.RunCliAsync("config", "get", "PrOvIdErS.cOpIlOt.ApIkEy");
 
-        result.ExitCode.Should().Be(0);
-        result.StdOut.Trim().Should().Be("abc123");
+        result.ExitCode.ShouldBe(0);
+        result.StdOut.Trim().ShouldBe("abc123");
     }
 
     [Fact]
@@ -205,8 +204,8 @@ public sealed class ConfigPathResolverTests
 
         var result = await fixture.RunCliAsync("config", "get", "gateway.cors.allowedOrigins[1]");
 
-        result.ExitCode.Should().Be(0);
-        result.StdOut.Trim().Should().Be("https://two.test");
+        result.ExitCode.ShouldBe(0);
+        result.StdOut.Trim().ShouldBe("https://two.test");
     }
 
     [Fact]
@@ -224,9 +223,9 @@ public sealed class ConfigPathResolverTests
 
         var setResult = await fixture.RunCliAsync("config", "set", "gateway.cors.allowedOrigins[0]", "https://updated.test");
 
-        setResult.ExitCode.Should().Be(0);
+        setResult.ExitCode.ShouldBe(0);
         var config = await fixture.LoadConfigAsync();
-        config.Gateway?.Cors?.AllowedOrigins?[0].Should().Be("https://updated.test");
+        config.Gateway?.Cors?.AllowedOrigins?[0].ShouldBe("https://updated.test");
     }
 
     [Fact]
@@ -244,8 +243,8 @@ public sealed class ConfigPathResolverTests
 
         var result = await fixture.RunCliAsync("config", "get", "gateway.cors.allowedOrigins.0");
 
-        result.ExitCode.Should().Be(1);
-        result.CombinedOutput.Should().Contain("Property '0' does not exist");
+        result.ExitCode.ShouldBe(1);
+        result.CombinedOutput.ShouldContain("Property '0' does not exist");
     }
 
     private sealed class CliConfigFixture : IAsyncDisposable

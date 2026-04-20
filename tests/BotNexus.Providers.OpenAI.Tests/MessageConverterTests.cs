@@ -1,7 +1,6 @@
 using System.Text.Json;
 using BotNexus.Agent.Providers.Core.Compatibility;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.Providers.OpenAI.Tests;
 
@@ -14,9 +13,9 @@ public class MessageConverterTests
     {
         var content = new UserMessageContent("hello");
 
-        content.IsText.Should().BeTrue();
-        content.Text.Should().Be("hello");
-        content.Blocks.Should().BeNull();
+        content.IsText.ShouldBeTrue();
+        content.Text.ShouldBe("hello");
+        content.Blocks.ShouldBeNull();
     }
 
     [Fact]
@@ -29,8 +28,8 @@ public class MessageConverterTests
         };
         var content = new UserMessageContent(blocks);
 
-        content.IsText.Should().BeFalse();
-        content.Blocks.Should().HaveCount(2);
+        content.IsText.ShouldBeFalse();
+        content.Blocks!.Count().ShouldBe(2);
     }
 
     [Fact]
@@ -38,8 +37,8 @@ public class MessageConverterTests
     {
         UserMessageContent content = "hello";
 
-        content.IsText.Should().BeTrue();
-        content.Text.Should().Be("hello");
+        content.IsText.ShouldBeTrue();
+        content.Text.ShouldBe("hello");
     }
 
     [Fact]
@@ -48,7 +47,7 @@ public class MessageConverterTests
         var content = new UserMessageContent("test message");
         var json = JsonSerializer.Serialize(content);
 
-        json.Should().Be("\"test message\"");
+        json.ShouldBe("\"test message\"");
     }
 
     [Fact]
@@ -57,9 +56,9 @@ public class MessageConverterTests
         var json = "\"hello world\"";
         var content = JsonSerializer.Deserialize<UserMessageContent>(json);
 
-        content.Should().NotBeNull();
-        content!.IsText.Should().BeTrue();
-        content.Text.Should().Be("hello world");
+        content.ShouldNotBeNull();
+        content!.IsText.ShouldBeTrue();
+        content.Text.ShouldBe("hello world");
     }
 
     [Fact]
@@ -83,12 +82,12 @@ public class MessageConverterTests
             ResponseId: "resp-1",
             Timestamp: Ts);
 
-        msg.Content.Should().HaveCount(2);
-        msg.Content[0].Should().BeOfType<TextContent>();
-        msg.Content[1].Should().BeOfType<ToolCallContent>();
+        msg.Content.Count().ShouldBe(2);
+        msg.Content[0].ShouldBeOfType<TextContent>();
+        msg.Content[1].ShouldBeOfType<ToolCallContent>();
         var tc = (ToolCallContent)msg.Content[1];
-        tc.Id.Should().Be("call_123");
-        tc.Name.Should().Be("read_file");
+        tc.Id.ShouldBe("call_123");
+        tc.Name.ShouldBe("read_file");
     }
 
     [Fact]
@@ -101,9 +100,9 @@ public class MessageConverterTests
             IsError: false,
             Timestamp: Ts);
 
-        msg.ToolCallId.Should().Be("call_123");
-        msg.ToolName.Should().Be("read_file");
-        msg.IsError.Should().BeFalse();
+        msg.ToolCallId.ShouldBe("call_123");
+        msg.ToolName.ShouldBe("read_file");
+        msg.IsError.ShouldBeFalse();
     }
 
     [Fact]
@@ -111,7 +110,7 @@ public class MessageConverterTests
     {
         var compat = new OpenAICompletionsCompat();
 
-        compat.SupportsDeveloperRole.Should().BeTrue();
+        compat.SupportsDeveloperRole.ShouldBeTrue();
     }
 
     [Fact]
@@ -119,7 +118,7 @@ public class MessageConverterTests
     {
         var compat = new OpenAICompletionsCompat { SupportsDeveloperRole = false };
 
-        compat.SupportsDeveloperRole.Should().BeFalse();
+        compat.SupportsDeveloperRole.ShouldBeFalse();
     }
 
     [Fact]
@@ -127,6 +126,6 @@ public class MessageConverterTests
     {
         var compat = new OpenAICompletionsCompat { RequiresThinkingAsText = true };
 
-        compat.RequiresThinkingAsText.Should().BeTrue();
+        compat.RequiresThinkingAsText.ShouldBeTrue();
     }
 }

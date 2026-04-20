@@ -1,6 +1,5 @@
 using BotNexus.Extensions.Skills;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Skills.Tests;
 
@@ -24,8 +23,8 @@ public sealed class SkillResolverTests
 
         var result = SkillResolver.Resolve(skills, config);
 
-        result.Loaded.Should().ContainSingle(s => s.Name == "email-triage");
-        result.Available.Should().ContainSingle(s => s.Name == "calendar");
+        result.Loaded.Where(s => s.Name == "email-triage").ShouldHaveSingleItem();
+        result.Available.Where(s => s.Name == "calendar").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -36,8 +35,8 @@ public sealed class SkillResolverTests
 
         var result = SkillResolver.Resolve(skills, config);
 
-        result.Loaded.Should().ContainSingle(s => s.Name == "calendar");
-        result.Denied.Should().ContainSingle(s => s.Name == "email-triage");
+        result.Loaded.Where(s => s.Name == "calendar").ShouldHaveSingleItem();
+        result.Denied.Where(s => s.Name == "email-triage").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -48,8 +47,8 @@ public sealed class SkillResolverTests
 
         var result = SkillResolver.Resolve(skills, config);
 
-        result.Available.Select(s => s.Name).Should().BeEquivalentTo(["email-triage", "ado"]);
-        result.Denied.Should().ContainSingle(s => s.Name == "calendar");
+        result.Available.Select(s => s.Name).ShouldBe(new[] { "email-triage", "ado" });
+        result.Denied.Where(s => s.Name == "calendar").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -60,9 +59,9 @@ public sealed class SkillResolverTests
 
         var result = SkillResolver.Resolve(skills, config);
 
-        result.Loaded.Should().BeEmpty();
-        result.Available.Should().BeEmpty();
-        result.Denied.Should().ContainSingle(s => s.Name == "email-triage");
+        result.Loaded.ShouldBeEmpty();
+        result.Available.ShouldBeEmpty();
+        result.Denied.Where(s => s.Name == "email-triage").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -73,8 +72,8 @@ public sealed class SkillResolverTests
 
         var result = SkillResolver.Resolve(skills, config, explicitlyLoaded: ["calendar"]);
 
-        result.Loaded.Should().ContainSingle(s => s.Name == "calendar");
-        result.Available.Should().ContainSingle(s => s.Name == "email-triage");
+        result.Loaded.Where(s => s.Name == "calendar").ShouldHaveSingleItem();
+        result.Available.Where(s => s.Name == "email-triage").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -85,8 +84,8 @@ public sealed class SkillResolverTests
 
         var result = SkillResolver.Resolve(skills, config);
 
-        result.Loaded.Should().HaveCount(3);
-        result.Available.Should().HaveCount(2);
+        result.Loaded.Count().ShouldBe(3);
+        result.Available.Count().ShouldBe(2);
     }
 
     [Fact]
@@ -102,8 +101,8 @@ public sealed class SkillResolverTests
         var result = SkillResolver.Resolve(skills, config);
 
         // big exceeds budget, small fits
-        result.Loaded.Select(s => s.Name).Should().Contain("small");
-        result.Loaded.Select(s => s.Name).Should().NotContain("big");
+        result.Loaded.Select(s => s.Name).ShouldContain("small");
+        result.Loaded.Select(s => s.Name).ShouldNotContain("big");
     }
 
     [Fact]
@@ -114,8 +113,8 @@ public sealed class SkillResolverTests
 
         var result = SkillResolver.Resolve(skills, config);
 
-        result.Loaded.Should().BeEmpty();
-        result.Available.Should().BeEmpty();
+        result.Loaded.ShouldBeEmpty();
+        result.Available.ShouldBeEmpty();
     }
 
     [Fact]
@@ -125,8 +124,8 @@ public sealed class SkillResolverTests
 
         var result = SkillResolver.Resolve(skills, config: null);
 
-        result.Available.Should().ContainSingle(s => s.Name == "email-triage");
-        result.Loaded.Should().BeEmpty();
+        result.Available.Where(s => s.Name == "email-triage").ShouldHaveSingleItem();
+        result.Loaded.ShouldBeEmpty();
     }
 
     [Fact]
@@ -137,8 +136,8 @@ public sealed class SkillResolverTests
 
         var result = SkillResolver.Resolve(skills, config, explicitlyLoaded: ["email-triage"]);
 
-        result.Loaded.Should().BeEmpty();
-        result.Denied.Should().ContainSingle(s => s.Name == "email-triage");
+        result.Loaded.ShouldBeEmpty();
+        result.Denied.Where(s => s.Name == "email-triage").ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -153,8 +152,8 @@ public sealed class SkillResolverTests
 
         var result = SkillResolver.Resolve(skills, config);
 
-        result.Loaded.Should().HaveCount(30);
-        result.Available.Should().BeEmpty();
+        result.Loaded.Count().ShouldBe(30);
+        result.Available.ShouldBeEmpty();
     }
 
     [Fact]
@@ -173,7 +172,7 @@ public sealed class SkillResolverTests
 
         var result = SkillResolver.Resolve(skills, config);
 
-        result.Loaded.Select(s => s.Name).Should().BeEquivalentTo(["huge", "small"]);
-        result.Available.Should().BeEmpty();
+        result.Loaded.Select(s => s.Name).ShouldBe(new[] { "huge", "small" });
+        result.Available.ShouldBeEmpty();
     }
 }

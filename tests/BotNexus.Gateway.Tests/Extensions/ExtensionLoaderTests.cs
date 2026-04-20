@@ -5,7 +5,6 @@ using BotNexus.Gateway.Abstractions.Extensions;
 using BotNexus.Gateway.Abstractions.Hooks;
 using BotNexus.Gateway.Extensions;
 using BotNexus.Gateway.Hooks;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Abstractions;
@@ -48,8 +47,8 @@ public sealed class ExtensionLoaderTests : IDisposable
 
         var discovered = await loader.DiscoverAsync(_rootPath);
 
-        discovered.Should().ContainSingle();
-        discovered[0].Manifest.Id.Should().Be("valid-extension");
+        discovered.ShouldHaveSingleItem();
+        discovered[0].Manifest.Id.ShouldBe("valid-extension");
     }
 
     [Fact]
@@ -71,7 +70,7 @@ public sealed class ExtensionLoaderTests : IDisposable
 
         var discovered = await loader.DiscoverAsync(_rootPath);
 
-        discovered.Should().Contain(x => x.Manifest.Id == "media-handler-extension");
+        discovered.ShouldContain(x => x.Manifest.Id == "media-handler-extension");
     }
 
     [Fact]
@@ -99,23 +98,23 @@ public sealed class ExtensionLoaderTests : IDisposable
 
         var result = await loader.LoadAsync(discovered.Single());
 
-        result.Success.Should().BeTrue();
-        result.RegisteredServices.Should().Contain(service => service.StartsWith("IChannelAdapter->", StringComparison.Ordinal));
+        result.Success.ShouldBeTrue();
+        result.RegisteredServices.ShouldContain(service => service.StartsWith("IChannelAdapter->", StringComparison.Ordinal));
         var descriptor = services.Single(d => d.ServiceType == typeof(IChannelAdapter));
-        descriptor.ImplementationType.Should().NotBeNull();
-        descriptor.ImplementationType!.FullName.Should().Contain("TelegramChannelAdapter");
+        descriptor.ImplementationType.ShouldNotBeNull();
+        descriptor.ImplementationType!.FullName.ShouldContain("TelegramChannelAdapter");
 
         var loadContext = AssemblyLoadContext.GetLoadContext(descriptor.ImplementationType.Assembly);
-        loadContext.Should().NotBeNull();
-        loadContext!.IsCollectible.Should().BeTrue();
-        loadContext.Should().NotBe(AssemblyLoadContext.Default);
+        loadContext.ShouldNotBeNull();
+        loadContext!.IsCollectible.ShouldBeTrue();
+        loadContext.ShouldNotBe(AssemblyLoadContext.Default);
 
-        loader.GetLoaded().Should().ContainSingle(x => x.ExtensionId == "telegram-extension");
+        loader.GetLoaded().Where(x => x.ExtensionId == "telegram-extension").ShouldHaveSingleItem();
         await loader.UnloadAsync("telegram-extension");
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
-        loader.GetLoaded().Should().BeEmpty();
+        loader.GetLoaded().ShouldBeEmpty();
     }
 
     [Fact]
@@ -139,8 +138,8 @@ public sealed class ExtensionLoaderTests : IDisposable
 
         var result = await loader.LoadAsync(discovered.Single(x => x.Manifest.Id == "bad-assembly"));
 
-        result.Success.Should().BeFalse();
-        result.Error.Should().NotBeNullOrWhiteSpace();
+        result.Success.ShouldBeFalse();
+        result.Error.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -161,7 +160,7 @@ public sealed class ExtensionLoaderTests : IDisposable
 
         var discovered = await loader.DiscoverAsync(_rootPath);
 
-        discovered.Should().NotContain(x => x.Manifest.Id == "missing-entry");
+        discovered.ShouldNotContain(x => x.Manifest.Id == "missing-entry");
     }
 
     private static AssemblyLoadContextExtensionLoader CreateLoader(IServiceCollection services)

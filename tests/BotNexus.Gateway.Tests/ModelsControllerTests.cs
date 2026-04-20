@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Api.Controllers;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 
@@ -20,8 +19,8 @@ public sealed class ModelsControllerTests
         var result = controller.GetModels();
 
         var models = (result.Result as OkObjectResult)?.Value as IEnumerable<ModelInfo>;
-        models.Should().NotBeNull();
-        models!.Should().BeEmpty();
+        models.ShouldNotBeNull();
+        models!.ShouldBeEmpty();
     }
 
     [Fact]
@@ -41,8 +40,8 @@ public sealed class ModelsControllerTests
         var result = controller.GetModels();
 
         var models = (result.Result as OkObjectResult)?.Value as IEnumerable<ModelInfo>;
-        models.Should().NotBeNull();
-        models!.Select(model => model.Name).Should().BeEquivalentTo(["GPT-4o", "Claude Sonnet 4"]);
+        models.ShouldNotBeNull();
+        models!.Select(model => model.Name).OrderBy(n => n).ShouldBe(new[] { "Claude Sonnet 4", "GPT-4o" });
     }
 
     [Fact]
@@ -60,8 +59,8 @@ public sealed class ModelsControllerTests
         var result = controller.GetModels();
 
         var models = (result.Result as OkObjectResult)?.Value as IEnumerable<ModelInfo>;
-        models.Should().NotBeNull();
-        models!.Select(model => model.Name).Should().Equal("Anthropic Haiku", "Claude Sonnet 4");
+        models.ShouldNotBeNull();
+        models!.Select(model => model.Name).ShouldBe(new[] { "Anthropic Haiku", "Claude Sonnet 4" });
     }
 
     [Fact]
@@ -76,8 +75,8 @@ public sealed class ModelsControllerTests
         var result = controller.GetModels(provider: "openai");
 
         var models = (result.Result as OkObjectResult)?.Value as IEnumerable<ModelInfo>;
-        models.Should().NotBeNull();
-        models!.Select(model => model.Provider).Should().Equal("openai");
+        models.ShouldNotBeNull();
+        models!.ShouldAllBe(model => model.Provider == "openai");
         modelFilter.Verify(filter => filter.GetModels("openai"), Times.Once);
         modelFilter.Verify(filter => filter.GetProviders(), Times.Never);
     }
@@ -103,8 +102,8 @@ public sealed class ModelsControllerTests
         var result = controller.GetModels(agentId: "agent-a");
 
         var models = (result.Result as OkObjectResult)?.Value as IEnumerable<ModelInfo>;
-        models.Should().NotBeNull();
-        models!.Select(model => model.ModelId).Should().Equal("gpt-4o");
+        models.ShouldNotBeNull();
+        models!.ShouldHaveSingleItem().ModelId.ShouldBe("gpt-4o");
         modelFilter.Verify(filter => filter.GetModelsForAgent("openai", It.Is<IReadOnlyList<string>>(list => list.SequenceEqual(new[] { "gpt-4o" }))), Times.Once);
     }
 
@@ -116,7 +115,7 @@ public sealed class ModelsControllerTests
 
         var result = controller.GetModels(agentId: "missing-agent");
 
-        result.Result.Should().BeOfType<NotFoundObjectResult>();
+        result.Result.ShouldBeOfType<NotFoundObjectResult>();
     }
 
     [Fact]
@@ -139,8 +138,8 @@ public sealed class ModelsControllerTests
         var result = controller.GetAgentModels("agent-a");
 
         var models = (result.Result as OkObjectResult)?.Value as IEnumerable<ModelInfo>;
-        models.Should().NotBeNull();
-        models!.Should().ContainSingle(model => model.ModelId == "gpt-4o");
+        models.ShouldNotBeNull();
+        models!.Where(model => model.ModelId == "gpt-4o").ShouldHaveSingleItem();
     }
 
     private static Mock<IModelFilter> CreateModelFilter()

@@ -2,7 +2,6 @@ using System.Text.Json;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Memory.Tests.TestInfrastructure;
 using BotNexus.Memory.Tools;
-using FluentAssertions;
 
 namespace BotNexus.Memory.Tests.Tools;
 
@@ -16,7 +15,7 @@ public sealed class MemoryToolAdditionalTests
 
         var act = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?>());
 
-        await act.Should().ThrowAsync<ArgumentException>();
+        await act.ShouldThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -30,8 +29,8 @@ public sealed class MemoryToolAdditionalTests
         var id = GetText(result).Split(' ')[3];
         var stored = await context.Store.GetByIdAsync(id);
 
-        stored.Should().NotBeNull();
-        stored!.Content.Should().Be(payload);
+        stored.ShouldNotBeNull();
+        stored!.Content.ShouldBe(payload);
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public sealed class MemoryToolAdditionalTests
 
         var firstId = GetText(first).Split(' ')[3];
         var secondId = GetText(second).Split(' ')[3];
-        firstId.Should().NotBe(secondId);
+        firstId.ShouldNotBe(secondId);
     }
 
     [Fact]
@@ -58,7 +57,7 @@ public sealed class MemoryToolAdditionalTests
         var act = () => tool.PrepareArgumentsAsync(
             new Dictionary<string, object?> { ["content"] = "x", ["expiresInDays"] = "not-a-number" });
 
-        await act.Should().ThrowAsync<ArgumentException>();
+        await act.ShouldThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -69,7 +68,7 @@ public sealed class MemoryToolAdditionalTests
 
         var act = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?> { ["query"] = "   " });
 
-        await act.Should().ThrowAsync<ArgumentException>();
+        await act.ShouldThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -92,9 +91,9 @@ public sealed class MemoryToolAdditionalTests
             new Dictionary<string, object?> { ["query"] = "tool filter token", ["filter"] = filter });
 
         var text = GetText(result);
-        text.Should().Contain("Found 1 memory entry:");
-        text.Should().Contain("ID: keep");
-        text.Should().NotContain("ID: drop");
+        text.ShouldContain("Found 1 memory entry:");
+        text.ShouldContain("ID: keep");
+        text.ShouldNotContain("ID: drop");
     }
 
     [Fact]
@@ -106,7 +105,7 @@ public sealed class MemoryToolAdditionalTests
 
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?> { ["query"] = "" });
 
-        GetText(result).Should().Be("No matching memories found.");
+        GetText(result).ShouldBe("No matching memories found.");
     }
 
     [Fact]
@@ -117,7 +116,7 @@ public sealed class MemoryToolAdditionalTests
 
         var act = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?>());
 
-        await act.Should().ThrowAsync<ArgumentException>();
+        await act.ShouldThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -130,7 +129,7 @@ public sealed class MemoryToolAdditionalTests
 
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?> { ["id"] = "to-delete" });
 
-        GetText(result).Should().Be("Memory entry not found.");
+        GetText(result).ShouldBe("Memory entry not found.");
     }
 
     [Fact]
@@ -144,7 +143,7 @@ public sealed class MemoryToolAdditionalTests
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?> { ["sessionId"] = "sess", ["limit"] = "1" });
 
         var text = GetText(result);
-        text.Should().Contain("Session 'sess' memories (1):");
+        text.ShouldContain("Session 'sess' memories (1):");
     }
 
     [Fact]
@@ -158,7 +157,7 @@ public sealed class MemoryToolAdditionalTests
 
         var result = await tool.ExecuteAsync("call-1", new Dictionary<string, object?> { ["query"] = "' OR 1=1 --" });
 
-        GetText(result).Should().Be("No matching memories found.");
+        GetText(result).ShouldBe("No matching memories found.");
     }
 
     private static string GetText(AgentToolResult result)

@@ -1,5 +1,4 @@
 using BotNexus.CodingAgent;
-using FluentAssertions;
 
 namespace BotNexus.CodingAgent.Tests;
 
@@ -28,15 +27,15 @@ public sealed class SystemPromptBuilderTests
 
         var prompt = _builder.Build(context);
 
-        prompt.Should().Contain("You are a coding assistant");
-        prompt.Should().Contain("## Environment");
-        prompt.Should().Contain("- Working directory: C:/repo");
-        prompt.Should().Contain("## Available Tools");
-        prompt.Should().Contain("- read: Read files with line numbers.");
-        prompt.Should().Contain("## Tool Guidelines");
-        prompt.Should().Contain("Prefer read before edit.");
-        prompt.Should().Contain("Current date/time: 2026-04-06T10:30:00.0000000+00:00");
-        prompt.Should().Contain("Current working directory: C:/repo");
+        prompt.ShouldContain("You are a coding assistant");
+        prompt.ShouldContain("## Environment");
+        prompt.ShouldContain("- Working directory: C:/repo");
+        prompt.ShouldContain("## Available Tools");
+        prompt.ShouldContain("- read: Read files with line numbers.");
+        prompt.ShouldContain("## Tool Guidelines");
+        prompt.ShouldContain("Prefer read before edit.");
+        prompt.ShouldContain("Current date/time: 2026-04-06T10:30:00.0000000+00:00");
+        prompt.ShouldContain("Current working directory: C:/repo");
     }
 
     [Fact]
@@ -64,13 +63,13 @@ public sealed class SystemPromptBuilderTests
 
         var prompt = _builder.Build(context);
 
-        prompt.Should().Contain("## Skills");
-        prompt.Should().Contain("name: read");
-        prompt.Should().Contain("description: skill a description");
-        prompt.Should().Contain("Skill A");
-        prompt.Should().Contain("Skill B");
-        prompt.Should().Contain("## Custom Instructions");
-        prompt.Should().Contain("Use concise responses.");
+        prompt.ShouldContain("## Skills");
+        prompt.ShouldContain("name: read");
+        prompt.ShouldContain("description: skill a description");
+        prompt.ShouldContain("Skill A");
+        prompt.ShouldContain("Skill B");
+        prompt.ShouldContain("## Custom Instructions");
+        prompt.ShouldContain("Use concise responses.");
     }
 
     [Fact]
@@ -92,9 +91,9 @@ public sealed class SystemPromptBuilderTests
 
         var prompt = _builder.Build(context);
 
-        prompt.Should().Contain("## Project Context");
-        prompt.Should().Contain("### .botnexus-agent/context/runtime.md");
-        prompt.Should().Contain("Runtime details");
+        prompt.ShouldContain("## Project Context");
+        prompt.ShouldContain("### .botnexus-agent/context/runtime.md");
+        prompt.ShouldContain("Runtime details");
     }
 
     [Fact]
@@ -114,7 +113,7 @@ public sealed class SystemPromptBuilderTests
 
         var prompt = _builder.Build(context);
 
-        prompt.Should().NotContain("## Skills");
+        prompt.ShouldNotContain("## Skills");
     }
 
     [Fact]
@@ -134,9 +133,9 @@ public sealed class SystemPromptBuilderTests
 
         var prompt = _builder.Build(context);
 
-        prompt.Should().StartWith("Custom base prompt");
-        prompt.Should().Contain("Appended prompt");
-        prompt.Should().NotContain("## Environment");
+        prompt.ShouldStartWith("Custom base prompt");
+        prompt.ShouldContain("Appended prompt");
+        prompt.ShouldNotContain("## Environment");
     }
 
     [Fact]
@@ -154,7 +153,7 @@ public sealed class SystemPromptBuilderTests
 
         var prompt = _builder.Build(context);
 
-        prompt.Should().Contain("Use bash for file operations like ls, rg, find.");
+        prompt.ShouldContain("Use bash for file operations like ls, rg, find.");
     }
 
     [Fact]
@@ -172,6 +171,6 @@ public sealed class SystemPromptBuilderTests
 
         var prompt = _builder.Build(context);
 
-        prompt.Should().Contain("Prefer grep/find/ls tools over bash for file exploration (faster, respects .gitignore).");
+        prompt.ShouldContain("Prefer grep/find/ls tools over bash for file exploration (faster, respects .gitignore).");
     }
 }

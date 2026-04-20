@@ -4,4 +4,16 @@
          This sets BOTNEXUS_HOME to a temp path so tests never touch ~/.botnexus -->
     <RunSettingsFilePath>$(MSBuildThisFileDirectory)test.runsettings</RunSettingsFilePath>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Shouldly" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Shouldly" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)NullableBoolShouldlyExtensions.cs" Link="NullableBoolShouldlyExtensions.cs" />
+  </ItemGroup>
 </Project>

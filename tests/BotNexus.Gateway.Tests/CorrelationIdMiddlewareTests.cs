@@ -1,5 +1,4 @@
 using BotNexus.Gateway.Api;
-using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
@@ -23,7 +22,7 @@ public sealed class CorrelationIdMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        context.Response.Headers["X-Correlation-Id"].ToString().Should().Be(expectedTraceId.ToString());
+        context.Response.Headers["X-Correlation-Id"].ToString().ShouldBe(expectedTraceId.ToString());
     }
 
     [Fact]
@@ -35,7 +34,7 @@ public sealed class CorrelationIdMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        context.Response.Headers["X-Correlation-Id"].ToString().Should().NotBeNullOrWhiteSpace();
+        context.Response.Headers["X-Correlation-Id"].ToString().ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -47,6 +46,6 @@ public sealed class CorrelationIdMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        context.Response.Headers["X-Correlation-Id"].ToString().Should().Be("client-correlation-id");
+        context.Response.Headers["X-Correlation-Id"].ToString().ShouldBe("client-correlation-id");
     }
 }

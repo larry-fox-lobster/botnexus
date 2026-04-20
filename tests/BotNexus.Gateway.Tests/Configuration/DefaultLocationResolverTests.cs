@@ -1,6 +1,5 @@
 using BotNexus.Domain.World;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Configuration;
 
@@ -32,10 +31,10 @@ public sealed class DefaultLocationResolverTests
         var resolver = new DefaultLocationResolver(config);
 
         var location = resolver.Resolve("repo-root");
-        location.Should().NotBeNull();
-        location!.Type.Should().Be(LocationType.FileSystem);
-        resolver.ResolvePath("repo-root").Should().Be("Q:\\repos\\botnexus");
-        resolver.ResolvePath("gateway-api").Should().BeNull();
-        resolver.GetAll().Should().ContainSingle(x => x.Name == "gateway-api");
+        location.ShouldNotBeNull();
+        location!.Type.ShouldBe(LocationType.FileSystem);
+        resolver.ResolvePath("repo-root").ShouldBe("Q:\\repos\\botnexus");
+        resolver.ResolvePath("gateway-api").ShouldBeNull();
+        resolver.GetAll().Where(x => x.Name == "gateway-api").ShouldHaveSingleItem();
     }
 }

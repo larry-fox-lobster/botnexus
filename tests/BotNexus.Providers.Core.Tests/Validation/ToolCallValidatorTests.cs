@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Agent.Providers.Core.Validation;
-using FluentAssertions;
 
 namespace BotNexus.Providers.Core.Tests.Validation;
 
@@ -23,8 +22,9 @@ public class ToolCallValidatorTests
 
         var result = ToolCallValidator.Validate(arguments, schema);
 
-        result.IsValid.Should().BeFalse();
-        result.Errors.Should().ContainSingle(error => error.Contains("Missing required property 'limit'"));
+        result.IsValid.ShouldBeFalse();
+        var error = result.Errors.ShouldHaveSingleItem();
+        error.ShouldContain("Missing required property 'limit'");
     }
 
     [Fact]
@@ -42,8 +42,9 @@ public class ToolCallValidatorTests
 
         var result = ToolCallValidator.Validate(arguments, schema);
 
-        result.IsValid.Should().BeFalse();
-        result.Errors.Should().ContainSingle(error => error.Contains("Property 'timeout' must be of type integer"));
+        result.IsValid.ShouldBeFalse();
+        var error = result.Errors.ShouldHaveSingleItem();
+        error.ShouldContain("Property 'timeout' must be of type integer");
     }
 
     [Fact]
@@ -64,8 +65,9 @@ public class ToolCallValidatorTests
 
         var result = ToolCallValidator.Validate(arguments, schema);
 
-        result.IsValid.Should().BeFalse();
-        result.Errors.Should().ContainSingle(error => error.Contains("Property 'mode' must be one of the allowed enum values"));
+        result.IsValid.ShouldBeFalse();
+        var error = result.Errors.ShouldHaveSingleItem();
+        error.ShouldContain("Property 'mode' must be one of the allowed enum values");
     }
 
     [Fact]
@@ -85,8 +87,8 @@ public class ToolCallValidatorTests
 
         var result = ToolCallValidator.Validate(arguments, schema);
 
-        result.IsValid.Should().BeTrue();
-        result.Errors.Should().BeEmpty();
+        result.IsValid.ShouldBeTrue();
+        result.Errors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -97,8 +99,8 @@ public class ToolCallValidatorTests
 
         var result = ToolCallValidator.Validate(arguments, schema);
 
-        result.IsValid.Should().BeTrue();
-        result.Errors.Should().BeEmpty();
+        result.IsValid.ShouldBeTrue();
+        result.Errors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -109,8 +111,8 @@ public class ToolCallValidatorTests
 
         var result = ToolCallValidator.Validate(arguments, schema);
 
-        result.IsValid.Should().BeTrue();
-        result.Errors.Should().BeEmpty();
+        result.IsValid.ShouldBeTrue();
+        result.Errors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -129,7 +131,7 @@ public class ToolCallValidatorTests
 
         var result = ToolCallValidator.Validate(arguments, schema);
 
-        result.IsValid.Should().BeTrue();
-        result.Errors.Should().BeEmpty();
+        result.IsValid.ShouldBeTrue();
+        result.Errors.ShouldBeEmpty();
     }
 }

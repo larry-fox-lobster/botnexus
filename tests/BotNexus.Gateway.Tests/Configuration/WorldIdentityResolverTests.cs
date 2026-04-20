@@ -1,5 +1,4 @@
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Configuration;
 
@@ -24,10 +23,10 @@ public sealed class WorldIdentityResolverTests
 
         var world = WorldIdentityResolver.Resolve(config);
 
-        world.Id.Should().Be("local-dev");
-        world.Name.Should().Be("Local Development");
-        world.Description.Should().Be("Local development gateway");
-        world.Emoji.Should().Be("🏠");
+        world.Id.ShouldBe("local-dev");
+        world.Name.ShouldBe("Local Development");
+        world.Description.ShouldBe("Local development gateway");
+        world.Emoji.ShouldBe("🏠");
     }
 
     [Fact]
@@ -35,7 +34,7 @@ public sealed class WorldIdentityResolverTests
     {
         var world = WorldIdentityResolver.Resolve(new PlatformConfig());
 
-        world.Id.Should().Be(Environment.MachineName);
-        world.Name.Should().Be("BotNexus Gateway");
+        world.Id.ShouldBe(Environment.MachineName);
+        world.Name.ShouldBe("BotNexus Gateway");
     }
 }

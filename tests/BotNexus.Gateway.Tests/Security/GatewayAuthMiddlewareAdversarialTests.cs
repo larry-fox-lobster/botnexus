@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Api;
-using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -59,7 +58,7 @@ public sealed class GatewayAuthMiddlewareAdversarialTests
 
         await middleware.InvokeAsync(context);
 
-        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
         authHandler.Verify(handler => handler.AuthenticateAsync(It.IsAny<GatewayAuthContext>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -87,8 +86,8 @@ public sealed class GatewayAuthMiddlewareAdversarialTests
 
         await middleware.InvokeAsync(context);
 
-        nextCalled.Should().BeFalse();
-        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        nextCalled.ShouldBeFalse();
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
         authHandler.Verify(handler => handler.AuthenticateAsync(It.IsAny<GatewayAuthContext>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 

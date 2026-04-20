@@ -5,7 +5,6 @@ using BotNexus.Gateway.Abstractions.Extensions;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Commands;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -21,8 +20,12 @@ public sealed class BuiltInCommandContributorTests
 
         var commands = InvokeGetCommands(contributor);
 
-        commands.Select(command => command.Name).Should().Contain(
-            ["/help", "/status", "/agents", "/new", "/reset"]);
+        var names = commands.Select(command => command.Name).ToList();
+        names.ShouldContain("/help");
+        names.ShouldContain("/status");
+        names.ShouldContain("/agents");
+        names.ShouldContain("/new");
+        names.ShouldContain("/reset");
     }
 
     [Fact]
@@ -32,7 +35,7 @@ public sealed class BuiltInCommandContributorTests
 
         var reset = InvokeGetCommands(contributor).Single(command => command.Name == "/reset");
 
-        reset.ClientSideOnly.Should().BeTrue();
+        reset.ClientSideOnly.ShouldBeTrue();
     }
 
     [Fact]
@@ -42,8 +45,8 @@ public sealed class BuiltInCommandContributorTests
 
         var result = await InvokeExecuteAsync(contributor, "/help", "/help");
 
-        result.IsError.Should().BeFalse();
-        result.Body.Should().Contain("/help");
+        result.IsError.ShouldBeFalse();
+        result.Body.ShouldContain("/help");
     }
 
     [Fact]
@@ -53,8 +56,8 @@ public sealed class BuiltInCommandContributorTests
 
         var result = await InvokeExecuteAsync(contributor, "/status", "/status");
 
-        result.IsError.Should().BeFalse();
-        result.Body.Should().NotBeNullOrWhiteSpace();
+        result.IsError.ShouldBeFalse();
+        result.Body.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -74,8 +77,8 @@ public sealed class BuiltInCommandContributorTests
 
         var result = await InvokeExecuteAsync(contributor, "/agents", "/agents");
 
-        result.IsError.Should().BeFalse();
-        result.Body.ToLowerInvariant().Should().Contain("nova");
+        result.IsError.ShouldBeFalse();
+        result.Body.ToLowerInvariant().ShouldContain("nova");
     }
 
     [Fact]
@@ -85,8 +88,8 @@ public sealed class BuiltInCommandContributorTests
 
         var result = await InvokeExecuteAsync(contributor, "/reset", "/reset");
 
-        result.IsError.Should().BeTrue();
-        result.Body.ToLowerInvariant().Should().Contain("client");
+        result.IsError.ShouldBeTrue();
+        result.Body.ToLowerInvariant().ShouldContain("client");
     }
 
     [Fact]
@@ -96,7 +99,7 @@ public sealed class BuiltInCommandContributorTests
 
         var result = await InvokeExecuteAsync(contributor, "/unknown", "/unknown");
 
-        result.IsError.Should().BeTrue();
+        result.IsError.ShouldBeTrue();
     }
 
     private static object CreateContributor(
@@ -137,7 +140,7 @@ public sealed class BuiltInCommandContributorTests
     private static IReadOnlyList<CommandDescriptor> InvokeGetCommands(object contributor)
     {
         var method = contributor.GetType().GetMethod("GetCommands", BindingFlags.Instance | BindingFlags.Public);
-        method.Should().NotBeNull("BuiltInCommandContributor must expose GetCommands.");
+        method.ShouldNotBeNull("BuiltInCommandContributor must expose GetCommands.");
         return (IReadOnlyList<CommandDescriptor>)method!.Invoke(contributor, null)!;
     }
 
@@ -147,7 +150,7 @@ public sealed class BuiltInCommandContributorTests
             "ExecuteAsync",
             BindingFlags.Instance | BindingFlags.Public,
             [typeof(string), typeof(CommandExecutionContext), typeof(CancellationToken)]);
-        method.Should().NotBeNull("BuiltInCommandContributor must expose ExecuteAsync.");
+        method.ShouldNotBeNull("BuiltInCommandContributor must expose ExecuteAsync.");
 
         var context = new CommandExecutionContext
         {

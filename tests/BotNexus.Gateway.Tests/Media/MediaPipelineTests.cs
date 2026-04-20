@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Abstractions.Media;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Media;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -18,7 +17,7 @@ public sealed class MediaPipelineTests
 
         var result = await pipeline.ProcessAsync([], context);
 
-        result.Should().BeEmpty();
+        result.ShouldBeEmpty();
         handler.Verify(h => h.CanHandle(It.IsAny<MessageContentPart>()), Times.Never);
         handler.Verify(h => h.ProcessAsync(It.IsAny<MessageContentPart>(), It.IsAny<MediaProcessingContext>()), Times.Never);
     }
@@ -32,8 +31,8 @@ public sealed class MediaPipelineTests
 
         var result = await pipeline.ProcessAsync([inputPart], context);
 
-        result.Should().HaveCount(1);
-        result[0].Should().BeSameAs(inputPart);
+        result.Count().ShouldBe(1);
+        result[0].ShouldBeSameAs(inputPart);
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public sealed class MediaPipelineTests
 
         var result = await pipeline.ProcessAsync([inputPart], context);
 
-        result.Should().ContainSingle().Which.Should().BeSameAs(inputPart);
+        result.ShouldHaveSingleItem().ShouldBeSameAs(inputPart);
         handler.Verify(h => h.CanHandle(inputPart), Times.Once);
         handler.Verify(h => h.ProcessAsync(It.IsAny<MessageContentPart>(), It.IsAny<MediaProcessingContext>()), Times.Never);
     }
@@ -70,7 +69,7 @@ public sealed class MediaPipelineTests
 
         var result = await pipeline.ProcessAsync([inputPart], context);
 
-        result.Should().ContainSingle().Which.Should().BeSameAs(transformedPart);
+        result.ShouldHaveSingleItem().ShouldBeSameAs(transformedPart);
     }
 
     [Fact]
@@ -92,7 +91,7 @@ public sealed class MediaPipelineTests
 
         var result = await pipeline.ProcessAsync([inputPart], context);
 
-        result.Should().ContainSingle().Which.Should().BeSameAs(inputPart);
+        result.ShouldHaveSingleItem().ShouldBeSameAs(inputPart);
     }
 
     [Fact]
@@ -130,7 +129,7 @@ public sealed class MediaPipelineTests
 
         var result = await pipeline.ProcessAsync([audioPart], context);
 
-        result.Should().ContainSingle().Which.Should().BeSameAs(transcribedTextPart);
+        result.ShouldHaveSingleItem().ShouldBeSameAs(transcribedTextPart);
         secondHandler.Verify(h => h.CanHandle(It.Is<MessageContentPart>(p => ReferenceEquals(p, transcribedTextPart))), Times.Once);
         firstHandler.Verify(h => h.ProcessAsync(It.Is<MessageContentPart>(p => ReferenceEquals(p, audioPart)), It.IsAny<MediaProcessingContext>()), Times.Once);
         secondHandler.Verify(h => h.ProcessAsync(It.Is<MessageContentPart>(p => ReferenceEquals(p, transcribedTextPart)), It.IsAny<MediaProcessingContext>()), Times.Once);
@@ -151,7 +150,7 @@ public sealed class MediaPipelineTests
 
         var result = await pipeline.ProcessAsync([inputPart], context);
 
-        result.Should().ContainSingle().Which.Should().BeSameAs(inputPart);
+        result.ShouldHaveSingleItem().ShouldBeSameAs(inputPart);
     }
 
     [Fact]
@@ -175,7 +174,7 @@ public sealed class MediaPipelineTests
 
         var result = await pipeline.ProcessAsync([inputPart], context);
 
-        result.Should().ContainSingle().Which.Should().BeSameAs(inputPart);
+        result.ShouldHaveSingleItem().ShouldBeSameAs(inputPart);
         second.Verify(h => h.CanHandle(It.IsAny<MessageContentPart>()), Times.Never);
         second.Verify(h => h.ProcessAsync(It.IsAny<MessageContentPart>(), It.IsAny<MediaProcessingContext>()), Times.Never);
     }
@@ -200,9 +199,9 @@ public sealed class MediaPipelineTests
 
         var result = await pipeline.ProcessAsync([textPart, audioPart], context);
 
-        result.Should().HaveCount(2);
-        result[0].Should().BeSameAs(textPart);
-        result[1].Should().BeSameAs(transformedAudio);
+        result.Count().ShouldBe(2);
+        result[0].ShouldBeSameAs(textPart);
+        result[1].ShouldBeSameAs(transformedAudio);
     }
 
     [Fact]
@@ -229,7 +228,7 @@ public sealed class MediaPipelineTests
 
         await pipeline.ProcessAsync([inputPart], context);
 
-        observedToken.Should().Be(cts.Token);
+        observedToken.ShouldBe(cts.Token);
     }
 
     private static MediaPipeline CreatePipeline(IEnumerable<IMediaHandler> handlers)

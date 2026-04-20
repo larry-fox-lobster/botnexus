@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Domain.Primitives;
-using FluentAssertions;
 
 namespace BotNexus.Domain.Tests;
 
@@ -9,21 +8,21 @@ public sealed class SessionTypeTests
     [Fact]
     public void SessionType_KnownValues_WhenAccessed_ShouldExist()
     {
-        SessionType.UserAgent.Value.Should().Be("user-agent");
+        SessionType.UserAgent.Value.ShouldBe("user-agent");
     }
 
     [Fact]
     public void SessionType_FromString_WhenValueIsKnown_ShouldReturnKnownInstance()
     {
         var type = SessionType.FromString("USER-AGENT");
-        type.Should().BeSameAs(SessionType.UserAgent);
+        type.ShouldBeSameAs(SessionType.UserAgent);
     }
 
     [Fact]
     public void SessionType_FromString_WhenValueIsUnknown_ShouldCreateExtensibleInstance()
     {
         var type = SessionType.FromString("internal-trigger");
-        type.Value.Should().Be("internal-trigger");
+        type.Value.ShouldBe("internal-trigger");
     }
 
     [Fact]
@@ -31,14 +30,14 @@ public sealed class SessionTypeTests
     {
         var first = SessionType.FromString("CUSTOM-TYPE");
         var second = SessionType.FromString("custom-type");
-        first.Should().BeSameAs(second);
+        first.ShouldBeSameAs(second);
     }
 
     [Fact]
     public void SessionType_ImplicitConversion_WhenConvertedToString_ShouldReturnValue()
     {
         string value = SessionType.Cron;
-        value.Should().Be("cron");
+        value.ShouldBe("cron");
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public sealed class SessionTypeTests
     {
         var left = SessionType.FromString("agent-subagent");
         var right = SessionType.AgentSubAgent;
-        left.Should().Be(right);
+        left.ShouldBe(right);
     }
 
     [Fact]
@@ -54,14 +53,14 @@ public sealed class SessionTypeTests
     {
         var left = SessionType.UserAgent;
         var right = SessionType.AgentSelf;
-        left.Should().NotBe(right);
+        left.ShouldNotBe(right);
     }
 
     [Fact]
     public void SessionType_JsonRoundTrip_WhenSerializedAndDeserialized_ShouldBeEqual()
     {
         var roundTrip = JsonSerializer.Deserialize<SessionType>(JsonSerializer.Serialize(SessionType.AgentAgent));
-        roundTrip.Should().Be(SessionType.AgentAgent);
+        roundTrip.ShouldBe(SessionType.AgentAgent);
     }
 
     [Fact]
@@ -71,6 +70,6 @@ public sealed class SessionTypeTests
             .Select(_ => Task.Run(() => SessionType.FromString("thread-type")))
             .ToArray();
         var results = await Task.WhenAll(tasks);
-        results.Distinct().Should().HaveCount(1);
+        results.Distinct().Count().ShouldBe(1);
     }
 }

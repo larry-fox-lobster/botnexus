@@ -1,6 +1,5 @@
 using BotNexus.Cron;
 using BotNexus.Gateway.Api.Controllers;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,8 +20,8 @@ public sealed class CronControllerTests
         var result = await controller.List(CancellationToken.None);
 
         var jobs = (result.Result as OkObjectResult)?.Value as IReadOnlyList<CronJob>;
-        jobs.Should().NotBeNull();
-        jobs!.Should().HaveCount(2);
+        jobs.ShouldNotBeNull();
+        jobs!.Count().ShouldBe(2);
     }
 
     [Fact]
@@ -35,8 +34,8 @@ public sealed class CronControllerTests
         var result = await controller.Get("job-1", CancellationToken.None);
 
         var job = (result.Result as OkObjectResult)?.Value as CronJob;
-        job.Should().NotBeNull();
-        job!.Id.Should().Be("job-1");
+        job.ShouldNotBeNull();
+        job!.Id.ShouldBe("job-1");
     }
 
     [Fact]
@@ -49,9 +48,9 @@ public sealed class CronControllerTests
         var result = await controller.Create(request, CancellationToken.None);
 
         var created = (result.Result as CreatedAtActionResult)?.Value as CronJob;
-        created.Should().NotBeNull();
-        created!.Id.Should().NotBeNullOrWhiteSpace();
-        (await store.GetAsync(created.Id)).Should().NotBeNull();
+        created.ShouldNotBeNull();
+        created!.Id.ShouldNotBeNullOrWhiteSpace();
+        (await store.GetAsync(created.Id)).ShouldNotBeNull();
     }
 
     [Fact]
@@ -63,8 +62,8 @@ public sealed class CronControllerTests
 
         var result = await controller.Delete("job-1", CancellationToken.None);
 
-        result.Should().BeOfType<NoContentResult>();
-        (await store.GetAsync("job-1")).Should().BeNull();
+        result.ShouldBeOfType<NoContentResult>();
+        (await store.GetAsync("job-1")).ShouldBeNull();
     }
 
     [Fact]
@@ -78,9 +77,9 @@ public sealed class CronControllerTests
         var result = await controller.Run("job-1", CancellationToken.None);
 
         var run = (result.Result as AcceptedResult)?.Value as CronRun;
-        run.Should().NotBeNull();
-        run!.Status.Should().Be("ok");
-        action.ExecutionCount.Should().Be(1);
+        run.ShouldNotBeNull();
+        run!.Status.ShouldBe("ok");
+        action.ExecutionCount.ShouldBe(1);
     }
 
     private static CronController CreateController(FakeCronStore store, ICronAction action)

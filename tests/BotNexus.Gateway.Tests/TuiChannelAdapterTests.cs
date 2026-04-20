@@ -1,7 +1,6 @@
 using BotNexus.Extensions.Channels.Tui;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -14,7 +13,7 @@ public sealed class TuiChannelAdapterTests
     {
         var adapter = new TuiChannelAdapter(NullLogger<TuiChannelAdapter>.Instance);
 
-        adapter.SupportsSteering.Should().BeTrue();
+        adapter.SupportsSteering.ShouldBeTrue();
     }
 
     [Fact]
@@ -59,8 +58,8 @@ public sealed class TuiChannelAdapterTests
             return string.Equals(value?.ToString(), "steer", StringComparison.OrdinalIgnoreCase);
         });
 
-        steerDispatchCount.Should().Be(1);
-        output.ToString().Should().Contain("Steering queued");
+        steerDispatchCount.ShouldBe(1);
+        output.ToString().ShouldContain("Steering queued");
     }
 
     [Fact]
@@ -94,8 +93,8 @@ public sealed class TuiChannelAdapterTests
             .OfType<InboundMessage>()
             .ToList();
 
-        dispatchedMessages.Should().ContainSingle(m => m.Content == "hello world");
-        dispatchedMessages.Should().OnlyContain(m => !m.Metadata.ContainsKey("control"));
-        output.ToString().Should().NotContain("Steering queued");
+        dispatchedMessages.Where(m => m.Content == "hello world").ShouldHaveSingleItem();
+        dispatchedMessages.ShouldAllBe(m => !m.Metadata.ContainsKey("control"));
+        output.ToString().ShouldNotContain("Steering queued");
     }
 }

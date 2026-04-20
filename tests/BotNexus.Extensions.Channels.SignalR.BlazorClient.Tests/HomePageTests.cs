@@ -47,7 +47,7 @@ public sealed class HomePageTests : IDisposable
 
         var cut = _ctx.Render<Home>();
 
-        cut.FindAll(".text-muted").Should().BeEmpty();
+        cut.FindAll(".text-muted").ShouldBeEmpty();
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public sealed class HomePageTests : IDisposable
     {
         var cut = _ctx.Render<Home>();
 
-        cut.Find(".empty-state").TextContent.Should().Contain("Select an agent");
+        cut.Find(".empty-state").TextContent.ShouldContain("Select an agent");
     }
 
     // ── Agent list rendering ─────────────────────────────────────────────
@@ -70,9 +70,9 @@ public sealed class HomePageTests : IDisposable
         var cut = _ctx.Render<Home>();
 
         var agentNames = cut.FindAll(".agent-name");
-        agentNames.Should().HaveCount(2);
-        agentNames[0].TextContent.Should().Be("Nova");
-        agentNames[1].TextContent.Should().Be("Spark");
+        agentNames.Count().ShouldBe(2);
+        agentNames[0].TextContent.ShouldBe("Nova");
+        agentNames[1].TextContent.ShouldBe("Spark");
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public sealed class HomePageTests : IDisposable
 
         var cut = _ctx.Render<Home>();
 
-        cut.FindAll(".agent-node").Should().HaveCount(3);
+        cut.FindAll(".agent-node").Count().ShouldBe(3);
     }
 
     // ── Agent selection ──────────────────────────────────────────────────
@@ -98,13 +98,13 @@ public sealed class HomePageTests : IDisposable
         var cut = _ctx.Render<Home>();
 
         // Initially collapsed — no channel items
-        cut.FindAll(".agent-children").Should().BeEmpty();
+        cut.FindAll(".agent-children").ShouldBeEmpty();
 
         // Click to expand
         cut.Find(".agent-node-header").Click();
 
-        cut.FindAll(".agent-children").Should().NotBeEmpty();
-        cut.FindAll(".channel-item").Should().NotBeEmpty();
+        cut.FindAll(".agent-children").ShouldNotBeEmpty();
+        cut.FindAll(".channel-item").ShouldNotBeEmpty();
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public sealed class HomePageTests : IDisposable
         cut.Find(".channel-item").Click();
 
         // Should show the chat panel (not the empty state alone)
-        cut.FindAll(".chat-panel-wrapper.active").Should().NotBeEmpty();
+        cut.FindAll(".chat-panel-wrapper.active").ShouldNotBeEmpty();
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public sealed class HomePageTests : IDisposable
         cut.Find(".agent-node-header").Click();
         cut.Find(".channel-item").Click();
 
-        cut.Find(".agent-node.active").Should().NotBeNull();
+        cut.Find(".agent-node.active").ShouldNotBeNull();
     }
 
     // ── Unread badges ────────────────────────────────────────────────────
@@ -151,7 +151,7 @@ public sealed class HomePageTests : IDisposable
         var cut = _ctx.Render<Home>();
 
         var badge = cut.Find(".unread-badge");
-        badge.TextContent.Should().Be("3");
+        badge.TextContent.ShouldBe("3");
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public sealed class HomePageTests : IDisposable
 
         var cut = _ctx.Render<Home>();
 
-        cut.FindAll(".unread-badge").Should().BeEmpty();
+        cut.FindAll(".unread-badge").ShouldBeEmpty();
     }
 
     // ── Streaming dots ───────────────────────────────────────────────────
@@ -176,7 +176,7 @@ public sealed class HomePageTests : IDisposable
 
         var cut = _ctx.Render<Home>();
 
-        cut.Find(".agent-streaming-dot").Should().NotBeNull();
+        cut.Find(".agent-streaming-dot").ShouldNotBeNull();
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public sealed class HomePageTests : IDisposable
 
         var cut = _ctx.Render<Home>();
 
-        cut.FindAll(".agent-streaming-dot").Should().BeEmpty();
+        cut.FindAll(".agent-streaming-dot").ShouldBeEmpty();
     }
 
     // ── Connection status ────────────────────────────────────────────────
@@ -197,7 +197,7 @@ public sealed class HomePageTests : IDisposable
     {
         var cut = _ctx.Render<Home>();
 
-        cut.Find(".connection-indicator").Should().NotBeNull();
+        cut.Find(".connection-indicator").ShouldNotBeNull();
     }
 
     // ── Sidebar structure ────────────────────────────────────────────────
@@ -207,7 +207,7 @@ public sealed class HomePageTests : IDisposable
     {
         var cut = _ctx.Render<Home>();
 
-        cut.Find(".agent-list h3").TextContent.Should().Be("Agents");
+        cut.Find(".agent-list h3").TextContent.ShouldBe("Agents");
     }
 
     [Fact]
@@ -216,8 +216,8 @@ public sealed class HomePageTests : IDisposable
         var cut = _ctx.Render<Home>();
 
         var restartBtn = cut.Find(".restart-btn");
-        restartBtn.Should().NotBeNull();
-        restartBtn.TextContent.Should().Contain("Restart Gateway");
+        restartBtn.ShouldNotBeNull();
+        restartBtn.TextContent.ShouldContain("Restart Gateway");
     }
 
     // ── Main grid layout ─────────────────────────────────────────────────
@@ -227,9 +227,9 @@ public sealed class HomePageTests : IDisposable
     {
         var cut = _ctx.Render<Home>();
 
-        cut.Find(".main-grid").Should().NotBeNull();
-        cut.Find(".agent-list").Should().NotBeNull();
-        cut.Find(".chat-area").Should().NotBeNull();
+        cut.Find(".main-grid").ShouldNotBeNull();
+        cut.Find(".agent-list").ShouldNotBeNull();
+        cut.Find(".chat-area").ShouldNotBeNull();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

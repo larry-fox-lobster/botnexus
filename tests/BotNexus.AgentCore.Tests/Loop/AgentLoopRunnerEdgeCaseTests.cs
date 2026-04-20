@@ -4,7 +4,6 @@ using BotNexus.AgentCore.Tests.TestUtils;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Agent.Providers.Core;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.AgentCore.Tests.Loop;
 
@@ -52,8 +51,8 @@ public class AgentLoopRunnerEdgeCaseTests
             evt => { events.Add(evt); return Task.CompletedTask; },
             CancellationToken.None);
 
-        attempts.Should().BeGreaterThan(1, $"transient error '{errorMessage}' should trigger retry");
-        result.OfType<AssistantAgentMessage>().Should().Contain(m => m.Content == "recovered");
+        attempts.ShouldBeGreaterThan(1, $"transient error '{errorMessage}' should trigger retry");
+        result.OfType<AssistantAgentMessage>().ShouldContain(m => m.Content == "recovered");
     }
 
     [Theory]
@@ -80,8 +79,8 @@ public class AgentLoopRunnerEdgeCaseTests
             _ => Task.CompletedTask,
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
-        attempts.Should().Be(1, $"non-transient error '{errorMessage}' should not retry");
+        await act.ShouldThrowAsync<InvalidOperationException>();
+        attempts.ShouldBe(1, $"non-transient error '{errorMessage}' should not retry");
     }
 
     [Fact]
@@ -104,8 +103,8 @@ public class AgentLoopRunnerEdgeCaseTests
             _ => Task.CompletedTask,
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
-        attempts.Should().Be(4, "should exhaust all 4 retry attempts");
+        await act.ShouldThrowAsync<InvalidOperationException>();
+        attempts.ShouldBe(4, "should exhaust all 4 retry attempts");
     }
 
     // --- Context overflow compaction tests ---
@@ -136,8 +135,8 @@ public class AgentLoopRunnerEdgeCaseTests
             _ => Task.CompletedTask,
             CancellationToken.None);
 
-        attempts.Should().Be(2, "should retry after overflow compaction");
-        result.OfType<AssistantAgentMessage>().Should().Contain(m => m.Content == "after-compaction");
+        attempts.ShouldBe(2, "should retry after overflow compaction");
+        result.OfType<AssistantAgentMessage>().ShouldContain(m => m.Content == "after-compaction");
     }
 
     [Fact]
@@ -160,9 +159,9 @@ public class AgentLoopRunnerEdgeCaseTests
             _ => Task.CompletedTask,
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.ShouldThrowAsync<InvalidOperationException>();
         // First attempt triggers overflow, second attempt also overflows but recovery already used
-        attempts.Should().Be(2, "overflow recovery only happens once");
+        attempts.ShouldBe(2, "overflow recovery only happens once");
     }
 
     // --- ContinueAsync validation tests ---
@@ -175,8 +174,8 @@ public class AgentLoopRunnerEdgeCaseTests
 
         var act = () => AgentLoopRunner.ContinueAsync(context, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*no messages*");
+        var ex1 = await act.ShouldThrowAsync<InvalidOperationException>();
+        ex1.Message.ShouldContain("no messages");
     }
 
     [Fact]
@@ -192,8 +191,8 @@ public class AgentLoopRunnerEdgeCaseTests
 
         var act = () => AgentLoopRunner.ContinueAsync(context, config, _ => Task.CompletedTask, CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*last message is from the assistant*");
+        var ex2 = await act.ShouldThrowAsync<InvalidOperationException>();
+        ex2.Message.ShouldContain("last message is from the assistant");
     }
 
     // --- Cancellation tests ---
@@ -218,7 +217,7 @@ public class AgentLoopRunnerEdgeCaseTests
             _ => Task.CompletedTask,
             cts.Token);
 
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
     #region Helpers

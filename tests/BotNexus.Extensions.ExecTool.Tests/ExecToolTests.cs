@@ -4,7 +4,6 @@ using System.Text.Json;
 using BotNexus.Agent.Core.Types;
 using BotNexus.Extensions.ExecTool;
 using BotNexus.Agent.Providers.Core.Utilities;
-using FluentAssertions;
 using System.IO.Abstractions.TestingHelpers;
 
 namespace BotNexus.Extensions.ExecTool.Tests;
@@ -21,17 +20,17 @@ public class ExecToolTests : IDisposable
     [Fact]
     public void Name_ReturnsExec()
     {
-        _tool.Name.Should().Be("exec");
+        _tool.Name.ShouldBe("exec");
     }
 
     [Fact]
     public void Definition_HasRequiredCommandProperty()
     {
         var def = _tool.Definition;
-        def.Name.Should().Be("exec");
+        def.Name.ShouldBe("exec");
         def.Parameters.GetProperty("required").EnumerateArray()
             .Select(e => e.GetString())
-            .Should().Contain("command");
+            .ShouldContain("command");
     }
 
     [Fact]
@@ -42,7 +41,7 @@ public class ExecToolTests : IDisposable
         var result = await _tool.ExecuteAsync("test-1", args);
 
         var text = GetResultText(result);
-        text.Should().Contain("hello world");
+        text.ShouldContain("hello world");
     }
 
     [Fact]
@@ -57,12 +56,12 @@ public class ExecToolTests : IDisposable
         var result = await _tool.ExecuteAsync("test-exitcode", args);
 
         var text = GetResultText(result);
-        text.Should().Contain("42");
+        text.ShouldContain("42");
 
         var details = result.Details as ExecTool.ExecToolDetails;
-        details.Should().NotBeNull();
-        details!.ExitCode.Should().Be(42);
-        details.Termination.Should().Be("exit");
+        details.ShouldNotBeNull();
+        details!.ExitCode.ShouldBe(42);
+        details.Termination.ShouldBe("exit");
     }
 
     [Fact]
@@ -77,11 +76,11 @@ public class ExecToolTests : IDisposable
         var result = await _tool.ExecuteAsync("test-timeout", args);
 
         var text = GetResultText(result);
-        text.Should().Contain("timed out");
+        text.ShouldContain("timed out");
 
         var details = result.Details as ExecTool.ExecToolDetails;
-        details.Should().NotBeNull();
-        details!.Termination.Should().Be("timeout");
+        details.ShouldNotBeNull();
+        details!.Termination.ShouldBe("timeout");
     }
 
     [Fact]
@@ -99,13 +98,13 @@ public class ExecToolTests : IDisposable
         var json = JsonDocument.Parse(text);
         var pid = json.RootElement.GetProperty("pid").GetInt32();
         await WaitForProcessStartAsync(pid);
-        pid.Should().BeGreaterThan(0);
-        json.RootElement.GetProperty("status").GetString().Should().Be("running");
+        pid.ShouldBeGreaterThan(0);
+        json.RootElement.GetProperty("status").GetString().ShouldBe("running");
 
         var details = result.Details as ExecTool.ExecToolDetails;
-        details.Should().NotBeNull();
-        details!.Termination.Should().Be("background");
-        details.Pid.Should().BeGreaterThan(0);
+        details.ShouldNotBeNull();
+        details!.Termination.ShouldBe("background");
+        details.Pid!.Value.ShouldBeGreaterThan(0);
 
         // Cleanup: kill background process
         TryKillPid(details.Pid!.Value);
@@ -125,7 +124,7 @@ public class ExecToolTests : IDisposable
 
         var text = GetResultText(result);
         // Normalize both paths for comparison
-        text.Trim().ToLowerInvariant().Should().Contain(
+        text.Trim().ToLowerInvariant().ShouldContain(
             Path.GetFullPath(tempDir).TrimEnd(Path.DirectorySeparatorChar).ToLowerInvariant());
     }
 
@@ -141,7 +140,7 @@ public class ExecToolTests : IDisposable
         var result = await _tool.ExecuteAsync("test-stdin", args);
 
         var text = GetResultText(result);
-        text.Should().Contain("piped input line");
+        text.ShouldContain("piped input line");
     }
 
     [Fact]
@@ -153,8 +152,8 @@ public class ExecToolTests : IDisposable
         };
 
         var act = () => _tool.PrepareArgumentsAsync(args);
-        await act.Should().ThrowAsync<ArgumentException>()
-            .WithMessage("*at least one element*");
+        var ex = await Should.ThrowAsync<ArgumentException>(act);
+        ex.Message.ShouldContain("at least one element");
     }
 
     [Fact]
@@ -167,7 +166,7 @@ public class ExecToolTests : IDisposable
         };
 
         var act = () => _tool.PrepareArgumentsAsync(args);
-        await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+        await act.ShouldThrowAsync<ArgumentOutOfRangeException>();
     }
 
     [ConditionalFact(typeof(WindowsOnly))]
@@ -178,7 +177,7 @@ public class ExecToolTests : IDisposable
         var result = await _tool.ExecuteAsync("test-win-resolve", args);
 
         var text = GetResultText(result);
-        text.Should().Contain("cmd.exe");
+        text.ShouldContain("cmd.exe");
     }
 
     [Fact]
@@ -187,8 +186,8 @@ public class ExecToolTests : IDisposable
         if (IsWindows) return; // skip on Windows
 
         var (fileName, args) = ExecTool.ResolveCommand(["mycommand", "arg1", "arg2"]);
-        fileName.Should().Be("mycommand");
-        args.Should().BeEquivalentTo(["arg1", "arg2"]);
+        fileName.ShouldBe("mycommand");
+        args.ShouldBe(new[] { "arg1", "arg2" });
     }
 
     // --- Negative input / edge case tests ---
@@ -199,8 +198,8 @@ public class ExecToolTests : IDisposable
         var args = new Dictionary<string, object?>();
 
         var act = () => _tool.PrepareArgumentsAsync(args);
-        await act.Should().ThrowAsync<ArgumentException>()
-            .WithMessage("*command*");
+        var ex = await Should.ThrowAsync<ArgumentException>(act);
+        ex.Message.ShouldContain("command");
     }
 
     [Fact]
@@ -212,7 +211,7 @@ public class ExecToolTests : IDisposable
         };
 
         var act = () => _tool.PrepareArgumentsAsync(args);
-        await act.Should().ThrowAsync<ArgumentException>();
+        await act.ShouldThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -225,7 +224,7 @@ public class ExecToolTests : IDisposable
         };
 
         var act = () => _tool.PrepareArgumentsAsync(args);
-        await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+        await act.ShouldThrowAsync<ArgumentOutOfRangeException>();
     }
 
     [Fact]
@@ -238,7 +237,7 @@ public class ExecToolTests : IDisposable
         };
 
         var act = () => _tool.PrepareArgumentsAsync(args);
-        await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+        await act.ShouldThrowAsync<ArgumentOutOfRangeException>();
     }
 
     [Fact]
@@ -255,15 +254,14 @@ public class ExecToolTests : IDisposable
             var result = await _tool.ExecuteAsync("test-fail", args);
             var details = result.Details as ExecTool.ExecToolDetails;
             // If it doesn't throw, it should indicate failure
-            details.Should().NotBeNull();
-            details!.ExitCode.Should().NotBe(0);
+            details.ShouldNotBeNull();
+            details!.ExitCode.ShouldNotBe(0);
         }
         catch (Exception ex)
         {
             // System.ComponentModel.Win32Exception or InvalidOperationException
-            ex.Should().Match<Exception>(e =>
-                e is System.ComponentModel.Win32Exception ||
-                e is InvalidOperationException);
+            (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+                .ShouldBeTrue($"Expected Win32Exception or InvalidOperationException but got {ex.GetType().Name}");
         }
     }
 
@@ -289,7 +287,7 @@ public class ExecToolTests : IDisposable
         var result = await _tool.ExecuteAsync("test-env", dict);
 
         var text = GetResultText(result);
-        text.Should().Contain("hello_from_env");
+        text.ShouldContain("hello_from_env");
     }
 
     [Fact]
@@ -305,8 +303,8 @@ public class ExecToolTests : IDisposable
         var result = await _tool.ExecuteAsync("test-cancel", args, cts.Token);
 
         var details = result.Details as ExecTool.ExecToolDetails;
-        details.Should().NotBeNull();
-        details!.Termination.Should().Be("cancelled");
+        details.ShouldNotBeNull();
+        details!.Termination.ShouldBe("cancelled");
     }
 
     [Fact]
@@ -321,8 +319,8 @@ public class ExecToolTests : IDisposable
 
         var text = GetResultText(result);
         var details = result.Details as ExecTool.ExecToolDetails;
-        details.Should().NotBeNull();
-        details!.ExitCode.Should().Be(0);
+        details.ShouldNotBeNull();
+        details!.ExitCode.ShouldBe(0);
         // Should be either empty output indicator or whitespace
     }
 
@@ -337,8 +335,8 @@ public class ExecToolTests : IDisposable
         var result = await _tool.ExecuteAsync("test-stderr", args);
 
         var text = GetResultText(result);
-        text.Should().Contain("stdout_msg");
-        text.Should().Contain("stderr_msg");
+        text.ShouldContain("stdout_msg");
+        text.ShouldContain("stderr_msg");
     }
 
     [Fact]
@@ -349,10 +347,10 @@ public class ExecToolTests : IDisposable
 
         var prepared = await _tool.PrepareArgumentsAsync(parsed);
 
-        prepared.Should().ContainKey("command");
+        prepared.ShouldContainKey("command");
         var command = prepared["command"] as IReadOnlyList<string>;
-        command.Should().NotBeNull();
-        command.Should().BeEquivalentTo(["echo", "hello"]);
+        command.ShouldNotBeNull();
+        command.ShouldBe(new[] { "echo", "hello" });
     }
 
     #region Helpers
@@ -390,7 +388,7 @@ public class ExecToolTests : IDisposable
 
     private static string GetResultText(AgentToolResult result)
     {
-        result.Content.Should().NotBeEmpty();
+        result.Content.ShouldNotBeEmpty();
         return result.Content[0].Value;
     }
 
@@ -429,7 +427,7 @@ public class ExecToolTests : IDisposable
         }
 
         using var finalProcess = Process.GetProcessById(pid);
-        finalProcess.HasExited.Should().BeFalse();
+        finalProcess.HasExited.ShouldBeFalse();
     }
 
     #endregion

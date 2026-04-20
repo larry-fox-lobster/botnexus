@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Abstractions.Security;
 using BotNexus.Gateway.Api;
 using BotNexus.Gateway.Security;
-using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -34,8 +33,8 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        nextCalled.Should().BeTrue();
-        context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+        nextCalled.ShouldBeTrue();
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
     }
 
     [Fact]
@@ -54,7 +53,7 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
     }
 
     [Fact]
@@ -74,7 +73,7 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
     }
 
     [Fact]
@@ -97,7 +96,7 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        nextCalled.Should().BeTrue();
+        nextCalled.ShouldBeTrue();
     }
 
     [Theory]
@@ -122,7 +121,7 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        nextCalled.Should().BeTrue();
+        nextCalled.ShouldBeTrue();
     }
 
     [Fact]
@@ -156,7 +155,7 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        nextCalled.Should().BeTrue();
+        nextCalled.ShouldBeTrue();
     }
 
     [Fact]
@@ -173,7 +172,7 @@ public sealed class GatewayAuthMiddlewareTests
 
         var result = await handler.AuthenticateAsync(context);
 
-        result.IsAuthenticated.Should().BeTrue();
+        result.IsAuthenticated.ShouldBeTrue();
     }
 
     [Fact]
@@ -193,7 +192,7 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
     }
 
     [Fact]
@@ -217,8 +216,8 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        nextCalled.Should().BeFalse();
-        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        nextCalled.ShouldBeFalse();
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
     }
 
     [Theory]
@@ -246,8 +245,8 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        nextCalled.Should().BeFalse();
-        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        nextCalled.ShouldBeFalse();
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
     }
 
     [Theory]
@@ -272,7 +271,7 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        nextCalled.Should().BeTrue();
+        nextCalled.ShouldBeTrue();
     }
 
     [Fact]
@@ -290,7 +289,7 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
     }
 
     [Fact]
@@ -305,13 +304,13 @@ public sealed class GatewayAuthMiddlewareTests
 
         var context = new DefaultHttpContext();
         var requestFeature = context.Features.Get<IHttpRequestFeature>();
-        requestFeature.Should().NotBeNull();
+        requestFeature.ShouldNotBeNull();
         requestFeature!.Path = null!;
         context.Response.Body = new MemoryStream();
 
         await middleware.InvokeAsync(context);
 
-        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
     }
 
     [Fact]
@@ -334,7 +333,7 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
         fileProvider.Verify(provider => provider.GetFileInfo(It.IsAny<string>()), Times.Never);
     }
 
@@ -358,7 +357,7 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
         fileProvider.Verify(provider => provider.GetFileInfo(It.IsAny<string>()), Times.Never);
     }
 
@@ -393,7 +392,7 @@ public sealed class GatewayAuthMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        nextCalled.Should().BeTrue();
+        nextCalled.ShouldBeTrue();
     }
 
     private static IWebHostEnvironment CreateWebHostEnvironment()

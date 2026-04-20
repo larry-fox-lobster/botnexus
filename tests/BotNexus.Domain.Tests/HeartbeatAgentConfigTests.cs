@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Gateway.Abstractions.Models;
-using FluentAssertions;
 
 namespace BotNexus.Domain.Tests;
 
@@ -11,10 +10,10 @@ public sealed class HeartbeatAgentConfigTests
     {
         var config = new HeartbeatAgentConfig();
 
-        config.IntervalMinutes.Should().Be(30);
-        config.QuietHours.Should().BeNull();
-        config.Prompt.Should().BeNull();
-        config.Enabled.Should().BeFalse();
+        config.IntervalMinutes.ShouldBe(30);
+        config.QuietHours.ShouldBeNull();
+        config.Prompt.ShouldBeNull();
+        config.Enabled.ShouldBeFalse();
     }
 
     [Fact]
@@ -22,9 +21,9 @@ public sealed class HeartbeatAgentConfigTests
     {
         var config = new QuietHoursConfig();
 
-        config.Start.Should().Be("23:00");
-        config.End.Should().Be("07:00");
-        config.Enabled.Should().BeFalse();
+        config.Start.ShouldBe("23:00");
+        config.End.ShouldBe("07:00");
+        config.Enabled.ShouldBeFalse();
     }
 
     [Fact]
@@ -47,14 +46,14 @@ public sealed class HeartbeatAgentConfigTests
         var json = JsonSerializer.Serialize(original);
         var roundTrip = JsonSerializer.Deserialize<HeartbeatAgentConfig>(json);
 
-        roundTrip.Should().NotBeNull();
-        roundTrip!.Enabled.Should().BeTrue();
-        roundTrip.IntervalMinutes.Should().Be(15);
-        roundTrip.Prompt.Should().Be("Check heartbeat");
-        roundTrip.QuietHours.Should().NotBeNull();
-        roundTrip.QuietHours!.Enabled.Should().BeTrue();
-        roundTrip.QuietHours.Start.Should().Be("22:30");
-        roundTrip.QuietHours.End.Should().Be("06:45");
-        roundTrip.QuietHours.Timezone.Should().Be("UTC");
+        roundTrip.ShouldNotBeNull();
+        roundTrip!.Enabled.ShouldBeTrue();
+        roundTrip.IntervalMinutes.ShouldBe(15);
+        roundTrip.Prompt.ShouldBe("Check heartbeat");
+        roundTrip.QuietHours.ShouldNotBeNull();
+        roundTrip.QuietHours!.Enabled.ShouldBeTrue();
+        roundTrip.QuietHours.Start.ShouldBe("22:30");
+        roundTrip.QuietHours.End.ShouldBe("06:45");
+        roundTrip.QuietHours.Timezone.ShouldBe("UTC");
     }
 }

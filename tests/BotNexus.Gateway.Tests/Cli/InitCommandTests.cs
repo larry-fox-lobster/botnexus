@@ -1,4 +1,3 @@
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Cli;
 
@@ -11,17 +10,17 @@ public sealed class InitCommandTests
 
         var result = await fixture.RunCliAsync("init");
 
-        result.ExitCode.Should().Be(0);
-        File.Exists(fixture.ConfigPath).Should().BeTrue();
-        Directory.Exists(Path.Combine(fixture.RootPath, "extensions")).Should().BeTrue();
-        Directory.Exists(Path.Combine(fixture.RootPath, "tokens")).Should().BeTrue();
-        Directory.Exists(Path.Combine(fixture.RootPath, "sessions")).Should().BeTrue();
-        Directory.Exists(Path.Combine(fixture.RootPath, "logs")).Should().BeTrue();
-        Directory.Exists(Path.Combine(fixture.RootPath, "agents")).Should().BeTrue();
+        result.ExitCode.ShouldBe(0);
+        File.Exists(fixture.ConfigPath).ShouldBeTrue();
+        Directory.Exists(Path.Combine(fixture.RootPath, "extensions")).ShouldBeTrue();
+        Directory.Exists(Path.Combine(fixture.RootPath, "tokens")).ShouldBeTrue();
+        Directory.Exists(Path.Combine(fixture.RootPath, "sessions")).ShouldBeTrue();
+        Directory.Exists(Path.Combine(fixture.RootPath, "logs")).ShouldBeTrue();
+        Directory.Exists(Path.Combine(fixture.RootPath, "agents")).ShouldBeTrue();
 
         var config = await fixture.LoadConfigAsync();
-        config.Agents.Should().ContainKey("assistant");
-        config.Agents!["assistant"].Provider.Should().Be("copilot");
+        config.Agents.ShouldContainKey("assistant");
+        config.Agents!["assistant"].Provider.ShouldBe("copilot");
     }
 
     [Fact]
@@ -32,9 +31,9 @@ public sealed class InitCommandTests
         var result = await fixture.RunCliAsync("init");
         var config = await fixture.LoadConfigAsync();
 
-        result.ExitCode.Should().Be(0);
-        result.CombinedOutput.Should().Contain("Use --force to overwrite");
-        config.Gateway?.ListenUrl.Should().Be("http://localhost:5999");
+        result.ExitCode.ShouldBe(0);
+        result.CombinedOutput.ShouldContain("Use --force to overwrite");
+        config.Gateway?.ListenUrl.ShouldBe("http://localhost:5999");
     }
 
     [Fact]
@@ -45,9 +44,9 @@ public sealed class InitCommandTests
         var result = await fixture.RunCliAsync("init", "--force");
         var config = await fixture.LoadConfigAsync();
 
-        result.ExitCode.Should().Be(0);
-        config.Gateway?.ListenUrl.Should().Be("http://localhost:5005");
-        config.Agents.Should().ContainKey("assistant");
+        result.ExitCode.ShouldBe(0);
+        config.Gateway?.ListenUrl.ShouldBe("http://localhost:5005");
+        config.Agents.ShouldContainKey("assistant");
     }
 }
 

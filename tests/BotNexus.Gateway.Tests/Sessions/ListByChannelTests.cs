@@ -2,7 +2,6 @@ using System.Reflection;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Sessions;
-using FluentAssertions;
 
 namespace BotNexus.Gateway.Tests.Sessions;
 
@@ -18,7 +17,7 @@ public sealed class ListByChannelTests
 
         var sessions = await InvokeListByChannelAsync(store, "agent-a", ChannelKey.From("web"));
 
-        sessions.Select(s => s.SessionId.Value).Should().BeEquivalentTo(["match"]);
+        sessions.Select(s => s.SessionId.Value).ShouldBe(new[] { "match" });
     }
 
     [Fact]
@@ -31,8 +30,8 @@ public sealed class ListByChannelTests
 
         var sessions = await InvokeListByChannelAsync(store, "agent-a", ChannelKey.From("web"));
 
-        sessions.Select(s => s.SessionId.Value).Should().ContainInOrder("newest", "middle", "oldest");
-        sessions.Select(s => s.CreatedAt).Should().BeInDescendingOrder();
+        sessions.Select(s => s.SessionId.Value).ToList().ShouldBe(new[] { "newest", "middle", "oldest" });
+        sessions.Select(s => s.CreatedAt).ShouldBeInOrder(SortDirection.Descending);
     }
 
     [Fact]
@@ -44,7 +43,7 @@ public sealed class ListByChannelTests
 
         var sessions = await InvokeListByChannelAsync(store, "agent-a", ChannelKey.From("web"));
 
-        sessions.Select(s => s.SessionId.Value).Should().BeEquivalentTo(["web"]);
+        sessions.Select(s => s.SessionId.Value).ShouldBe(new[] { "web" });
     }
 
     private static async Task SaveSessionAsync(
@@ -76,17 +75,17 @@ public sealed class ListByChannelTests
             BindingFlags.Instance | BindingFlags.Public,
             [typeof(BotNexus.Domain.Primitives.AgentId), typeof(ChannelKey), typeof(CancellationToken)]);
 
-        method.Should().NotBeNull("ListByChannelAsync must exist on session store implementations.");
+        method.ShouldNotBeNull("ListByChannelAsync must exist on session store implementations.");
         var invocationResult = method!.Invoke(store, [BotNexus.Domain.Primitives.AgentId.From(agentId), channelType, CancellationToken.None]);
-        invocationResult.Should().BeAssignableTo<Task>();
+        invocationResult.ShouldBeAssignableTo<Task>();
 
         var task = (Task)invocationResult!;
         await task;
 
         var resultProperty = task.GetType().GetProperty("Result");
-        resultProperty.Should().NotBeNull();
+        resultProperty.ShouldNotBeNull();
         var sessions = resultProperty!.GetValue(task) as IReadOnlyList<GatewaySession>;
-        sessions.Should().NotBeNull();
+        sessions.ShouldNotBeNull();
         return sessions!;
     }
 }

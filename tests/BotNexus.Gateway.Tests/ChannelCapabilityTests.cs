@@ -4,7 +4,6 @@ using BotNexus.Extensions.Channels.Tui;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Extensions.Channels.SignalR;
-using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -20,10 +19,10 @@ public sealed class ChannelCapabilityTests
     {
         var adapter = new TestChannelAdapter();
 
-        adapter.SupportsSteering.Should().BeFalse();
-        adapter.SupportsFollowUp.Should().BeFalse();
-        adapter.SupportsThinkingDisplay.Should().BeFalse();
-        adapter.SupportsToolDisplay.Should().BeFalse();
+        adapter.SupportsSteering.ShouldBeFalse();
+        adapter.SupportsFollowUp.ShouldBeFalse();
+        adapter.SupportsThinkingDisplay.ShouldBeFalse();
+        adapter.SupportsToolDisplay.ShouldBeFalse();
     }
 
     [Fact]
@@ -31,11 +30,11 @@ public sealed class ChannelCapabilityTests
     {
         var adapter = new TuiChannelAdapter(NullLogger<TuiChannelAdapter>.Instance);
 
-        adapter.SupportsSteering.Should().BeTrue();
-        adapter.SupportsFollowUp.Should().BeFalse();
-        adapter.SupportsThinkingDisplay.Should().BeTrue();
-        adapter.SupportsToolDisplay.Should().BeTrue();
-        adapter.Should().BeAssignableTo<IStreamEventChannelAdapter>();
+        adapter.SupportsSteering.ShouldBeTrue();
+        adapter.SupportsFollowUp.ShouldBeFalse();
+        adapter.SupportsThinkingDisplay.ShouldBeTrue();
+        adapter.SupportsToolDisplay.ShouldBeTrue();
+        adapter.ShouldBeAssignableTo<IStreamEventChannelAdapter>();
     }
 
     [Fact]
@@ -45,12 +44,12 @@ public sealed class ChannelCapabilityTests
             NullLogger<SignalRChannelAdapter>.Instance,
             Mock.Of<IHubContext<GatewayHub, IGatewayHubClient>>());
 
-        adapter.SupportsStreaming.Should().BeTrue();
-        adapter.SupportsSteering.Should().BeTrue();
-        adapter.SupportsFollowUp.Should().BeTrue();
-        adapter.SupportsThinkingDisplay.Should().BeTrue();
-        adapter.SupportsToolDisplay.Should().BeTrue();
-        adapter.Should().BeAssignableTo<IStreamEventChannelAdapter>();
+        adapter.SupportsStreaming.ShouldBeTrue();
+        adapter.SupportsSteering.ShouldBeTrue();
+        adapter.SupportsFollowUp.ShouldBeTrue();
+        adapter.SupportsThinkingDisplay.ShouldBeTrue();
+        adapter.SupportsToolDisplay.ShouldBeTrue();
+        adapter.ShouldBeAssignableTo<IStreamEventChannelAdapter>();
     }
 
     [Fact]
@@ -67,12 +66,12 @@ public sealed class ChannelCapabilityTests
             options,
             apiClient);
 
-        adapter.SupportsStreaming.Should().BeTrue();
-        adapter.SupportsSteering.Should().BeFalse();
-        adapter.SupportsFollowUp.Should().BeFalse();
-        adapter.SupportsThinkingDisplay.Should().BeTrue();
-        adapter.SupportsToolDisplay.Should().BeTrue();
-        adapter.Should().BeAssignableTo<IStreamEventChannelAdapter>();
+        adapter.SupportsStreaming.ShouldBeTrue();
+        adapter.SupportsSteering.ShouldBeFalse();
+        adapter.SupportsFollowUp.ShouldBeFalse();
+        adapter.SupportsThinkingDisplay.ShouldBeTrue();
+        adapter.SupportsToolDisplay.ShouldBeTrue();
+        adapter.ShouldBeAssignableTo<IStreamEventChannelAdapter>();
     }
 
     [Fact]
@@ -80,10 +79,10 @@ public sealed class ChannelCapabilityTests
     {
         IChannelAdapter adapter = new TuiChannelAdapter(NullLogger<TuiChannelAdapter>.Instance);
 
-        adapter.SupportsSteering.Should().BeTrue();
-        adapter.SupportsFollowUp.Should().BeFalse();
-        adapter.SupportsThinkingDisplay.Should().BeTrue();
-        adapter.SupportsToolDisplay.Should().BeTrue();
+        adapter.SupportsSteering.ShouldBeTrue();
+        adapter.SupportsFollowUp.ShouldBeFalse();
+        adapter.SupportsThinkingDisplay.ShouldBeTrue();
+        adapter.SupportsToolDisplay.ShouldBeTrue();
     }
 
     private sealed class TestChannelAdapter : ChannelAdapterBase

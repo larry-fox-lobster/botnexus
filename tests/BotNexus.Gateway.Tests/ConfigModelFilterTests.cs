@@ -1,7 +1,6 @@
 using BotNexus.Gateway.Configuration;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
-using FluentAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -19,7 +18,7 @@ public sealed class ConfigModelFilterTests
 
         var providers = filter.GetProviders();
 
-        providers.Should().Equal("anthropic", "openai");
+        providers.ShouldBe(new[] { "anthropic", "openai" });
     }
 
     [Fact]
@@ -40,7 +39,7 @@ public sealed class ConfigModelFilterTests
 
         var providers = filter.GetProviders();
 
-        providers.Should().Equal("anthropic", "github-copilot");
+        providers.ShouldBe(new[] { "anthropic", "github-copilot" });
     }
 
     [Fact]
@@ -59,7 +58,7 @@ public sealed class ConfigModelFilterTests
 
         var models = filter.GetModels("openai");
 
-        models.Select(model => model.Id).Should().BeEquivalentTo(["gpt-4o", "gpt-4.1"]);
+        models.Select(model => model.Id).OrderBy(id => id).ShouldBe(new[] { "gpt-4.1", "gpt-4o" });
     }
 
     [Fact]
@@ -78,7 +77,7 @@ public sealed class ConfigModelFilterTests
 
         var models = filter.GetModels("openai");
 
-        models.Select(model => model.Id).Should().Equal("gpt-4o");
+        models.ShouldHaveSingleItem().Id.ShouldBe("gpt-4o");
     }
 
     [Fact]
@@ -91,7 +90,7 @@ public sealed class ConfigModelFilterTests
 
         var models = filter.GetModelsForAgent("openai", []);
 
-        models.Select(model => model.Id).Should().BeEquivalentTo(["gpt-4o", "gpt-4.1"]);
+        models.Select(model => model.Id).OrderBy(id => id).ShouldBe(new[] { "gpt-4.1", "gpt-4o" });
     }
 
     [Fact]
@@ -104,7 +103,7 @@ public sealed class ConfigModelFilterTests
 
         var models = filter.GetModelsForAgent("openai", ["GPT-4.1"]);
 
-        models.Select(model => model.Id).Should().Equal("gpt-4.1");
+        models.ShouldHaveSingleItem().Id.ShouldBe("gpt-4.1");
     }
 
     private static ConfigModelFilter CreateFilter(ModelRegistry registry, PlatformConfig config)

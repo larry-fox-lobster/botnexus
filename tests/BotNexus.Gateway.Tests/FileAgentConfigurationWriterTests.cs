@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 
@@ -30,9 +29,9 @@ public sealed class FileAgentConfigurationWriterTests : IDisposable
         await writer.SaveAsync(descriptor);
 
         var configPath = Path.Combine(_configDirectory, "nova.json");
-        _fileSystem.File.Exists(configPath).Should().BeTrue();
-        _fileSystem.Directory.Exists(Path.Combine(_home.AgentsPath, "nova")).Should().BeTrue();
-        _fileSystem.File.Exists(Path.Combine(_home.AgentsPath, "nova", "workspace", "SOUL.md")).Should().BeTrue();
+        _fileSystem.File.Exists(configPath).ShouldBeTrue();
+        _fileSystem.Directory.Exists(Path.Combine(_home.AgentsPath, "nova")).ShouldBeTrue();
+        _fileSystem.File.Exists(Path.Combine(_home.AgentsPath, "nova", "workspace", "SOUL.md")).ShouldBeTrue();
     }
 
     [Fact]
@@ -50,11 +49,11 @@ public sealed class FileAgentConfigurationWriterTests : IDisposable
         await writer.SaveAsync(descriptor);
 
         var json = await _fileSystem.File.ReadAllTextAsync(Path.Combine(_configDirectory, "nova.json"));
-        json.Should().Contain("\"agentId\": \"nova\"");
-        json.Should().Contain("\"subAgentIds\": [");
-        json.Should().Contain("\"toolIds\": [");
-        json.Should().NotContain("\"description\"");
-        json.Should().NotContain("\"systemPromptFile\"");
+        json.ShouldContain("\"agentId\": \"nova\"");
+        json.ShouldContain("\"subAgentIds\": [");
+        json.ShouldContain("\"toolIds\": [");
+        json.ShouldNotContain("\"description\"");
+        json.ShouldNotContain("\"systemPromptFile\"");
     }
 
     [Fact]
@@ -65,7 +64,7 @@ public sealed class FileAgentConfigurationWriterTests : IDisposable
 
         await writer.DeleteAsync("nova");
 
-        _fileSystem.File.Exists(Path.Combine(_configDirectory, "nova.json")).Should().BeFalse();
+        _fileSystem.File.Exists(Path.Combine(_configDirectory, "nova.json")).ShouldBeFalse();
     }
 
     [Fact]
@@ -84,14 +83,14 @@ public sealed class FileAgentConfigurationWriterTests : IDisposable
             _configDirectory,
             new NullLogger<FileAgentConfigurationSource>(),
             _fileSystem);
-        var loaded = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var loaded = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        loaded.AgentId.Should().Be(descriptor.AgentId);
-        loaded.DisplayName.Should().Be(descriptor.DisplayName);
-        loaded.ModelId.Should().Be(descriptor.ModelId);
-        loaded.ApiProvider.Should().Be(descriptor.ApiProvider);
-        loaded.Metadata["owner"].Should().Be("gateway");
-        loaded.IsolationOptions["timeoutMs"].Should().Be(1000L);
+        loaded.AgentId.ShouldBe(descriptor.AgentId);
+        loaded.DisplayName.ShouldBe(descriptor.DisplayName);
+        loaded.ModelId.ShouldBe(descriptor.ModelId);
+        loaded.ApiProvider.ShouldBe(descriptor.ApiProvider);
+        loaded.Metadata["owner"].ShouldBe("gateway");
+        loaded.IsolationOptions["timeoutMs"].ShouldBe(1000L);
     }
 
     public void Dispose() { }

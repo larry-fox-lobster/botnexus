@@ -1,6 +1,5 @@
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Configuration;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
@@ -27,7 +26,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
 
         var descriptors = await source.LoadAsync();
 
-        descriptors.Should().BeEmpty();
+        descriptors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -62,24 +61,24 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
 
         var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>(), _fileSystem);
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.AgentId.Should().Be("agent-a");
-        descriptor.DisplayName.Should().Be("Agent A");
-        descriptor.Description.Should().Be("Primary agent");
-        descriptor.ModelId.Should().Be("model-x");
-        descriptor.ApiProvider.Should().Be("provider-x");
-        descriptor.SystemPrompt.Should().Be("Be concise");
-        descriptor.ToolIds.Should().Equal("tool-1", "tool-2");
-        descriptor.IsolationStrategy.Should().Be("process");
-        descriptor.MaxConcurrentSessions.Should().Be(3);
-        descriptor.Metadata["owner"].Should().Be("gateway");
-        descriptor.Metadata["priority"].Should().Be(7L);
-        descriptor.Metadata["enabled"].Should().Be(true);
-        ((object?[])descriptor.Metadata["labels"]!).Should().Equal("alpha", "beta");
-        ((IReadOnlyDictionary<string, object?>)descriptor.Metadata["nested"]!)["kind"].Should().Be("test");
-        descriptor.IsolationOptions["timeoutMs"].Should().Be(2500L);
-        descriptor.IsolationOptions["sandbox"].Should().Be(false);
+        descriptor.AgentId.Value.ShouldBe("agent-a");
+        descriptor.DisplayName.ShouldBe("Agent A");
+        descriptor.Description.ShouldBe("Primary agent");
+        descriptor.ModelId.ShouldBe("model-x");
+        descriptor.ApiProvider.ShouldBe("provider-x");
+        descriptor.SystemPrompt.ShouldBe("Be concise");
+        descriptor.ToolIds.ShouldBe(new[] { "tool-1", "tool-2" });
+        descriptor.IsolationStrategy.ShouldBe("process");
+        descriptor.MaxConcurrentSessions.ShouldBe(3);
+        descriptor.Metadata["owner"].ShouldBe("gateway");
+        descriptor.Metadata["priority"].ShouldBe(7L);
+        descriptor.Metadata["enabled"].ShouldBe(true);
+        ((object?[])descriptor.Metadata["labels"]!).ShouldBe(new[] { "alpha", "beta" });
+        ((IReadOnlyDictionary<string, object?>)descriptor.Metadata["nested"]!)["kind"].ShouldBe("test");
+        descriptor.IsolationOptions["timeoutMs"].ShouldBe(2500L);
+        descriptor.IsolationOptions["sandbox"].ShouldBe(false);
     }
 
     [Fact]
@@ -103,12 +102,12 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
 
         var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>(), _fileSystem);
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.FileAccess.Should().NotBeNull();
-        descriptor.FileAccess!.AllowedReadPaths.Should().Equal(@"Q:\repos\botnexus\docs");
-        descriptor.FileAccess.AllowedWritePaths.Should().Equal(@"Q:\repos\botnexus\artifacts");
-        descriptor.FileAccess.DeniedPaths.Should().Equal(@"Q:\repos\botnexus\docs\secrets");
+        descriptor.FileAccess.ShouldNotBeNull();
+        descriptor.FileAccess!.AllowedReadPaths.ShouldHaveSingleItem().ShouldBe(@"Q:\repos\botnexus\docs");
+        descriptor.FileAccess.AllowedWritePaths.ShouldHaveSingleItem().ShouldBe(@"Q:\repos\botnexus\artifacts");
+        descriptor.FileAccess.DeniedPaths.ShouldHaveSingleItem().ShouldBe(@"Q:\repos\botnexus\docs\secrets");
     }
 
     [Fact]
@@ -131,10 +130,10 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
 
         var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>(), _fileSystem);
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.SystemPrompt.Should().Be("Prompt from file");
-        descriptor.SystemPromptFile.Should().BeNull();
+        descriptor.SystemPrompt.ShouldBe("Prompt from file");
+        descriptor.SystemPromptFile.ShouldBeNull();
     }
 
     [Fact]
@@ -157,8 +156,8 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
 
         var descriptors = await source.LoadAsync();
 
-        descriptors.Should().BeEmpty();
-        logger.Entries.Should().Contain(e =>
+        descriptors.ShouldBeEmpty();
+        logger.Entries.ShouldContain(e =>
             e.Level == LogLevel.Warning &&
             e.Message.Contains("Path traversal blocked", StringComparison.Ordinal));
     }
@@ -190,8 +189,8 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
 
             var descriptors = await source.LoadAsync();
 
-            descriptors.Should().BeEmpty();
-            logger.Entries.Should().Contain(e =>
+            descriptors.ShouldBeEmpty();
+            logger.Entries.ShouldContain(e =>
                 e.Level == LogLevel.Warning &&
                 e.Message.Contains("Path traversal blocked", StringComparison.Ordinal));
         }
@@ -223,10 +222,10 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
 
         var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>(), _fileSystem);
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.SystemPrompt.Should().Be("Absolute prompt from file");
-        descriptor.SystemPromptFile.Should().BeNull();
+        descriptor.SystemPrompt.ShouldBe("Absolute prompt from file");
+        descriptor.SystemPromptFile.ShouldBeNull();
     }
 
     [Fact]
@@ -249,8 +248,8 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
 
         var descriptors = await source.LoadAsync();
 
-        descriptors.Should().ContainSingle(d => d.AgentId == "good");
-        logger.Entries.Should().Contain(e =>
+        descriptors.Where(d => d.AgentId == "good").ShouldHaveSingleItem();
+        logger.Entries.ShouldContain(e =>
             e.Level == LogLevel.Warning &&
             e.Message.Contains("Skipping malformed agent config file", StringComparison.Ordinal));
     }
@@ -273,8 +272,8 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
 
         var descriptors = await source.LoadAsync();
 
-        descriptors.Should().BeEmpty();
-        logger.Entries.Should().Contain(e =>
+        descriptors.ShouldBeEmpty();
+        logger.Entries.ShouldContain(e =>
             e.Level == LogLevel.Warning &&
             e.Message.Contains("Failed to load agent config file", StringComparison.Ordinal));
     }
@@ -297,9 +296,9 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
 
         var source = new FileAgentConfigurationSource(_directoryPath, new ListLogger<FileAgentConfigurationSource>(), _fileSystem);
 
-        var descriptor = (await source.LoadAsync()).Should().ContainSingle().Subject;
+        var descriptor = (await source.LoadAsync()).ShouldHaveSingleItem();
 
-        descriptor.SubAgentIds.Should().Equal("child-1", "child-2", "child-3");
+        descriptor.SubAgentIds.ShouldBe(new[] { "child-1", "child-2", "child-3" });
     }
 
     [Fact]
@@ -313,7 +312,7 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
         {
             var watcher = source.Watch(_ => { });
 
-            watcher.Should().NotBeNull();
+            watcher.ShouldNotBeNull();
             watcher!.Dispose();
         }
         finally
@@ -350,9 +349,9 @@ public sealed class FileAgentConfigurationSourceTests : IDisposable
 
             var completed = await Task.WhenAny(callback.Task, Task.Delay(TimeSpan.FromSeconds(10)));
 
-            completed.Should().Be(callback.Task);
+            completed.ShouldBe(callback.Task);
             var descriptors = await callback.Task;
-            descriptors.Should().ContainSingle(d => d.AgentId == "agent-a");
+            descriptors.Where(d => d.AgentId == "agent-a").ShouldHaveSingleItem();
         }
         finally
         {

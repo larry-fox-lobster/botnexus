@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BotNexus.Domain.Primitives;
-using FluentAssertions;
 
 namespace BotNexus.Domain.Tests;
 
@@ -9,21 +8,21 @@ public sealed class SessionStatusTests
     [Fact]
     public void SessionStatus_KnownValues_WhenAccessed_ShouldExist()
     {
-        SessionStatus.Active.Value.Should().Be("active");
+        SessionStatus.Active.Value.ShouldBe("active");
     }
 
     [Fact]
     public void SessionStatus_FromString_WhenValueIsKnown_ShouldReturnKnownInstance()
     {
         var status = SessionStatus.FromString("ACTIVE");
-        status.Should().BeSameAs(SessionStatus.Active);
+        status.ShouldBeSameAs(SessionStatus.Active);
     }
 
     [Fact]
     public void SessionStatus_FromString_WhenValueIsUnknown_ShouldCreateExtensibleInstance()
     {
         var status = SessionStatus.FromString("paused-for-maintenance");
-        status.Value.Should().Be("paused-for-maintenance");
+        status.Value.ShouldBe("paused-for-maintenance");
     }
 
     [Fact]
@@ -31,14 +30,14 @@ public sealed class SessionStatusTests
     {
         var first = SessionStatus.FromString("CUSTOM-STATUS");
         var second = SessionStatus.FromString("custom-status");
-        first.Should().BeSameAs(second);
+        first.ShouldBeSameAs(second);
     }
 
     [Fact]
     public void SessionStatus_ImplicitConversion_WhenConvertedToString_ShouldReturnValue()
     {
         string value = SessionStatus.Sealed;
-        value.Should().Be("sealed");
+        value.ShouldBe("sealed");
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public sealed class SessionStatusTests
     {
         var left = SessionStatus.FromString("suspended");
         var right = SessionStatus.Suspended;
-        left.Should().Be(right);
+        left.ShouldBe(right);
     }
 
     [Fact]
@@ -54,14 +53,14 @@ public sealed class SessionStatusTests
     {
         var left = SessionStatus.Active;
         var right = SessionStatus.Sealed;
-        left.Should().NotBe(right);
+        left.ShouldNotBe(right);
     }
 
     [Fact]
     public void SessionStatus_JsonRoundTrip_WhenSerializedAndDeserialized_ShouldBeEqual()
     {
         var roundTrip = JsonSerializer.Deserialize<SessionStatus>(JsonSerializer.Serialize(SessionStatus.Suspended));
-        roundTrip.Should().Be(SessionStatus.Suspended);
+        roundTrip.ShouldBe(SessionStatus.Suspended);
     }
 
     [Fact]
@@ -71,6 +70,6 @@ public sealed class SessionStatusTests
             .Select(_ => Task.Run(() => SessionStatus.FromString("thread-status")))
             .ToArray();
         var results = await Task.WhenAll(tasks);
-        results.Distinct().Should().HaveCount(1);
+        results.Distinct().Count().ShouldBe(1);
     }
 }

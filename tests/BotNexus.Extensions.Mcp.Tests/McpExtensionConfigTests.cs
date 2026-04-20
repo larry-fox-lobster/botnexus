@@ -1,5 +1,4 @@
 using System.Text.Json;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Mcp.Tests;
 
@@ -30,31 +29,31 @@ public class McpExtensionConfigTests
 
         var config = JsonSerializer.Deserialize<McpExtensionConfig>(json);
 
-        config.Should().NotBeNull();
-        config!.Servers.Should().HaveCount(2);
-        config.ToolPrefix.Should().BeTrue();
+        config.ShouldNotBeNull();
+        config!.Servers.Count().ShouldBe(2);
+        config.ToolPrefix.ShouldBeTrue();
 
-        config.Servers["github"].Command.Should().Be("npx");
-        config.Servers["github"].Args.Should().Contain("-y");
-        config.Servers["github"].Env.Should().ContainKey("GITHUB_TOKEN");
+        config.Servers["github"].Command.ShouldBe("npx");
+        config.Servers["github"].Args.ShouldContain("-y");
+        config.Servers["github"].Env.ShouldContainKey("GITHUB_TOKEN");
 
-        config.Servers["filesystem"].Command.Should().Be("node");
-        config.Servers["filesystem"].WorkingDirectory.Should().Be("/opt/mcp");
+        config.Servers["filesystem"].Command.ShouldBe("node");
+        config.Servers["filesystem"].WorkingDirectory.ShouldBe("/opt/mcp");
     }
 
     [Fact]
     public void Defaults_ToolPrefixToTrue()
     {
         var config = new McpExtensionConfig();
-        config.ToolPrefix.Should().BeTrue();
+        config.ToolPrefix.ShouldBeTrue();
     }
 
     [Fact]
     public void Defaults_Timeouts()
     {
         var serverConfig = new McpServerConfig();
-        serverConfig.InitTimeoutMs.Should().Be(30_000);
-        serverConfig.CallTimeoutMs.Should().Be(60_000);
+        serverConfig.InitTimeoutMs.ShouldBe(30_000);
+        serverConfig.CallTimeoutMs.ShouldBe(60_000);
     }
 
     [Fact]
@@ -75,8 +74,8 @@ public class McpExtensionConfigTests
 
         var config = JsonSerializer.Deserialize<McpExtensionConfig>(json);
 
-        config!.Servers["slow-server"].InitTimeoutMs.Should().Be(60_000);
-        config.Servers["slow-server"].CallTimeoutMs.Should().Be(120_000);
+        config!.Servers["slow-server"].InitTimeoutMs.ShouldBe(60_000);
+        config.Servers["slow-server"].CallTimeoutMs.ShouldBe(120_000);
     }
 
     [Fact]
@@ -97,11 +96,11 @@ public class McpExtensionConfigTests
 
         var config = JsonSerializer.Deserialize<McpExtensionConfig>(json);
 
-        config.Should().NotBeNull();
-        config!.Servers["remote"].Url.Should().Be("http://localhost:3000/mcp");
-        config.Servers["remote"].Headers.Should().ContainKey("Authorization");
-        config.Servers["remote"].Headers!["Authorization"].Should().Be("Bearer my-token");
-        config.Servers["remote"].Command.Should().BeNull();
+        config.ShouldNotBeNull();
+        config!.Servers["remote"].Url.ShouldBe("http://localhost:3000/mcp");
+        config.Servers["remote"].Headers.ShouldContainKey("Authorization");
+        config.Servers["remote"].Headers!["Authorization"].ShouldBe("Bearer my-token");
+        config.Servers["remote"].Command.ShouldBeNull();
     }
 
     [Fact]
@@ -123,12 +122,12 @@ public class McpExtensionConfigTests
 
         var config = JsonSerializer.Deserialize<McpExtensionConfig>(json);
 
-        config.Should().NotBeNull();
-        config!.Servers.Should().HaveCount(2);
-        config.Servers["local"].Command.Should().Be("npx");
-        config.Servers["local"].Url.Should().BeNull();
-        config.Servers["remote"].Url.Should().Be("http://remote-host:8080/mcp");
-        config.Servers["remote"].Command.Should().BeNull();
+        config.ShouldNotBeNull();
+        config!.Servers.Count().ShouldBe(2);
+        config.Servers["local"].Command.ShouldBe("npx");
+        config.Servers["local"].Url.ShouldBeNull();
+        config.Servers["remote"].Url.ShouldBe("http://remote-host:8080/mcp");
+        config.Servers["remote"].Command.ShouldBeNull();
     }
 
     [Fact]
@@ -138,8 +137,8 @@ public class McpExtensionConfigTests
 
         var config = JsonSerializer.Deserialize<McpExtensionConfig>(json);
 
-        config.Should().NotBeNull();
-        config!.Servers.Should().BeEmpty();
+        config.ShouldNotBeNull();
+        config!.Servers.ShouldBeEmpty();
     }
 
     [Fact]
@@ -157,12 +156,12 @@ public class McpExtensionConfigTests
 
         var config = JsonSerializer.Deserialize<McpExtensionConfig>(json);
 
-        config!.Servers["simple"].Command.Should().Be("echo");
-        config.Servers["simple"].Args.Should().BeNull();
-        config.Servers["simple"].Env.Should().BeNull();
-        config.Servers["simple"].WorkingDirectory.Should().BeNull();
-        config.Servers["simple"].Url.Should().BeNull();
-        config.Servers["simple"].Headers.Should().BeNull();
+        config!.Servers["simple"].Command.ShouldBe("echo");
+        config.Servers["simple"].Args.ShouldBeNull();
+        config.Servers["simple"].Env.ShouldBeNull();
+        config.Servers["simple"].WorkingDirectory.ShouldBeNull();
+        config.Servers["simple"].Url.ShouldBeNull();
+        config.Servers["simple"].Headers.ShouldBeNull();
     }
 
     [Fact]
@@ -183,16 +182,16 @@ public class McpExtensionConfigTests
         var config = JsonSerializer.Deserialize<McpExtensionConfig>(json);
 
         // Both fields are deserialized; runtime decides precedence (command wins in Phase 1-2)
-        config!.Servers["both"].Command.Should().Be("node");
-        config.Servers["both"].Url.Should().Be("http://localhost:3000/mcp");
+        config!.Servers["both"].Command.ShouldBe("node");
+        config.Servers["both"].Url.ShouldBe("http://localhost:3000/mcp");
     }
 
     [Fact]
     public void Defaults_ServersToEmptyDictionary()
     {
         var config = new McpExtensionConfig();
-        config.Servers.Should().NotBeNull();
-        config.Servers.Should().BeEmpty();
+        config.Servers.ShouldNotBeNull();
+        config.Servers.ShouldBeEmpty();
     }
 
     [Fact]
@@ -200,14 +199,14 @@ public class McpExtensionConfigTests
     {
         var config = new McpServerConfig();
 
-        config.Command.Should().BeNull();
-        config.Args.Should().BeNull();
-        config.Env.Should().BeNull();
-        config.WorkingDirectory.Should().BeNull();
-        config.Url.Should().BeNull();
-        config.Headers.Should().BeNull();
-        config.InitTimeoutMs.Should().Be(30_000);
-        config.CallTimeoutMs.Should().Be(60_000);
+        config.Command.ShouldBeNull();
+        config.Args.ShouldBeNull();
+        config.Env.ShouldBeNull();
+        config.WorkingDirectory.ShouldBeNull();
+        config.Url.ShouldBeNull();
+        config.Headers.ShouldBeNull();
+        config.InitTimeoutMs.ShouldBe(30_000);
+        config.CallTimeoutMs.ShouldBe(60_000);
     }
 
     [Fact]
@@ -222,7 +221,7 @@ public class McpExtensionConfigTests
 
         var config = JsonSerializer.Deserialize<McpExtensionConfig>(json);
 
-        config!.ToolPrefix.Should().BeFalse();
+        config!.ToolPrefix.ShouldBeFalse();
     }
 
     [Fact]
@@ -245,9 +244,9 @@ public class McpExtensionConfigTests
 
         var config = JsonSerializer.Deserialize<McpExtensionConfig>(json);
 
-        config!.Servers["srv"].Env.Should().HaveCount(3);
-        config.Servers["srv"].Env!["TOKEN"].Should().Be("${env:MY_TOKEN}");
-        config.Servers["srv"].Env!["API_KEY"].Should().Be("${env:API_KEY:-default-key}");
-        config.Servers["srv"].Env!["PLAIN"].Should().Be("literal-value");
+        config!.Servers["srv"].Env.Count().ShouldBe(3);
+        config.Servers["srv"].Env!["TOKEN"].ShouldBe("${env:MY_TOKEN}");
+        config.Servers["srv"].Env!["API_KEY"].ShouldBe("${env:API_KEY:-default-key}");
+        config.Servers["srv"].Env!["PLAIN"].ShouldBe("literal-value");
     }
 }

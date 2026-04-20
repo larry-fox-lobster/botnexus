@@ -4,7 +4,6 @@ using BotNexus.Agent.Core.Tools;
 using BotNexus.Agent.Core.Types;
 using BotNexus.AgentCore.Tests.TestUtils;
 using BotNexus.Agent.Providers.Core.Models;
-using FluentAssertions;
 
 namespace BotNexus.AgentCore.Tests.Loop;
 
@@ -27,11 +26,11 @@ public class ContextConverterTests
             (messages, _) => Task.FromResult<IReadOnlyList<Message>>(MessageConverter.ToProviderMessages(messages)),
             CancellationToken.None);
 
-        providerContext.SystemPrompt.Should().Be("System prompt");
-        providerContext.Messages.Should().ContainSingle().Which.Should().BeOfType<ProviderUserMessage>();
-        providerContext.Tools.Should().NotBeNull();
-        providerContext.Tools!.Should().HaveCount(2);
-        providerContext.Tools.Select(tool => tool.Name).Should().BeEquivalentTo("calculate", "get_current_time");
+        providerContext.SystemPrompt.ShouldBe("System prompt");
+        providerContext.Messages.ShouldHaveSingleItem().ShouldBeOfType<ProviderUserMessage>();
+        providerContext.Tools.ShouldNotBeNull();
+        providerContext.Tools!.Count().ShouldBe(2);
+        providerContext.Tools.Select(tool => tool.Name).ShouldBe(["calculate", "get_current_time"]);
     }
 
     [Fact]
@@ -42,10 +41,10 @@ public class ContextConverterTests
 
         var providerTool = ContextConverter.ToProviderTool(tool);
 
-        providerTool.Name.Should().Be("search");
-        providerTool.Description.Should().Be("Search docs");
-        providerTool.Parameters.GetProperty("type").GetString().Should().Be("object");
-        providerTool.Parameters.GetProperty("properties").GetProperty("query").GetProperty("type").GetString().Should().Be("string");
+        providerTool.Name.ShouldBe("search");
+        providerTool.Description.ShouldBe("Search docs");
+        providerTool.Parameters.GetProperty("type").GetString().ShouldBe("object");
+        providerTool.Parameters.GetProperty("properties").GetProperty("query").GetProperty("type").GetString().ShouldBe("string");
     }
 
     private sealed class StubTool(string name, string description, JsonElement schema) : IAgentTool

@@ -4,7 +4,6 @@ using System.Text;
 using System.Text.Json;
 using BotNexus.Extensions.Mcp.Protocol;
 using BotNexus.Extensions.Mcp.Transport;
-using FluentAssertions;
 
 namespace BotNexus.Extensions.Mcp.Tests.Transport;
 
@@ -19,7 +18,7 @@ public sealed class HttpSseTransportRobustnessTests
         var transport = new HttpSseMcpTransport(new Uri("http://localhost/mcp"), httpClient: client, connectTimeout: TimeSpan.FromMilliseconds(100));
 
         var act = () => transport.ConnectAsync();
-        await act.Should().ThrowAsync<TimeoutException>();
+        await act.ShouldThrowAsync<TimeoutException>();
     }
 
     [Fact]
@@ -31,7 +30,7 @@ public sealed class HttpSseTransportRobustnessTests
         await transport.ParseSseStreamAsync(new StringReader(sse), CancellationToken.None);
 
         var act = () => transport.ReceiveAsync(new CancellationTokenSource(50).Token);
-        await act.Should().ThrowAsync<Exception>();
+        await act.ShouldThrowAsync<Exception>();
         await transport.DisposeAsync();
     }
 
@@ -47,7 +46,7 @@ public sealed class HttpSseTransportRobustnessTests
 
         await transport.ParseSseStreamAsync(new StringReader(sse), CancellationToken.None);
         var read = await transport.ReceiveAsync(new CancellationTokenSource(TimeSpan.FromSeconds(1)).Token);
-        read.Id.Should().NotBeNull();
+        read.Id.ShouldNotBeNull();
         await transport.DisposeAsync();
     }
 
@@ -60,7 +59,7 @@ public sealed class HttpSseTransportRobustnessTests
         await transport.ParseSseStreamAsync(new StringReader("event: message\ndata: {"), CancellationToken.None);
 
         var act = () => transport.ReceiveAsync(new CancellationTokenSource(50).Token);
-        await act.Should().ThrowAsync<Exception>();
+        await act.ShouldThrowAsync<Exception>();
         await transport.DisposeAsync();
     }
 
@@ -73,8 +72,8 @@ public sealed class HttpSseTransportRobustnessTests
         var transport = new HttpSseMcpTransport(new Uri("http://localhost/mcp"), httpClient: client, connectTimeout: TimeSpan.FromMilliseconds(200), maxReconnectAttempts: 2);
 
         var act = () => transport.ConnectAsync();
-        await act.Should().ThrowAsync<HttpRequestException>();
-        handler.CallCount.Should().Be(1);
+        await act.ShouldThrowAsync<HttpRequestException>();
+        handler.CallCount.ShouldBe(1);
     }
 
     [Fact]
@@ -86,7 +85,7 @@ public sealed class HttpSseTransportRobustnessTests
         var transport = new HttpSseMcpTransport(new Uri("http://localhost/mcp"), httpClient: client);
 
         var act = () => transport.ConnectAsync();
-        await act.Should().ThrowAsync<HttpRequestException>();
+        await act.ShouldThrowAsync<HttpRequestException>();
     }
 
     private sealed class DelayedHandler(TimeSpan delay) : HttpMessageHandler
