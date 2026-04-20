@@ -5,6 +5,34 @@
 - **Stack:** C# (.NET latest), modular class libraries: Core, Agent, Api, Channels (Base/Discord/Slack/Telegram), Command, Cron, Gateway, Heartbeat, Providers (Base/Anthropic/OpenAI), Session, Tools.GitHub, WebUI
 - **Created:** 2026-04-01
 
+## Core Context
+
+**Fry's Specialization:** Web Dev for BotNexus WebUI (Blazor + vanilla JS). Owns chat panel, message rendering, streaming UI, WebSocket integration, layout restructure, and cross-cutting UI concerns.
+
+**Active Stream (Phase 12+):**
+- Phase 4 Wave 1 (2026-04-05): Thinking blocks, tool timers, steer mode UX, reconnection banners
+- Sub-Agent Feature Waves 1-4 (2026-04-10): Model validation, manager ops, integration testing, WebUI panel with real-time updates + kill button + ownership validation
+- Session Switching (2026-04-10): Fixed race condition (async re-entry, flight flags, version counters) — established pattern for concurrent async functions with global side effects
+- Floating 'New Messages' Button (latest): Increment counter when scrolled up, dismiss on click, reset on session switch
+- Blazor Layout Restructure (2026-04-15): Moved agent list/sidebar from Home.razor to MainLayout.razor, rewrote with dropdown + session list persistence, established MainLayout as structural shell pattern
+- **Current:** Auto-Scroll Bug Fix Wave 1 (2026-04-20): Reordered OnAfterRenderAsync (markdown-first, scroll-last), hardened chat.js scroll functions with 50ms backstop and streaming-aware threshold
+
+**Key Patterns Established:**
+1. **Version counters for re-entrant async** — Each concurrent async operation captures version number; after every await, checks if superseded and bails early
+2. **Reset state at switch START, not end** — Global flags (flight, queue) must reset before awaiting new operations; end-of-stream events for old session may never arrive
+3. **OnAfterRenderAsync reorder for Blazor** — Separate DOM-mutating work from scroll logic; only scroll when re-render work is complete
+4. **Component-level CSS state** — Use data attributes or classes for active state (e.g., `.active`, `.hidden`); maintain via component lifecycle
+
+**Test Philosophy:** Manual browser testing for scroll/layout UX; bUnit for component lifecycle verification; Playwright for E2E.
+
+---
+
+## Archived Entries (2026-04-01 to 2026-04-19)
+
+**Sprint Summary:** Phase 4 UX polish (thinking blocks, tool timers, steer mode, reconnection banners), Sub-Agent Feature Waves 1-4 (complete span from models through WebUI integration), Session Switching race condition fix (version counters established pattern), floating new-messages button, Blazor MainLayout restructure (moved sidebar to shell), multiple layout and CSS refinements. Build consistently green; test counts grew from 337 to 2545+ (gateway tests grew from 368 to 794+). Established Web Dev patterns for async re-entry handling, OnAfterRenderAsync ordering, and component-shell architecture.
+
+---
+
 ## cli-28 — Gateway /api/status, /api/doctor, /api/shutdown endpoints
 
 **Commit:** 1d1bc34 — `feat(api): add status, doctor, and shutdown Gateway endpoints`
@@ -432,4 +460,42 @@ ull
 - Session ID truncation needs Math.Min(8, sub.SubAgentId.Length) to avoid index errors
 - Restart button catches empty — connection drop is expected behavior
 - GatewayHubConnection.IsConnected is a property (line 69), not a method
+
+## 2026-04-20 — Blazor Auto-Scroll Bug Fix: Wave 1 Implementation
+
+**Status:** ✅ Complete  
+**Commit:** efd9837e  
+**Team Update:** Cross-agent session on bug-blazor-autoscroll (regression from improvement-blazor-chat-autoscroll Apr '26)
+
+**Your Role:** Web Dev (Fry). Wave 1 implementation of auto-scroll race condition fix.
+
+**Root Cause:** Race condition between scroll execution and markdown rendering in `ChatPanel.razor` `OnAfterRenderAsync`:
+1. Scroll fires first (calls JS interop)
+2. Markdown renders (iterates messages, populates cache)
+3. StateHasChanged triggered → second OnAfterRenderAsync cycle
+4. DOM layout changed from markdown rendering → scroll threshold check fails silently
+
+**Deliverables:**
+
+1. **ChatPanel.razor — Reorder OnAfterRenderAsync (lines 367–417)**
+   - Markdown rendering first (populate `_markdownCache`, do NOT call StateHasChanged yet)
+   - If markdown found, call `StateHasChanged()` and RETURN
+   - Only scroll after markdown is complete (`needsRender == false`)
+   - Pass `State.IsStreaming` to JS `scrollToBottom` for dynamic threshold
+
+2. **chat.js — Harden scroll functions**
+   - `forceScrollToBottom`: Added `setTimeout(50)` backstop after `requestAnimationFrame` to catch residual DOM changes
+   - `scrollToBottom`: Accept optional `isStreaming` parameter; use 200px threshold when streaming (vs 100px normally)
+
+**Build & Tests:**
+- ✅ Build: Green (0 errors)
+- ✅ Tests: 2545 passing, 0 failures
+- ✅ No regressions
+
+**Pattern Established:**
+- When re-render cycles are possible (like OnAfterRenderAsync), separate DOM-mutating work from scroll logic
+- JS scroll helpers should double-check layout after requestAnimationFrame (async DOM mutations can occur between frames)
+- Streaming context affects scroll thresholds — pass state from component to JS to enable adaptive behavior
+
+**Next:** Wave 2 verification (Hermes) + Consistency review (Nibbler)
 

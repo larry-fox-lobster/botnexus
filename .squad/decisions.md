@@ -2,6 +2,53 @@
 
 ## Active Decisions
 
+### Leela Design Review: bug-blazor-autoscroll (2026-04-20)
+
+**Decision Date:** 2026-04-20  
+**Decided By:** Leela (Lead/Architect)  
+**Status:** Delivered
+
+**Context:** Blazor chat UI regression — messages do not auto-scroll to bottom when new content arrives. Users must manually scroll after every message. This is a regression of the previously delivered `improvement-blazor-chat-autoscroll` (Apr '26).
+
+**Root Cause:** Race condition between scroll execution and markdown rendering in `ChatPanel.razor` `OnAfterRenderAsync`:
+1. **Scroll fires first** — calls `chatScroll.forceScrollToBottom` via JS interop
+2. **Markdown renders** — iterates messages, calls `BotNexus.renderMarkdown`, populates cache
+3. **Re-render triggered** — calls `StateHasChanged()` on markdown change
+4. **Second cycle runs** — new DOM content from markdown rendering has changed layout, making scroll threshold check fail
+
+**Decision:** Fix render-then-scroll ordering + harden JS scroll functions:
+
+**Contracts:**
+1. **Reorder `OnAfterRenderAsync` in `ChatPanel.razor`** — markdown first, scroll last. Only scroll when `needsRender == false`. When markdown found, `StateHasChanged()` and return.
+2. **Update `forceScrollToBottom` in `chat.js`** — add `setTimeout(50)` backstop after `requestAnimationFrame` to catch residual DOM changes.
+3. **Update `scrollToBottom` in `chat.js`** — accept optional `isStreaming` parameter, use 200px threshold when streaming (vs 100px normally).
+4. **Pass streaming state** — `ChatPanel.razor` invokes `scrollToBottom(element, State.IsStreaming)`.
+
+**Files Modified:**
+- `src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/Components/ChatPanel.razor`
+- `src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/wwwroot/js/chat.js`
+
+**Wave Plan:**
+- **Wave 1 (Fry):** Implementation of fix contracts. Build + 2545 tests green. ✅ Complete
+- **Wave 2 (Hermes):** Manual verification of 7 spec edge cases, bUnit test for render lifecycle. ✅ Complete
+- **Wave 3 (Nibbler):** Post-work consistency review (JSDoc, archived spec cleanup). ✅ Complete
+
+**Rationale:**
+1. **Root cause identified** — Race condition between scroll timing and markdown re-render, not missing JS interop
+2. **Bounded fix** — 2-file change, no architectural changes, no new dependencies
+3. **Low risk** — Threshold increase to 200px only during streaming; 50ms backstop below perceptual threshold; reorder doesn't introduce new race conditions (Blazor WASM is single-threaded)
+4. **Verified** — All 7 spec edge cases manually tested; bUnit test added for lifecycle ordering
+
+**Risks Mitigated:**
+| Risk | Mitigation |
+|------|------------|
+| Reorder may cause first-render flash (raw markdown visible) | Already current behavior — markdown is rendered async today. No regression. |
+| `setTimeout(50)` backstop could cause visible jump | 50ms below perceptual threshold. User won't notice. |
+| Streaming threshold (200px) may scroll when user doesn't want | 200px ≈ 2-3 lines. Only during active streaming. Acceptable trade-off. |
+| `StateHasChanged()` loop if markdown keeps finding new messages | Loop terminates because `_markdownCache` is populated — each message rendered once. |
+
+---
+
 ### SessionStoreBase Status-Filter Overload (2026-04-12)
 
 **Decision Date:** 2026-04-12  
@@ -3039,7 +3086,8 @@ See full decision in `.squad/decisions/inbox/leela-workspace-templates.md` (merg
    - Status checks
    - Manage extensions
 
-2. **Config Hot Reload** — Gateway should watch ~/.botnexus/config.json and automatically reload when it changes. No manual restart needed for config changes. Use .NET's eloadOnChange: true + IOptionsMonitor<T>.
+2. **Config Hot Reload** — Gateway should watch ~/.botnexus/config.json and automatically reload when it changes. No manual restart needed for config changes. Use .NET's 
+eloadOnChange: true + IOptionsMonitor<T>.
 
 3. **Doctor Command** — otnexus doctor that validates the environment:
    - Pluggable check system: IHealthCheckup base interface with properties (type, category, description)
