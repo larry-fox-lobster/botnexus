@@ -73,6 +73,7 @@
 - 2026-04-14: Added Probe dual-mode entrypoint (serve + CLI) with command handlers for logs/sessions/session/correlate/files/gateway/traces/trace, JSON/text output modes, and explicit no-results exit code semantics for automation.
 - 2026-04-14: Added read-only SQLite session DB ingestion to BotNexus.Probe with shared-connection SessionDbReader (busy retry + query-only pragmas), API/CLI preference for sqlite with transparent JSONL fallback, and session counts/search/history endpoints over sqlite metadata.
 - 2026-04-14: Updated Probe sessions web UI to consume rich sqlite payloads (agent/channel/type/status filters, metadata-rich detail cards, tool/compaction history badges) while remaining compatible with legacy JSONL response shapes.
+- 2026-04-15 (Wave 2): CLI command structure uses System.CommandLine with DI-injected command classes. Singleton registration is appropriate for stateless command classes and for services that maintain shared state (e.g., `IGatewayProcessManager` with PID file tracking). When `UseShellExecute = true` (required for detached Windows processes), environment variables cannot be set on `ProcessStartInfo` — use command-line arguments instead (e.g., `--urls`, `--environment`).
 
 
 ## 2026-04-15 — Extension-Contributed Commands Implementation, Wave 1 (Platform Dev)
@@ -107,4 +108,45 @@
 ✅ 10 unit tests passing (registration, dispatch, parsing, duplicates, error handling)
 
 **Next Wave:** Wave 2 — WebUI command palette integration
+
+## 2026-04-15 — Gateway Lifecycle Management, Wave 2 (Platform Dev)
+
+**Status:** ✅ Complete  
+**Commit:** 62030e7b  
+**Build:** Green (0 errors, 0 warnings)  
+**Tests:** ✅ All 956 gateway tests passing
+
+**Context:** Wave 2 implementation of gateway lifecycle management. Integrated Bender's Wave 1 abstractions (`IGatewayProcessManager`, `IHealthChecker`) into the CLI command structure.
+
+**Deliverables:**
+
+### New Command Surface
+- Created `GatewayCommand` class with full lifecycle management:
+  - `botnexus gateway start` — detached mode (new console window), default
+  - `botnexus gateway start --attached` — foreground mode for debugging
+  - `botnexus gateway stop` — kills process, cleans PID file
+  - `botnexus gateway status` — displays state, PID, uptime with ✓/● symbols
+  - `botnexus gateway restart` — stop + start sequence
+
+### DI Integration (Program.cs)
+- Registered `IHealthChecker` → `HttpHealthChecker` (singleton, HttpClient reuse)
+- Registered `IGatewayProcessManager` → `GatewayProcessManager` (singleton, PID state consistency)
+- Registered `GatewayCommand` (singleton)
+- Added logging configuration with console output at Warning level
+
+### Refactoring
+- Refactored `ServeCommand` to delegate gateway subcommand to `GatewayCommand`
+- Exposed helper methods as public static: `DeployExtensions`, `IsPortAvailable`, `WaitForRestartOrQuitAsync`
+- Fixed unused variable warning in `GatewayProcessManager`
+
+### Technical Decisions
+- Used command-line arguments (`--urls`, `--environment`) instead of environment variables because `UseShellExecute = true` (required for Windows detached process) doesn't support `ProcessStartInfo.Environment`
+- Preserved backward compatibility: existing `serve` command continues to work
+- Attached mode delegates to the original foreground behavior from `ServeCommand`
+
+**Build Status:**
+✅ Solution builds with 0 errors, 0 warnings  
+✅ All unit tests passing (956 gateway tests, full test suite green)
+
+**Next Steps:** Integration testing, user acceptance testing of CLI surface
 
