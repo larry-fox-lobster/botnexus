@@ -32,9 +32,9 @@
     @* ── Read-only banner for sub-agent sessions ──────────────────── *@
     @if (State.IsReadOnly)
     {
-        <div class="read-only-banner">
+        <div class="read-only-banner" role="status" aria-label="Read-only sub-agent session view">
             <span class="read-only-badge">🔍 Sub-agent session</span>
-            <span class="read-only-status">@GetSubAgentStatus()</span>
+            <span class="read-only-status @(State.IsStreaming ? "" : "completed")">@GetSubAgentStatus()</span>
             <span class="read-only-label">Read-only — you can observe but not interact</span>
         </div>
     }
