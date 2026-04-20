@@ -203,3 +203,57 @@
 - Document the boundary: what unit tests can verify vs. what requires integration/E2E tests
 
 **Next:** Consistency review (Nibbler), then spec archive
+
+## 2026-04-20 — CLI Gateway Process Manager Wave 3 Test Coverage (Tester)
+
+**Status:** ✅ Complete  
+**Commit:** 540ae659  
+**Test Results:** 33/33 passing (100%)
+
+**Context:** Wave 3 test suite for GatewayProcessManager and HttpHealthChecker. Comprehensive coverage of CLI gateway lifecycle management, health checking, and edge cases.
+
+**Test Coverage (33 tests):**
+
+### GatewayProcessManagerTests (18)
+- Platform enforcement (Windows-only guard)
+- Already-running detection with live PID verification
+- Stale PID cleanup and auto-recovery
+- Stop operations (not running, stale PID, live process with file deletion)
+- Status queries (not running, stale PID, running with uptime, PID recycling guard)
+- IsRunning property (no PID, alive process, stale PID)
+- Consecutive status call consistency
+
+### HttpHealthCheckerTests (7)
+- Successful health check (200 OK)
+- Failed health check (500 error, timeout)
+- Connection refused handling
+- Cancellation token propagation
+- Exponential backoff retry behavior (200ms → 2000ms cap)
+- Timeout enforcement
+
+### GatewayProcessTypesTests (8)
+- Default parameter values (Attached = false)
+- Record initialization and property assignment
+- Null property validation (NotRunning state)
+- Enum value coverage (GatewayState)
+- Record equality semantics
+
+**Test Approach:**
+- Reflection-based PID file path override for isolated temp directory testing
+- Real process spawning for integration scenarios (cmd.exe, dotnet)
+- NSubstitute mocks for IHealthChecker, custom HttpMessageHandler for HTTP
+- Platform-specific test skipping for Windows-only behavior
+- Edge case coverage: stale PIDs, PID recycling (process name guard), concurrent calls
+
+**Results:**
+- ✅ All 33 new tests passing
+- ✅ Full suite: 2578 tests passing (56 CLI + 956 Gateway + 1566 other)
+- ✅ Build clean (0 errors, 0 warnings)
+- ✅ 100% coverage of Wave 3 architectural decisions
+
+**Next:** Ready for Wave 4 CLI command integration (`botnexus gateway start/stop/status`)
+
+## Learnings
+- 2026-04-14: For BotNexus.Probe, comprehensive parser coverage works best with real temp files and explicit newline/case/filter edge-case assertions across Serilog and JSONL readers.
+- 2026-04-14: Probe currently keeps OTLP and CLI parsing logic in non-public methods; reflection-based tests provide reliable coverage without changing production API shape.
+- 2026-04-20: For process management testing, reflection-based path overrides enable isolated temp directory usage without modifying production code. Real process spawning (cmd.exe, dotnet) validates integration scenarios better than full mocking. Platform-specific guards (Windows-only) require runtime skip logic in tests to avoid CI failures on non-Windows hosts.
