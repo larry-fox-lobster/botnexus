@@ -45,22 +45,7 @@ internal sealed class BuildCommand
 
         AnsiConsole.MarkupLine("[blue][[build]][/] Building solution (Release, skipping test projects)...");
 
-        // Always show build output — it's the primary action and users need to see progress
-        var exitCode = await InstallCommand.RunProcessAsync(
-            "dotnet",
-            $"build \"{solution}\" -c Release --nologo --tl:off /p:SkipTests=true",
-            repoRoot,
-            showOutput: true,
-            cancellationToken);
-
-        if (exitCode != 0)
-        {
-            AnsiConsole.MarkupLine("[red][[build]] Build failed.[/]");
-            return exitCode;
-        }
-
-        AnsiConsole.MarkupLine("[green][[build]] Build succeeded.[/]");
-        return 0;
+        return await BuildOutputStreamer.RunAsync(solution, repoRoot, verbose, cancellationToken);
     }
 
     internal static string ResolveRepoRoot(string? explicitPath, bool dev)
