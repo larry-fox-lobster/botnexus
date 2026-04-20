@@ -27,7 +27,7 @@
 |------|-----|--------|-------|---------|
 | [feature-ask-user-tool](feature-ask-user-tool/design-spec.md) | 🔴 high | design | Apr '26 | Interactive ask_user tool — free-form, single/multi choice, hybrid input |
 | [feature-prompt-templates](feature-prompt-templates/design-spec.md) | 🟡 medium | planning | Jul '26 | Saved parameterized prompt templates for agents, cron, and interactive use |
-| [feature-blazor-subagent-session-view](feature-blazor-subagent-session-view/design-spec.md) | 🟡 medium | draft | Jul '26 | Read-only sub-agent session viewing in Blazor UI |
+| [feature-blazor-subagent-session-view](feature-blazor-subagent-session-view/design-spec.md) | 🟡 medium | done | Jul '26 | Read-only sub-agent session viewing in Blazor UI |
 | [feature-spec-driven-squad-automation](feature-spec-driven-squad-automation/design-spec.md) | 🟡 medium | draft | Jul '25 | Automate Squad execution based on spec status transitions |
 | [feature-api-documentation](feature-api-documentation/design-spec.md) | 🟡 medium | draft | Jul '25 | REST, SignalR, and .NET API reference — OpenAPI, DocFX, interactive docs |
 | [feature-architecture-documentation](feature-architecture-documentation/design-spec.md) | 🟡 medium | draft | Jul '25 | Architecture documentation — arc42, C4, ADRs |

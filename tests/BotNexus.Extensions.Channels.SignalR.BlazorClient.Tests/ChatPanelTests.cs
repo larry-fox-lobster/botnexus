@@ -388,6 +388,92 @@ public sealed class ChatPanelTests : IDisposable
         textarea.GetAttribute("placeholder").ShouldContain("Type a message");
     }
 
+    // ── Read-only sub-agent sessions ─────────────────────────────────────
+
+    [Fact]
+    public void Shows_read_only_banner_when_SessionType_is_agent_subagent()
+    {
+        var state = TestSessionFactory.CreateAgentState();
+        state.SessionType = "agent-subagent";
+
+        var cut = RenderChatPanel(state);
+
+        cut.Find(".read-only-banner").ShouldNotBeNull();
+        cut.Find(".read-only-badge").TextContent.ShouldContain("Sub-agent session");
+        cut.Find(".read-only-label").TextContent.ShouldContain("Read-only");
+    }
+
+    [Fact]
+    public void Does_not_show_read_only_banner_for_normal_sessions()
+    {
+        var state = TestSessionFactory.CreateAgentState();
+        state.SessionType = "user-agent";
+
+        var cut = RenderChatPanel(state);
+
+        cut.FindAll(".read-only-banner").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Hides_input_area_when_IsReadOnly()
+    {
+        var state = TestSessionFactory.CreateAgentState();
+        state.SessionType = "agent-subagent";
+
+        var cut = RenderChatPanel(state);
+
+        // Input elements should not be present
+        cut.FindAll(".chat-input").ShouldBeEmpty();
+        cut.FindAll(".send-btn").ShouldBeEmpty();
+        cut.FindAll(".mic-btn").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Shows_input_area_when_not_read_only()
+    {
+        var state = TestSessionFactory.CreateAgentState();
+        state.SessionType = "user-agent";
+
+        var cut = RenderChatPanel(state);
+
+        cut.Find(".chat-input").ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void Read_only_status_shows_running_when_streaming()
+    {
+        var state = TestSessionFactory.CreateAgentState(isStreaming: true);
+        state.SessionType = "agent-subagent";
+
+        var cut = RenderChatPanel(state);
+
+        cut.Find(".read-only-status").TextContent.ShouldContain("Running");
+    }
+
+    [Fact]
+    public void Read_only_status_shows_completed_when_not_streaming()
+    {
+        var state = TestSessionFactory.CreateAgentState(isStreaming: false);
+        state.SessionType = "agent-subagent";
+
+        var cut = RenderChatPanel(state);
+
+        cut.Find(".read-only-status").TextContent.ShouldContain("Completed");
+    }
+
+    [Fact]
+    public void Read_only_banner_contains_observe_but_not_interact_text()
+    {
+        var state = TestSessionFactory.CreateAgentState();
+        state.SessionType = "agent-subagent";
+
+        var cut = RenderChatPanel(state);
+
+        var banner = cut.Find(".read-only-banner");
+        banner.TextContent.ShouldContain("observe");
+        banner.TextContent.ShouldContain("not interact");
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────
 
     private IRenderedComponent<ChatPanel> RenderChatPanel(AgentSessionState state)

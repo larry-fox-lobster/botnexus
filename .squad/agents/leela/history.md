@@ -29,6 +29,49 @@
 
 ---
 
+## 2026-04-20 — Blazor Sub-Agent Session View Design Review (Lead)
+
+**Status:** ✅ Design Review Complete — Approved for 3-Wave Delivery  
+**Requested by:** Copilot (on behalf of Jon Bullen)  
+**Spec Author:** Nova  
+**Scope:** Full design review for read-only sub-agent session viewing in Blazor UI
+
+**Context:**
+Sub-agent sessions already appear in sidebar (predecessor spec: `feature-subagent-ui-visibility`), but clicking them does nothing. Users cannot view sub-agent conversation history, tool calls, or reasoning — only ask parent to summarize (lossy). Feature request: make sub-agent sessions clickable and viewable in read-only mode.
+
+**Key Findings:**
+1. **All infrastructure exists** — SignalR streaming for sub-agents already works, `SessionType.AgentSubAgent` exists, history API endpoints work for sub-agent sessions, sidebar already renders sub-agent items
+2. **No new abstractions needed** — Reuse existing `ChatPanel` component with conditional rendering (`IsReadOnly` flag)
+3. **Clean extension** — Add `SessionType` property to `AgentSessionState`, derive `IsReadOnly` from it, conditionally hide input area and show banner
+4. **Session identity already solved** — `SessionId.IsSubAgent` property exists, `SessionId` pattern is `{parentSessionId}::subagent::{uniqueId}`
+5. **No routing changes needed** — Sub-agent sessions use same `/` route as normal sessions, panel toggles visibility via CSS
+
+**Deliverables:**
+- Comprehensive infrastructure audit (ChatPanel, AgentSessionManager, SessionsController, ChannelHistoryController, domain models)
+- Interface/contract definitions: `AgentSessionState.SessionType`, `AgentSessionState.IsReadOnly`, `RegisterSession` signature extension, `ViewSubAgentAsync` method
+- Edge case analysis: running sub-agents, completed sub-agents, gateway restart, nested sub-agents, no messages, sealed sessions
+- Risk register: 6 risks identified with mitigations (ID collision, wrong session type, user confusion, event routing, markdown rendering)
+- 3-wave breakdown:
+  - Wave 1 (Fry): Core read-only view — clickable sessions, banner, input disabled, history loading
+  - Wave 2 (Hermes): Testing — 8 spec test cases + bUnit tests for read-only mode
+  - Wave 3 (Amy/Kif): Polish — banner styling, accessibility, user docs
+
+**Architectural Principles Enforced:**
+- ✅ No over-abstraction (reused ChatPanel, no separate ReadOnlyPanel)
+- ✅ Single Responsibility (ChatPanel renders, AgentSessionManager manages state)
+- ✅ Open/Closed (extended ChatPanel without modifying core logic)
+- ✅ Dependency Inversion (depends on SessionType abstraction, not ID parsing)
+
+**Deferred to Future (P2):**
+- Breadcrumb navigation ("← Back to parent session")
+- Deep-link URL routing for sub-agent sessions
+- Auto-hide sealed sessions after time
+- Sidebar nesting (indented sub-agents under parent)
+
+**Decision written to:** `.squad/decisions/inbox/leela-subagent-session-view-design-review.md`
+
+---
+
 ## Learnings — Provider/Model Configuration Proposal (2026-04-08)
 
 1. **BuiltInModels registers 29 models across 3 providers unconditionally** — `RegisterAll()` populates github-copilot (20), anthropic (4), and openai (5) models with no filtering. The `ModelRegistry` has no concept of active/inactive and no allowlist mechanism. Both `ProvidersController` and `ModelsController` return everything unfiltered.

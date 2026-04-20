@@ -3,7 +3,7 @@ id: improvement-gateway-detached-process
 title: "Launch Gateway as Detached Process from CLI"
 type: improvement
 priority: medium
-status: delivered
+status: in-progress
 created: 2026-07-28
 updated: 2026-07-28
 author: nova
@@ -13,7 +13,7 @@ tags: [cli, gateway, process-management, windows, developer-experience]
 
 # Improvement: Launch Gateway as Detached Process from CLI
 
-**Status:** Delivered
+**Status:** In Progress
 **Priority:** medium
 **Created:** 2026-07-28
 
@@ -206,10 +206,10 @@ After spawning the process, the CLI should:
 
 ## Success Criteria
 
-- [x] `botnexus gateway start` launches gateway in a separate console window and returns control immediately
-- [x] PID file written to `~/.botnexus/gateway.pid`
-- [x] `botnexus gateway status` correctly reports running/stopped state
-- [x] `botnexus gateway stop` gracefully stops the gateway and cleans up PID file
-- [x] `botnexus gateway restart` works end-to-end
-- [x] Stale PID files are detected and cleaned up
-- [x] Gateway logs continue writing to `~/.botnexus/logs/` when running detached
+- [ ] `botnexus gateway start` launches gateway in a separate console window and returns control immediately
+- [ ] PID file written to `~/.botnexus/gateway.pid`
+- [ ] `botnexus gateway status` correctly reports running/stopped state
+- [ ] `botnexus gateway stop` gracefully stops the gateway and cleans up PID file
+- [ ] `botnexus gateway restart` works end-to-end
+- [ ] Stale PID files are detected and cleaned up
+- [ ] Gateway logs continue writing to `~/.botnexus/logs/` when running detached

@@ -390,3 +390,34 @@ The project follows a consistent pattern for documenting CLI features and proces
    - Planning docs in `docs/planning/{improvement-id}/`
    - History entries use RFC3339 timestamps when logging precise session work
 
+
+---
+
+## 2026-04-20T19:04Z — Read-Only Sub-Agent Session View: Wave 3 Documentation
+
+**Status:** ✅ Delivered  
+**Feature:** feature-blazor-subagent-session-view  
+
+**Your Role:** Documentation (user guide)
+
+**Deliverables:**
+1. **User Guide** — `docs/webui/sub-agent-sessions.md`
+   - Feature overview and sub-agent session display
+   - Clickable items and read-only view behavior
+   - Banner explanation with status indicators
+   - Message history, tool calls, thinking blocks
+   - Real-time streaming for active sub-agents
+   - Limitations and deferred features
+
+2. **Release Notes** — Updated with new capability
+
+3. **Screenshots** — Visual documentation of UI elements
+
+**Content Quality:**
+✅ Accurate reflection of implementation  
+✅ Clear user workflows  
+✅ Visual examples  
+✅ Limitations clearly stated  
+✅ Deferred features documented  
+
+**Orchestration Log:** `.squad/orchestration-log/2026-04-20T19-04-00Z-kif.md`
