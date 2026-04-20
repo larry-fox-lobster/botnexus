@@ -10,7 +10,7 @@ tags: [blazor, webui, ux, chat]
 
 # Improvement: Blazor Chat Canvas Auto-Scroll to Bottom
 
-**Status:** draft
+**Status:** Delivered
 **Priority:** medium
 **Created:** 2026-04-17
 

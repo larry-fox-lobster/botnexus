@@ -1,8 +1,10 @@
 // BotNexus Blazor Client — Chat scroll & input helpers
 window.chatScroll = {
     /**
-     * Scrolls to bottom only if the user is already near the bottom (within threshold).
-     * This preserves scroll position when the user has scrolled up to read history.
+     * Scrolls to bottom only if the user is already near the bottom.
+     * Uses a larger threshold during streaming (200px) so the viewport keeps up
+     * with rapidly growing content, and a tighter threshold (100px) otherwise.
+     * Preserves scroll position when the user has scrolled up to read history.
      */
     scrollToBottom: function (element, isStreaming) {
         if (!element) return;
