@@ -35,6 +35,4 @@
     <Copy SourceFiles="@(BlazorPublishFiles)" DestinationFolder="$(OutputPath)blazor\%(RecursiveDir)" SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- Deploy extension to ~/.botnexus/extensions/signalr/ so the gateway discovers it.
-       ContinueOnError prevents build failures when the gateway has DLLs locked. -->
   </Project>
