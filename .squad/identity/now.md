@@ -1,15 +1,15 @@
 ---
-updated_at: 2026-04-20T19:06:00Z
-focus_area: Read-Only Sub-Agent Session View Delivered
+updated_at: 2026-04-20T23:30:00Z
+focus_area: Sub-Agent Completion Wakeup Bug Fix Delivered
 active_issues: []
-status: subagent_session_view_delivered
+status: subagent_wake_fix_delivered
 ---
 
 # What We're Focused On
 
-**Read-Only Sub-Agent Session View delivered (2026-04-20 19:06Z).** Users can now click sub-agent sessions in sidebar to view full conversation history, tool calls, and streaming output in read-only mode. Clickable sidebar items, read-only banner, conditional input hiding, WCAG AA accessible styling, complete test coverage. 5-agent team (Leela, Fry, Hermes, Amy, Kif, Nibbler) in 3 waves. Design review A (Leela), testing 22 tests all passing (Hermes), consistency review A (Nibbler). 92 BlazorClient tests passing (+22 new), 0 code issues.
+**Sub-Agent Completion Wakeup Bug Fix delivered (2026-04-20 23:30Z).** Fixed two root causes preventing sub-agent completion signals from waking parent session: (1) InternalChannelAdapter stream event delivery via `SendStreamEventAsync`, (2) IsRunning race condition in `DefaultSubAgentManager.OnCompletedAsync` eliminated by removing timing-dependent branching and always dispatching via gateway queue. 5-wave delivery: Design Review (Leela) → Tests (Hermes) → Adapter Integration (Farnsworth) → Race Fix (Bender) → Consistency Review (Nibbler). 6 files changed, 309 insertions, 46 deletions. 3 new reproducing tests + 5 existing tests updated. 2,584 total tests passing, zero failures.
 
-**Previous:** Extension Config Inheritance delivered (2026-04-16 04:15Z). World-level extension config defaults with agent-level overrides. ExtensionConfigMerger utility, PlatformConfigAgentSource wiring.
+**Previous:** Read-Only Sub-Agent Session View delivered (2026-04-20 19:06Z). Users can click sub-agent sessions in sidebar to view full conversation history, tool calls, and streaming output in read-only mode. 92 BlazorClient tests passing (+22 new), 0 code issues.
 
 ## Deferred
 

@@ -75,6 +75,7 @@
 - 2026-04-14: Updated Probe sessions web UI to consume rich sqlite payloads (agent/channel/type/status filters, metadata-rich detail cards, tool/compaction history badges) while remaining compatible with legacy JSONL response shapes.
 - 2026-04-15 (Wave 2): CLI command structure uses System.CommandLine with DI-injected command classes. Singleton registration is appropriate for stateless command classes and for services that maintain shared state (e.g., `IGatewayProcessManager` with PID file tracking). When `UseShellExecute = true` (required for detached Windows processes), environment variables cannot be set on `ProcessStartInfo` — use command-line arguments instead (e.g., `--urls`, `--environment`).
 - 2026-04-15: System.CommandLine `Command` objects cannot be added to two parents — call `.Build()` twice on the command builder to get two separate instances when registering in multiple command trees (e.g., `gateway` at top-level and as `serve gateway` subcommand).
+- 2026-04-20 (Wave 2): `InternalChannelAdapter` must implement `IStreamEventChannelAdapter` to preserve full `AgentStreamEvent` delivery through `GatewayHost`; without it, non-delta lifecycle events are dropped and only delta fallback can be used.
 
 
 ## 2026-04-15 — Extension-Contributed Commands Implementation, Wave 1 (Platform Dev)
@@ -150,4 +151,3 @@
 ✅ All unit tests passing (956 gateway tests, full test suite green)
 
 **Next Steps:** Integration testing, user acceptance testing of CLI surface
-

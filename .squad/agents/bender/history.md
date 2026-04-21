@@ -148,3 +148,8 @@
   - Default port: 5005, env: Development
 - Commit: `e8b81299` (Wave 1 complete, ready for Wave 2 integration by Farnsworth)
 
+
+### 2026-04-20 — Wave 3 sub-agent completion race fix
+- Removed `IsRunning`/`FollowUpAsync` branching in `DefaultSubAgentManager.OnCompletedAsync`; parent wake now always uses `_dispatcher.DispatchAsync` so completion delivery is serialized via the session queue.
+- Added wake-delivery telemetry in `GatewayTelemetry`: `SubAgentWakeDispatched` and `SubAgentWakeDeliveryFailed`, and instrumented success/failure paths in `OnCompletedAsync`.
+- Updated sub-agent wake tests to reflect always-dispatch semantics and verified `SubAgentCompletionWake` test suite passes (8/8).

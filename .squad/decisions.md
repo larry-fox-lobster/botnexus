@@ -15685,3 +15685,58 @@ Made three ServeCommand methods public static to avoid duplication:
 **Build:** 0 errors, 46 warnings (pre-existing)  
 
 Feature is **highly consistent** and **ready for use**.
+
+
+---
+
+# Decision: Wave 3 race-condition fix for sub-agent completion wake
+
+- **Date:** 2026-04-20
+- **Owner:** Bender
+- **Status:** Implemented
+
+## Context
+`DefaultSubAgentManager.OnCompletedAsync` previously branched on `parentHandle.IsRunning` and used `FollowUpAsync` when true. A race window allowed the parent loop to stop draining follow-ups while still reporting running, stranding sub-agent completion messages until the next user input.
+
+## Decision
+Adopt the simpler and deterministic wake strategy: **always dispatch sub-agent completion via `_dispatcher.DispatchAsync`** with `ChannelType = internal` and `TargetAgentId` set to the parent agent.
+
+## Rationale
+- Eliminates the `IsRunning` race by removing timing-dependent branching.
+- Uses the gateway session queue as the single serialization mechanism for wake processing.
+- Preserves proactive completion delivery without mid-turn follow-up coupling.
+
+## Implementation notes
+- Removed `_supervisor.GetOrCreateAsync(parent...)` from completion delivery path.
+- Added telemetry counters for wake dispatch and delivery failures.
+- Updated wake-up tests to assert dispatch-only behavior.
+
+
+
+---
+
+# Nibbler Consistency Review: Sub-Agent Wake Delivery Fix
+
+**Date:** 2026-07-22
+**Reviewer:** Nibbler
+**Scope:** bug-subagent-completion-wakeup post-work consistency review
+
+## Issues Fixed
+
+1. **Bug spec status drift** — `docs/planning/bug-subagent-completion-wakeup/design-spec.md` had `status: draft` but work was actively being delivered. Updated to `in-progress`.
+
+2. **Feature doc stale completion flow** — `docs/features/sub-agent-spawning.md` described completion delivery via `FollowUpAsync` (the old mechanism). Updated to reflect the new `DispatchAsync` approach through the internal channel.
+
+## Verified Clean
+
+- InternalChannelAdapter XML docs describe intent, not just signature
+- No dead code in DefaultSubAgentManager after FollowUpAsync branch removal
+- Cross-adapter pattern for SendStreamEventAsync is consistent
+- Telemetry counter names follow existing convention
+- New test names follow Method_Condition_ExpectedBehavior pattern
+- Archived improvement spec correctly left as-is (historical context)
+
+## Recommendation
+
+The test scaffold `InterfaceBackedSubAgentManager` in `DefaultSubAgentManagerTests.cs` still uses `FollowUpAsync` for completion delivery. Consider updating it to use `IChannelDispatcher.DispatchAsync` in a future cleanup to keep test scaffolds aligned with production behavior.
+

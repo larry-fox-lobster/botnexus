@@ -1,5 +1,9 @@
 # Copilot Instructions — BotNexus
 
+## Git Workflow
+
+- **No worktrees.** Do not use `git worktree` in this repo. Work directly on the current branch. Skip the `worktree` skill entirely.
+
 ## Dev Environment
 
 - **BotNexus user config:** `C:\Users\<ALIAS>\.botnexus\config.json`
