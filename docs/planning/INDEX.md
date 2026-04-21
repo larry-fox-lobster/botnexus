@@ -1,124 +1,105 @@
-# 🗺️ Planning Index
+# 📋 Planning Index
 
-> Maintained by Nova ✨ | Last updated: 2026-04-20
->
-> Generated from spec frontmatter via `build-index.ps1` — don't hand-edit, rebuild instead.
+> Auto-maintained by Nova's daily planning maintenance. Last updated: 2026-04-21
 
----
+## 🐛 Bugs
 
-## 🔥 Active
+### 🔴 Critical
+- [SQLite Session Store Global Lock Blocks Multi-Agent Concurrency](bug-sqlite-session-lock/design-spec.md) — `draft`
+- [No Tool Execution Timeout or Stuck-Turn Recovery](bug-tool-execution-timeout/design-spec.md) — `draft`
 
-### 🐛 Bug Fixes
+### 🟠 High
+- [NO_REPLY Sentinel Visible as Literal Text in Blazor UI](bug-noreply-visible-in-ui/design-spec.md) — `draft`
+- [Session Switching Broken During Active Agent Work](bug-session-switching-ui/design-spec.md) — `partially-delivered` 📄
 
-| Item | Pri | Status | Since | Summary |
-|------|-----|--------|-------|---------|
-| [bug-sqlite-session-lock](bug-sqlite-session-lock/design-spec.md) | 🔴 critical | draft | Apr '26 | SQLite global SemaphoreSlim(1,1) blocks all agents during any session I/O |
-| [bug-edit-tool-diffplex-missing](bug-edit-tool-diffplex-missing/design-spec.md) | 🔴 high | draft | Apr '26 | Edit tool fails — DiffPlex assembly not found at runtime |
-| [bug-blazor-autoscroll](bug-blazor-autoscroll/design-spec.md) | 🔴 high | draft | Jul '25 | Blazor UI auto-scroll not working on new messages (regression) |
-| [bug-subagent-completion-wakeup](bug-subagent-completion-wakeup/design-spec.md) | 🔴 high | draft | Jul '26 | Sub-agent completion signals not waking parent agent session |
-| [bug-session-switching-ui](bug-session-switching-ui/design-spec.md) | 🔴 high | partial | Apr '26 | Session switching broken during active agent work (send-side still open) |
-| [bug-steering-message-visibility](bug-steering-message-visibility/design-spec.md) | 🟡 medium | draft | Apr '26 | Steering messages not visible in conversation flow |
-| [bug-blazor-session-history-loss](bug-blazor-session-history-loss/design-spec.md) | 🟡 medium | draft | Jul '26 | Blazor UI loses session history for agent/channel combo |
-| [message-queue-injection-timing](message-queue-injection-timing/design-spec.md) | 🟡 medium | planning | Jul '25 | User messages queued during multi-tool turns not visible until turn completes |
+### 🟡 Medium
+- [Blazor UI Loses Session History for Agent/Channel Combo](bug-blazor-session-history-loss/design-spec.md) — `draft`
+- [Message Queue Injection Timing](message-queue-injection-timing/design-spec.md) — `planning`
+- [Steering Messages Not Visible in Conversation Flow](bug-steering-message-visibility/design-spec.md) — `draft` 📄
 
-### ✨ Features
+## ✨ Features
 
-| Item | Pri | Status | Since | Summary |
-|------|-----|--------|-------|---------|
-| [feature-ask-user-tool](feature-ask-user-tool/design-spec.md) | 🔴 high | design | Apr '26 | Interactive ask_user tool — free-form, single/multi choice, hybrid input |
-| [feature-prompt-templates](feature-prompt-templates/design-spec.md) | 🟡 medium | planning | Jul '26 | Saved parameterized prompt templates for agents, cron, and interactive use |
-| [feature-blazor-subagent-session-view](feature-blazor-subagent-session-view/design-spec.md) | 🟡 medium | done | Jul '26 | Read-only sub-agent session viewing in Blazor UI |
-| [feature-spec-driven-squad-automation](feature-spec-driven-squad-automation/design-spec.md) | 🟡 medium | draft | Jul '25 | Automate Squad execution based on spec status transitions |
-| [feature-api-documentation](feature-api-documentation/design-spec.md) | 🟡 medium | draft | Jul '25 | REST, SignalR, and .NET API reference — OpenAPI, DocFX, interactive docs |
-| [feature-architecture-documentation](feature-architecture-documentation/design-spec.md) | 🟡 medium | draft | Jul '25 | Architecture documentation — arc42, C4, ADRs |
-| [feature-code-documentation](feature-code-documentation/design-spec.md) | 🟡 medium | draft | Jul '25 | Contributing guide, XML comment standards, developer guides |
+### 🟠 High
+- [ask_user Tool](feature-ask-user-tool/design-spec.md) — `design`
 
-### 🔧 Improvements
+### 🟡 Medium
+- [API Documentation — REST, SignalR, and .NET API Reference](feature-api-documentation/design-spec.md) — `draft`
+- [Architecture Documentation — arc42, C4, ADRs](feature-architecture-documentation/design-spec.md) — `draft`
+- [Prompt Templates](feature-prompt-templates/design-spec.md) — `planning`
+- [Spec-Driven Squad Automation](feature-spec-driven-squad-automation/design-spec.md) — `draft`
+- [Code & Developer Documentation](feature-code-documentation/design-spec.md) — `draft`
 
-| Item | Pri | Status | Since | Summary |
-|------|-----|--------|-------|---------|
-| [improvement-dynamic-config-reload](improvement-dynamic-config-reload/design-spec.md) | 🔴 high | draft | Apr '26 | Hot-reload config.json without gateway restart |
-| [improvement-memory-lifecycle](improvement-memory-lifecycle/design-spec.md) | 🔴 high | draft | Apr '26 | Memory persistence, pre-compaction flush, dreaming consolidation |
-| [improvement-skills-path-resolution](improvement-skills-path-resolution/design-spec.md) | 🟡 medium | draft | Apr '26 | Expose skill base path on load so agents can resolve relative file refs |
-| [improvement-gateway-detached-process](improvement-gateway-detached-process/design-spec.md) | 🟡 medium | delivered | Jul '26 | Launch gateway as detached process from CLI with PID tracking |
-| [improvement-blazor-configuration-ui](improvement-blazor-configuration-ui/design-spec.md) | 🟡 medium | proposed | Jul '25 | Config canvas views, root config node, Locations section, per-agent locations |
-| [improvement-blazor-dynamic-agent-list](improvement-blazor-dynamic-agent-list/design-spec.md) | 🟢 low | proposed | Jul '25 | Auto-detect new agent folders without page refresh |
+## 🔧 Improvements
 
-### 📋 Process
+### 🟠 High
+- [Dynamic Configuration Reload](improvement-dynamic-config-reload/design-spec.md) — `in-progress`
+- [Memory Persistence Lifecycle](improvement-memory-lifecycle/design-spec.md) — `draft` 📄
 
-| Item | Status | Since | Purpose |
-|------|--------|-------|---------|
-| [feature-planning-pipeline](feature-planning-pipeline/design-spec.md) | active | Apr '26 | Planning folder conventions and spec lifecycle |
+### 🟡 Medium
+- [Skills Extension — Expose Base Path on Load](improvement-skills-path-resolution/design-spec.md) — `draft`
+- [Blazor Configuration UI](improvement-blazor-configuration-ui/design-spec.md) — `proposed`
+
+### 🔵 Low
+- [Dynamic Agent List](improvement-blazor-dynamic-agent-list/design-spec.md) — `proposed`
+
+## 📐 Process
+
+- [Planning Pipeline Convention](feature-planning-pipeline/design-spec.md) — `active` 📄
 
 ---
 
-## ✅ Archived / Done
+📄 = has research.md
 
 <details>
-<summary>🐛 Bug Fixes — 12 resolved</summary>
+<summary>📦 Archived (41 items)</summary>
 
-| Item | Pri | Status | Since | Summary |
-|------|-----|--------|-------|---------|
-| bug-subagent-spawn-path | 🔴 critical | delivered | Apr '26 | Sub-agent AgentId :: creates illegal Windows paths |
-| bug-internal-channel-adapter-missing | 🔴 critical | delivered | Jul '26 | Internal channel adapter missing — sub-agent messages silently drop |
-| bug-session-resumption | 🔴 critical | in-progress | Apr '26 | Session rehydration fails after gateway restart |
-| bug-cross-agent-session-blocking | 🔴 high | delivered | Jul '26 | Response delivery stalls while another agent runs |
-| bug-edit-tool-double-parse | 🔴 high | done | Apr '26 | EditTool double-parses edits argument |
-| bug-exec-process-disconnect | 🔴 high | done | Jul '26 | ExecTool/ProcessTool built on wrong process lifecycle assumptions |
-| bug-pathutils-ignores-file-access-policy | 🔴 high | done | Apr '26 | PathUtils enforces workspace-only, ignoring FileAccessPolicy |
-| bug-session-lifecycle-fragmentation | 🔴 high | done | Apr '26 | 7 session creation paths, no single truth |
-| bug-steering-delivery-latency | 🔴 high | done | Apr '26 | Steering messages delivered too late |
-| bug-tool-argument-type-mismatch | 🔴 high | done | Apr '26 | Type mismatch between StreamingJsonParser and tool parsers |
-| bug-blazor-message-timestamps-ordering | 🟡 medium | delivered | Apr '26 | Blazor messages missing timestamps and misordered |
-| bug-subagent-realtime-updates | 🟡 medium | done | Jul '26 | Sub-agent SignalR bridge missing — WebUI only showed on refresh |
+### Bugs
+- [Internal Channel Adapter Missing](archived/bug-internal-channel-adapter-missing/design-spec.md) — `delivered`
+- [Session Resumption and Rehydration](archived/bug-session-resumption/design-spec.md) — `in-progress`
+- [Sub-Agent AgentId Illegal Paths](archived/bug-subagent-spawn-path/design-spec.md) — `delivered`
+- [Tool Argument Type Mismatch](archived/bug-tool-argument-type-mismatch/design-spec.md) — `done`
+- [Cross-Agent Session Blocking](archived/bug-cross-agent-session-blocking/design-spec.md) — `delivered`
+- [EditTool Double-Parse](archived/bug-edit-tool-double-parse/design-spec.md) — `done`
+- [ExecTool/ProcessTool Wrong Assumptions](archived/bug-exec-process-disconnect/design-spec.md) — `done`
+- [PathUtils Ignores FileAccessPolicy](archived/bug-pathutils-ignores-file-access-policy/design-spec.md) — `done`
+- [Session Lifecycle Fragmentation](archived/bug-session-lifecycle-fragmentation/design-spec.md) — `done`
+- [Steering Delivery Latency](archived/bug-steering-delivery-latency/design-spec.md) — `done`
+- [Blazor Message Timestamps/Ordering](archived/bug-blazor-message-timestamps-ordering/design-spec.md) — `delivered`
+- [Sub-Agent Realtime Updates](archived/bug-subagent-realtime-updates/design-spec.md) — `done`
+- [Blazor Auto-Scroll](archived/bug-blazor-autoscroll/design-spec.md) — `delivered`
+- [Edit Tool DiffPlex Missing](archived/bug-edit-tool-diffplex-missing/design-spec.md) — `delivered`
+- [Sub-Agent Completion Wakeup](archived/bug-subagent-completion-wakeup/design-spec.md) — `delivered`
 
-</details>
+### Features
+- [Context Diagnostics](archived/feature-context-diagnostics/design-spec.md) — `delivered`
+- [Media Pipeline](archived/feature-media-pipeline/design-spec.md) — `delivered`
+- [User Documentation](archived/feature-user-documentation/design-spec.md) — `delivered`
+- [Tool Permission Model](archived/feature-tool-permission-model/design-spec.md) — `done`
+- [Sub-Agent Spawning](archived/feature-subagent-spawning/design-spec.md) — `done`
+- [Session Visibility Rules](archived/feature-session-visibility/design-spec.md) — `implemented`
+- [Config Management API](archived/feature-config-management-api/design-spec.md) — `delivered`
+- [Agent File Access Policy](archived/feature-agent-file-access-policy/design-spec.md) — `delivered`
+- [Blazor WebUI](archived/feature-blazor-webui/design-spec.md) — `delivered`
+- [Context Visibility](archived/feature-context-visibility/design-spec.md) — `superseded`
+- [Sub-Agent UI Visibility](archived/feature-subagent-ui-visibility/design-spec.md) — `delivered`
+- [Blazor Sub-Agent Session View](archived/feature-blazor-subagent-session-view/design-spec.md) — `done`
+- [Agent Delay Tool](archived/feature-agent-delay-tool/design-spec.md) — `draft`
+- [Infinite Scrollback](archived/feature-infinite-scrollback/design-spec.md) — `draft`
+- [File Watcher Tool](archived/feature-file-watcher-tool/design-spec.md) — `draft`
+- [Extension-Contributed Commands](archived/feature-extension-contributed-commands/design-spec.md) — `delivered`
+- [Location Management](archived/feature-location-management/design-spec.md) — `done`
+- [Multi-Session Connection](archived/feature-multi-session-connection/architecture-proposal.md)
 
-<details>
-<summary>✨ Features — 14 shipped/archived</summary>
-
-| Item | Pri | Status | Since | Summary |
-|------|-----|--------|-------|---------|
-| feature-context-diagnostics | 🔴 critical | delivered | Apr '26 | /context command + debug API |
-| feature-blazor-webui | 🔴 high | delivered | Apr '26 | Blazor WASM SPA migration |
-| feature-config-management-api | 🔴 high | delivered | Apr '26 | Full config CRUD via Gateway REST + dynamic reload |
-| feature-user-documentation | 🔴 high | delivered | Jul '25 | User docs — Diátaxis, tutorials, how-tos, reference |
-| feature-tool-permission-model | 🔴 high | done | Apr '26 | Per-agent file system permission model |
-| feature-agent-file-access-policy | 🔴 high | delivered | Jul '26 | Per-agent file access policy configuration |
-| feature-subagent-spawning | 🔴 high | done | Apr '26 | Sub-agent spawning for parallel work delegation |
-| feature-session-visibility | 🔴 high | implemented | Apr '26 | Session visibility rules for multi-session UI |
-| feature-media-pipeline | 🔴 high | delivered | Jul '26 | Audio transcription and extensible media types |
-| feature-subagent-ui-visibility | 🟡 medium | delivered | Apr '26 | Sub-agent sessions visible in WebUI sidebar |
-| feature-extension-contributed-commands | 🟡 medium | delivered | Apr '26 | Extension-contributed commands for WebUI/TUI |
-| feature-context-visibility | 🟡 medium | superseded | Apr '26 | Superseded by feature-context-diagnostics |
-| feature-location-management | 🟡 medium | done | Jul '26 | Location management |
-| feature-infinite-scrollback | 🟡 medium | draft | Jul '25 | Infinite scrollback — paginated history |
-| feature-file-watcher-tool | 🟡 medium | draft | Jul '26 | File watcher tool |
-| feature-agent-delay-tool | 🟡 medium | draft | Jul '26 | Agent delay/wait tool |
-
-</details>
-
-<details>
-<summary>🔧 Improvements — 9 completed/archived</summary>
-
-| Item | Pri | Status | Since | Summary |
-|------|-----|--------|-------|---------|
-| improvement-repo-folder-and-namespace-cleanup | 🔴 high | delivered | Apr '26 | Repo folder and namespace cleanup |
-| improvement-heartbeat-service | 🔴 high | delivered | Jul '26 | Reliable periodic agent polling via cron |
-| improvement-subagent-completion-handling | 🔴 high | delivered | Jul '26 | Reliable parent wake-up on sub-agent completion |
-| improvement-memory-indexing | 🔴 high | done | Jul '26 | MemoryIndexer hosted service + CLI backfill |
-| ddd-refactoring | 🔴 high | done | Jul '25 | Domain-driven design refactoring |
-| improvement-blazor-chat-autoscroll | 🟡 medium | delivered | Apr '26 | Blazor chat auto-scroll to bottom |
-| improvement-extension-config-inheritance | 🟡 medium | delivered | Jul '25 | World-level extension config defaults with agent overrides |
-| improvement-agent-trust-paths | 🟡 medium | draft | Apr '26 | Configurable per-agent trusted file paths |
-| improvement-datetime-awareness | 🟡 medium | draft | Apr '26 | Agent datetime/timezone awareness |
+### Improvements
+- [Repo Folder & Namespace Cleanup](archived/improvement-repo-folder-and-namespace-cleanup/design-spec.md) — `delivered`
+- [DDD Refactoring](archived/ddd-refactoring/design-spec.md) — `done`
+- [Heartbeat Service](archived/improvement-heartbeat-service/design-spec.md) — `delivered`
+- [Memory Indexing & Backfill](archived/improvement-memory-indexing/design-spec.md) — `done`
+- [Sub-Agent Completion Handling](archived/improvement-subagent-completion-handling/design-spec.md) — `delivered`
+- [Agent Trust Paths](archived/improvement-agent-trust-paths/design-spec.md) — `draft`
+- [Blazor Chat Auto-Scroll](archived/improvement-blazor-chat-autoscroll/design-spec.md) — `delivered`
+- [DateTime Awareness](archived/improvement-datetime-awareness/design-spec.md) — `draft`
+- [Extension Config Inheritance](archived/improvement-extension-config-inheritance/design-spec.md) — `delivered`
+- [Gateway Detached Process](archived/improvement-gateway-detached-process/design-spec.md) — `done`
 
 </details>
-
----
-
-> **Legend:** 🔴 critical/high · 🟡 medium · 🟢 low · ⚪ unset
->
-> **Statuses:** planning → draft → design → ready → in-progress → delivered → done
->
-> **Rebuild:** `pwsh docs/planning/build-index.ps1` → JSON → regenerate this file

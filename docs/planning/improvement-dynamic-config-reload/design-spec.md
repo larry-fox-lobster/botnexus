@@ -3,7 +3,7 @@ id: improvement-dynamic-config-reload
 title: "Dynamic Configuration Reload — Hot-Reload Without Gateway Restart"
 type: improvement
 priority: high
-status: draft
+status: in-progress
 created: 2026-04-16
 updated: 2026-07-28
 tags: [configuration, hot-reload, options-pattern, dotnet, platform]
@@ -11,7 +11,7 @@ tags: [configuration, hot-reload, options-pattern, dotnet, platform]
 
 # Improvement: Dynamic Configuration Reload
 
-**Status:** draft
+**Status:** in-progress (Phase 1 largely done — Watch() wired, core services use IOptionsMonitor; ~15 services still use static IOptions)
 **Priority:** high
 **Created:** 2026-04-16
 

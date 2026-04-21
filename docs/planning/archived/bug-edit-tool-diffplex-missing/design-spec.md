@@ -3,14 +3,14 @@ id: bug-edit-tool-diffplex-missing
 title: "Edit Tool Fails — DiffPlex Assembly Not Found"
 type: bug
 priority: high
-status: draft
+status: delivered
 created: 2026-04-17
 tags: [bug, tools, edit, dependency]
 ---
 
 # Bug: Edit Tool Fails — DiffPlex Assembly Not Found
 
-**Status:** draft
+**Status:** delivered
 **Priority:** high
 **Created:** 2026-04-17
 
@@ -58,3 +58,4 @@ Any `edit` tool call should reproduce. Example:
 
 - Reported by: Aurum agent, 2026-04-17
 - Nova's edit tool appears to work (this file was created successfully) — may be intermittent or agent-specific load context issue
+
