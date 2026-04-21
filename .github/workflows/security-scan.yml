@@ -100,8 +100,9 @@ jobs:
 
           # Check for private key material in tracked files
           echo "Checking for private key material..."
+          PK_MARKER="PRIVATE KEY"
           PRIVATE_KEY_HITS=$(git ls-files -z | xargs -0 grep -l \
-            "BEGIN RSA PRIVATE KEY\|BEGIN PRIVATE KEY\|BEGIN EC PRIVATE KEY\|BEGIN OPENSSH PRIVATE KEY" \
+            "BEGIN RSA ${PK_MARKER}\|BEGIN ${PK_MARKER}\|BEGIN EC ${PK_MARKER}\|BEGIN OPENSSH ${PK_MARKER}" \
             2>/dev/null || true)
           if [ -n "$PRIVATE_KEY_HITS" ]; then
             FINDINGS+=("CRITICAL: Private key material found in tracked files:\n$PRIVATE_KEY_HITS")
