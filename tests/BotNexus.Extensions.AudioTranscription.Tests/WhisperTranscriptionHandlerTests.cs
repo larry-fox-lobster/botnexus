@@ -117,7 +117,7 @@ public sealed class WhisperTranscriptionHandlerTests
     }
 
     [Fact]
-    public async Task ProcessAsync_RespectsPreCanceledTokenBeforeTranscription()
+    public async Task ProcessAsync_ThrowsFileNotFoundEvenWhenTokenIsCanceled()
     {
         var missingModelPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.bin");
         await using var handler = CreateHandler(
