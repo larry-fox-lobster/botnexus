@@ -9,8 +9,9 @@ using BotNexus.Agent.Providers.Core.Models;
 namespace BotNexus.Tools;
 
 /// <summary>
-/// Controls which shell is used for command execution on Windows.
-/// On non-Windows platforms, bash is always used regardless of this setting.
+/// Controls which shell is used for command execution.
+/// On all platforms, <see cref="ShellPreference.Pwsh"/> uses PowerShell Core (pwsh).
+/// <see cref="ShellPreference.Auto"/> and <see cref="ShellPreference.Bash"/> use bash.
 /// </summary>
 public enum ShellPreference
 {
@@ -33,8 +34,8 @@ public enum ShellPreference
 /// <list type="bullet">
 ///   <item><see cref="ShellPreference.Auto"/> (default) — Windows prefers bash when available,
 ///         falling back to PowerShell; non-Windows uses bash.</item>
-///   <item><see cref="ShellPreference.Pwsh"/> — Windows uses pwsh/powershell directly;
-///         non-Windows still uses bash.</item>
+///   <item><see cref="ShellPreference.Pwsh"/> — Uses pwsh on all platforms.
+///         Requires pwsh to be installed.</item>
 ///   <item><see cref="ShellPreference.Bash"/> — Always uses bash on all platforms.</item>
 /// </list>
 /// </para>
@@ -68,19 +69,19 @@ public sealed class ShellTool : IAgentTool
     }
 
     /// <inheritdoc />
-    public string Name => _shellPreference == ShellPreference.Pwsh && RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+    public string Name => _shellPreference == ShellPreference.Pwsh
         ? "shell"
         : "bash";
 
     /// <inheritdoc />
-    public string Label => _shellPreference == ShellPreference.Pwsh && RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+    public string Label => _shellPreference == ShellPreference.Pwsh
         ? "Shell (PowerShell)"
         : "Bash";
 
     /// <inheritdoc />
     public Tool Definition => new(
         Name,
-        _shellPreference == ShellPreference.Pwsh && RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+        _shellPreference == ShellPreference.Pwsh
             ? "Execute a PowerShell command in the current working directory and return stdout/stderr."
             : "Execute a bash command in the current working directory and return stdout/stderr.",
         JsonDocument.Parse("""
@@ -149,13 +150,25 @@ public sealed class ShellTool : IAgentTool
         var startInfo = new ProcessStartInfo
         {
             FileName = invocation.FileName,
-            Arguments = invocation.Args,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
             WorkingDirectory = _workingDirectory ?? string.Empty
         };
+
+        // Handle different argument passing methods
+        if (!string.IsNullOrEmpty(invocation.Args))
+        {
+            startInfo.Arguments = invocation.Args;
+        }
+        else if (!string.IsNullOrEmpty(invocation.Command))
+        {
+            // For Unix bash with commands, use ArgumentList to avoid escaping issues
+            startInfo.ArgumentList.Add("-l");
+            startInfo.ArgumentList.Add("-c");
+            startInfo.ArgumentList.Add(invocation.Command);
+        }
 
         using var process = new Process { StartInfo = startInfo };
         if (!process.Start())
@@ -250,20 +263,21 @@ public sealed class ShellTool : IAgentTool
 
     private static ShellInvocation BuildShellInvocation(string command, ShellPreference preference)
     {
+        // Pwsh preference works on all platforms
+        if (preference == ShellPreference.Pwsh)
+        {
+            return BuildPwshInvocation(command, warningPrefix: null);
+        }
+
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            if (preference == ShellPreference.Pwsh)
-            {
-                return BuildPwshInvocation(command, warningPrefix: null);
-            }
-
             if (preference == ShellPreference.Bash)
             {
                 var bashPath = WindowsBashPath.Value;
                 if (!string.IsNullOrWhiteSpace(bashPath))
                 {
                     var bashEscaped = command.Replace("'", "'\"'\"'", StringComparison.Ordinal);
-                    return new ShellInvocation(bashPath, $"-lc '{bashEscaped}'", null);
+                    return new ShellInvocation(bashPath, $"-lc '{bashEscaped}'", null, null);
                 }
 
                 // Bash explicitly requested but not found — fall back to pwsh with warning.
@@ -276,15 +290,15 @@ public sealed class ShellTool : IAgentTool
             if (!string.IsNullOrWhiteSpace(autoBashPath))
             {
                 var bashEscaped = command.Replace("'", "'\"'\"'", StringComparison.Ordinal);
-                return new ShellInvocation(autoBashPath, $"-lc '{bashEscaped}'", null);
+                return new ShellInvocation(autoBashPath, $"-lc '{bashEscaped}'", null, null);
             }
 
             return BuildPwshInvocation(command,
                 "[warning: bash not found, using PowerShell — install Git for Windows for best compatibility]\n");
         }
 
-        var unixBashEscaped = command.Replace("'", "'\"'\"'", StringComparison.Ordinal);
-        return new ShellInvocation("/bin/bash", $"-lc '{unixBashEscaped}'", null);
+        // Unix with Auto or Bash preference: use bash with ArgumentList
+        return new ShellInvocation("/bin/bash", null, command, null);
     }
 
     private static ShellInvocation BuildPwshInvocation(string command, string? warningPrefix)
@@ -295,6 +309,7 @@ public sealed class ShellTool : IAgentTool
         return new ShellInvocation(
             pwshPath,
             $"-NoLogo -NoProfile -NonInteractive -Command \"{escaped}\"",
+            null,
             warningPrefix);
     }
 
@@ -515,5 +530,5 @@ public sealed class ShellTool : IAgentTool
     /// </summary>
     public sealed record ShellToolDetails(int ExitCode, bool TimedOut, bool IsError);
 
-    private sealed record ShellInvocation(string FileName, string Args, string? WarningPrefix);
+    private sealed record ShellInvocation(string FileName, string? Args, string? Command, string? WarningPrefix);
 }

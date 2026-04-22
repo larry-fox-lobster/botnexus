@@ -27,7 +27,7 @@ public sealed class SessionPrimitivesTests
     public async Task SessionJsonl_WriteAndRead_RoundTripsEntries()
     {
         var fileSystem = new MockFileSystem();
-        var path = @"C:\sessions\history.jsonl";
+        var path = Path.Combine(Path.GetTempPath(), "sessions", "history.jsonl");
         var entries = new[]
         {
             new SessionEntry { Role = MessageRole.User, Content = "hello" },
@@ -46,7 +46,7 @@ public sealed class SessionPrimitivesTests
     public async Task SessionMetadataSidecar_WriteAndRead_RoundTripsMetadata()
     {
         var fileSystem = new MockFileSystem();
-        var path = @"C:\sessions\session.meta.json";
+        var path = Path.Combine(Path.GetTempPath(), "sessions", "session.meta.json");
         var metadata = new TestMetadata("s1", "agent-a", DateTimeOffset.UtcNow);
 
         await SessionMetadataSidecar.WriteAsync(fileSystem, path, metadata, JsonOptions);

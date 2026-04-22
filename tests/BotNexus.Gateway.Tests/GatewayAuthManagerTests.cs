@@ -16,7 +16,7 @@ public sealed class GatewayAuthManagerTests : IDisposable
     public GatewayAuthManagerTests()
     {
         _fileSystem = new MockFileSystem();
-        _rootPath = @"C:\botnexus\gateway-auth-tests";
+        _rootPath = Path.Combine(Path.GetTempPath(), "botnexus", "gateway-auth-tests");
         _fileSystem.Directory.CreateDirectory(_rootPath);
         _authFilePath = Path.Combine(_rootPath, "auth.json");
         _legacyAuthFilePath = Path.Combine(_rootPath, "legacy-auth.json");

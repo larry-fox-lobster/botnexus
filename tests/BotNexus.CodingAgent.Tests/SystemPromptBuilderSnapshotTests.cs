@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 using BotNexus.CodingAgent;
 
@@ -9,6 +10,7 @@ public sealed class SystemPromptBuilderSnapshotTests
     public void Build_GitAndToolContributions_MatchesSnapshot()
     {
         var builder = new SystemPromptBuilder();
+        // Use fixed cross-platform directory path instead of Path.GetTempPath() to avoid platform differences
         var prompt = builder.Build(new SystemPromptContext(
             WorkingDirectory: Path.Combine(Path.GetTempPath(), "repo"),
             GitBranch: "feature/unify-prompts",

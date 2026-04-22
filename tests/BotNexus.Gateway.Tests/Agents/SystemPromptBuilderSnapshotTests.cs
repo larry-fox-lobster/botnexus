@@ -10,7 +10,7 @@ public sealed class SystemPromptBuilderSnapshotTests
     {
         var prompt = SystemPromptBuilder.Build(new SystemPromptParams
         {
-            WorkspaceDir = @"C:\\repo\\workspace",
+            WorkspaceDir = Path.Combine(Path.GetTempPath(), "repo", "workspace"),
             ExtraSystemPrompt = "Custom context line 1\n\nCustom context line 2",
             ToolNames = ["read", "exec", "process", "cron", "update_plan", "gateway", "message"],
             UserTimezone = "Pacific/Auckland",
@@ -23,7 +23,7 @@ public sealed class SystemPromptBuilderSnapshotTests
             ],
             SkillsPrompt = "## Available Skills\n- skill-a\n- skill-b",
             HeartbeatPrompt = "HEARTBEAT?",
-            DocsPath = @"C:\\repo\\docs",
+            DocsPath = Path.Combine(Path.GetTempPath(), "repo", "docs"),
             WorkspaceNotes = ["Note one", "Note two"],
             TtsHint = "Speak naturally.",
             PromptMode = PromptMode.Full,
@@ -54,7 +54,7 @@ public sealed class SystemPromptBuilderSnapshotTests
     {
         var prompt = SystemPromptBuilder.Build(new SystemPromptParams
         {
-            WorkspaceDir = @"C:\\repo\\workspace",
+            WorkspaceDir = Path.Combine(Path.GetTempPath(), "repo", "workspace"),
             ExtraSystemPrompt = "Sub-agent context",
             ToolNames = ["read", "exec", "process"],
             UserTimezone = "UTC",
@@ -65,7 +65,7 @@ public sealed class SystemPromptBuilderSnapshotTests
             ],
             SkillsPrompt = "## Available Skills\n- skill-a",
             HeartbeatPrompt = "HEARTBEAT?",
-            DocsPath = @"C:\\repo\\docs",
+            DocsPath = Path.Combine(Path.GetTempPath(), "repo", "docs"),
             WorkspaceNotes = ["Minimal note"],
             TtsHint = "Speak naturally.",
             PromptMode = PromptMode.Minimal,
@@ -95,7 +95,7 @@ public sealed class SystemPromptBuilderSnapshotTests
     {
         var prompt = SystemPromptBuilder.Build(new SystemPromptParams
         {
-            WorkspaceDir = @"C:\\repo\\workspace",
+            WorkspaceDir = Path.Combine(Path.GetTempPath(), "repo", "workspace"),
             ToolNames = [],
             PromptMode = PromptMode.Full,
             Runtime = new RuntimeInfo

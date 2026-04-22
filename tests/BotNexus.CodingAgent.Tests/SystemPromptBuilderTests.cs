@@ -10,7 +10,7 @@ public sealed class SystemPromptBuilderTests
     public void Build_IncludesRoleToolsAndEnvironmentSections()
     {
         var context = new SystemPromptContext(
-            WorkingDirectory: Path.Combine(Path.GetTempPath(), "repo"),
+            WorkingDirectory: "C:/repo",
             GitBranch: "main",
             GitStatus: "clean",
             PackageManager: "npm",
