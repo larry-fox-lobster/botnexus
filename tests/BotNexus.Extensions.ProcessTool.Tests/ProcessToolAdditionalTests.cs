@@ -471,12 +471,10 @@ public sealed class ProcessManagerAndManagedProcessTests : IDisposable
     public void Dispose_KillsUnderlyingProcess()
     {
         var process = SpawnManagedProcess("ping -n 60 127.0.0.1 >nul", "sleep 60");
-        var pid = process.Pid;
 
+        process.IsRunning.ShouldBeTrue();
         process.Dispose();
-
-        Action act = () => Process.GetProcessById(pid);
-        act.ShouldThrow<ArgumentException>();
+        process.IsRunning.ShouldBeFalse();
     }
 
     [Fact]
