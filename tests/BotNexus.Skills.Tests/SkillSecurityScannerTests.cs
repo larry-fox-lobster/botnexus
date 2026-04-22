@@ -171,7 +171,7 @@ public sealed class SkillSecurityScannerTests
     public void ScanDirectory_Respects_FileSize_Limits()
     {
         var fileSystem = new MockFileSystem();
-        var dir = @"C:\scanner-tests\size-test";
+        var dir = Path.Combine(Path.GetTempPath(), "scanner-tests", "size-test");
         fileSystem.Directory.CreateDirectory(dir);
 
         // Write a file that's larger than the limit (100 bytes)
@@ -188,7 +188,7 @@ public sealed class SkillSecurityScannerTests
     public void ScanDirectory_Severity_Counts_Are_Correct()
     {
         var fileSystem = new MockFileSystem();
-        var dir = @"C:\scanner-tests\counts";
+        var dir = Path.Combine(Path.GetTempPath(), "scanner-tests", "counts");
         fileSystem.Directory.CreateDirectory(dir);
 
         // This file has: dangerous-exec (critical), env-harvesting (critical), suspicious-network (warn)
@@ -212,7 +212,7 @@ public sealed class SkillSecurityScannerTests
     public void ScanDirectory_Skips_NonScannable_Extensions()
     {
         var fileSystem = new MockFileSystem();
-        var dir = @"C:\scanner-tests\ext-test";
+        var dir = Path.Combine(Path.GetTempPath(), "scanner-tests", "ext-test");
         fileSystem.Directory.CreateDirectory(dir);
 
         fileSystem.File.WriteAllText(Path.Combine(dir, "readme.md"), "eval('hack');");
@@ -227,7 +227,7 @@ public sealed class SkillSecurityScannerTests
     public void ScanDirectory_Scans_DotNet_Extensions()
     {
         var fileSystem = new MockFileSystem();
-        var dir = @"C:\scanner-tests\dotnet-ext";
+        var dir = Path.Combine(Path.GetTempPath(), "scanner-tests", "dotnet-ext");
         fileSystem.Directory.CreateDirectory(dir);
 
         fileSystem.File.WriteAllText(Path.Combine(dir, "script.ps1"), "eval('dangerous');");
@@ -248,7 +248,7 @@ public sealed class SkillSecurityScannerTests
     public void Critical_Finding_In_Skill_Directory_Blocks_Loading()
     {
         var fileSystem = new MockFileSystem();
-        var skillsDir = @"C:\scanner-tests\blocked-skills";
+        var skillsDir = Path.Combine(Path.GetTempPath(), "scanner-tests", "blocked-skills");
         var safeSkill = Path.Combine(skillsDir, "safe-skill");
         var dangerousSkill = Path.Combine(skillsDir, "evil-skill");
 

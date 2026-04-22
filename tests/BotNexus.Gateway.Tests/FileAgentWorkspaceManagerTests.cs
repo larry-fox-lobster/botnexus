@@ -13,7 +13,7 @@ public sealed class FileAgentWorkspaceManagerTests : IDisposable
 
     public FileAgentWorkspaceManagerTests()
     {
-        _homePath = @"C:\botnexus\workspace-tests";
+        _homePath = Path.Combine(Path.GetTempPath(), "botnexus", "workspace-tests");
         _fileSystem = new MockFileSystem();
         _workspaceManager = new FileAgentWorkspaceManager(new BotNexusHome(_fileSystem, _homePath), _fileSystem);
     }

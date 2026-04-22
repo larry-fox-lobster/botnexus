@@ -305,7 +305,7 @@ public sealed class FileSessionStoreTests
         {
             FileSystem = new MockFileSystem();
             StorePath = Path.Combine(
-                "C:\\",
+                Path.GetTempPath(),
                 "FileSessionStoreTests",
                 Guid.NewGuid().ToString("N"));
             FileSystem.Directory.CreateDirectory(StorePath);

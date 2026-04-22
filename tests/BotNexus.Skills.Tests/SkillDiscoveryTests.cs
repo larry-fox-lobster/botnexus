@@ -6,7 +6,7 @@ namespace BotNexus.Extensions.Skills.Tests;
 public sealed class SkillDiscoveryTests
 {
     private readonly MockFileSystem _fileSystem = new();
-    private const string TempDir = @"C:\botnexus-skill-tests";
+    private static readonly string TempDir = Path.Combine(Path.GetTempPath(), "botnexus-skill-tests");
 
     [Fact]
     public void Discover_GlobalSkills_FindsValidSkills()
@@ -76,7 +76,7 @@ public sealed class SkillDiscoveryTests
     [Fact]
     public void Discover_NonexistentPaths_ReturnsEmpty()
     {
-        SkillDiscovery.Discover(@"C:\nonexistent", null, null, _fileSystem).ShouldBeEmpty();
+        SkillDiscovery.Discover(Path.Combine(Path.GetTempPath(), "nonexistent"), null, null, _fileSystem).ShouldBeEmpty();
     }
 
     [Fact]
