@@ -149,13 +149,25 @@ public sealed class ShellTool : IAgentTool
         var startInfo = new ProcessStartInfo
         {
             FileName = invocation.FileName,
-            Arguments = invocation.Args,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
             WorkingDirectory = _workingDirectory ?? string.Empty
         };
+
+        // Handle different argument passing methods
+        if (!string.IsNullOrEmpty(invocation.Args))
+        {
+            startInfo.Arguments = invocation.Args;
+        }
+        else if (!string.IsNullOrEmpty(invocation.Command))
+        {
+            // For Unix bash with commands, use ArgumentList to avoid escaping issues
+            startInfo.ArgumentList.Add("-l");
+            startInfo.ArgumentList.Add("-c");
+            startInfo.ArgumentList.Add(invocation.Command);
+        }
 
         using var process = new Process { StartInfo = startInfo };
         if (!process.Start())
@@ -263,7 +275,7 @@ public sealed class ShellTool : IAgentTool
                 if (!string.IsNullOrWhiteSpace(bashPath))
                 {
                     var bashEscaped = command.Replace("'", "'\"'\"'", StringComparison.Ordinal);
-                    return new ShellInvocation(bashPath, $"-lc '{bashEscaped}'", null);
+                    return new ShellInvocation(bashPath, $"-lc '{bashEscaped}'", null, null);
                 }
 
                 // Bash explicitly requested but not found — fall back to pwsh with warning.
@@ -276,15 +288,16 @@ public sealed class ShellTool : IAgentTool
             if (!string.IsNullOrWhiteSpace(autoBashPath))
             {
                 var bashEscaped = command.Replace("'", "'\"'\"'", StringComparison.Ordinal);
-                return new ShellInvocation(autoBashPath, $"-lc '{bashEscaped}'", null);
+                return new ShellInvocation(autoBashPath, $"-lc '{bashEscaped}'", null, null);
             }
 
             return BuildPwshInvocation(command,
                 "[warning: bash not found, using PowerShell — install Git for Windows for best compatibility]\n");
         }
 
-        var unixBashEscaped = command.Replace("'", "'\"'\"'", StringComparison.Ordinal);
-        return new ShellInvocation("/bin/bash", $"-lc '{unixBashEscaped}'", null);
+        // For Unix, use ArgumentList to avoid shell escaping issues with single quotes
+        // The command will be passed as separate arguments: ["-l", "-c", command]
+        return new ShellInvocation("/bin/bash", null, command, null);
     }
 
     private static ShellInvocation BuildPwshInvocation(string command, string? warningPrefix)
@@ -295,6 +308,7 @@ public sealed class ShellTool : IAgentTool
         return new ShellInvocation(
             pwshPath,
             $"-NoLogo -NoProfile -NonInteractive -Command \"{escaped}\"",
+            null,
             warningPrefix);
     }
 
@@ -515,5 +529,5 @@ public sealed class ShellTool : IAgentTool
     /// </summary>
     public sealed record ShellToolDetails(int ExitCode, bool TimedOut, bool IsError);
 
-    private sealed record ShellInvocation(string FileName, string Args, string? WarningPrefix);
+    private sealed record ShellInvocation(string FileName, string? Args, string? Command, string? WarningPrefix);
 }

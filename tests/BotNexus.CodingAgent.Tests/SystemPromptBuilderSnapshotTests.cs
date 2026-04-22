@@ -9,8 +9,9 @@ public sealed class SystemPromptBuilderSnapshotTests
     public void Build_GitAndToolContributions_MatchesSnapshot()
     {
         var builder = new SystemPromptBuilder();
+        // Use fixed cross-platform directory path instead of Path.GetTempPath() to avoid platform differences
         var prompt = builder.Build(new SystemPromptContext(
-            WorkingDirectory: Path.Combine(Path.GetTempPath(), "repo"),
+            WorkingDirectory: "/tmp/repo",
             GitBranch: "feature/unify-prompts",
             GitStatus: "M src/file.cs",
             PackageManager: "pnpm",
