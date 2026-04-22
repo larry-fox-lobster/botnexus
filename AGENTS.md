@@ -78,15 +78,20 @@ Common properties and package versions are centralized — **do not duplicate th
 
 **All file paths must be constructed using `Path.Combine()` and platform APIs.** BotNexus runs on Windows, Linux, and macOS — hardcoded paths break portability.
 
+The project uses **`System.IO.Abstractions`** (`TestableIO.System.IO.Abstractions`) for filesystem operations. Production code should inject `IFileSystem` and use its path APIs (`fileSystem.Path.Combine()`, `fileSystem.Path.GetTempPath()`, etc.) rather than calling `System.IO.Path` directly. This enables testability via `MockFileSystem` and ensures consistent cross-platform behaviour.
+
 **Rules:**
-- Use `Path.Combine()` to build all file paths — never concatenate strings with `/` or `\`
+- Use `IFileSystem.Path.Combine()` in production code (or `Path.Combine()` in tests and static helpers)
 - Use `Path.GetTempPath()` for temporary directories — never hardcode `/tmp/` or `C:\Temp\`
 - Use `Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)` for the user home directory, with a fallback to `Environment.GetEnvironmentVariable("HOME")` on Linux/macOS
 - Use `Path.DirectorySeparatorChar` or `Path.AltDirectorySeparatorChar` when separator-aware logic is needed
 - In test assertions, normalise paths before comparing (e.g., `Path.GetFullPath()`) rather than asserting exact separator characters
 
 ```csharp
-// GOOD — works on all platforms
+// GOOD — production code with IFileSystem
+var configDir = _fileSystem.Path.Combine(_fileSystem.Path.GetTempPath(), "botnexus", "config");
+
+// GOOD — test setup
 var configDir = Path.Combine(Path.GetTempPath(), "botnexus-tests", Guid.NewGuid().ToString("N"));
 var userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
     is { Length: > 0 } home ? home : Environment.GetEnvironmentVariable("HOME") ?? "/tmp";
