@@ -3,48 +3,29 @@ id: improvement-blazor-configuration-ui
 title: "Blazor Configuration UI — Canvas Views, Root Config, Locations"
 type: improvement
 priority: medium
-status: proposed
+status: partially-delivered
 created: 2025-07-17
+updated: 2026-04-23
 tags: [blazor, configuration, ux, locations]
 ---
 
 # Improvement: Blazor Configuration UI
 
-**Status:** proposed
+**Status:** partially-delivered
 **Priority:** medium
-**Created:** 2025-07-17
+**Updated:** 2026-04-23
 
-## Problem
+## Delivery Status
 
-The Blazor configuration UI has several usability gaps and missing functionality:
+### ✅ Delivered (Issue #12, 2026-04-23)
+- **A. Config Section → Canvas View** — Configuration sections now open in the main canvas. Delivered as part of the Blazor redesign.
+- **B. Root Configuration Node** — Clicking "Configuration" opens world-level settings. The new "🌍 World Settings" section (added in issue #12) shows `agents.defaults` and `cron.enabled`.
 
-1. **Config sections don't open in main canvas** — Clicking a config section item in the sidebar has no effect on the main content area. Section detail should open as a full view in the main canvas.
-2. **Root "Configuration" node has no action** — Clicking the root "Configuration" node should open general/world-level configuration settings (e.g., gateway options, default provider, global preferences).
-3. **"Locations" section is missing** — There is no UI for managing locations despite `feature-location-management` being shipped. Users cannot view or edit locations from the config UI.
-4. **No per-agent location configuration** — Locations can only be set globally. Agents should be able to have agent-level location overrides (e.g., an agent scoped to a specific repo or working directory).
+### ⏳ Still Needed
+- **C. Locations Config Section** — No UI for managing locations despite the backend being shipped. Users cannot view or edit locations from the config UI.
+- **D. Per-Agent Location Configuration** — Agent config panel has no locations section; no agent-level location overrides.
 
-## Requirements
-
-### A. Config Section → Canvas View
-- Clicking any config section item in the sidebar opens its detail/edit view in the main canvas area.
-- Canvas view should show the full configuration for that section with edit capabilities.
-- Sidebar selection state should visually indicate which section is active.
-
-### B. Root Configuration Node
-- Clicking "Configuration" (root) opens a world-level settings view.
-- World-level view shows: gateway options, default provider, global agent defaults, and other top-level config.
-
-### C. Locations Config Section
-- Add "Locations" as a new section in the configuration sidebar tree.
-- List all configured locations with name, path, and description.
-- Support add/edit/delete of locations.
-- Wire to the existing `feature-location-management` backend APIs.
-
-### D. Per-Agent Location Configuration
-- In the agent configuration view, add a locations section.
-- Allow assigning/overriding locations at the agent level.
-- Agent-level locations should merge with or override world-level locations.
-- Backend: extend agent config schema to support `locations` property.
+## Remaining Requirements
 
 ## Design
 
@@ -75,3 +56,20 @@ The Blazor configuration UI has several usability gaps and missing functionality
 - Blazor UI: sidebar navigation, canvas routing, new Locations components
 - Backend: agent config schema extension for per-agent locations
 - No changes to core location resolution logic (that's already shipped)
+
+### C. Locations Config Section
+- Add "Locations" as a new section in the configuration sidebar tree.
+- List all configured locations with name, path, and description.
+- Support add/edit/delete of locations.
+- Wire to the existing `feature-location-management` backend APIs.
+
+### D. Per-Agent Location Configuration
+- In the agent configuration view, add a locations section.
+- Allow assigning/overriding locations at the agent level.
+- Agent-level locations should merge with or override world-level locations.
+- Backend: extend agent config schema to support `locations` property.
+
+## Scope (remaining)
+- Blazor UI: new Locations config section component, per-agent location fields in AgentConfigPanel
+- Backend: agent config schema extension for `locations` property
+- No changes to core location resolution logic (already shipped)

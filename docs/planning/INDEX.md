@@ -1,6 +1,6 @@
 # 📋 Planning Index
 
-> Auto-maintained by Nova's daily planning maintenance. Last updated: 2026-04-21
+> Auto-maintained by Nova's daily planning maintenance. Last updated: 2026-04-23
 
 ## 🐛 Bugs
 
@@ -10,7 +10,6 @@
 
 ### 🟠 High
 - [NO_REPLY Sentinel Visible as Literal Text in Blazor UI](bug-noreply-visible-in-ui/design-spec.md) — `draft`
-- [Session Switching Broken During Active Agent Work](bug-session-switching-ui/design-spec.md) — `partially-delivered` 📄
 
 ### 🟡 Medium
 - [Blazor UI Loses Session History for Agent/Channel Combo](bug-blazor-session-history-loss/design-spec.md) — `draft`
@@ -37,7 +36,7 @@
 
 ### 🟡 Medium
 - [Skills Extension — Expose Base Path on Load](improvement-skills-path-resolution/design-spec.md) — `draft`
-- [Blazor Configuration UI](improvement-blazor-configuration-ui/design-spec.md) — `proposed`
+- [Blazor Configuration UI — C/D: Locations + Per-Agent](improvement-blazor-configuration-ui/design-spec.md) — `partially-delivered`
 
 ### 🔵 Low
 - [Dynamic Agent List](improvement-blazor-dynamic-agent-list/design-spec.md) — `proposed`
@@ -69,6 +68,7 @@
 - [Blazor Auto-Scroll](archived/bug-blazor-autoscroll/design-spec.md) — `delivered`
 - [Edit Tool DiffPlex Missing](archived/bug-edit-tool-diffplex-missing/design-spec.md) — `delivered`
 - [Sub-Agent Completion Wakeup](archived/bug-subagent-completion-wakeup/design-spec.md) — `delivered`
+- [Session Switching Broken During Active Agent Work](bug-session-switching-ui/design-spec.md) — `done` — Fixed by Blazor redesign
 
 ### Features
 - [Context Diagnostics](archived/feature-context-diagnostics/design-spec.md) — `delivered`
