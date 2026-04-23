@@ -144,6 +144,7 @@ public sealed class ToolExecutorTimeoutTests
         var mock = new Mock<IAgentTool>(MockBehavior.Strict);
         mock.SetupGet(t => t.Name).Returns(name);
         mock.SetupGet(t => t.Label).Returns(name);
+        mock.SetupGet(t => t.DefaultTimeout).Returns((TimeSpan?)null);
         mock.SetupGet(t => t.Definition).Returns(new Tool(name, "mock", JsonDocument.Parse("""{"type":"object"}""").RootElement.Clone()));
         mock.Setup(t => t.PrepareArgumentsAsync(It.IsAny<IReadOnlyDictionary<string, object?>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyDictionary<string, object?> args, CancellationToken _) => args);
@@ -184,5 +185,76 @@ public sealed class ToolExecutorTimeoutTests
         completedNormally.ShouldBeTrue();
         results.ShouldHaveSingleItem();
         results[0].IsError.ShouldBeFalse();
+    }
+
+    /// <summary>Tool.DefaultTimeout overrides the safety cap — long-running tool completes.</summary>
+    [Fact]
+    public async Task ToolDefaultTimeout_OverridesSafetyCap_LongToolCompletes()
+    {
+        var completedNormally = false;
+
+        // Tool takes 200ms but the safety cap is only 100ms
+        // Tool declares DefaultTimeout = 5s → executor should use 5s not 100ms
+        var tool = CreateToolWithDefaultTimeout("slow-tool", TimeSpan.FromSeconds(5), async ct =>
+        {
+            await Task.Delay(200, ct);
+            completedNormally = true;
+            return new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, "done")]);
+        });
+
+        var msg = CreateAssistant("tc-1", "slow-tool");
+        var config = TestHelpers.CreateTestConfig(toolTimeout: TimeSpan.FromMilliseconds(100));
+        var context = new AgentContext(null, [], [tool]);
+
+        var results = await ToolExecutor.ExecuteAsync(
+            context, msg, config, _ => Task.CompletedTask, CancellationToken.None);
+
+        completedNormally.ShouldBeTrue();
+        results[0].IsError.ShouldBeFalse();
+    }
+
+    /// <summary>Tool.DefaultTimeout smaller than safety cap — safety cap wins.</summary>
+    [Fact]
+    public async Task ToolDefaultTimeout_SmallerThanSafetyCap_SafetyCapWins()
+    {
+        // Tool declares 50ms default but safety cap is 500ms
+        // Tool runs for 200ms — should complete fine (both limits are above 200ms is wrong)
+        // Actually: safety cap 500ms > tool default 50ms → safety cap wins → tool gets 500ms
+        // Tool finishes in 200ms → success
+        var completedNormally = false;
+        var tool = CreateToolWithDefaultTimeout("quick-tool", TimeSpan.FromMilliseconds(50), async ct =>
+        {
+            await Task.Delay(200, ct);
+            completedNormally = true;
+            return new AgentToolResult([new AgentToolContent(AgentToolContentType.Text, "done")]);
+        });
+
+        var msg = CreateAssistant("tc-1", "quick-tool");
+        var config = TestHelpers.CreateTestConfig(toolTimeout: TimeSpan.FromMilliseconds(500));
+        var context = new AgentContext(null, [], [tool]);
+
+        var results = await ToolExecutor.ExecuteAsync(
+            context, msg, config, _ => Task.CompletedTask, CancellationToken.None);
+
+        // Safety cap (500ms) > tool default (50ms) → executor uses 500ms → 200ms tool succeeds
+        completedNormally.ShouldBeTrue();
+        results[0].IsError.ShouldBeFalse();
+    }
+
+    private static IAgentTool CreateToolWithDefaultTimeout(
+        string name,
+        TimeSpan defaultTimeout,
+        Func<CancellationToken, Task<AgentToolResult>> execute)
+    {
+        var mock = new Mock<IAgentTool>();
+        mock.Setup(t => t.Name).Returns(name);
+        mock.Setup(t => t.Label).Returns(name);
+        mock.Setup(t => t.DefaultTimeout).Returns(defaultTimeout);
+        mock.Setup(t => t.Definition).Returns(new Tool(name, name, JsonDocument.Parse("""{"type":"object"}""").RootElement.Clone()));
+        mock.Setup(t => t.PrepareArgumentsAsync(It.IsAny<IReadOnlyDictionary<string, object?>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyDictionary<string, object?> args, CancellationToken _) => args);
+        mock.Setup(t => t.ExecuteAsync(It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, object?>>(), It.IsAny<CancellationToken>(), It.IsAny<AgentToolUpdateCallback?>()))
+            .Returns((string _, IReadOnlyDictionary<string, object?> _, CancellationToken ct, AgentToolUpdateCallback? _) => execute(ct));
+        return mock.Object;
     }
 }

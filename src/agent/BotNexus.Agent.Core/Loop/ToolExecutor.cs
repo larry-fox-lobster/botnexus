@@ -296,10 +296,21 @@ internal static class ToolExecutor
 
         // If the tool call includes an explicit timeout argument, respect it.
         // Tools like ShellTool (timeout: seconds) and ExecTool (timeoutMs: ms) expose this.
-        // Use whichever is larger — the configured safety cap or the agent-requested timeout
-        // plus a small buffer so the tool's own timeout fires first.
+        // Also check tool.DefaultTimeout — tools declare their own expected duration.
+        // Use the largest of: configured safety cap, tool default, agent-requested arg timeout.
         var effectiveTimeout = toolTimeout;
-        if (toolTimeout.HasValue)
+
+        // Tool-declared default — long-running tools (shell, exec, mcp) set this
+        if (prepared.Tool.DefaultTimeout.HasValue)
+        {
+            effectiveTimeout = effectiveTimeout.HasValue
+                ? (TimeSpan?)TimeSpan.FromTicks(Math.Max(effectiveTimeout.Value.Ticks, prepared.Tool.DefaultTimeout.Value.Ticks))
+                : prepared.Tool.DefaultTimeout;
+        }
+
+        // Agent-specified timeout in arguments (timeout: seconds or timeoutMs: ms)
+        // Honours explicit agent intent — e.g. "run this deploy script, timeout: 600"
+        if (effectiveTimeout.HasValue)
         {
             TimeSpan? requested = null;
             if (prepared.ValidatedArgs.TryGetValue("timeout", out var rawSec) && rawSec is not null
