@@ -3,20 +3,24 @@ id: bug-session-switching-ui
 title: "Session Switching Broken During Active Agent Work"
 type: bug
 priority: high
-status: partially-delivered
+status: done
 created: 2026-04-10
-updated: 2026-07-18
+updated: 2026-04-23
 author: nova
 tags: [webui, session, ux, multi-agent, critical-ux]
 blocks: [feature-subagent-ui-visibility]
-likely_fixed_by: feature-multi-session-connection (subscribe-all model)
-verification_needed: true
-partial_fix: 28a0329 (receive-side event isolation)
+resolution: Fixed by Blazor redesign — Razor component model eliminates JS state races
 ---
 
-## Status Note (2026-04-13)
+## Status Note (2026-04-23)
 
-**Partially fixed.** Commit `28a0329` addresses the **receive-side cross-session bleed** (Pattern A):
+**Resolved.** The new Blazor Server architecture eliminates the root cause. The original bug was a JavaScript state race in `app.js` where `currentSessionId` could be stale/null during async session switch operations. The Blazor redesign replaced the JS client entirely with Razor components and C# state management (`AgentSessionManager`), making the stale-session race structurally impossible — session identity is managed server-side and bound directly to Razor component parameters.
+
+The send-side misrouting, per-session loading state, and related JS testing requirements are all moot under the new architecture.
+
+## Original Status Note (2026-04-13)
+
+**Partially fixed.** Commit `28a0329` addressed the **receive-side cross-session bleed** (Pattern A).
 - **Server**: `SendAsync` and `SendStreamDeltaAsync` now wrap `ContentDelta` payloads as `{ sessionId, contentDelta }` instead of raw strings
 - **Client**: `routeEvent()` no longer falls back to `activeViewId` when `sessionId` is missing — events without a `sessionId` are dropped with a console warning
 
