@@ -73,7 +73,7 @@ internal static class ToolExecutor
 
             var (result, isError) = preparation.Prepared is null
                 ? (preparation.Result!, preparation.IsError)
-                : await ExecutePreparedToolCallAsync(preparation.Prepared, emit, cancellationToken).ConfigureAwait(false);
+                : await ExecutePreparedToolCallAsync(preparation.Prepared, emit, cancellationToken, config.ToolTimeout).ConfigureAwait(false);
 
             if (preparation.Prepared is not null)
             {
@@ -164,7 +164,7 @@ internal static class ToolExecutor
 
         var executionTasks = preparedItems.Select(async item =>
         {
-            var execution = await ExecutePreparedToolCallAsync(item.Prepared, emit, cancellationToken).ConfigureAwait(false);
+            var execution = await ExecutePreparedToolCallAsync(item.Prepared, emit, cancellationToken, config.ToolTimeout).ConfigureAwait(false);
             return new ToolExecutionOutcome(
                 item.Index,
                 item.Prepared.ToolCall,
@@ -287,24 +287,41 @@ internal static class ToolExecutor
     private static async Task<(AgentToolResult Result, bool IsError)> ExecutePreparedToolCallAsync(
         PreparedToolCall prepared,
         Func<AgentEvent, Task> emit,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TimeSpan? toolTimeout = null)
     {
         AgentToolResult result;
         var isError = false;
         var updateTasks = new ConcurrentBag<Task>();
+
+        // Create a linked CancellationTokenSource for the per-tool timeout if configured.
+        using var timeoutCts = toolTimeout.HasValue
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+            : null;
+        if (timeoutCts is not null && toolTimeout.HasValue)
+        {
+            timeoutCts.CancelAfter(toolTimeout.Value);
+        }
+        var effectiveToken = timeoutCts?.Token ?? cancellationToken;
 
         try
         {
             result = await prepared.Tool.ExecuteAsync(
                 prepared.ToolCall.Id,
                 prepared.ValidatedArgs,
-                cancellationToken,
+                effectiveToken,
                 partialResult => updateTasks.Add(emit(new ToolExecutionUpdateEvent(
                     prepared.ToolCall.Id,
                     prepared.ToolCall.Name,
                     prepared.ValidatedArgs,
                     partialResult,
                     DateTimeOffset.UtcNow)))).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (timeoutCts is not null && timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            // Tool timed out (not user/turn cancellation) — return structured error to LLM.
+            result = BuildErrorResult($"Tool '{prepared.ToolCall.Name}' timed out after {toolTimeout!.Value.TotalSeconds:0}s. The operation did not complete.");
+            isError = true;
         }
         catch (Exception ex)
         {
