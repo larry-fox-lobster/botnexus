@@ -136,15 +136,31 @@
     private List<Announcement> _announcements = [];
     private bool _restarting;
     private bool _sidebarOpen = false;
+    private const string SidebarKey = "botnexus-sidebar-open";
 
     protected override void OnInitialized()
     {
         Manager.OnStateChanged += HandleStateChanged;
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var stored = await JS.InvokeAsync<string?>("localStorage.getItem", SidebarKey);
+            _sidebarOpen = stored == "true";
+            StateHasChanged();
+        }
+    }
+
     private void HandleStateChanged() => InvokeAsync(StateHasChanged);
 
-    private void ToggleSidebar() => _sidebarOpen = !_sidebarOpen;
+    private async Task ToggleSidebar()
+    {
+        _sidebarOpen = !_sidebarOpen;
+        await JS.InvokeVoidAsync("localStorage.setItem", SidebarKey, _sidebarOpen ? "true" : "false");
+    }
+
     private void CloseSidebar() => _sidebarOpen = false;
 
     private void OnNavClick()
