@@ -12,7 +12,9 @@ This guide helps you diagnose and resolve common issues with BotNexus.
 6. [Tool Execution Failures](#tool-execution-failures)
 7. [Extension Loading Errors](#extension-loading-errors)
 8. [Performance Issues](#performance-issues)
-9. [Logs and Diagnostics](#logs-and-diagnostics)
+9. [Linux-Specific Issues](#linux-specific-issues)
+10. [Ollama / Local Model Issues](#ollama--local-model-issues)
+11. [Logs and Diagnostics](#logs-and-diagnostics)
 
 ---
 
@@ -764,6 +766,118 @@ tail -f ~/.botnexus/logs/gateway.log | grep -i mcp
   "providers": {
     "anthropic": {
       "enablePromptCaching": true
+    }
+  }
+}
+```
+
+---
+
+## Linux-Specific Issues
+
+### WebUI Connects But Immediately Disconnects (CultureNotFoundException)
+
+**Symptom:** The BotNexus web UI loads in the browser but the SignalR hub connection fails immediately. The browser console shows:
+```text
+Hub connection failed: The 'InvokeCoreAsync' method cannot be called if the connection is not active
+```
+Gateway logs show:
+```text
+System.Globalization.CultureNotFoundException: Culture is not supported. (Parameter 'name')
+`1 is an invalid culture identifier.
+   at System.Globalization.CultureInfo.GetCultureInfo(String name)
+   at System.Reflection.RuntimeAssembly.GetLocale()
+   at Microsoft.AspNetCore.SignalR.Internal.DefaultHubDispatcher`1.OnConnectedAsync
+```
+
+**Cause:** .NET 10 on Linux attempts to resolve the locale from assembly metadata when SignalR enumerates hub methods. Generic type names (containing `` `1 ``) produce invalid culture identifiers, crashing `OnConnectedAsync` before the client can handshake.
+
+**Fix:** Run the gateway with globalization invariant mode:
+```bash
+export DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+dotnet BotNexus.Gateway.Api.dll --urls "http://0.0.0.0:5005"
+```
+
+Or set it permanently in your launch script / systemd service:
+```ini
+# systemd service example
+[Service]
+Environment="DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1"
+ExecStart=/home/user/.dotnet/dotnet /path/to/BotNexus.Gateway.Api.dll
+```
+
+---
+
+## Ollama / Local Model Issues
+
+### Agent Not Responding When Using Ollama
+
+**Symptom:** Agent is configured with an Ollama model but never responds. Gateway logs show:
+```text
+System.Net.Http.HttpRequestException: HTTP 400: registry.ollama.ai/library/phi4-reasoning:latest does not support tools
+```
+
+**Cause:** BotNexus sends tool definitions with every agent request. Ollama models that don't declare `tools` in their capabilities manifest reject these requests with HTTP 400.
+
+**Fix:** BotNexus automatically detects Ollama tool support via `/api/show` at startup and strips tool definitions for models that don't support them. If you see this error, ensure you're running BotNexus v1.0+ with the Ollama auto-detection fix.
+
+To check which models on your Ollama instance support tools:
+```bash
+curl -s http://localhost:11434/api/show -d '{"name":"your-model:tag"}' | python3 -c \
+  "import sys,json; d=json.load(sys.stdin); print(d.get('capabilities', []))"
+```
+Models with `tools` in the capabilities list will receive tool definitions. Others get plain chat.
+
+### Ollama Model Not Registered / "Model not registered" Error
+
+**Symptom:** Gateway logs show:
+```text
+System.InvalidOperationException: Model 'phi4-reasoning:latest' for provider 'openai-compat' is not registered.
+```
+
+**Cause:** Ollama models are not in BotNexus's built-in model registry (which covers hosted providers like Copilot, OpenAI, Anthropic). Local models must be declared in `config.json`.
+
+**Fix:** Configure your Ollama provider and agent correctly in `~/.botnexus/config.json`:
+```json
+{
+  "providers": {
+    "openai-compat": {
+      "baseUrl": "http://localhost:11434/v1",
+      "apiKey": "ollama",
+      "enabled": true
+    }
+  },
+  "agents": {
+    "assistant": {
+      "provider": "openai-compat",
+      "model": "your-model:tag",
+      "enabled": true
+    }
+  }
+}
+```
+
+Key points:
+- Provider must be `openai-compat` (not `ollama`) — Ollama exposes an OpenAI-compatible `/v1` endpoint
+- `apiKey` can be any non-empty string (e.g. `"ollama"`) — Ollama doesn't validate it but the gateway requires a value
+- The model ID must exactly match the Ollama model tag shown by `ollama list`
+
+### Ollama "No API Key" Error
+
+**Symptom:**
+```text
+System.InvalidOperationException: No API key for openai-compat.
+Set credentials before using model 'your-model:latest'.
+```
+
+**Cause:** The `openai-compat` provider requires an `apiKey` to be set even though Ollama doesn't authenticate.
+
+**Fix:** Add any non-empty string as the API key:
+```json
+{
+  "providers": {
+    "openai-compat": {
+      "apiKey": "ollama"
     }
   }
 }
