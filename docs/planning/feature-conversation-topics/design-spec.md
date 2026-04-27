@@ -3,7 +3,7 @@ id: feature-conversation-model
 title: "Feature: Conversation Model — for Omnichannel Continuity"
 type: feature
 priority: high
-status: draft
+status: ready
 created: 2026-04-27
 author: rusty
 tags: [sessions, channels, signalr, portal, omnichannel, architecture]
@@ -17,7 +17,7 @@ related:
 
 **Type**: Feature  
 **Priority**: High  
-**Status**: Draft  
+**Status**: Ready for implementation  
 **Author**: Rusty (via Jon)
 
 ## Overview
@@ -503,18 +503,15 @@ The following were decided by Jon Bullen on 2026-04-27:
 
 ## Remaining Open Questions
 
-1. Do we need a distinct conversation event stream (`ConversationCreated`, `BindingAdded`, etc.) or is session stream + REST lookup sufficient initially?
-
-   - **Option A: Session stream + lookup** — portal gets a session event with a `conversationId`, calls `GET /api/conversations/{id}` to refresh conversation state. No new SignalR events needed. Simpler upfront.
-   - **Option B: Distinct conversation events** — new hub events (`ConversationCreated`, `ConversationUpdated`, `BindingAdded`, `BindingRemoved`). Portal updates in real-time without polling. Cleaner long-term, more work to implement.
-
-   Recommendation: **Option A** for initial implementation, migrate to Option B as conversation event surface grows.
+None — all decisions resolved.
 
 ## Resolved Decisions
 
 1. **Reset timing** — resetting a conversation creates a new session. The first inbound message starts the session. Any pre-session hooks (e.g. soul/memory injection) should fire eagerly on reset to reduce response latency on the first message.
 
 2. **Conversation title** — user can set or rename a conversation title at any time. If no title is set, the agent auto-generates one based on conversation content. Both can coexist: agent suggestion, user override.
+
+3. **Event stream** — **Option A: session stream + lookup.** Conversations are metadata — a stable identity container. All live events happen at session level. The portal observes session events and looks up conversation context via REST when needed. No dedicated conversation event stream required. Conversation is just a lookup.
 
 ## Recommendation
 
