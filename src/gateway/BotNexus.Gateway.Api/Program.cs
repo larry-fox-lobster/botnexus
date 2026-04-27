@@ -7,10 +7,8 @@ using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Extensions;
 using BotNexus.Agent.Providers.Anthropic;
 using BotNexus.Agent.Providers.Core;
-using BotNexus.Agent.Providers.Core.Compatibility;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
-using BotNexus.Agent.Providers.OpenAICompat;
 using Microsoft.Extensions.Options;
 using BotNexus.Agent.Providers.OpenAI;
 using BotNexus.Agent.Providers.OpenAICompat;
@@ -182,19 +180,27 @@ builder.Services.AddSingleton<LlmClient>(serviceProvider =>
             if (!providerConfig.Enabled || string.IsNullOrWhiteSpace(providerConfig.BaseUrl))
                 continue;
 
-            // Register each explicitly listed model for this provider
             if (providerConfig.Models is { Count: > 0 })
             {
                 foreach (var modelId in providerConfig.Models)
                 {
-                    models.Register(providerName, BuildCompatModel(
-                        modelId, providerName, providerConfig.BaseUrl, httpClient));
+                    models.Register(providerName, new LlmModel(
+                        Id: modelId,
+                        Name: modelId,
+                        Api: "openai-completions",
+                        Provider: providerName,
+                        BaseUrl: providerConfig.BaseUrl,
+                        Reasoning: modelId.Contains("reasoning", StringComparison.OrdinalIgnoreCase),
+                        Input: ["text"],
+                        Cost: new ModelCost(0, 0, 0, 0),
+                        ContextWindow: 128000,
+                        MaxTokens: 32000));
                 }
             }
         }
     }
 
-    // Also register the default model for any agent using an openai-compat provider not in BuiltInModels
+    // Register the model for any agent using an openai-compat provider not in BuiltInModels
     if (platformConfig.Agents is not null && platformConfig.Providers is not null)
     {
         foreach (KeyValuePair<string, AgentDefinitionConfig> agentEntry in platformConfig.Agents)
@@ -207,53 +213,24 @@ builder.Services.AddSingleton<LlmClient>(serviceProvider =>
             if (string.IsNullOrWhiteSpace(agentProvider.BaseUrl))
                 continue;
             if (models.GetModel(agentConfig.Provider, agentConfig.Model) is not null)
-                continue; // already registered
+                continue;
 
-            models.Register(agentConfig.Provider, BuildCompatModel(
-                agentConfig.Model, agentConfig.Provider, agentProvider.BaseUrl, httpClient));
+            models.Register(agentConfig.Provider, new LlmModel(
+                Id: agentConfig.Model,
+                Name: agentConfig.Model,
+                Api: "openai-completions",
+                Provider: agentConfig.Provider,
+                BaseUrl: agentProvider.BaseUrl,
+                Reasoning: agentConfig.Model.Contains("reasoning", StringComparison.OrdinalIgnoreCase),
+                Input: ["text"],
+                Cost: new ModelCost(0, 0, 0, 0),
+                ContextWindow: 128000,
+                MaxTokens: 32000));
         }
     }
 
     return new LlmClient(apiProviders, models);
 });
-
-/// <summary>
-/// Builds an LlmModel for an openai-compat provider, checking Ollama tool support when applicable.
-/// </summary>
-static LlmModel BuildCompatModel(string modelId, string provider, string baseUrl, HttpClient httpClient)
-{
-    var isOllama = baseUrl.Contains("localhost:11434") || baseUrl.Contains("127.0.0.1:11434");
-    var supportsTools = !isOllama || OllamaCapabilityChecker
-        .SupportsToolsAsync(httpClient, baseUrl, modelId)
-        .GetAwaiter().GetResult();
-
-    var compat = isOllama
-        ? new OpenAICompletionsCompat
-        {
-            SupportsTools = supportsTools,
-            SupportsStore = false,
-            SupportsDeveloperRole = false,
-            SupportsReasoningEffort = false,
-            SupportsUsageInStreaming = false,
-            MaxTokensField = "max_tokens",
-            SupportsStrictMode = false,
-            RequiresToolResultName = true,
-        }
-        : null; // non-Ollama: let CompatDetector handle it at call time
-
-    return new LlmModel(
-        Id: modelId,
-        Name: modelId,
-        Api: "openai-completions",
-        Provider: provider,
-        BaseUrl: baseUrl,
-        Reasoning: modelId.Contains("reasoning", StringComparison.OrdinalIgnoreCase),
-        Input: ["text"],
-        Cost: new ModelCost(0, 0, 0, 0),
-        ContextWindow: 128000,
-        MaxTokens: 32000,
-        Compat: compat);
-}
 
 using (var bootstrapLoggerFactory = new Serilog.Extensions.Logging.SerilogLoggerFactory(Log.Logger, dispose: false))
 {

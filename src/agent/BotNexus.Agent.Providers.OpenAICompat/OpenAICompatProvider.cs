@@ -190,7 +190,7 @@ public sealed class OpenAICompatProvider(HttpClient httpClient) : IApiProvider
             body["tool_choice"] = compatOpts2.ToolChoice;
 
         // Tools
-        if (context.Tools is { Count: > 0 })
+        if (context.Tools is { Count: > 0 } && compat.SupportsTools != false)
         {
             var tools = new List<object>();
             foreach (var tool in context.Tools)
@@ -213,7 +213,7 @@ public sealed class OpenAICompatProvider(HttpClient httpClient) : IApiProvider
             }
             body["tools"] = ToNode(tools);
         }
-        else if (HasToolHistory(context.Messages))
+        else if (HasToolHistory(context.Messages) && compat.SupportsTools != false)
         {
             body["tools"] = ToNode(Array.Empty<object>());
         }

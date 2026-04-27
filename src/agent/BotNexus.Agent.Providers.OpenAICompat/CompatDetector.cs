@@ -19,10 +19,14 @@ public static class CompatDetector
         var baseUrl = model.BaseUrl.ToLowerInvariant();
 
         // Ollama: localhost:11434
+        // Query /api/show to check if this specific model supports tools.
+        // Results are cached per model — safe to call synchronously at startup.
         if (provider == "ollama" || baseUrl.Contains("localhost:11434") || baseUrl.Contains("127.0.0.1:11434"))
         {
+            var supportsTools = OllamaCapabilityChecker.SupportsToolsSync(model.BaseUrl, model.Id);
             return new OpenAICompletionsCompat
             {
+                SupportsTools = supportsTools,
                 SupportsStore = false,
                 SupportsDeveloperRole = false,
                 SupportsReasoningEffort = false,

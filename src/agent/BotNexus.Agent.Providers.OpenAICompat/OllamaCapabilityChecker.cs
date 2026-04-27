@@ -13,6 +13,14 @@ public static class OllamaCapabilityChecker
     private static readonly SemaphoreSlim _lock = new(1, 1);
 
     /// <summary>
+    /// Synchronous wrapper for use in <see cref="CompatDetector.Detect"/> which is called per-request.
+    /// Safe because results are cached after the first call.
+    /// </summary>
+    public static bool SupportsToolsSync(string ollamaBaseUrl, string modelId)
+        => SupportsToolsAsync(new HttpClient(), ollamaBaseUrl, modelId)
+            .GetAwaiter().GetResult();
+
+    /// <summary>
     /// Returns true if the Ollama model supports tool calling.
     /// Falls back to false on any error (safe default — strip tools rather than crash).
     /// </summary>
