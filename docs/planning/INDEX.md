@@ -12,7 +12,7 @@
 - [NO_REPLY Sentinel Visible as Literal Text in Blazor UI](bug-noreply-visible-in-ui/design-spec.md) — `draft`
 
 ### 🟡 Medium
-- [Blazor UI Loses Session History for Agent/Channel Combo](bug-blazor-session-history-loss/design-spec.md) — `draft`
+- [Blazor UI Loses Session History for Agent/Channel Combo](bug-blazor-session-history-loss/design-spec.md) — `done`
 - [Message Queue Injection Timing](message-queue-injection-timing/design-spec.md) — `planning`
 - [Steering Messages Not Visible in Conversation Flow](bug-steering-message-visibility/design-spec.md) — `draft` 📄
 

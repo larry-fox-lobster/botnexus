@@ -3,7 +3,7 @@ id: bug-blazor-session-history-loss
 title: "Blazor UI Loses Session History for Agent/Channel Combo"
 type: bug
 priority: medium
-status: draft
+status: done
 created: 2026-07-17
 updated: 2026-07-17
 author: nova
