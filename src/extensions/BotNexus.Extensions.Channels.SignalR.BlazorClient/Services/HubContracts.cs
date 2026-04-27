@@ -93,15 +93,16 @@ public sealed record SendMessageResult(
 public sealed record SubscribeAllResult(
     [property: JsonPropertyName("sessions")] IReadOnlyList<SessionSummary> Sessions);
 
-/// <summary>Session summary returned in <see cref="SubscribeAllResult"/>.</summary>
+/// <summary>Session summary returned in <see cref="SubscribeAllResult"/> and GET /api/sessions.</summary>
 public sealed record SessionSummary(
     [property: JsonPropertyName("sessionId")] string SessionId,
     [property: JsonPropertyName("agentId")] string AgentId,
     [property: JsonPropertyName("channelType")] string? ChannelType,
     [property: JsonPropertyName("status")] string? Status,
     [property: JsonPropertyName("messageCount")] int MessageCount,
-    [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
-    [property: JsonPropertyName("updatedAt")] DateTimeOffset UpdatedAt);
+    [property: JsonPropertyName("isInteractive")] bool IsInteractive = true,
+    [property: JsonPropertyName("createdAt")] DateTimeOffset? CreatedAt = null,
+    [property: JsonPropertyName("updatedAt")] DateTimeOffset? UpdatedAt = null);
 
 /// <summary>Result returned by <c>CompactSession</c>.</summary>
 public sealed record CompactSessionResult(
@@ -127,3 +128,10 @@ public sealed record HistoryMessage(
     [property: JsonPropertyName("timestamp")] DateTimeOffset Timestamp,
     [property: JsonPropertyName("toolName")] string? ToolName = null,
     [property: JsonPropertyName("toolCallId")] string? ToolCallId = null);
+
+/// <summary>Response from GET /api/sessions/{sessionId}/history</summary>
+public sealed record SessionHistoryResponse(
+    [property: JsonPropertyName("entries")] IReadOnlyList<HistoryMessage>? Messages,
+    [property: JsonPropertyName("totalCount")] int TotalCount,
+    [property: JsonPropertyName("offset")] int Offset,
+    [property: JsonPropertyName("limit")] int Limit);
