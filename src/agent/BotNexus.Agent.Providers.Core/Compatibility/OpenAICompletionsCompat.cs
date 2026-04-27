@@ -7,6 +7,12 @@ namespace BotNexus.Agent.Providers.Core.Compatibility;
 public record OpenAICompletionsCompat
 {
     /// <summary>
+    /// Gets or sets a value indicating whether this provider/model supports tool definitions.
+    /// When false, tool definitions are stripped from requests — the model gets plain chat only.
+    /// Default is true. Set false for Ollama models without tool support.
+    /// </summary>
+    public bool? SupportsTools { get; init; } = true;
+    /// <summary>
     /// Gets or sets the supports store param.
     /// </summary>
     public bool? SupportsStoreParam { get; init; } = true;

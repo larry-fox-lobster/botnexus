@@ -287,13 +287,13 @@ public sealed class OpenAICompletionsProvider(
 
         payload["messages"] = ConvertMessages(systemPrompt, model, messages, compat);
 
-        if (tools is { Count: > 0 })
+        if (tools is { Count: > 0 } && compat.SupportsTools != false)
         {
             payload["tools"] = ConvertTools(tools, compat);
             if (compat.ZaiToolStream == true)
                 payload["tool_stream"] = true;
         }
-        else if (HasToolHistory(messages))
+        else if (HasToolHistory(messages) && compat.SupportsTools != false)
         {
             payload["tools"] = new JsonArray();
         }

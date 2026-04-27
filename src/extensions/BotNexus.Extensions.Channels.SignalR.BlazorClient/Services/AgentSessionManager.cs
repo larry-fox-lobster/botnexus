@@ -226,7 +226,8 @@ public sealed class AgentSessionManager : IDisposable
         }
     }
 
-    /// <summary>Load message history from the REST API for the given agent.</summary>
+    /// <summary>Load message history from the REST API for the given agent.
+    /// Queries all sessions for the agent (not channel-scoped) and loads the most recent one.</summary>
     public async Task LoadHistoryAsync(string agentId)
     {
         if (!_sessions.TryGetValue(agentId, out var state))
@@ -239,25 +240,41 @@ public sealed class AgentSessionManager : IDisposable
 
         try
         {
-            var channelType = state.ChannelType ?? "signalr";
-            var url = $"{_apiBaseUrl}channels/{channelType}/agents/{agentId}/history?limit=50";
-            var response = await _http.GetFromJsonAsync<HistoryResponse>(url);
+            // Get all sessions for this agent across all channels
+            var sessionsUrl = $"{_apiBaseUrl}sessions?agentId={Uri.EscapeDataString(agentId)}";
+            var allSessions = await _http.GetFromJsonAsync<List<SessionSummary>>(sessionsUrl);
 
-            if (response?.Messages is { Count: > 0 })
+            // Find the most recent interactive session
+            var recentSession = allSessions
+                ?.Where(s => s.IsInteractive && s.Status != "Sealed")
+                .OrderByDescending(s => s.UpdatedAt ?? s.CreatedAt)
+                .FirstOrDefault();
+
+            if (recentSession is not null)
             {
-                state.Messages.Clear();
-                // API returns messages in chronological order (oldest first)
-                foreach (var msg in response.Messages)
+                // Resume into this session so new messages go to the same session
+                if (state.SessionId is null)
+                    state.SessionId = recentSession.SessionId;
+
+                // Load its history
+                var historyUrl = $"{_apiBaseUrl}sessions/{Uri.EscapeDataString(recentSession.SessionId)}/history?limit=50";
+                var historyResponse = await _http.GetFromJsonAsync<SessionHistoryResponse>(historyUrl);
+
+                if (historyResponse?.Messages is { Count: > 0 })
                 {
-                    state.Messages.Add(new ChatMessage(
-                        MapRole(msg.Role),
-                        msg.Content,
-                        msg.Timestamp)
+                    state.Messages.Clear();
+                    foreach (var msg in historyResponse.Messages)
                     {
-                        ToolName = msg.ToolName,
-                        ToolCallId = msg.ToolCallId,
-                        IsToolCall = msg.ToolName is not null
-                    });
+                        state.Messages.Add(new ChatMessage(
+                            MapRole(msg.Role),
+                            msg.Content,
+                            msg.Timestamp)
+                        {
+                            ToolName = msg.ToolName,
+                            ToolCallId = msg.ToolCallId,
+                            IsToolCall = msg.ToolName is not null
+                        });
+                    }
                 }
             }
 
