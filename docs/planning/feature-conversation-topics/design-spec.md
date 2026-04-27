@@ -274,7 +274,7 @@ Per agent:
 
 Inside a conversation:
 - current conversation transcript is shown as the merged history of the conversation's sessions
-- session boundaries can optionally appear as dividers (`Compacted`, `Restarted`, `New runtime`) 
+- session boundaries **always** appear as explicit dividers in the portal — a horizontal rule showing the date/time and session ID 
 - controls for compact/reset operate on the active session in the conversation context
 - advanced panel may show session history/segments for diagnostics
 
@@ -355,19 +355,20 @@ New events:
 
 Behavior:
 - returns merged chronological entries across all sessions linked to the conversation
-- includes boundary markers between sessions
+- includes explicit `boundary` entries between sessions carrying `sessionId`, `timestamp`, and `reason`
+- the portal renders each boundary as a full-width horizontal rule: `────── Session s_abc123 · Apr 27 2026 14:32 UTC ──────`
 - supports pagination
 
 Example response concept:
 
 ```json
 {
-  "topicId": "t_123",
+  "conversationId": "c_123",
   "entries": [
-    { "kind": "message", "sessionId": "s1", "role": "user", "content": "hey" },
-    { "kind": "message", "sessionId": "s1", "role": "assistant", "content": "hi" },
-    { "kind": "boundary", "reason": "compacted", "sessionId": "s1" },
-    { "kind": "message", "sessionId": "s2", "role": "user", "content": "continue" }
+    { "kind": "message", "sessionId": "s1", "role": "user", "content": "hey", "timestamp": "2026-04-27T10:00:00Z" },
+    { "kind": "message", "sessionId": "s1", "role": "assistant", "content": "hi", "timestamp": "2026-04-27T10:00:05Z" },
+    { "kind": "boundary", "sessionId": "s1", "timestamp": "2026-04-27T10:05:00Z", "reason": "compacted" },
+    { "kind": "message", "sessionId": "s2", "role": "user", "content": "continue", "timestamp": "2026-04-27T10:05:10Z" }
   ]
 }
 ```
@@ -498,7 +499,7 @@ The following were decided by Jon Bullen on 2026-04-27:
    - **Portal:** full native multi-conversation UI — sidebar shows each conversation as a distinct chat, no prefixing needed.
    - `ChannelBinding` should carry a `ThreadingMode` hint: `NativeThread`, `Prefix`, or `Single`, so each channel adapter can apply the right display strategy.
 
-5. **History: assembled from session segments** — No separate materialized conversation history store. Full history is assembled on demand from the ordered sessions linked to the conversation. Segment boundaries appear as dividers (e.g. `Compacted Apr 27`). Sessions remain the single source of truth.
+5. **History: assembled from session segments** — No separate materialized conversation history store. Full history is assembled on demand from the ordered sessions linked to the conversation. The portal renders an explicit **session boundary divider** between segments — a horizontal rule with the date/time and session ID — so the user can see exactly where one session ended and the next began. Sessions remain the single source of truth.
 
 ## Remaining Open Questions
 
