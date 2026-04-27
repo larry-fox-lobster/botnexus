@@ -7,8 +7,10 @@ using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Extensions;
 using BotNexus.Agent.Providers.Anthropic;
 using BotNexus.Agent.Providers.Core;
+using BotNexus.Agent.Providers.Core.Compatibility;
 using BotNexus.Agent.Providers.Core.Models;
 using BotNexus.Agent.Providers.Core.Registry;
+using BotNexus.Agent.Providers.OpenAICompat;
 using Microsoft.Extensions.Options;
 using BotNexus.Agent.Providers.OpenAI;
 using BotNexus.Agent.Providers.OpenAICompat;
@@ -185,17 +187,8 @@ builder.Services.AddSingleton<LlmClient>(serviceProvider =>
             {
                 foreach (var modelId in providerConfig.Models)
                 {
-                    models.Register(providerName, new LlmModel(
-                        Id: modelId,
-                        Name: modelId,
-                        Api: "openai-completions",
-                        Provider: providerName,
-                        BaseUrl: providerConfig.BaseUrl,
-                        Reasoning: false,
-                        Input: ["text"],
-                        Cost: new ModelCost(0, 0, 0, 0),
-                        ContextWindow: 128000,
-                        MaxTokens: 32000));
+                    models.Register(providerName, BuildCompatModel(
+                        modelId, providerName, providerConfig.BaseUrl, httpClient));
                 }
             }
         }
@@ -216,22 +209,51 @@ builder.Services.AddSingleton<LlmClient>(serviceProvider =>
             if (models.GetModel(agentConfig.Provider, agentConfig.Model) is not null)
                 continue; // already registered
 
-            models.Register(agentConfig.Provider, new LlmModel(
-                Id: agentConfig.Model,
-                Name: agentConfig.Model,
-                Api: "openai-completions",
-                Provider: agentConfig.Provider,
-                BaseUrl: agentProvider.BaseUrl,
-                Reasoning: agentConfig.Model.Contains("reasoning", StringComparison.OrdinalIgnoreCase),
-                Input: ["text"],
-                Cost: new ModelCost(0, 0, 0, 0),
-                ContextWindow: 128000,
-                MaxTokens: 32000));
+            models.Register(agentConfig.Provider, BuildCompatModel(
+                agentConfig.Model, agentConfig.Provider, agentProvider.BaseUrl, httpClient));
         }
     }
 
     return new LlmClient(apiProviders, models);
 });
+
+/// <summary>
+/// Builds an LlmModel for an openai-compat provider, checking Ollama tool support when applicable.
+/// </summary>
+static LlmModel BuildCompatModel(string modelId, string provider, string baseUrl, HttpClient httpClient)
+{
+    var isOllama = baseUrl.Contains("localhost:11434") || baseUrl.Contains("127.0.0.1:11434");
+    var supportsTools = !isOllama || OllamaCapabilityChecker
+        .SupportsToolsAsync(httpClient, baseUrl, modelId)
+        .GetAwaiter().GetResult();
+
+    var compat = isOllama
+        ? new OpenAICompletionsCompat
+        {
+            SupportsTools = supportsTools,
+            SupportsStore = false,
+            SupportsDeveloperRole = false,
+            SupportsReasoningEffort = false,
+            SupportsUsageInStreaming = false,
+            MaxTokensField = "max_tokens",
+            SupportsStrictMode = false,
+            RequiresToolResultName = true,
+        }
+        : null; // non-Ollama: let CompatDetector handle it at call time
+
+    return new LlmModel(
+        Id: modelId,
+        Name: modelId,
+        Api: "openai-completions",
+        Provider: provider,
+        BaseUrl: baseUrl,
+        Reasoning: modelId.Contains("reasoning", StringComparison.OrdinalIgnoreCase),
+        Input: ["text"],
+        Cost: new ModelCost(0, 0, 0, 0),
+        ContextWindow: 128000,
+        MaxTokens: 32000,
+        Compat: compat);
+}
 
 using (var bootstrapLoggerFactory = new Serilog.Extensions.Logging.SerilogLoggerFactory(Log.Logger, dispose: false))
 {
