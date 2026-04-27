@@ -24,7 +24,7 @@ public sealed record CrossWorldRelayRequest
     /// <summary>
     /// Gets or sets the conversation id.
     /// </summary>
-    public required string ConversationId { get; init; }
+    public required string ChannelAddress { get; init; }
     /// <summary>
     /// Gets or sets the source session id.
     /// </summary>

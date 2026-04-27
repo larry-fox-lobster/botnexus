@@ -221,7 +221,7 @@ public sealed class GatewayHub : Hub<IGatewayHubClient>
                 {
                     ChannelType = ChannelKey.From("signalr"),
                     SenderId = connectionId,
-                    ConversationId = session.SessionId.Value,
+                    ChannelAddress = session.SessionId.Value,
                     SessionId = session.SessionId.Value,
                     TargetAgentId = typedAgentId.Value,
                     Content = content,
@@ -244,7 +244,7 @@ public sealed class GatewayHub : Hub<IGatewayHubClient>
             {
                 ChannelType = ChannelKey.From("signalr"),
                 SenderId = senderId,
-                ConversationId = typedSessionId.Value,
+                ChannelAddress = typedSessionId.Value,
                 SessionId = typedSessionId.Value,
                 TargetAgentId = typedAgentId.Value,
                 Content = content,
@@ -324,7 +324,7 @@ public sealed class GatewayHub : Hub<IGatewayHubClient>
                 {
                     ChannelType = ChannelKey.From("signalr"),
                     SenderId = connectionId,
-                    ConversationId = typedSessionId.Value,
+                    ChannelAddress = typedSessionId.Value,
                     SessionId = typedSessionId.Value,
                     TargetAgentId = typedAgentId.Value,
                     Content = content,

@@ -64,7 +64,7 @@ public sealed class InboundMessageContentPartsTests
     {
         ChannelType = ChannelKey.From("signalr"),
         SenderId = "sender-1",
-        ConversationId = "conversation-1",
+        ChannelAddress = "conversation-1",
         Content = "hello"
     };
 }

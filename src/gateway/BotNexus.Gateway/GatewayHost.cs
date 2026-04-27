@@ -223,7 +223,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
 
         foreach (var agentId in targetAgents)
         {
-            var sessionId = message.SessionId ?? $"{message.ChannelType}:{message.ConversationId}:{agentId}";
+            var sessionId = message.SessionId ?? $"{message.ChannelType}:{message.ChannelAddress}:{agentId}";
             using var agentActivity = GatewayDiagnostics.Source.StartActivity("gateway.agent_process", ActivityKind.Internal);
             agentActivity?.SetTag("botnexus.agent.id", agentId);
             agentActivity?.SetTag("botnexus.session.id", sessionId);
@@ -372,10 +372,10 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
                                     : evt;
 
                                 if (channel is IStreamEventChannelAdapter streamEventChannel)
-                                    return new ValueTask(streamEventChannel.SendStreamEventAsync(message.ConversationId, enriched, ct));
+                                    return new ValueTask(streamEventChannel.SendStreamEventAsync(message.ChannelAddress, enriched, ct));
 
                                 if (evt.Type == AgentStreamEventType.ContentDelta && evt.ContentDelta is not null)
-                                    return new ValueTask(channel.SendStreamDeltaAsync(message.ConversationId, evt.ContentDelta, ct));
+                                    return new ValueTask(channel.SendStreamDeltaAsync(message.ChannelAddress, evt.ContentDelta, ct));
 
                                 return ValueTask.CompletedTask;
                             }),
@@ -395,7 +395,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
                         await ch.SendAsync(new OutboundMessage
                         {
                             ChannelType = message.ChannelType,
-                            ConversationId = message.ConversationId,
+                            ChannelAddress = message.ChannelAddress,
                             Content = response.Content,
                             SessionId = sessionId
                         }, cancellationToken);
@@ -459,7 +459,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
                         await errorChannel.SendAsync(new OutboundMessage
                         {
                             ChannelType = message.ChannelType,
-                            ConversationId = message.ConversationId,
+                            ChannelAddress = message.ChannelAddress,
                             Content = $"Error: {ex.Message}",
                             SessionId = sessionId
                         }, CancellationToken.None);
@@ -497,7 +497,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
             await channel.SendAsync(new OutboundMessage
             {
                 ChannelType = message.ChannelType,
-                ConversationId = message.ConversationId,
+                ChannelAddress = message.ChannelAddress,
                 Content = statusMessage,
                 SessionId = sessionId
             }, cancellationToken);
@@ -589,7 +589,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
             await channel.SendAsync(new OutboundMessage
             {
                 ChannelType = message.ChannelType,
-                ConversationId = message.ConversationId,
+                ChannelAddress = message.ChannelAddress,
                 Content = feedback,
                 SessionId = sessionId
             }, cancellationToken);
@@ -632,7 +632,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
     private static string GetQueueKey(InboundMessage message)
         => !string.IsNullOrWhiteSpace(message.SessionId)
             ? message.SessionId
-            : $"{message.ChannelType}:{message.ConversationId}";
+            : $"{message.ChannelType}:{message.ChannelAddress}";
 
     private async Task SendBusyAsync(InboundMessage message, CancellationToken cancellationToken)
     {
@@ -642,7 +642,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
         await channel.SendAsync(new OutboundMessage
         {
             ChannelType = message.ChannelType,
-            ConversationId = message.ConversationId,
+            ChannelAddress = message.ChannelAddress,
             Content = BusyMessage,
             SessionId = message.SessionId
         }, cancellationToken);

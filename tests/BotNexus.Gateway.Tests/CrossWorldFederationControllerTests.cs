@@ -73,7 +73,7 @@ public sealed class CrossWorldFederationControllerTests
                 SourceAgentId = "nova",
                 TargetAgentId = "leela",
                 Message = "Hello from world-a",
-                ConversationId = "nova::cross::leela::abc123"
+                ChannelAddress = "nova::cross::leela::abc123"
             },
             CancellationToken.None);
 
@@ -140,7 +140,7 @@ public sealed class CrossWorldFederationControllerTests
                 SourceAgentId = "nova",
                 TargetAgentId = "leela",
                 Message = "hello",
-                ConversationId = "c-1"
+                ChannelAddress = "c-1"
             },
             CancellationToken.None);
 

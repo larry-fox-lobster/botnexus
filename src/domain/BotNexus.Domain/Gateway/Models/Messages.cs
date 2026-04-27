@@ -17,7 +17,7 @@ public sealed record InboundMessage
     /// Conversation identifier within the channel (e.g., chat ID, thread ID).
     /// Combined with <see cref="ChannelType"/> to derive a session key.
     /// </summary>
-    public required string ConversationId { get; init; }
+    public required string ChannelAddress { get; init; }
 
     /// <summary>The message text content.</summary>
     public required string Content { get; init; }
@@ -55,7 +55,7 @@ public sealed record OutboundMessage
     public required ChannelKey ChannelType { get; init; }
 
     /// <summary>Target conversation identifier within the channel.</summary>
-    public required string ConversationId { get; init; }
+    public required string ChannelAddress { get; init; }
 
     /// <summary>The message content.</summary>
     public required string Content { get; init; }
