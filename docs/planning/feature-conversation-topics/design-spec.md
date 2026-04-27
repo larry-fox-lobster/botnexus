@@ -1,6 +1,6 @@
 ---
-id: feature-conversation-topics
-title: "Feature: Conversation Topics for Omnichannel Continuity"
+id: feature-conversation-model
+title: "Feature: Conversation Model — for Omnichannel Continuity"
 type: feature
 priority: high
 status: draft
@@ -13,7 +13,7 @@ related:
   - bug-blazor-session-history-loss/design-spec.md
 ---
 
-# Design Spec: Conversation Topics for Omnichannel Continuity
+# Design Spec: Conversation Model for Omnichannel Continuity
 
 **Type**: Feature  
 **Priority**: High  
@@ -22,16 +22,16 @@ related:
 
 ## Overview
 
-Introduce a new user-facing container above `Session` called **ConversationTopic** (working name: *topic*). A topic represents the conversation a user has with an agent, regardless of channel. Sessions remain the runtime/history segments within that topic.
+Introduce a new user-facing container above `Session` called **Conversation**. A conversation represents the discussion a user has with an agent, regardless of which channel or device they are using. Sessions remain the runtime/history segments within that conversation.
 
 This allows BotNexus to support the intended interaction model:
 - each agent has a default conversation when it comes online,
 - the portal shows that default conversation immediately,
 - the portal can deliberately create second/third/fourth independent conversations with the same agent,
-- external channels like Telegram and iMessage bind to a topic rather than directly to a session,
+- external channels like Telegram and iMessage bind to a conversation rather than directly to a session,
 - the same conversation can continue across channels,
-- agent replies can be delivered to all subscribed channels on the topic,
-- session operations like compact/reset happen inside the topic without collapsing the topic itself.
+- agent replies can be delivered to all subscribed channels on the conversation,
+- session operations like compact/reset happen inside the conversation without collapsing the conversation itself.
 
 ## Problem
 
@@ -63,80 +63,83 @@ That leads to several product problems:
 
 ### Must Have
 
-- Add a new durable parent container above session: `ConversationTopic`
-- Each agent has one default topic available for the user by default
-- A topic can contain one or more sessions over time
-- Portal UI becomes topic-first
-- Portal allows deliberate creation of additional topics per agent
-- External channels bind to a topic
-- Inbound channel messages route to the topic's active session
-- Topic can survive session compaction/reset/sealing/rollover
-- Topic history can be reconstructed from topic sessions
+- Add a new durable parent container above session: `Conversation`
+- Each agent has one default conversation available for the user by default
+- A conversation can contain one or more sessions over time
+- Portal UI becomes conversation-first
+- Portal allows deliberate creation of additional conversations per agent
+- External channels bind to a conversation
+- Inbound channel messages route to the conversation's active session
+- Conversation can survive session compaction/reset/sealing/rollover
+- Conversation history can be reconstructed from conversation sessions
 - Existing session-based infrastructure remains usable during migration
 
 ### Should Have
 
-- Agent replies fan out to all active channel bindings on the topic
+- Agent replies fan out to all active channel bindings on the conversation
 - User replies from one external channel are **not** mirrored into other external channels as if sent by the user
-- Topic metadata supports title, created/updated timestamps, and a default flag
-- Portal can switch between topics cleanly
-- Session list becomes a detail view inside a topic rather than the main sidebar abstraction
+- Conversation metadata supports title, created/updated timestamps, and a default flag
+- Portal can switch between conversations cleanly
+- Session list becomes a detail view inside a conversation rather than the main sidebar abstraction
 
 ### Nice to Have
 
 - Per-binding notification modes (`interactive`, `notify-only`, `muted`)
-- Topic rename/archive support
-- Topic search/filter in the portal
-- Topic-level analytics and summaries
-- Explicit "move channel to another topic" workflows in UI
+- Conversation rename/archive support
+- Conversation search/filter in the portal
+- Conversation-level analytics and summaries
+- Explicit "move channel to another conversation" workflows in UI
 
 ## Non-Goals
 
 - Full multi-user permissions model
-- Cross-agent shared topics
-- Automatic semantic splitting of one conversation into multiple topics
-- Cross-topic search/analytics in this first iteration
+- Cross-agent shared conversations
+- Automatic semantic splitting of one conversation into multiple conversations
+- Cross-conversation search/analytics in this first iteration
 - Immediate parity across every channel UI from day one
 
 ## Proposed Domain Model
 
-### New Entity: ConversationTopic
+### New Entity: Conversation
 
 ```csharp
-public sealed record ConversationTopic
+public sealed record Conversation
 {
-    public TopicId TopicId { get; set; }
+    public ConversationId ConversationId { get; set; }
     public AgentId AgentId { get; set; }
     public string Title { get; set; } = "New conversation";
     public bool IsDefault { get; set; }
-    public TopicStatus Status { get; set; } = TopicStatus.Active;
+    public ConversationStatus Status { get; set; } = ConversationStatus.Active;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public SessionId? ActiveSessionId { get; set; }
-    public List<TopicChannelBinding> ChannelBindings { get; set; } = [];
+    public List<ChannelBinding> ChannelBindings { get; set; } = [];
     public Dictionary<string, object?> Metadata { get; set; } = [];
 }
 ```
 
-### New Value/Object Model: TopicChannelBinding
+### New Value/Object Model: ChannelBinding
 
 ```csharp
-public sealed record TopicChannelBinding
+public sealed record ChannelBinding
 {
     public string BindingId { get; set; } = Guid.NewGuid().ToString("N");
     public ChannelKey ChannelType { get; set; }
     public string ExternalAddress { get; set; } = string.Empty; // e.g. telegram:5067802539
     public BindingMode Mode { get; set; } = BindingMode.Interactive;
+    public ThreadingMode ThreadingMode { get; set; } = ThreadingMode.Single;
+    public string? ThreadId { get; set; } // native thread/topic id when ThreadingMode = NativeThread
+    public string? DisplayPrefix { get; set; } // short name for prefix mode, e.g. "Project Alpha"
     public DateTimeOffset BoundAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? LastInboundAt { get; set; }
     public DateTimeOffset? LastOutboundAt { get; set; }
 }
 ```
 
-### New Enum: TopicStatus
+### New Enum: ConversationStatus
 
 ```csharp
-public enum TopicStatus
+public enum ConversationStatus
 {
     Active,
     Archived
@@ -154,6 +157,17 @@ public enum BindingMode
 }
 ```
 
+### New Enum: ThreadingMode
+
+```csharp
+public enum ThreadingMode
+{
+    Single,       // channel maps to one conversation only (default; Telegram, iMessage)
+    NativeThread, // conversation maps to a native thread/topic (Teams, Slack)
+    Prefix        // conversation name prefixed on all outbound messages (iMessage fallback, SMS)
+}
+```
+
 ## Relationship to Existing Session Model
 
 `Session` remains and continues to represent:
@@ -167,9 +181,9 @@ New relationship:
 
 ```text
 Agent
-  -> ConversationTopic
+  -> Conversation
       -> Session (1..n over time)
-      -> TopicChannelBinding (0..n)
+      -> ChannelBinding (0..n)
 ```
 
 ### Required Session Changes
@@ -180,68 +194,68 @@ Minimal additive change:
 public sealed record Session
 {
     ...
-    public TopicId? TopicId { get; set; }
+    public ConversationId? ConversationId { get; set; }
 }
 ```
 
-This preserves backward compatibility while letting sessions be grouped under a topic.
+This preserves backward compatibility while letting sessions be grouped under a conversation.
 
 ## Conceptual Behavior
 
-### 1. Default Topic per Agent
+### 1. Default Conversation per Agent
 
-When an agent becomes visible/available to the system, BotNexus ensures a default topic exists.
+When an agent becomes visible/available to the system, BotNexus ensures a default conversation exists.
 
 Rules:
-- one default topic per `AgentId`
-- portal shows this topic as the main conversation for that agent
-- if no topic exists yet, create it lazily on first contact or eagerly during warmup (configurable)
+- one default conversation per `AgentId`
+- portal shows this conversation as the main conversation for that agent
+- if no conversation exists yet, create it lazily on first contact or eagerly during warmup (configurable)
 
-### 2. Additional Topics Created Deliberately
+### 2. Additional Conversations Created Deliberately
 
 The portal exposes **New Conversation** for an agent.
 
-That creates a new topic:
+That creates a new conversation:
 - `IsDefault = false`
 - no channel bindings initially (or optionally binds the portal view implicitly)
 - title can start as `Conversation 2`, `New conversation`, or first-user-message derived
 
 ### 3. Channel Binding Rules
 
-External channels bind to a topic, not directly to a session.
+External channels bind to a conversation, not directly to a session.
 
 For v1:
-- Telegram/iMessage default to the agent's default topic
-- later, user may explicitly rebind a channel to another topic
-- multiple channels may bind to the same topic
+- Telegram/iMessage default to the agent's default conversation
+- later, user may explicitly rebind a channel to another conversation
+- multiple channels may bind to the same conversation
 
 ### 4. Inbound Routing
 
 When an inbound message arrives:
-1. resolve `(AgentId, ChannelType, ExternalAddress)` to a topic binding
-2. if none exists, bind the channel to the default topic for that agent
-3. resolve or create the topic's active session
+1. resolve `(AgentId, ChannelType, ExternalAddress)` to a conversation binding
+2. if none exists, bind the channel to the default conversation for that agent
+3. resolve or create the conversation's active session
 4. dispatch message into that session
 
 ### 5. Outbound Routing
 
-When the agent emits an assistant/user-visible response in the topic's active session:
-- deliver to all channel bindings on the topic where mode allows outbound delivery
-- portal subscribers viewing that topic always receive the update
+When the agent emits an assistant/user-visible response in the conversation's active session:
+- deliver to all channel bindings on the conversation where mode allows outbound delivery
+- portal subscribers viewing that conversation always receive the update
 
 Important rule:
 - **Do not mirror a human user's inbound message from Telegram into iMessage/portal as if that user sent it there.**
 - Only assistant/system outputs are fanned out cross-channel.
 
-### 6. Session Lifecycle Under a Topic
+### 6. Session Lifecycle Under a Conversation
 
-A topic may accumulate multiple sessions over time.
+A conversation may accumulate multiple sessions over time.
 
 Examples:
-- topic starts with session A
-- user compacts session A -> same topic continues on compacted A or new session B depending implementation
-- user resets conversation -> session A sealed, session B created, topic unchanged
-- agent crash/restart -> runtime session replaced, topic unchanged
+- conversation starts with session A
+- user compacts session A -> same conversation continues on compacted A or new session B depending implementation
+- user resets conversation -> session A sealed, session B created, conversation unchanged
+- agent crash/restart -> runtime session replaced, conversation unchanged
 
 The visible conversation identity is stable even if the runtime segment changes.
 
@@ -249,52 +263,52 @@ The visible conversation identity is stable even if the runtime segment changes.
 
 ### Primary Sidebar
 
-Portal sidebar should show **topics**, not raw sessions.
+Portal sidebar should show **conversations**, not raw sessions.
 
 Per agent:
-- show default topic immediately
-- show any additional user-created topics
-- each topic appears as a separate chat/conversation
+- show default conversation immediately
+- show any additional user-created conversations
+- each conversation appears as a separate chat/conversation
 
-### Topic Detail View
+### Conversation Detail View
 
-Inside a topic:
-- current conversation transcript is shown as the merged history of the topic's sessions
+Inside a conversation:
+- current conversation transcript is shown as the merged history of the conversation's sessions
 - session boundaries can optionally appear as dividers (`Compacted`, `Restarted`, `New runtime`) 
-- controls for compact/reset operate on the active session in the topic context
+- controls for compact/reset operate on the active session in the conversation context
 - advanced panel may show session history/segments for diagnostics
 
 ### Session Detail
 
 Raw session list remains valuable, but as a secondary/diagnostic UI:
 - active session id
-- prior sealed sessions in the topic
-- channel bindings attached to the topic
+- prior sealed sessions in the conversation
+- channel bindings attached to the conversation
 
 ## API and Storage Impact
 
 ### New Store Contract
 
-Add `ITopicStore`:
+Add `IConversationStore`:
 
 ```csharp
-public interface ITopicStore
+public interface IConversationStore
 {
-    Task<ConversationTopic?> GetAsync(TopicId topicId, CancellationToken ct = default);
-    Task<IReadOnlyList<ConversationTopic>> ListAsync(AgentId? agentId = null, CancellationToken ct = default);
-    Task<ConversationTopic> GetOrCreateDefaultAsync(AgentId agentId, CancellationToken ct = default);
-    Task<ConversationTopic> CreateAsync(ConversationTopic topic, CancellationToken ct = default);
-    Task SaveAsync(ConversationTopic topic, CancellationToken ct = default);
-    Task ArchiveAsync(TopicId topicId, CancellationToken ct = default);
-    Task<ConversationTopic?> ResolveByBindingAsync(AgentId agentId, ChannelKey channelType, string externalAddress, CancellationToken ct = default);
+    Task<Conversation?> GetAsync(ConversationId conversationId, CancellationToken ct = default);
+    Task<IReadOnlyList<Conversation>> ListAsync(AgentId? agentId = null, CancellationToken ct = default);
+    Task<Conversation> GetOrCreateDefaultAsync(AgentId agentId, CancellationToken ct = default);
+    Task<Conversation> CreateAsync(Conversation conversation, CancellationToken ct = default);
+    Task SaveAsync(Conversation conversation, CancellationToken ct = default);
+    Task ArchiveAsync(ConversationId conversationId, CancellationToken ct = default);
+    Task<Conversation?> ResolveByBindingAsync(AgentId agentId, ChannelKey channelType, string externalAddress, CancellationToken ct = default);
 }
 ```
 
 ### New Summary DTOs
 
 ```csharp
-public sealed record TopicSummary(
-    string TopicId,
+public sealed record ConversationSummary(
+    string ConversationId,
     string AgentId,
     string Title,
     bool IsDefault,
@@ -309,13 +323,13 @@ public sealed record TopicSummary(
 ### New Gateway/REST Endpoints
 
 Potential endpoints:
-- `GET /api/topics?agentId=assistant`
-- `POST /api/topics`
-- `GET /api/topics/{topicId}`
-- `GET /api/topics/{topicId}/history`
-- `POST /api/topics/{topicId}/bind-channel`
-- `POST /api/topics/{topicId}/sessions/reset`
-- `POST /api/topics/{topicId}/sessions/compact`
+- `GET /api/conversations?agentId=assistant`
+- `POST /api/conversations`
+- `GET /api/conversations/{topicId}`
+- `GET /api/conversations/{topicId}/history`
+- `POST /api/conversations/{topicId}/bind-channel`
+- `POST /api/conversations/{topicId}/sessions/reset`
+- `POST /api/conversations/{topicId}/sessions/compact`
 
 ### SignalR Additions
 
@@ -335,12 +349,12 @@ New events:
 
 ## History Model
 
-### Topic History Endpoint
+### Conversation History Endpoint
 
-`GET /api/topics/{topicId}/history`
+`GET /api/conversations/{topicId}/history`
 
 Behavior:
-- returns merged chronological entries across all sessions linked to the topic
+- returns merged chronological entries across all sessions linked to the conversation
 - includes boundary markers between sessions
 - supports pagination
 
@@ -364,54 +378,54 @@ This lets the portal show one continuous conversation while preserving runtime s
 
 ### Phase 1 — Planning + additive model
 
-- Add `TopicId` primitive
-- Add `ConversationTopic` + `TopicChannelBinding`
-- Add `ITopicStore`
-- Add optional `Session.TopicId`
-- Introduce default topic creation for agents
+- Add `ConversationId` primitive
+- Add `Conversation` + `ChannelBinding`
+- Add `IConversationStore`
+- Add optional `Session.ConversationId`
+- Introduce default conversation creation for agents
 - No UI change yet
 
 ### Phase 2 — routing layer
 
-- Change inbound channel routing to resolve topic first
-- Add topic binding persistence
-- Route inbound messages to topic active session
-- Fan out assistant replies to topic bindings
+- Change inbound channel routing to resolve conversation first
+- Add conversation binding persistence
+- Route inbound messages to conversation active session
+- Fan out assistant replies to conversation bindings
 - Preserve current session APIs for compatibility
 
-### Phase 3 — portal topic-first UX
+### Phase 3 — portal conversation-first UX
 
-- Portal sidebar lists topics instead of raw sessions
-- Default topic visible immediately
-- New conversation creates a new topic
-- Topic history endpoint used by portal
+- Portal sidebar lists conversations instead of raw sessions
+- Default conversation visible immediately
+- New conversation creates a new conversation
+- Conversation history endpoint used by portal
 - Session list moved into advanced/details panel
 
 ### Phase 4 — lifecycle polish
 
-- reset/compact operate in topic context
+- reset/compact operate in conversation context
 - explicit rebind/move channel workflows
-- archive topic
-- optional topic rename and summaries
+- archive conversation
+- optional conversation rename and summaries
 
 ## Compatibility Notes
 
 - Existing session store remains valid.
-- Existing channel adapters can keep writing to sessions during transition if routing shims resolve topic -> active session.
-- Existing Blazor history/session code can be adapted gradually by swapping session list endpoints for topic list endpoints.
-- Existing `SubscribeAll` session model may remain as a lower-level transport while the portal becomes topic-oriented.
+- Existing channel adapters can keep writing to sessions during transition if routing shims resolve conversation -> active session.
+- Existing Blazor history/session code can be adapted gradually by swapping session list endpoints for conversation list endpoints.
+- Existing `SubscribeAll` session model may remain as a lower-level transport while the portal becomes conversation-oriented.
 
 ## Risks
 
 ### 1. Conceptual duplication
 
-Having both topics and sessions may confuse contributors unless responsibilities are documented clearly.
+Having both conversations and sessions may confuse contributors unless responsibilities are documented clearly.
 
-**Mitigation:** make topic user-facing, session runtime-facing in all docs/API naming.
+**Mitigation:** make conversation user-facing, session runtime-facing in all docs/API naming.
 
 ### 2. History reconstruction complexity
 
-Merged topic history across sessions may complicate pagination and scrollback.
+Merged conversation history across sessions may complicate pagination and scrollback.
 
 **Mitigation:** introduce explicit boundary entries and keep session-scoped history endpoints intact.
 
@@ -425,62 +439,79 @@ Cross-channel outbound delivery could annoy users if too aggressive.
 
 The Blazor client recently moved toward session-first logic.
 
-**Mitigation:** additive rollout; first add topics alongside sessions, then flip UI abstraction later.
+**Mitigation:** additive rollout; first add conversations alongside sessions, then flip UI abstraction later.
 
 ### 5. Future multi-user scope
 
 Current design assumes a single effective user per agent/channel context.
 
-**Mitigation:** keep `Topic` model extensible for future owner/participant metadata.
+**Mitigation:** keep `Conversation` model extensible for future owner/participant metadata.
 
 ## Testing Plan
 
 ### Domain / Store Tests
 
-- creating default topic for an agent is idempotent
-- creating additional topics does not affect default topic
-- resolving channel binding returns the correct topic
-- archived topics are excluded from active lists
-- topic summaries include active session and binding counts
+- creating default conversation for an agent is idempotent
+- creating additional conversations does not affect default conversation
+- resolving channel binding returns the correct conversation
+- archived conversations are excluded from active lists
+- conversation summaries include active session and binding counts
 
 ### Routing Tests
 
-- first Telegram message binds to default topic
-- subsequent Telegram message routes to same topic even if session rolled over
-- iMessage can bind to same topic and continue context
+- first Telegram message binds to default conversation
+- subsequent Telegram message routes to same conversation even if session rolled over
+- iMessage can bind to same conversation and continue context
 - assistant message fans out to all interactive/notify bindings
 - inbound user message on one channel is not replayed as user input to other channels
 
 ### Portal Tests
 
-- default topic is visible when agent loads
-- new conversation creates second topic
-- switching topics changes visible merged history
-- compact/reset inside topic preserves topic identity
-- topic history shows session boundaries correctly
+- default conversation is visible when agent loads
+- new conversation creates second conversation
+- switching conversations changes visible merged history
+- compact/reset inside conversation preserves conversation identity
+- conversation history shows session boundaries correctly
 
 ### Compatibility Tests
 
-- existing session APIs still work when topic support is enabled
-- session history endpoint remains correct for a topic's active session
+- existing session APIs still work when conversation support is enabled
+- session history endpoint remains correct for a conversation's active session
 - old clients can still send messages through session routing shim
 
-## Open Questions
+## Design Decisions
 
-1. Final name: `Topic`, `Conversation`, or `Thread`?
-2. Should default topic creation be eager (agent startup) or lazy (first contact)?
-3. Should the portal itself create an explicit channel binding, or be treated as an implicit subscriber?
-4. Are channel bindings scoped to exact external address only, or can one provider/channel family bind broadly?
-5. When resetting a topic, should a new session always be created immediately?
-6. Should topic title come from user input, auto-summary, or both?
-7. Do we need a distinct topic event stream, or is session stream + lookup enough initially?
+The following were decided by Jon Bullen on 2026-04-27:
+
+1. **Name: `Conversation`** — More natural. Humans have conversations across any channel — in person, on the phone, via text.
+
+2. **Default conversation: eager creation** — When an agent comes online, BotNexus immediately ensures a default conversation exists. The agent is always ready; no waiting for a first contact.
+
+3. **Portal: implicit subscriber to all active conversations** — The portal does not create an explicit channel binding. It is always subscribed to all active conversations and sees everything. It is the control surface, not just another channel.
+
+4. **Fan-out: all surfaces receive all agent replies by default** — Agent replies go to every surface with an active binding. This may be refined later with `BindingMode`, but the starting position is full fan-out so every channel stays in sync.
+
+   **Channel threading strategies** — Channels vary in their ability to represent multiple conversations:
+   - **Teams / Slack:** a dedicated agent channel where each new post starts a thread that maps to one conversation. Replies stay inside that thread. Native, idiomatic.
+   - **iMessage / SMS:** no thread model. Prefix messages with the short conversation name so the user can visually group them. e.g. `[Project Alpha] Here is the plan...`
+   - **Telegram:** may support topics/threads in groups; otherwise fall back to the prefix approach.
+   - **Portal:** full native multi-conversation UI — sidebar shows each conversation as a distinct chat, no prefixing needed.
+   - `ChannelBinding` should carry a `ThreadingMode` hint: `NativeThread`, `Prefix`, or `Single`, so each channel adapter can apply the right display strategy.
+
+5. **History: assembled from session segments** — No separate materialized conversation history store. Full history is assembled on demand from the ordered sessions linked to the conversation. Segment boundaries appear as dividers (e.g. `Compacted Apr 27`). Sessions remain the single source of truth.
+
+## Remaining Open Questions
+
+1. When resetting a conversation, should a new session start immediately or only on the next inbound message?
+2. Should conversation title come from user input, auto-summary, or both?
+3. Do we need a distinct conversation event stream, or is session stream + lookup sufficient initially?
 
 ## Recommendation
 
-Proceed with a **topic-first architectural iteration**.
+Proceed with a **conversation-first architectural iteration**.
 
 The key product correction is:
 - **sessions are runtime segments**,
-- **topics are the user-visible omnichannel conversations**.
+- **conversations are the user-visible omnichannel conversations**.
 
 That matches the mental model Jon described and gives BotNexus a cleaner long-term foundation for portal UX, channel routing, and agent continuity across transports.

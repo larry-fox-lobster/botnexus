@@ -137,28 +137,28 @@ A new domain object is needed above session. Working name from Jon: **topic**.
 
 Alternative names:
 - `Conversation`
-- `Thread`
-- `Topic`
+- `Thread` (not chosen)
+- `Conversation`
 - `WorkspaceConversation`
 - `Dialogue`
 
-Initial recommendation: **ConversationTopic** in specs/code until naming is finalized.
+Initial recommendation: **Conversation** in specs/code until naming is finalized.
 
 Reason:
 - `Session` is already overloaded.
 - `Conversation` alone may collide with existing transport/runtime vocabulary.
-- `Topic` suggests user intent grouping and supports multiple runtime sessions beneath it.
+- `Conversation` suggests user intent grouping and supports multiple runtime sessions beneath it.
 
 ## Proposed Conceptual Model
 
 ```text
 Agent
-  -> ConversationTopic (user-visible)
+  -> Conversation (user-visible)
       -> ChannelBinding(s)
       -> Session(s) (runtime/history segments)
 ```
 
-### ConversationTopic responsibilities
+### Conversation responsibilities
 
 - User-facing conversation container
 - Stable identity across channels
@@ -195,7 +195,7 @@ Agent
 
 ## Open Questions
 
-1. **Naming** — should the new container be `Topic`, `Conversation`, or `Thread`?
+1. **Naming** — should the new container be `Conversation`, `Conversation`, or `Thread` (not chosen)?
 2. **Binding granularity** — is channel binding per provider (`telegram`) or per channel identity (`telegram chat 5067802539`)?
 3. **Fan-out policy** — should all agent replies go to all bound channels by default, or should bindings support notification-only vs interactive modes?
 4. **Topic creation policy** — should every agent always have exactly one default topic at first boot, or only once first contacted?
