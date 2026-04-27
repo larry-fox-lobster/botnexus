@@ -750,6 +750,13 @@ html, body, #app {
     transition: border-color 0.15s;
 }
 
+/* Prevent iOS Safari auto-zoom on input focus — must be >= 16px */
+@media (max-width: 768px) {
+    .chat-input {
+        font-size: 16px;
+    }
+}
+
 .chat-input:focus {
     border-color: var(--accent);
 }
