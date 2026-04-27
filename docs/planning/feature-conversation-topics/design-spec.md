@@ -503,9 +503,18 @@ The following were decided by Jon Bullen on 2026-04-27:
 
 ## Remaining Open Questions
 
-1. When resetting a conversation, should a new session start immediately or only on the next inbound message?
-2. Should conversation title come from user input, auto-summary, or both?
-3. Do we need a distinct conversation event stream, or is session stream + lookup sufficient initially?
+1. Do we need a distinct conversation event stream (`ConversationCreated`, `BindingAdded`, etc.) or is session stream + REST lookup sufficient initially?
+
+   - **Option A: Session stream + lookup** — portal gets a session event with a `conversationId`, calls `GET /api/conversations/{id}` to refresh conversation state. No new SignalR events needed. Simpler upfront.
+   - **Option B: Distinct conversation events** — new hub events (`ConversationCreated`, `ConversationUpdated`, `BindingAdded`, `BindingRemoved`). Portal updates in real-time without polling. Cleaner long-term, more work to implement.
+
+   Recommendation: **Option A** for initial implementation, migrate to Option B as conversation event surface grows.
+
+## Resolved Decisions
+
+1. **Reset timing** — resetting a conversation creates a new session. The first inbound message starts the session. Any pre-session hooks (e.g. soul/memory injection) should fire eagerly on reset to reduce response latency on the first message.
+
+2. **Conversation title** — user can set or rename a conversation title at any time. If no title is set, the agent auto-generates one based on conversation content. Both can coexist: agent suggestion, user override.
 
 ## Recommendation
 
