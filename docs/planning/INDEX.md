@@ -31,7 +31,7 @@
 ## 🔧 Improvements
 
 ### 🟡 Medium
-- [CLI --home flag for multi-instance gateway management](improvement-cli-multi-instance/design-spec.md) — `draft`
+- [CLI multi-instance support via --source/--target](improvement-cli-multi-instance/design-spec.md) — `in-progress`
 - [Dynamic Configuration Reload](improvement-dynamic-config-reload/design-spec.md) — `in-progress`
 - [Memory Persistence Lifecycle](improvement-memory-lifecycle/design-spec.md) — `draft` 📄
 

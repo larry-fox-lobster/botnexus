@@ -1,52 +1,72 @@
 ---
 id: improvement-cli-multi-instance
-title: "Improvement: CLI --home flag for multi-instance gateway management"
+title: "Improvement: Full multi-instance support via --source and --target"
 type: improvement
 priority: medium
-status: draft
+status: in-progress
 created: 2026-04-28
 author: rusty
 ---
 
-# Improvement: CLI --home flag for multi-instance gateway management
+# Improvement: Full multi-instance CLI support
 
 **Type**: Improvement  
 **Priority**: Medium  
-**Status**: Draft
+**Status**: In-progress (partially delivered by PR #22)
 
-## Problem
+## Background
 
-The CLI's `gateway start` hardcodes `~/.botnexus` as the BotNexus home directory via `PlatformConfigLoader.DefaultConfigPath` and `GatewayProcessManager` (which writes `~/.botnexus/gateway.pid`). This means:
+The CLI previously hardcoded `~/.botnexus` as the BotNexus home directory and `~/botnexus` as the
+source repo. Running two instances (prod + dev) from the same machine required the sync script to
+manage process launch directly.
 
-- Running two instances (prod + dev) from the same machine is not possible via the CLI alone
-- The sync script (`botnexus-sync.ps1`) has to manage process launch directly rather than delegating to the CLI
-- Developers and ops can't use `botnexus gateway status` to check a non-default instance
+## What PR #22 delivered
 
-## Desired Behaviour
+- `--source` on `build`, `serve`, `gateway start/restart`, `install` — specifies repo location (default: `~/botnexus`)
+- `--target` on `gateway start/stop/status/restart`, `serve` — specifies runtime home (default: `~/.botnexus`, sets `BOTNEXUS_HOME`)
+- `GatewayProcessManager` reads `BOTNEXUS_HOME` env var / accepts `homePath` constructor param
+- `CliPaths` helper centralises default resolution
+- `DeployExtensions` takes explicit home path
 
-```bash
-botnexus gateway start --home ~/.botnexus-dev --port 5006 --path ~/projects/botnexus
-botnexus gateway stop  --home ~/.botnexus-dev
-botnexus gateway status --home ~/.botnexus-dev
+The sync script can now be simplified to:
+
+```powershell
+# prod
+botnexus gateway start --source ~/botnexus-prod --target ~/.botnexus --port 5005
+
+# dev
+botnexus gateway start --source ~/projects/botnexus --target ~/.botnexus-dev --port 5006
 ```
 
-Each instance has its own `gateway.pid`, config, extensions, and logs — all scoped to the specified home.
+## Remaining work
 
-## Impact
+The following commands still read `PlatformConfigLoader.DefaultConfigPath` directly and do not
+respect `--target`:
 
-- `GatewayProcessManager` — PID file path must use the configured home, not a hardcoded constant
-- `PlatformConfigLoader` — needs to accept a home path override
-- `GatewayCommand` — expose `--home` option on all subcommands
-- `ServeCommand.DeployExtensions` — must deploy to the specified home
-- `BotNexusHome` class — already accepts a path in constructor, just needs to be wired up
+- `InitCommand` — initialises config at `~/.botnexus`
+- `ProviderCommand` — reads/writes provider credentials
+- `ConfigCommands` — reads/writes `config.json`
+- `DoctorCommand` — health checks config path
+- `AgentCommands` / `MemoryCommands` — agent and memory management
+- `ValidateCommand` — validates config at default path
 
-## Migration
+### Required change
 
-No breaking change — `--home` defaults to `~/.botnexus` if not specified. Existing users see no difference.
+Add `--target` as a global option on the root command (or a shared option on affected commands)
+and thread it through to `PlatformConfigLoader` so all commands respect the specified home.
+
+The cleanest approach is a **global `--target` option** on the root `RootCommand` in `Program.cs`,
+resolved once and passed via a shared `CliContext` or `IOptions<CliOptions>` to all commands.
+
+```bash
+# Full multi-instance — all commands respect --target
+botnexus --target ~/.botnexus-dev provider setup
+botnexus --target ~/.botnexus-dev gateway status
+botnexus --target ~/.botnexus-dev config validate
+```
 
 ## Done When
 
-- `botnexus gateway start --home <path> --port <n>` starts a gateway using that home
-- `botnexus gateway stop --home <path>` stops it
-- `botnexus gateway status --home <path>` reports its state
-- `botnexus-sync.ps1` can be simplified to delegate entirely to the CLI for both instances
+- All commands respect `--target` (or global `--target` on root)
+- `botnexus-sync.ps1` delegates gateway lifecycle entirely to the CLI
+- `botnexus gateway status --target ~/.botnexus-dev` correctly reports the dev instance state
