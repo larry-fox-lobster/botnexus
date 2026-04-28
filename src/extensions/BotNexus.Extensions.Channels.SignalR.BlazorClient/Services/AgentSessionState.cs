@@ -65,6 +65,62 @@ public sealed class AgentSessionState
 
     /// <summary>Whether thinking blocks are visible in the chat panel.</summary>
     public bool ShowThinking { get; set; } = true;
+
+    // ── Conversation-awareness ─────────────────────────────────────────────
+
+    /// <summary>All conversations for this agent, keyed by conversation ID.</summary>
+    public Dictionary<string, ConversationListItemState> Conversations { get; } = new();
+
+    /// <summary>The currently selected conversation ID.</summary>
+    public string? ActiveConversationId { get; set; }
+
+    /// <summary>Whether the conversation list has been loaded from the REST API.</summary>
+    public bool ConversationsLoaded { get; set; }
+
+    /// <summary>Whether a conversation list fetch is currently in-flight.</summary>
+    public bool IsLoadingConversations { get; set; }
+
+    /// <summary>Display title of the active conversation, or null if none selected.</summary>
+    public string? ActiveConversationTitle =>
+        ActiveConversationId is not null && Conversations.TryGetValue(ActiveConversationId, out var c)
+            ? c.Title
+            : null;
+}
+
+/// <summary>
+/// Client-side view-model for one conversation in the sidebar list.
+/// </summary>
+public sealed class ConversationListItemState
+{
+    public required string ConversationId { get; init; }
+    public string Title { get; set; } = "New conversation";
+    public bool IsDefault { get; set; }
+    public string Status { get; set; } = "Active";
+    public string? ActiveSessionId { get; set; }
+    public int UnreadCount { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    // UI-only state
+    public bool HistoryLoaded { get; set; }
+    public bool IsLoadingHistory { get; set; }
+}
+
+/// <summary>
+/// A conversation history entry, used when mapping REST responses into the message timeline.
+/// </summary>
+public sealed record ConversationHistoryItem(
+    string Kind,
+    string SessionId,
+    DateTimeOffset Timestamp)
+{
+    public string? Role { get; init; }
+    public string? Content { get; init; }
+    public string? ToolName { get; init; }
+    public string? ToolCallId { get; init; }
+    public string? Reason { get; init; }
+
+    public bool IsBoundary => Kind == "boundary";
 }
 
 /// <summary>
@@ -149,6 +205,18 @@ public sealed record ChatMessage(string Role, string Content, DateTimeOffset Tim
 
     /// <summary>Thinking content attached to this assistant message (from ThinkingDelta events).</summary>
     public string? ThinkingContent { get; init; }
+
+    /// <summary>Message kind: "message" (default) or "boundary" (session divider).</summary>
+    public string Kind { get; init; } = "message";
+
+    /// <summary>Human-readable label for session boundary entries.</summary>
+    public string? BoundaryLabel { get; init; }
+
+    /// <summary>Session ID encoded in the boundary entry.</summary>
+    public string? BoundarySessionId { get; init; }
+
+    /// <summary>Whether this entry is a session boundary divider.</summary>
+    public bool IsBoundary => Kind == "boundary";
 
     /// <summary>CSS class derived from the message role.</summary>
     public string CssClass => Role.ToLowerInvariant();

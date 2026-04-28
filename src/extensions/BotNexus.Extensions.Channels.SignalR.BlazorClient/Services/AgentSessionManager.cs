@@ -74,7 +74,7 @@ public sealed class AgentSessionManager : IDisposable
         }
     }
 
-    /// <summary>Set the active agent tab, clear its unread count, and load history if needed.</summary>
+    /// <summary>Set the active agent tab, clear its unread count, and load conversations if needed.</summary>
     public async Task SetActiveAgentAsync(string? agentId)
     {
         ActiveAgentId = agentId;
@@ -82,13 +82,16 @@ public sealed class AgentSessionManager : IDisposable
         {
             state.UnreadCount = 0;
 
-            // Load history on first visit when a session exists but we have no local messages
-            if (!state.HistoryLoaded && !state.IsLoadingHistory)
+            // Load conversations on first visit
+            if (!state.ConversationsLoaded && !state.IsLoadingConversations)
             {
-                if (state.SessionId is not null && state.Messages.Count == 0)
-                    await LoadHistoryAsync(agentId);
-                else
-                    state.HistoryLoaded = true;
+                await LoadConversationsAsync(agentId);
+            }
+            else if (state.ActiveConversationId is not null
+                && state.Conversations.TryGetValue(state.ActiveConversationId, out var conv)
+                && !conv.HistoryLoaded && !conv.IsLoadingHistory)
+            {
+                await LoadConversationHistoryAsync(agentId, state.ActiveConversationId);
             }
         }
 
@@ -288,6 +291,294 @@ public sealed class AgentSessionManager : IDisposable
         finally
         {
             state.IsLoadingHistory = false;
+            OnStateChanged?.Invoke();
+        }
+    }
+
+    // ── Conversation methods ─────────────────────────────────────────────────
+
+    /// <summary>Load the conversation list for the given agent from the REST API.</summary>
+    public async Task LoadConversationsAsync(string agentId)
+    {
+        if (!_sessions.TryGetValue(agentId, out var state))
+            return;
+        if (state.ConversationsLoaded || state.IsLoadingConversations)
+            return;
+
+        state.IsLoadingConversations = true;
+        OnStateChanged?.Invoke();
+
+        try
+        {
+            var url = $"{_apiBaseUrl}conversations?agentId={Uri.EscapeDataString(agentId)}";
+            var list = await _http.GetFromJsonAsync<List<ConversationSummaryDto>>(url);
+
+            if (list is not null)
+            {
+                state.Conversations.Clear();
+                foreach (var dto in list)
+                {
+                    state.Conversations[dto.ConversationId] = new ConversationListItemState
+                    {
+                        ConversationId = dto.ConversationId,
+                        Title = dto.Title,
+                        IsDefault = dto.IsDefault,
+                        Status = dto.Status,
+                        ActiveSessionId = dto.ActiveSessionId,
+                        CreatedAt = dto.CreatedAt,
+                        UpdatedAt = dto.UpdatedAt
+                    };
+                }
+            }
+
+            // Auto-select a conversation if none is selected
+            if (state.ActiveConversationId is null && state.Conversations.Count > 0)
+            {
+                var defaultConv = state.Conversations.Values.FirstOrDefault(c => c.IsDefault)
+                    ?? state.Conversations.Values.OrderByDescending(c => c.UpdatedAt).First();
+                state.ActiveConversationId = defaultConv.ConversationId;
+
+                // Sync SessionId to the active conversation's session
+                if (defaultConv.ActiveSessionId is not null)
+                    state.SessionId = defaultConv.ActiveSessionId;
+            }
+
+            state.ConversationsLoaded = true;
+
+            // If this is the currently visible agent, load history now
+            if (agentId == ActiveAgentId && state.ActiveConversationId is not null)
+            {
+                var conv = state.Conversations.GetValueOrDefault(state.ActiveConversationId);
+                if (conv is not null && !conv.HistoryLoaded && !conv.IsLoadingHistory)
+                    await LoadConversationHistoryAsync(agentId, state.ActiveConversationId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to load conversations for {agentId}: {ex.Message}");
+            state.ConversationsLoaded = true; // Don't retry on failure
+        }
+        finally
+        {
+            state.IsLoadingConversations = false;
+            OnStateChanged?.Invoke();
+        }
+    }
+
+    /// <summary>Select a conversation for the given agent and load its history if needed.</summary>
+    public async Task SelectConversationAsync(string agentId, string conversationId)
+    {
+        if (!_sessions.TryGetValue(agentId, out var state))
+            return;
+        if (!state.Conversations.TryGetValue(conversationId, out var conv))
+            return;
+
+        state.ActiveConversationId = conversationId;
+
+        // Sync active session to the selected conversation's live session
+        if (conv.ActiveSessionId is not null)
+            state.SessionId = conv.ActiveSessionId;
+
+        // Clear conversation unread count
+        conv.UnreadCount = 0;
+
+        OnStateChanged?.Invoke();
+
+        if (!conv.HistoryLoaded && !conv.IsLoadingHistory)
+            await LoadConversationHistoryAsync(agentId, conversationId);
+    }
+
+    /// <summary>Create a new conversation for the given agent.</summary>
+    public async Task<string?> CreateConversationAsync(string agentId, string? title = null, bool select = true)
+    {
+        if (!_sessions.TryGetValue(agentId, out var state))
+            return null;
+
+        try
+        {
+            var request = new CreateConversationRequestDto(agentId, title);
+            var response = await _http.PostAsJsonAsync($"{_apiBaseUrl}conversations", request);
+            response.EnsureSuccessStatusCode();
+
+            var dto = await response.Content.ReadFromJsonAsync<ConversationResponseDto>();
+            if (dto is null)
+                return null;
+
+            state.Conversations[dto.ConversationId] = new ConversationListItemState
+            {
+                ConversationId = dto.ConversationId,
+                Title = dto.Title,
+                IsDefault = dto.IsDefault,
+                Status = dto.Status,
+                ActiveSessionId = dto.ActiveSessionId,
+                CreatedAt = dto.CreatedAt,
+                UpdatedAt = dto.UpdatedAt
+            };
+
+            if (select)
+                await SelectConversationAsync(agentId, dto.ConversationId);
+            else
+                OnStateChanged?.Invoke();
+
+            return dto.ConversationId;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to create conversation for {agentId}: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>Re-fetch the conversation list, preserving local UI state for existing conversations.</summary>
+    public async Task RefreshConversationsAsync(string agentId)
+    {
+        if (!_sessions.TryGetValue(agentId, out var state))
+            return;
+
+        try
+        {
+            var url = $"{_apiBaseUrl}conversations?agentId={Uri.EscapeDataString(agentId)}";
+            var list = await _http.GetFromJsonAsync<List<ConversationSummaryDto>>(url);
+
+            if (list is null)
+                return;
+
+            var incoming = list.ToDictionary(d => d.ConversationId);
+
+            // Add or update, preserving local UI state for existing entries
+            foreach (var dto in list)
+            {
+                if (state.Conversations.TryGetValue(dto.ConversationId, out var existing))
+                {
+                    // Preserve local-only fields
+                    existing.Title = dto.Title;
+                    existing.IsDefault = dto.IsDefault;
+                    existing.Status = dto.Status;
+                    existing.ActiveSessionId = dto.ActiveSessionId;
+                    existing.CreatedAt = dto.CreatedAt;
+                    existing.UpdatedAt = dto.UpdatedAt;
+                }
+                else
+                {
+                    state.Conversations[dto.ConversationId] = new ConversationListItemState
+                    {
+                        ConversationId = dto.ConversationId,
+                        Title = dto.Title,
+                        IsDefault = dto.IsDefault,
+                        Status = dto.Status,
+                        ActiveSessionId = dto.ActiveSessionId,
+                        CreatedAt = dto.CreatedAt,
+                        UpdatedAt = dto.UpdatedAt
+                    };
+                }
+            }
+
+            // Remove any conversations no longer in the list
+            var toRemove = state.Conversations.Keys.Where(id => !incoming.ContainsKey(id)).ToList();
+            foreach (var id in toRemove)
+                state.Conversations.Remove(id);
+
+            // If active conversation was removed, fall back
+            if (state.ActiveConversationId is not null && !state.Conversations.ContainsKey(state.ActiveConversationId))
+            {
+                var fallback = state.Conversations.Values.FirstOrDefault(c => c.IsDefault)
+                    ?? state.Conversations.Values.OrderByDescending(c => c.UpdatedAt).FirstOrDefault();
+                state.ActiveConversationId = fallback?.ConversationId;
+                if (state.ActiveConversationId is null)
+                    state.Messages.Clear();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to refresh conversations for {agentId}: {ex.Message}");
+        }
+
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>Mark all messages in a conversation as read.</summary>
+    public void MarkConversationRead(string agentId, string conversationId)
+    {
+        if (!_sessions.TryGetValue(agentId, out var state))
+            return;
+        if (!state.Conversations.TryGetValue(conversationId, out var conv))
+            return;
+
+        conv.UnreadCount = 0;
+
+        // If this is the active agent, recompute agent-level unread as sum of conversations
+        if (agentId == ActiveAgentId)
+            state.UnreadCount = state.Conversations.Values.Sum(c => c.UnreadCount);
+
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>Load conversation history from the REST API and populate the message timeline.</summary>
+    private async Task LoadConversationHistoryAsync(string agentId, string conversationId)
+    {
+        if (!_sessions.TryGetValue(agentId, out var state))
+            return;
+        if (!state.Conversations.TryGetValue(conversationId, out var conv))
+            return;
+        if (conv.HistoryLoaded || conv.IsLoadingHistory)
+            return;
+
+        conv.IsLoadingHistory = true;
+        OnStateChanged?.Invoke();
+
+        try
+        {
+            var url = $"{_apiBaseUrl}conversations/{Uri.EscapeDataString(conversationId)}/history?limit=200";
+            var response = await _http.GetFromJsonAsync<ConversationHistoryResponseDto>(url);
+
+            if (response?.Entries is { Count: > 0 })
+            {
+                // Only replace messages if this conversation is still active
+                if (state.ActiveConversationId == conversationId)
+                {
+                    state.Messages.Clear();
+                    foreach (var entry in response.Entries)
+                    {
+                        if (entry.Kind == "boundary")
+                        {
+                            var label = $"Session \u00b7 {entry.Timestamp.ToLocalTime():MMM d HH:mm} \u00b7 {entry.SessionId}";
+                            state.Messages.Add(new ChatMessage("System", string.Empty, entry.Timestamp)
+                            {
+                                Kind = "boundary",
+                                BoundaryLabel = label,
+                                BoundarySessionId = entry.SessionId
+                            });
+                        }
+                        else
+                        {
+                            state.Messages.Add(new ChatMessage(
+                                MapRole(entry.Role ?? "system"),
+                                entry.Content ?? string.Empty,
+                                entry.Timestamp)
+                            {
+                                ToolName = entry.ToolName,
+                                ToolCallId = entry.ToolCallId,
+                                IsToolCall = entry.ToolName is not null
+                            });
+                        }
+                    }
+                }
+            }
+
+            conv.HistoryLoaded = true;
+
+            // Sync SessionId from the conversation after loading
+            if (state.ActiveConversationId == conversationId && conv.ActiveSessionId is not null)
+                state.SessionId = conv.ActiveSessionId;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to load history for conversation {conversationId}: {ex.Message}");
+            conv.HistoryLoaded = true; // Don't retry on failure
+        }
+        finally
+        {
+            conv.IsLoadingHistory = false;
             OnStateChanged?.Invoke();
         }
     }
@@ -558,10 +849,18 @@ public sealed class AgentSessionManager : IDisposable
         state.IsStreaming = false;
         state.ProcessingStage = null;
 
-        // Track unread for non-active agents
+        // Track unread for non-active agents, and per-conversation for non-active conversations
         if (state.AgentId != ActiveAgentId)
         {
             state.UnreadCount++;
+        }
+
+        // Increment conversation unread count for the conversation whose live session fired this event
+        var activeConv = state.Conversations.Values
+            .FirstOrDefault(c => c.ActiveSessionId == evt.SessionId);
+        if (activeConv is not null && activeConv.ConversationId != state.ActiveConversationId)
+        {
+            activeConv.UnreadCount++;
         }
 
         OnStateChanged?.Invoke();
@@ -726,8 +1025,8 @@ public sealed class AgentSessionManager : IDisposable
                     state.CurrentStreamBuffer = "";
                     state.ThinkingBuffer = "";
                     state.ProcessingStage = null;
-                    state.HistoryLoaded = false; // Force reload to pick up missed messages
-                    await LoadHistoryAsync(agentId);
+                    state.ConversationsLoaded = false; // Force reload to pick up missed messages
+                    await LoadConversationsAsync(agentId);
                 }
             }
 

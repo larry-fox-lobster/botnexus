@@ -73,14 +73,58 @@
                     @if (Manager.ActiveAgentId is not null &&
                          Manager.Sessions.TryGetValue(Manager.ActiveAgentId, out var activeState))
                     {
-                        <div class="agent-session-list">
-                            @if (activeState.SessionId is not null)
+                        <div class="agent-conversation-list">
+                            <div class="agent-conversation-list-header">
+                                <span class="agent-conversation-list-title">Conversations</span>
+                                <button class="conversation-new-btn"
+                                        @onclick="() => CreateConversationAndClose(activeState.AgentId)"
+                                        title="Start a new conversation">
+                                    <span class="conversation-new-btn-icon">+</span>
+                                    <span class="conversation-new-btn-label">New</span>
+                                </button>
+                            </div>
+
+                            @if (activeState.IsLoadingConversations)
                             {
-                                <div class="agent-session-item active">
-                                    <span>💬</span>
-                                    <span>@(activeState.ChannelType ?? "signalr")</span>
-                                </div>
+                                <div class="conversation-list-loading">Loading conversations…</div>
                             }
+                            else if (activeState.Conversations.Count == 0)
+                            {
+                                <div class="conversation-list-empty">No conversations yet.</div>
+                            }
+                            else
+                            {
+                                @foreach (var conversation in activeState.Conversations.Values
+                                    .OrderByDescending(c => c.IsDefault)
+                                    .ThenByDescending(c => c.UpdatedAt))
+                                {
+                                    <button class="conversation-list-item @(conversation.ConversationId == activeState.ActiveConversationId ? "active" : "")"
+                                            @onclick="() => SelectConversationAndClose(activeState.AgentId, conversation.ConversationId)">
+                                        <span class="conversation-list-item-main">
+                                            <span class="conversation-list-item-title">@conversation.Title</span>
+
+                                            @if (conversation.IsDefault)
+                                            {
+                                                <span class="conversation-default-badge">Default</span>
+                                            }
+                                        </span>
+
+                                        <span class="conversation-list-item-meta">
+                                            @if (conversation.UnreadCount > 0)
+                                            {
+                                                <span class="conversation-unread-dot"
+                                                      aria-label="Unread messages"></span>
+                                            }
+
+                                            <span class="conversation-updated-at">
+                                                @FormatConversationTimestamp(conversation.UpdatedAt)
+                                            </span>
+                                        </span>
+                                    </button>
+                                }
+                            }
+
+                            @* Sub-agent sessions *@
                             @foreach (var sub in activeState.SubAgents.Values
                                 .Where(s => s.Status is "Running" or "Completed"))
                             {
@@ -224,6 +268,27 @@
     private bool IsSubAgentActive(SubAgentInfo sub)
     {
         return Manager.ActiveAgentId == sub.SubAgentId;
+    }
+
+    private async Task SelectConversationAndClose(string agentId, string conversationId)
+    {
+        await Manager.SelectConversationAsync(agentId, conversationId);
+        _sidebarOpen = false;
+    }
+
+    private async Task CreateConversationAndClose(string agentId)
+    {
+        await Manager.CreateConversationAsync(agentId);
+        _sidebarOpen = false;
+    }
+
+    private static string FormatConversationTimestamp(DateTimeOffset ts)
+    {
+        var local = ts.ToLocalTime();
+        var now = DateTimeOffset.Now;
+        return local.Date == now.Date
+            ? local.ToString("h:mm tt")
+            : local.ToString("MMM d");
     }
 
     private void DismissAnnouncement(string id)
