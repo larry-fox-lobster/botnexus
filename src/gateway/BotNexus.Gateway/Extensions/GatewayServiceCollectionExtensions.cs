@@ -326,7 +326,7 @@ public static class GatewayServiceCollectionExtensions
             ? explicitType
             : !string.IsNullOrWhiteSpace(sessionsDirectory)
                 ? "File"
-                : "InMemory";
+                : "Sqlite"; // Default to SQLite — InMemory loses all data on restart
 
         if (resolvedType.Equals("InMemory", StringComparison.OrdinalIgnoreCase))
         {
@@ -355,9 +355,10 @@ public static class GatewayServiceCollectionExtensions
 
         if (resolvedType.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
         {
-            var connectionString = sessionStore?.ConnectionString;
-            if (string.IsNullOrWhiteSpace(connectionString))
-                throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), ["gateway.sessionStore.connectionString is required when gateway.sessionStore.type is 'Sqlite'."]);
+            // Use explicit connection string, or default to sessions.sqlite in the config directory
+            var connectionString = !string.IsNullOrWhiteSpace(sessionStore?.ConnectionString)
+                ? sessionStore!.ConnectionString!
+                : $"Data Source={Path.Combine(configDirectory, "sessions.sqlite")}";
 
             services.Replace(ServiceDescriptor.Singleton<ISessionStore>(serviceProvider =>
                 new SqliteSessionStore(
@@ -378,7 +379,7 @@ public static class GatewayServiceCollectionExtensions
             ? explicitType
             : !string.IsNullOrWhiteSpace(sessionsDirectory)
                 ? "File"
-                : "InMemory";
+                : "Sqlite"; // Default to SQLite — InMemory loses all data on restart
 
         if (resolvedType.Equals("InMemory", StringComparison.OrdinalIgnoreCase))
         {
@@ -407,9 +408,9 @@ public static class GatewayServiceCollectionExtensions
 
         if (resolvedType.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
         {
-            var connectionString = sessionStore?.ConnectionString;
-            if (string.IsNullOrWhiteSpace(connectionString))
-                throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), ["gateway.sessionStore.connectionString is required when gateway.sessionStore.type is 'Sqlite'."]);
+            var connectionString = !string.IsNullOrWhiteSpace(sessionStore?.ConnectionString)
+                ? sessionStore!.ConnectionString!
+                : $"Data Source={Path.Combine(configDirectory, "sessions.sqlite")}";
 
             services.Replace(ServiceDescriptor.Singleton<IConversationStore>(serviceProvider =>
                 new SqliteConversationStore(
