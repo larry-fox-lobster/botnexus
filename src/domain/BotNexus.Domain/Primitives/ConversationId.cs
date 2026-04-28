@@ -14,6 +14,17 @@ public readonly record struct ConversationId(string Value) : IComparable<Convers
     /// </summary>
     /// <param name="value">The value.</param>
     /// <returns>The from result.</returns>
+    /// <summary>
+    /// Creates a new unique <see cref="ConversationId"/> with the <c>c_</c> prefix.
+    /// </summary>
+    /// <returns>A new <see cref="ConversationId"/>.</returns>
+    public static ConversationId Create() => From($"c_{Guid.NewGuid():N}");
+
+    /// <summary>
+    /// Creates a <see cref="ConversationId"/> from an existing string value.
+    /// </summary>
+    /// <param name="value">The raw conversation id string.</param>
+    /// <returns>A <see cref="ConversationId"/>.</returns>
     public static ConversationId From(string value) =>
         string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException("ConversationId cannot be empty", nameof(value))

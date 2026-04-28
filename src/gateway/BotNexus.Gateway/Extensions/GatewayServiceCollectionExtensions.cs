@@ -6,6 +6,7 @@ using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Media;
 using BotNexus.Gateway.Abstractions.Routing;
 using BotNexus.Gateway.Abstractions.Security;
+using BotNexus.Gateway.Abstractions.Conversations;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Abstractions.Configuration;
 using BotNexus.Gateway.Abstractions.Extensions;
@@ -127,6 +128,7 @@ public static class GatewayServiceCollectionExtensions
         services.AddSingleton<IConfigPathResolver, ConfigPathResolver>();
         services.TryAddSingleton<IChannelManager, ChannelManager>();
         services.TryAddSingleton<ISessionStore, InMemorySessionStore>();
+        services.TryAddSingleton<IConversationStore, InMemoryConversationStore>();
         services.AddSingleton<InternalChannelAdapter>();
         services.AddSingleton<IChannelAdapter>(serviceProvider => serviceProvider.GetRequiredService<InternalChannelAdapter>());
         services.AddSingleton<ISessionCompactor, LlmSessionCompactor>();
@@ -251,6 +253,7 @@ public static class GatewayServiceCollectionExtensions
         }
 
         ConfigureSessionStore(services, config, configDirectory);
+        ConfigureConversationStore(services, config, configDirectory);
 
         var agentsDirectory = config.Gateway?.AgentsDirectory;
         if (!string.IsNullOrWhiteSpace(agentsDirectory))
@@ -362,6 +365,42 @@ public static class GatewayServiceCollectionExtensions
         }
 
         throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), ["gateway.sessionStore.type must be either 'InMemory', 'File', or 'Sqlite'."]);
+    }
+
+    private static void ConfigureConversationStore(IServiceCollection services, PlatformConfig config, string configDirectory)
+    {
+        var sessionStore = config.Gateway?.SessionStore;
+        var explicitType = sessionStore?.Type?.Trim();
+        var sessionsDirectory = config.Gateway?.SessionsDirectory;
+        var resolvedType = !string.IsNullOrWhiteSpace(explicitType)
+            ? explicitType
+            : !string.IsNullOrWhiteSpace(sessionsDirectory)
+                ? "File"
+                : "InMemory";
+
+        if (resolvedType.Equals("InMemory", StringComparison.OrdinalIgnoreCase))
+        {
+            services.Replace(ServiceDescriptor.Singleton<IConversationStore, InMemoryConversationStore>());
+            return;
+        }
+
+        if (resolvedType.Equals("File", StringComparison.OrdinalIgnoreCase))
+        {
+            var configuredPath = sessionStore?.FilePath ?? sessionsDirectory;
+            if (string.IsNullOrWhiteSpace(configuredPath))
+                throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), ["gateway.sessionStore.filePath is required when gateway.sessionStore.type is 'File'."]);
+
+            var conversationsPath = Path.Combine(ResolveConfiguredPath(configDirectory, configuredPath), "conversations");
+            services.Replace(ServiceDescriptor.Singleton<IConversationStore>(serviceProvider =>
+            {
+                var fs = serviceProvider.GetRequiredService<IFileSystem>();
+                fs.Directory.CreateDirectory(conversationsPath);
+                return new FileConversationStore(
+                    conversationsPath,
+                    serviceProvider.GetRequiredService<ILogger<FileConversationStore>>(),
+                    fs);
+            }));
+        }
     }
 
     /// <summary>
