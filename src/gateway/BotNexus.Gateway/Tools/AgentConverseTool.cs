@@ -1,7 +1,7 @@
 using System.Text.Json;
 using BotNexus.Agent.Core.Tools;
 using BotNexus.Agent.Core.Types;
-using BotNexus.Domain.Conversations;
+using BotNexus.Domain.AgentExchange;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Sessions;
@@ -10,7 +10,7 @@ using BotNexus.Agent.Providers.Core.Models;
 namespace BotNexus.Gateway.Tools;
 
 public sealed class AgentConverseTool(
-    IAgentConversationService conversationService,
+    IAgentExchangeService conversationService,
     ISessionStore sessionStore,
     AgentId initiatorAgentId,
     SessionId sessionId) : IAgentTool
@@ -63,7 +63,7 @@ public sealed class AgentConverseTool(
             ?? throw new ArgumentException("Missing required argument: message.");
 
         var result = await conversationService.ConverseAsync(
-            new ConversationRequest
+            new AgentExchangeRequest
             {
                 InitiatorId = initiatorAgentId,
                 TargetId = AgentId.From(targetAgentId),

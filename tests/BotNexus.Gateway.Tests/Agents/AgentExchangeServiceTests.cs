@@ -1,4 +1,4 @@
-using BotNexus.Domain.Conversations;
+using BotNexus.Domain.AgentExchange;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Channels;
 using System.Net;
@@ -16,7 +16,7 @@ using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
 
 namespace BotNexus.Gateway.Tests.Agents;
 
-public sealed class AgentConversationServiceTests
+public sealed class AgentExchangeServiceTests
 {
     [Fact]
     public async Task ConverseAsync_SingleTurn_CreatesSealedAgentAgentSessionVisibleToBothAgents()
@@ -33,14 +33,14 @@ public sealed class AgentConversationServiceTests
         supervisor.Setup(s => s.GetOrCreateAsync(target, It.IsAny<SessionId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(handle.Object);
 
-        var service = new AgentConversationService(
+        var service = new AgentExchangeService(
             registry.Object,
             supervisor.Object,
             sessionStore,
             Options.Create(new GatewayOptions()),
-            NullLogger<AgentConversationService>.Instance);
+            NullLogger<AgentExchangeService>.Instance);
 
-        var result = await service.ConverseAsync(new ConversationRequest
+        var result = await service.ConverseAsync(new AgentExchangeRequest
         {
             InitiatorId = initiator,
             TargetId = target,
@@ -72,14 +72,14 @@ public sealed class AgentConversationServiceTests
         var initiator = AgentId.From("nova");
         var target = AgentId.From("leela");
         var registry = CreateRegistry(initiator, target, []);
-        var service = new AgentConversationService(
+        var service = new AgentExchangeService(
             registry.Object,
             Mock.Of<IAgentSupervisor>(),
             new InMemorySessionStore(),
             Options.Create(new GatewayOptions()),
-            NullLogger<AgentConversationService>.Instance);
+            NullLogger<AgentExchangeService>.Instance);
 
-        Func<Task> action = () => service.ConverseAsync(new ConversationRequest
+        Func<Task> action = () => service.ConverseAsync(new AgentExchangeRequest
         {
             InitiatorId = initiator,
             TargetId = target,
@@ -95,14 +95,14 @@ public sealed class AgentConversationServiceTests
         var initiator = AgentId.From("nova");
         var target = AgentId.From("leela");
         var registry = CreateRegistry(initiator, target, ["leela"]);
-        var service = new AgentConversationService(
+        var service = new AgentExchangeService(
             registry.Object,
             Mock.Of<IAgentSupervisor>(),
             new InMemorySessionStore(),
             Options.Create(new GatewayOptions { AgentConversationMaxDepth = 4 }),
-            NullLogger<AgentConversationService>.Instance);
+            NullLogger<AgentExchangeService>.Instance);
 
-        Func<Task> action = () => service.ConverseAsync(new ConversationRequest
+        Func<Task> action = () => service.ConverseAsync(new AgentExchangeRequest
         {
             InitiatorId = initiator,
             TargetId = target,
@@ -120,14 +120,14 @@ public sealed class AgentConversationServiceTests
         var initiator = AgentId.From("nova");
         var target = AgentId.From("leela");
         var registry = CreateRegistry(initiator, target, ["leela"]);
-        var service = new AgentConversationService(
+        var service = new AgentExchangeService(
             registry.Object,
             Mock.Of<IAgentSupervisor>(),
             new InMemorySessionStore(),
             Options.Create(new GatewayOptions { AgentConversationMaxDepth = 2 }),
-            NullLogger<AgentConversationService>.Instance);
+            NullLogger<AgentExchangeService>.Instance);
 
-        Func<Task> action = () => service.ConverseAsync(new ConversationRequest
+        Func<Task> action = () => service.ConverseAsync(new AgentExchangeRequest
         {
             InitiatorId = initiator,
             TargetId = target,
@@ -167,12 +167,12 @@ public sealed class AgentConversationServiceTests
             NullLogger<CrossWorldChannelAdapter>.Instance,
             new HttpClient(handler));
 
-        var service = new AgentConversationService(
+        var service = new AgentExchangeService(
             registry.Object,
             Mock.Of<IAgentSupervisor>(),
             sessionStore,
             Options.Create(new GatewayOptions()),
-            NullLogger<AgentConversationService>.Instance,
+            NullLogger<AgentExchangeService>.Instance,
             new PlatformConfig
             {
                 Gateway = new GatewaySettingsConfig
@@ -203,7 +203,7 @@ public sealed class AgentConversationServiceTests
             },
             adapter);
 
-        var result = await service.ConverseAsync(new ConversationRequest
+        var result = await service.ConverseAsync(new AgentExchangeRequest
         {
             InitiatorId = initiator,
             TargetId = target,
@@ -232,12 +232,12 @@ public sealed class AgentConversationServiceTests
         var registry = CreateRegistry(initiator, AgentId.From("leela"), ["world-b:leela"]);
         registry.Setup(r => r.Contains(target)).Returns(false);
 
-        var service = new AgentConversationService(
+        var service = new AgentExchangeService(
             registry.Object,
             Mock.Of<IAgentSupervisor>(),
             new InMemorySessionStore(),
             Options.Create(new GatewayOptions()),
-            NullLogger<AgentConversationService>.Instance,
+            NullLogger<AgentExchangeService>.Instance,
             new PlatformConfig
             {
                 Gateway = new GatewaySettingsConfig
@@ -266,7 +266,7 @@ public sealed class AgentConversationServiceTests
                 }
             });
 
-        Func<Task> action = () => service.ConverseAsync(new ConversationRequest
+        Func<Task> action = () => service.ConverseAsync(new AgentExchangeRequest
         {
             InitiatorId = initiator,
             TargetId = target,

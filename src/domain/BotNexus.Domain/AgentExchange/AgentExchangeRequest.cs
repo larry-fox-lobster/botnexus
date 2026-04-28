@@ -1,11 +1,11 @@
 using BotNexus.Domain.Primitives;
 
-namespace BotNexus.Domain.Conversations;
+namespace BotNexus.Domain.AgentExchange;
 
 /// <summary>
 /// Represents a request for one agent to converse with another registered agent.
 /// </summary>
-public sealed record ConversationRequest
+public sealed record AgentExchangeRequest
 {
     /// <summary>
     /// The initiating agent.

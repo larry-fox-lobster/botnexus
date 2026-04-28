@@ -1,4 +1,4 @@
-using BotNexus.Domain.Conversations;
+using BotNexus.Domain.AgentExchange;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Channels;
 using BotNexus.Gateway.Abstractions.Agents;
@@ -16,23 +16,23 @@ namespace BotNexus.Gateway.Agents;
 /// <summary>
 /// Default implementation for synchronous peer agent conversations.
 /// </summary>
-public sealed class AgentConversationService : IAgentConversationService
+public sealed class AgentExchangeService : IAgentExchangeService
 {
     private readonly IAgentRegistry _registry;
     private readonly IAgentSupervisor _supervisor;
     private readonly ISessionStore _sessionStore;
     private readonly IOptions<Gateway.Configuration.GatewayOptions> _options;
-    private readonly ILogger<AgentConversationService> _logger;
+    private readonly ILogger<AgentExchangeService> _logger;
     private readonly PlatformConfig _platformConfig;
     private readonly CrossWorldChannelAdapter _crossWorldChannelAdapter;
     private readonly string _sourceWorldId;
 
-    public AgentConversationService(
+    public AgentExchangeService(
         IAgentRegistry registry,
         IAgentSupervisor supervisor,
         ISessionStore sessionStore,
         IOptions<Gateway.Configuration.GatewayOptions> options,
-        ILogger<AgentConversationService> logger,
+        ILogger<AgentExchangeService> logger,
         PlatformConfig? platformConfig = null,
         CrossWorldChannelAdapter? crossWorldChannelAdapter = null)
     {
@@ -49,7 +49,7 @@ public sealed class AgentConversationService : IAgentConversationService
     }
 
     /// <inheritdoc />
-    public async Task<AgentConversationResult> ConverseAsync(ConversationRequest request, CancellationToken cancellationToken = default)
+    public async Task<AgentExchangeResult> ConverseAsync(AgentExchangeRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrWhiteSpace(request.Message))
@@ -101,7 +101,7 @@ public sealed class AgentConversationService : IAgentConversationService
         session.Metadata["objective"] = request.Objective;
         session.Metadata["maxTurns"] = request.MaxTurns;
 
-        var transcript = new List<AgentConversationTranscriptEntry>();
+        var transcript = new List<AgentExchangeTranscriptEntry>();
         var targetHandle = await _supervisor.GetOrCreateAsync(request.TargetId, sessionId, cancellationToken).ConfigureAwait(false);
 
         var message = request.Message;
@@ -139,7 +139,7 @@ public sealed class AgentConversationService : IAgentConversationService
             throw;
         }
 
-        return new AgentConversationResult
+        return new AgentExchangeResult
         {
             SessionId = sessionId,
             Status = "sealed",
@@ -149,8 +149,8 @@ public sealed class AgentConversationService : IAgentConversationService
         };
     }
 
-    private async Task<AgentConversationResult> ConverseCrossWorldAsync(
-        ConversationRequest request,
+    private async Task<AgentExchangeResult> ConverseCrossWorldAsync(
+        AgentExchangeRequest request,
         CrossWorldAgentReference parsedTarget,
         IReadOnlyList<AgentId> normalizedChain,
         CancellationToken cancellationToken)
@@ -197,7 +197,7 @@ public sealed class AgentConversationService : IAgentConversationService
         session.Metadata["targetWorldId"] = resolvedTarget.WorldId;
         session.Metadata["conversationId"] = conversationId;
 
-        var transcript = new List<AgentConversationTranscriptEntry>();
+        var transcript = new List<AgentExchangeTranscriptEntry>();
         var message = request.Message;
         var finalResponse = string.Empty;
         string? remoteSessionId = null;
@@ -257,7 +257,7 @@ public sealed class AgentConversationService : IAgentConversationService
             throw;
         }
 
-        return new AgentConversationResult
+        return new AgentExchangeResult
         {
             SessionId = sessionId,
             Status = "sealed",
@@ -270,10 +270,10 @@ public sealed class AgentConversationService : IAgentConversationService
     private static void AddTurn(
         MessageRole role,
         string content,
-        List<AgentConversationTranscriptEntry> transcript,
+        List<AgentExchangeTranscriptEntry> transcript,
         GatewaySession session)
     {
-        transcript.Add(new AgentConversationTranscriptEntry(role.Value, content));
+        transcript.Add(new AgentExchangeTranscriptEntry(role.Value, content));
         session.AddEntry(new SessionEntry
         {
             Role = role,

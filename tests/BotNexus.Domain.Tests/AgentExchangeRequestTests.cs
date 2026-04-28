@@ -1,14 +1,14 @@
-using BotNexus.Domain.Conversations;
+using BotNexus.Domain.AgentExchange;
 using BotNexus.Domain.Primitives;
 
 namespace BotNexus.Domain.Tests;
 
-public sealed class ConversationRequestTests
+public sealed class AgentExchangeRequestTests
 {
     [Fact]
-    public void ConversationRequest_Defaults_MaxTurnsAndCallChainAreSafe()
+    public void AgentExchangeRequest_Defaults_MaxTurnsAndCallChainAreSafe()
     {
-        var request = new ConversationRequest
+        var request = new AgentExchangeRequest
         {
             InitiatorId = AgentId.From("agent-a"),
             TargetId = AgentId.From("agent-b"),
@@ -21,9 +21,9 @@ public sealed class ConversationRequestTests
     }
 
     [Fact]
-    public void ConversationRequest_AllowsExplicitCallChainAndTurnLimit()
+    public void AgentExchangeRequest_AllowsExplicitCallChainAndTurnLimit()
     {
-        var request = new ConversationRequest
+        var request = new AgentExchangeRequest
         {
             InitiatorId = AgentId.From("agent-a"),
             TargetId = AgentId.From("agent-b"),
