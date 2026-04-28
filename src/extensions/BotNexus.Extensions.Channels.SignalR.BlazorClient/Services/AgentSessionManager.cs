@@ -305,6 +305,10 @@ public sealed class AgentSessionManager : IDisposable
         if (state.ConversationsLoaded || state.IsLoadingConversations)
             return;
 
+        // If API URL not yet available, return early without marking loaded — allows retry
+        if (_apiBaseUrl is null)
+            return;
+
         state.IsLoadingConversations = true;
         OnStateChanged?.Invoke();
 
@@ -373,6 +377,21 @@ public sealed class AgentSessionManager : IDisposable
         if (!state.Conversations.TryGetValue(conversationId, out var conv))
             return;
 
+        // Clear messages when switching conversations so we don't show stale history
+        if (state.ActiveConversationId != conversationId)
+        {
+            state.Messages.Clear();
+            // Reset history flags so the new conversation's history will be loaded
+            foreach (var c in state.Conversations.Values)
+            {
+                if (c.ConversationId == conversationId)
+                {
+                    c.HistoryLoaded = false;
+                    c.IsLoadingHistory = false;
+                }
+            }
+        }
+
         state.ActiveConversationId = conversationId;
 
         // Sync active session to the selected conversation's live session
@@ -416,7 +435,12 @@ public sealed class AgentSessionManager : IDisposable
             };
 
             if (select)
+            {
+                // New conversation — clear messages so we don't inherit previous history
+                if (_sessions.TryGetValue(agentId, out var st))
+                    st.Messages.Clear();
                 await SelectConversationAsync(agentId, dto.ConversationId);
+            }
             else
                 OnStateChanged?.Invoke();
 
@@ -429,7 +453,69 @@ public sealed class AgentSessionManager : IDisposable
         }
     }
 
-    /// <summary>Re-fetch the conversation list, preserving local UI state for existing conversations.</summary>
+    /// <summary>Refresh the agent list from the REST API, adding any new agents.</summary>
+    public async Task RefreshAgentsAsync()
+    {
+        if (_apiBaseUrl is null)
+            return;
+
+        try
+        {
+            var url = $"{_apiBaseUrl}agents";
+            var agents = await _http.GetFromJsonAsync<List<AgentSummary>>(url);
+            if (agents is null)
+                return;
+
+            foreach (var agent in agents)
+            {
+                if (!_sessions.ContainsKey(agent.AgentId))
+                {
+                    _sessions[agent.AgentId] = new AgentSessionState
+                    {
+                        AgentId = agent.AgentId,
+                        DisplayName = agent.DisplayName,
+                        IsConnected = true
+                    };
+                }
+                else
+                {
+                    _sessions[agent.AgentId].DisplayName = agent.DisplayName;
+                }
+            }
+
+            OnStateChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to refresh agents: {ex.Message}");
+        }
+    }
+
+    /// <summary>Rename a conversation via PATCH /api/conversations/{id}.</summary>
+    public async Task RenameConversationAsync(string agentId, string? conversationId, string newTitle)
+    {
+        if (conversationId is null || !_sessions.TryGetValue(agentId, out var state))
+            return;
+        if (!state.Conversations.TryGetValue(conversationId, out var conv))
+            return;
+        if (string.IsNullOrWhiteSpace(newTitle))
+            return;
+
+        try
+        {
+            var url = $"{_apiBaseUrl}conversations/{Uri.EscapeDataString(conversationId)}";
+            var request = new PatchConversationRequestDto(newTitle);
+            var response = await _http.PatchAsJsonAsync(url, request);
+            response.EnsureSuccessStatusCode();
+
+            conv.Title = newTitle;
+            OnStateChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to rename conversation {conversationId}: {ex.Message}");
+        }
+    }
     public async Task RefreshConversationsAsync(string agentId)
     {
         if (!_sessions.TryGetValue(agentId, out var state))
@@ -695,6 +781,15 @@ public sealed class AgentSessionManager : IDisposable
                 DisplayName = agent.DisplayName,
                 IsConnected = true
             };
+        }
+
+        // Retry loading conversations for the active agent if not yet loaded
+        // (handles race where SetActiveAgentAsync was called before _apiBaseUrl was set)
+        if (ActiveAgentId is not null
+            && _sessions.TryGetValue(ActiveAgentId, out var activeState)
+            && !activeState.ConversationsLoaded)
+        {
+            _ = Task.Run(() => LoadConversationsAsync(ActiveAgentId));
         }
 
         OnStateChanged?.Invoke();
