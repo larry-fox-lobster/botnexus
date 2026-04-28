@@ -43,9 +43,42 @@ internal sealed class BuildCommand
             return 1;
         }
 
+        // Resolve git commit SHA from the repo so it gets embedded in the gateway binary.
+        // Falls back to "unknown" if git is unavailable or the directory is not a repo.
+        var commitSha = ResolveCommitSha(repoRoot);
+
         AnsiConsole.MarkupLine("[blue][[build]][/] Building solution (Release, skipping test projects)...");
 
-        return await BuildOutputStreamer.RunAsync(solution, repoRoot, verbose, cancellationToken);
+        return await BuildOutputStreamer.RunAsync(solution, repoRoot, commitSha, verbose, cancellationToken);
+    }
+
+    /// <summary>
+    /// Resolves the current git commit SHA from the repo at <paramref name="repoRoot"/>.
+    /// Returns <c>"unknown"</c> if git is not available or the directory is not a git repo.
+    /// </summary>
+    internal static string ResolveCommitSha(string repoRoot)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = "-C \"" + repoRoot + "\" rev-parse HEAD",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc is null) return "unknown";
+            var sha = proc.StandardOutput.ReadLine()?.Trim();
+            proc.WaitForExit();
+            return string.IsNullOrWhiteSpace(sha) ? "unknown" : sha;
+        }
+        catch
+        {
+            return "unknown";
+        }
     }
 
     internal static string ResolveRepoRoot(string? explicitPath, bool dev)
