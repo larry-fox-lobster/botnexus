@@ -204,7 +204,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await GatewayInfo.LoadAsync();
+        // GatewayInfo.LoadAsync() is called from HandleStateChanged once
+        // ApiBaseUrl is available (set after SignalR connects)
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -217,7 +218,21 @@
         }
     }
 
-    private void HandleStateChanged() => InvokeAsync(StateHasChanged);
+    private bool _gatewayInfoLoaded;
+    private void HandleStateChanged()
+    {
+        // Load gateway info once ApiBaseUrl is available (after SignalR connects)
+        if (!_gatewayInfoLoaded && Manager.ApiBaseUrl is not null)
+        {
+            _gatewayInfoLoaded = true;
+            _ = InvokeAsync(async () =>
+            {
+                await GatewayInfo.LoadAsync();
+                StateHasChanged();
+            });
+        }
+        InvokeAsync(StateHasChanged);
+    }
 
     private async Task ToggleSidebar()
     {
