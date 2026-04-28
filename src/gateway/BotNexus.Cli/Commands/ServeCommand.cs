@@ -2,7 +2,6 @@ using System.CommandLine;
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text.Json;
-using BotNexus.Gateway.Configuration;
 using Spectre.Console;
 
 namespace BotNexus.Cli.Commands;
@@ -22,48 +21,46 @@ internal sealed class ServeCommand
         var gatewayCommand = _gatewayCommand.Build(verboseOption);
 
         var probePortOption = new Option<int>("--port", () => 5050, "Port for the Probe web UI.");
-        var probeRepoOption = new Option<string?>("--path", () => null, "Path to the repository root. Defaults to the current directory.");
-        var probeDevOption = new Option<bool>("--dev", "Serve from a development repo clone instead of the install location.");
+        var probeSourceOption = new Option<string?>("--source", () => null, "Path to the BotNexus repository root. Defaults to ~/botnexus.");
         var gatewayUrlOption = new Option<string>("--gateway-url", () => "http://localhost:5005", "URL of a running BotNexus Gateway.");
 
         var probeCommand = new Command("probe", "Start the BotNexus Probe diagnostic tool.")
         {
             probePortOption,
-            probeRepoOption,
-            probeDevOption,
+            probeSourceOption,
             gatewayUrlOption
         };
         probeCommand.SetHandler(async context =>
         {
             var port = context.ParseResult.GetValueForOption(probePortOption);
-            var path = context.ParseResult.GetValueForOption(probeRepoOption);
-            var dev = context.ParseResult.GetValueForOption(probeDevOption);
+            var source = context.ParseResult.GetValueForOption(probeSourceOption);
             var gatewayUrl = context.ParseResult.GetValueForOption(gatewayUrlOption)!;
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            var repoRoot = BuildCommand.ResolveRepoRoot(path, dev);
+            var repoRoot = CliPaths.ResolveSource(source);
             context.ExitCode = await ServeProbeAsync(repoRoot, port, gatewayUrl, verbose, context.GetCancellationToken());
         });
 
         // serve (default = gateway)
         var servePortOption = new Option<int>("--port", () => 5005, "Port to listen on.");
-        var serveRepoOption = new Option<string?>("--path", () => null, "Path to the repository root. Defaults to the current directory.");
-        var serveDevOption = new Option<bool>("--dev", "Serve from a development repo clone instead of the install location.");
+        var serveSourceOption = new Option<string?>("--source", () => null, "Path to the BotNexus repository root. Defaults to ~/botnexus.");
+        var serveTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
 
         var command = new Command("serve", "Start a BotNexus service. Defaults to the gateway.")
         {
             servePortOption,
-            serveRepoOption,
-            serveDevOption
+            serveSourceOption,
+            serveTargetOption
         };
 
         command.SetHandler(async context =>
         {
             var port = context.ParseResult.GetValueForOption(servePortOption);
-            var path = context.ParseResult.GetValueForOption(serveRepoOption);
-            var dev = context.ParseResult.GetValueForOption(serveDevOption);
+            var source = context.ParseResult.GetValueForOption(serveSourceOption);
+            var target = context.ParseResult.GetValueForOption(serveTargetOption);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            var repoRoot = BuildCommand.ResolveRepoRoot(path, dev);
-            context.ExitCode = await ServeGatewayAsync(repoRoot, port, verbose, context.GetCancellationToken());
+            var repoRoot = CliPaths.ResolveSource(source);
+            var home = CliPaths.ResolveTarget(target);
+            context.ExitCode = await ServeGatewayAsync(repoRoot, home, port, verbose, context.GetCancellationToken());
         });
 
         command.AddCommand(gatewayCommand);
@@ -72,7 +69,7 @@ internal sealed class ServeCommand
         return command;
     }
 
-    private static async Task<int> ServeGatewayAsync(string repoRoot, int port, bool verbose, CancellationToken cancellationToken)
+    private static async Task<int> ServeGatewayAsync(string repoRoot, string home, int port, bool verbose, CancellationToken cancellationToken)
     {
         var buildResult = await BuildCommand.BuildSolutionAsync(repoRoot, verbose, cancellationToken);
         if (buildResult != 0)
@@ -86,11 +83,11 @@ internal sealed class ServeCommand
             return 1;
         }
 
-        // Auto-initialize ~/.botnexus/ with a default config if none exists
-        var configPath = PlatformConfigLoader.DefaultConfigPath;
+        // Auto-initialize home with a default config if none exists
+        var configPath = Path.Combine(home, "config.json");
         if (!File.Exists(configPath))
         {
-            AnsiConsole.MarkupLine("[blue][[serve]][/] No configuration found — creating default config...");
+            AnsiConsole.MarkupLine("[blue][[serve]][/] No configuration found \u2014 creating default config...");
             var init = new InitCommand();
             var initResult = await init.ExecuteAsync(force: false, verbose, cancellationToken);
             if (initResult != 0)
@@ -105,7 +102,7 @@ internal sealed class ServeCommand
             return 1;
         }
 
-        DeployExtensions(repoRoot, verbose);
+        DeployExtensions(repoRoot, home, verbose);
 
         var gatewayUrl = $"http://localhost:{port}";
         var lastExitCode = 0;
@@ -127,6 +124,7 @@ internal sealed class ServeCommand
             };
             psi.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
             psi.Environment["ASPNETCORE_URLS"] = gatewayUrl;
+            psi.Environment["BOTNEXUS_HOME"] = home;
 
             using var process = Process.Start(psi)
                 ?? throw new InvalidOperationException("Failed to start Gateway process.");
@@ -193,10 +191,10 @@ internal sealed class ServeCommand
     }
 
     /// <summary>
-    /// Deploys built extensions from the repository to ~/.botnexus/extensions.
+    /// Deploys built extensions from the repository to {home}/extensions.
     /// Public to allow GatewayCommand to use it.
     /// </summary>
-    public static void DeployExtensions(string repoRoot, bool verbose)
+    public static void DeployExtensions(string repoRoot, string home, bool verbose)
     {
         var extensionsRoot = Path.Combine(repoRoot, "src", "extensions");
         if (!Directory.Exists(extensionsRoot))
@@ -206,9 +204,7 @@ internal sealed class ServeCommand
             return;
         }
 
-        var destRoot = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".botnexus", "extensions");
+        var destRoot = Path.Combine(home, "extensions");
 
         var projects = Directory.GetFiles(extensionsRoot, "*.csproj", SearchOption.AllDirectories);
         var deployed = 0;
