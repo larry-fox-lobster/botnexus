@@ -8,7 +8,6 @@ using BotNexus.Gateway.Abstractions.Isolation;
 using BotNexus.Gateway.Abstractions.Media;
 using BotNexus.Gateway.Abstractions.Routing;
 using BotNexus.Gateway.Abstractions.Security;
-using BotNexus.Gateway.Abstractions.Conversations;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Abstractions.Configuration;
 using BotNexus.Gateway.Abstractions.Extensions;
@@ -403,7 +402,23 @@ public static class GatewayServiceCollectionExtensions
                     serviceProvider.GetRequiredService<ILogger<FileConversationStore>>(),
                     fs);
             }));
+            return;
         }
+
+        if (resolvedType.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
+        {
+            var connectionString = sessionStore?.ConnectionString;
+            if (string.IsNullOrWhiteSpace(connectionString))
+                throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), ["gateway.sessionStore.connectionString is required when gateway.sessionStore.type is 'Sqlite'."]);
+
+            services.Replace(ServiceDescriptor.Singleton<IConversationStore>(serviceProvider =>
+                new SqliteConversationStore(
+                    connectionString,
+                    serviceProvider.GetRequiredService<ILogger<SqliteConversationStore>>())));
+            return;
+        }
+
+        throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), ["gateway.sessionStore.type must be either 'InMemory', 'File', or 'Sqlite'."]);
     }
 
     /// <summary>

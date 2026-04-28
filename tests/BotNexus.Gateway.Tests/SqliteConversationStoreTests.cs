@@ -1,0 +1,253 @@
+using BotNexus.Domain.Primitives;
+using BotNexus.Gateway.Abstractions.Conversations;
+using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Sessions;
+using Microsoft.Extensions.Logging.Abstractions;
+
+namespace BotNexus.Gateway.Tests;
+
+/// <summary>
+/// Unit tests for <see cref="SqliteConversationStore"/>.
+/// </summary>
+public sealed class SqliteConversationStoreTests
+{
+    [Fact]
+    public async Task CreateAndRetrieveConversation_PersistsConversationAndBindings()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var conversation = CreateConversation(
+            Agent("agent-a"),
+            "First",
+            CreateBinding("telegram", "12345"));
+
+        await store.CreateAsync(conversation);
+
+        var loaded = await fixture.CreateStore().GetAsync(conversation.ConversationId);
+
+        loaded.ShouldNotBeNull();
+        loaded!.Title.ShouldBe("First");
+        loaded.ChannelBindings.Count.ShouldBe(1);
+        loaded.ChannelBindings[0].ChannelType.ShouldBe(ChannelKey.From("telegram"));
+        loaded.ChannelBindings[0].ChannelAddress.ShouldBe("12345");
+    }
+
+    [Fact]
+    public async Task GetOrCreateDefaultAsync_IsIdempotent()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+
+        var first = await store.GetOrCreateDefaultAsync(Agent("agent-a"));
+        var second = await store.GetOrCreateDefaultAsync(Agent("agent-a"));
+
+        first.ConversationId.ShouldBe(second.ConversationId);
+        first.IsDefault.ShouldBeTrue();
+        first.Title.ShouldBe("Default");
+    }
+
+    [Fact]
+    public async Task ListAsync_FiltersByAgentId()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        await store.CreateAsync(CreateConversation(Agent("agent-a"), "A1"));
+        await store.CreateAsync(CreateConversation(Agent("agent-b"), "B1"));
+        await store.CreateAsync(CreateConversation(Agent("agent-a"), "A2"));
+
+        var filtered = await fixture.CreateStore().ListAsync(Agent("agent-a"));
+
+        filtered.Count.ShouldBe(2);
+        filtered.ShouldAllBe(c => c.AgentId == Agent("agent-a"));
+    }
+
+    [Fact]
+    public async Task SaveAsync_UpdatesTitle()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var conversation = CreateConversation(Agent("agent-a"), "Before");
+        await store.CreateAsync(conversation);
+
+        conversation.Title = "After";
+        await store.SaveAsync(conversation);
+
+        var loaded = await fixture.CreateStore().GetAsync(conversation.ConversationId);
+        loaded.ShouldNotBeNull();
+        loaded!.Title.ShouldBe("After");
+    }
+
+    [Fact]
+    public async Task ArchiveAsync_SetsStatusToArchived()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var conversation = CreateConversation(Agent("agent-a"), "Archive me");
+        await store.CreateAsync(conversation);
+
+        await store.ArchiveAsync(conversation.ConversationId);
+
+        var loaded = await fixture.CreateStore().GetAsync(conversation.ConversationId);
+        loaded.ShouldNotBeNull();
+        loaded!.Status.ShouldBe(ConversationStatus.Archived);
+    }
+
+    [Fact]
+    public async Task ResolveByBindingAsync_FindsCorrectConversation()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var expected = CreateConversation(Agent("agent-a"), "Expected", CreateBinding("telegram", "12345"));
+        await store.CreateAsync(expected);
+        await store.CreateAsync(CreateConversation(Agent("agent-a"), "Other", CreateBinding("telegram", "99999")));
+
+        var resolved = await fixture.CreateStore().ResolveByBindingAsync(Agent("agent-a"), ChannelKey.From("telegram"), "12345", null);
+
+        resolved.ShouldNotBeNull();
+        resolved!.ConversationId.ShouldBe(expected.ConversationId);
+    }
+
+    [Fact]
+    public async Task ResolveByBindingAsync_WithThreadId_MatchesExactly()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var expected = CreateConversation(Agent("agent-a"), "Threaded", CreateBinding("teams", "channel-1", "thread-42"));
+        await store.CreateAsync(expected);
+        await store.CreateAsync(CreateConversation(Agent("agent-a"), "Other", CreateBinding("teams", "channel-1", "thread-99")));
+
+        var resolved = await fixture.CreateStore().ResolveByBindingAsync(Agent("agent-a"), ChannelKey.From("teams"), "channel-1", "thread-42");
+
+        resolved.ShouldNotBeNull();
+        resolved!.ConversationId.ShouldBe(expected.ConversationId);
+    }
+
+    [Fact]
+    public async Task ResolveByBindingAsync_WithoutThreadId_MatchesOnAddressOnly()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var expected = CreateConversation(Agent("agent-a"), "Address", CreateBinding("teams", "channel-1", "thread-42"));
+        await store.CreateAsync(expected);
+
+        var resolved = await fixture.CreateStore().ResolveByBindingAsync(Agent("agent-a"), ChannelKey.From("teams"), "channel-1", null);
+
+        resolved.ShouldNotBeNull();
+        resolved!.ConversationId.ShouldBe(expected.ConversationId);
+    }
+
+    [Fact]
+    public async Task GetSummariesAsync_ReturnsBindingCountCorrectly()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var conversation = CreateConversation(
+            Agent("agent-a"),
+            "Summary",
+            CreateBinding("telegram", "123"),
+            CreateBinding("teams", "abc", "thread-1"));
+        await store.CreateAsync(conversation);
+
+        var summaries = await fixture.CreateStore().GetSummariesAsync(Agent("agent-a"));
+
+        summaries.Count.ShouldBe(1);
+        summaries[0].ConversationId.ShouldBe(conversation.ConversationId.Value);
+        summaries[0].BindingCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task SaveAsync_AddBindingAndRetrieveViaGetAsync()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var conversation = CreateConversation(Agent("agent-a"), "Bindings", CreateBinding("telegram", "123"));
+        await store.CreateAsync(conversation);
+
+        conversation.ChannelBindings.Add(CreateBinding("teams", "abc", "thread-1"));
+        await store.SaveAsync(conversation);
+
+        var loaded = await fixture.CreateStore().GetAsync(conversation.ConversationId);
+        loaded.ShouldNotBeNull();
+        loaded!.ChannelBindings.Count.ShouldBe(2);
+        loaded.ChannelBindings.Any(b => b.ChannelType == ChannelKey.From("teams") && b.ThreadId == "thread-1").ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithDuplicateId_Throws()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var conversation = CreateConversation(Agent("agent-a"), "Duplicate");
+        await store.CreateAsync(conversation);
+
+        await Should.ThrowAsync<InvalidOperationException>(() => store.CreateAsync(conversation));
+    }
+
+    private static AgentId Agent(string id) => AgentId.From(id);
+
+    private static string TempDb()
+        => Path.Combine(Path.GetTempPath(), $"bn-conv-test-{Guid.NewGuid():N}.db");
+
+    private static Conversation CreateConversation(AgentId agentId, string title, params ChannelBinding[] bindings)
+        => new()
+        {
+            ConversationId = ConversationId.Create(),
+            AgentId = agentId,
+            Title = title,
+            Status = ConversationStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            ChannelBindings = bindings.ToList()
+        };
+
+    private static ChannelBinding CreateBinding(string channelType, string channelAddress, string? threadId = null)
+        => new()
+        {
+            BindingId = Guid.NewGuid().ToString("N"),
+            ChannelType = ChannelKey.From(channelType),
+            ChannelAddress = channelAddress,
+            ThreadId = threadId,
+            BoundAt = DateTimeOffset.UtcNow,
+            Mode = BindingMode.Interactive,
+            ThreadingMode = threadId is null ? ThreadingMode.Single : ThreadingMode.NativeThread
+        };
+
+    /// <summary>
+    /// Disposable SQLite store fixture backed by a temporary file.
+    /// </summary>
+    private sealed class StoreFixture : IDisposable
+    {
+        /// <summary>
+        /// Initialises a new instance of the <see cref="StoreFixture"/> class.
+        /// </summary>
+        public StoreFixture()
+        {
+            DatabasePath = TempDb();
+            ConnectionString = $"Data Source={DatabasePath};Pooling=False";
+        }
+
+        /// <summary>
+        /// Gets the database file path.
+        /// </summary>
+        public string DatabasePath { get; }
+
+        /// <summary>
+        /// Gets the SQLite connection string.
+        /// </summary>
+        public string ConnectionString { get; }
+
+        /// <summary>
+        /// Creates a new store instance over the fixture database.
+        /// </summary>
+        /// <returns>A fresh <see cref="SqliteConversationStore"/>.</returns>
+        public SqliteConversationStore CreateStore()
+            => new(ConnectionString, NullLogger<SqliteConversationStore>.Instance);
+
+        /// <inheritdoc />
+        public void Dispose()
+        {
+            if (File.Exists(DatabasePath))
+                File.Delete(DatabasePath);
+        }
+    }
+}
