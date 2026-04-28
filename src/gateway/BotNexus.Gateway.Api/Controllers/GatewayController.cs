@@ -21,6 +21,17 @@ public sealed class GatewayController(IHostApplicationLifetime lifetime) : Contr
     /// Executes shutdown.
     /// </summary>
     /// <returns>The shutdown result.</returns>
+    /// <summary>Returns runtime and build information about the running gateway.</summary>
+    [HttpGet("info")]
+    public IActionResult Info() => Ok(new
+    {
+        startedAt     = GatewayBuildInfo.StartedAt,
+        uptimeSeconds = (long)(DateTimeOffset.UtcNow - GatewayBuildInfo.StartedAt).TotalSeconds,
+        commitSha     = GatewayBuildInfo.CommitSha,
+        commitShort   = GatewayBuildInfo.CommitShort,
+        version       = GatewayBuildInfo.Version
+    });
+
     [HttpPost("shutdown")]
     public IActionResult Shutdown()
     {
