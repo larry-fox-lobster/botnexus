@@ -65,8 +65,7 @@ function Sync-Instance {
     & git pull $Remote main 2>&1 | Add-Content $LogFile
 
     Write-Log "[$Label] Building (Release)..."
-    $CommitSha = (git -C $Repo rev-parse HEAD).Trim()
-    & $DOTNET build "$Repo/BotNexus.slnx" -c Release --nologo --tl:off -p:SourceRevisionId=$CommitSha 2>&1 | Add-Content $LogFile
+    & $DOTNET build "$Repo/BotNexus.slnx" -c Release --nologo --tl:off 2>&1 | Add-Content $LogFile
     if ($LASTEXITCODE -ne 0) { Write-Log "[$Label] ERROR: Build failed — aborting."; return }
 
     Write-Log "[$Label] Running tests..."
