@@ -11,5 +11,6 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 builder.Services.AddScoped<GatewayHubConnection>();
 builder.Services.AddScoped<AgentSessionManager>();
 builder.Services.AddScoped<PlatformConfigService>();
+builder.Services.AddScoped<GatewayInfoService>();
 
 await builder.Build().RunAsync();

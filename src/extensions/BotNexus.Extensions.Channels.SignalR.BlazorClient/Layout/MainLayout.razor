@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Nav
 @inject AgentSessionManager Manager
+@inject GatewayInfoService GatewayInfo
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -116,11 +117,25 @@
                 <a href="agents" class="sidebar-nav-item @NavClass("agents")" @onclick="OnNavClick">🤖 Agents</a>
             </nav>
 
-            @* Restart button at bottom *@
+            @* Restart button + build info at bottom *@
             <div class="sidebar-footer">
                 <button class="restart-btn" @onclick="RestartGateway" disabled="@_restarting">
                     @(_restarting ? "Restarting…" : "🔄 Restart Gateway")
                 </button>
+                @if (GatewayInfo.Info is not null)
+                {
+                    <div class="gateway-info">
+                        <span class="gateway-started" title="@GatewayInfo.Info.StartedAt.ToString("o")">
+                            ↺ @FormatStarted(GatewayInfo.Info.StartedAt)
+                        </span>
+                        <a class="gateway-commit"
+                           href="https://github.com/sytone/botnexus/commit/@GatewayInfo.Info.CommitSha"
+                           target="_blank"
+                           title="@GatewayInfo.Info.CommitSha">
+                            @GatewayInfo.Info.CommitShort
+                        </a>
+                    </div>
+                }
             </div>
         </aside>
 
@@ -141,6 +156,11 @@
     protected override void OnInitialized()
     {
         Manager.OnStateChanged += HandleStateChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GatewayInfo.LoadAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -209,6 +229,18 @@
     private void DismissAnnouncement(string id)
     {
         _announcements.RemoveAll(a => a.Id == id);
+    }
+
+    private static string FormatStarted(DateTimeOffset startedAt)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var local = startedAt.ToLocalTime();
+        var today = now.ToLocalTime().Date;
+        if (local.Date == today)
+            return $"today {local:HH:mm}";
+        if (local.Date == today.AddDays(-1))
+            return $"yesterday {local:HH:mm}";
+        return local.ToString("MMM d HH:mm");
     }
 
     private async Task RestartGateway()
