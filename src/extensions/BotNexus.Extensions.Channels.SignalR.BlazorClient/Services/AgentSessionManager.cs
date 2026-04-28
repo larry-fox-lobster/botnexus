@@ -103,6 +103,23 @@ public sealed class AgentSessionManager : IDisposable
         if (!_sessions.TryGetValue(agentId, out var state))
             return;
 
+        // Ensure we have an active conversation before sending — creates a default one if absent.
+        // This also guarantees convId is non-null in all downstream event handlers,
+        // preventing the IsStreaming-stuck and message-loss bugs.
+        if (state.ActiveConversationId is null)
+        {
+            var convId = await CreateConversationAsync(agentId, title: null, select: true);
+            if (convId is null)
+            {
+                // Couldn't create conversation — surface error and bail
+                GetOrCreateMessageStore(state, state.ActiveConversationId)
+                    .Add(new ChatMessage("Error", "Failed to create conversation before sending.", DateTimeOffset.UtcNow));
+                OnStateChanged?.Invoke();
+                return;
+            }
+        }
+
+        // Route user message via the conversation store (never into the temp []).
         GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("User", content, DateTimeOffset.UtcNow));
         OnStateChanged?.Invoke();
 
@@ -110,6 +127,10 @@ public sealed class AgentSessionManager : IDisposable
         {
             var result = await _hub.SendMessageAsync(agentId, state.ChannelType ?? "signalr", content);
             RegisterSession(agentId, result.SessionId, result.ChannelType);
+
+            // Refresh conversation list so the server-assigned ActiveSessionId is picked up.
+            // This lets FindConversationIdForSession resolve correctly for subsequent events.
+            await RefreshConversationsAsync(agentId);
         }
         catch (Exception ex)
         {
