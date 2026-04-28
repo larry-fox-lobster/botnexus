@@ -3,6 +3,7 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
+using BotNexus.Gateway.Abstractions.Conversations;
 using AgentId = BotNexus.Domain.Primitives.AgentId;
 using ChannelKey = BotNexus.Domain.Primitives.ChannelKey;
 using ParticipantType = BotNexus.Domain.Primitives.ParticipantType;
@@ -32,6 +33,7 @@ public sealed class GatewayHub : Hub<IGatewayHubClient>
     private readonly IActivityBroadcaster _activity;
     private readonly ISessionCompactor _compactor;
     private readonly ISessionWarmupService _warmup;
+    private readonly IConversationRouter _conversationRouter;
     private readonly IOptionsMonitor<CompactionOptions> _compactionOptions;
     private readonly ILogger<GatewayHub> _logger;
 
@@ -43,6 +45,7 @@ public sealed class GatewayHub : Hub<IGatewayHubClient>
         IActivityBroadcaster activity,
         ISessionCompactor compactor,
         ISessionWarmupService warmup,
+        IConversationRouter conversationRouter,
         IOptionsMonitor<CompactionOptions> compactionOptions,
         ILogger<GatewayHub> logger)
     {
@@ -53,6 +56,7 @@ public sealed class GatewayHub : Hub<IGatewayHubClient>
         _activity = activity;
         _compactor = compactor;
         _warmup = warmup;
+        _conversationRouter = conversationRouter;
         _compactionOptions = compactionOptions;
         _logger = logger;
     }
@@ -529,15 +533,16 @@ public sealed class GatewayHub : Hub<IGatewayHubClient>
 
     private async Task<GatewaySession> ResolveOrCreateSessionAsync(AgentId agentId, ChannelKey channelType)
     {
-        var summaries = await _warmup.GetAvailableSessionsAsync(agentId.Value, Context.ConnectionAborted);
-        var existing = summaries
-            .Where(summary => ChannelMatches(summary.ChannelType, channelType))
-            .Where(summary => summary.Status != GatewaySessionStatus.Sealed)
-            .OrderByDescending(summary => summary.UpdatedAt)
-            .FirstOrDefault();
+        // Conversation-first routing: resolve/create via IConversationRouter
+        var channelAddress = Context.ConnectionId;
+        var routingResult = await _conversationRouter.ResolveInboundAsync(
+            agentId,
+            channelType,
+            channelAddress,
+            threadId: null,
+            Context.ConnectionAborted);
 
-        var sessionId = existing is null ? SessionId.Create() : SessionId.From(existing.SessionId);
-        var session = await _sessions.GetOrCreateAsync(sessionId, agentId, Context.ConnectionAborted);
+        var session = await _sessions.GetOrCreateAsync(routingResult.SessionId, agentId, Context.ConnectionAborted);
 
         var needsSave = false;
         if (session.Status == SessionStatus.Expired)
@@ -547,10 +552,9 @@ public sealed class GatewayHub : Hub<IGatewayHubClient>
             needsSave = true;
         }
 
-        var normalizedChannelType = channelType;
-        if (!session.ChannelType.HasValue || !ChannelMatches(session.ChannelType.Value, normalizedChannelType))
+        if (!session.ChannelType.HasValue || !ChannelMatches(session.ChannelType.Value, channelType))
         {
-            session.ChannelType = normalizedChannelType;
+            session.ChannelType = channelType;
             needsSave = true;
         }
 

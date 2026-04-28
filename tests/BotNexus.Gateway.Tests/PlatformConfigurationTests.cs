@@ -3,6 +3,7 @@ using System.Text.Json;
 using BotNexus.Domain.World;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Configuration;
+using BotNexus.Gateway.Abstractions.Conversations;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Configuration;
@@ -543,6 +544,9 @@ public sealed class PlatformConfigurationTests
         using var provider = services.BuildServiceProvider();
         var sessionStore = provider.GetRequiredService<ISessionStore>();
         sessionStore.ShouldBeOfType<SqliteSessionStore>();
+
+        var conversationStore = provider.GetRequiredService<IConversationStore>();
+        conversationStore.ShouldBeOfType<SqliteConversationStore>();
     }
 
     [Fact]

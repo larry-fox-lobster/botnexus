@@ -55,6 +55,12 @@ public sealed record Session
     public DateTimeOffset? ExpiresAt { get; set; }
 
     /// <summary>
+    /// Gets or sets the conversation this session belongs to, if any.
+    /// Sessions with no ConversationId are treated as legacy ungrouped sessions.
+    /// </summary>
+    public ConversationId? ConversationId { get; set; }
+
+    /// <summary>
     /// Gets or sets the metadata.
     /// </summary>
     public Dictionary<string, object?> Metadata { get; set; } = [];

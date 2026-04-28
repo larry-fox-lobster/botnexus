@@ -9,6 +9,8 @@ using BotNexus.Gateway.Abstractions.Media;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Routing;
 using BotNexus.Gateway.Abstractions.Sessions;
+using BotNexus.Gateway.Abstractions.Conversations;
+using BotNexus.Gateway.Conversations;
 using AgentId = BotNexus.Domain.Primitives.AgentId;
 using ChannelKey = BotNexus.Domain.Primitives.ChannelKey;
 using MessageRole = BotNexus.Domain.Primitives.MessageRole;
@@ -47,6 +49,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
     private readonly IOptionsMonitor<CompactionOptions> _compactionOptions;
     private readonly ILogger<GatewayHost> _logger;
     private readonly IMediaPipeline? _mediaPipeline;
+    private readonly IConversationRouter? _conversationRouter;
     private readonly SessionLifecycleEvents? _sessionLifecycleEvents;
     private readonly ConcurrentDictionary<string, SessionQueueState> _sessionQueues = new(StringComparer.OrdinalIgnoreCase);
 
@@ -61,7 +64,8 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
         ILogger<GatewayHost> logger,
         int sessionQueueCapacity = DefaultSessionQueueCapacity,
         SessionLifecycleEvents? sessionLifecycleEvents = null,
-        IMediaPipeline? mediaPipeline = null)
+        IMediaPipeline? mediaPipeline = null,
+        IConversationRouter? conversationRouter = null)
     {
         _supervisor = supervisor;
         _router = router;
@@ -72,6 +76,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
         _compactionOptions = compactionOptions;
         _logger = logger;
         _mediaPipeline = mediaPipeline;
+        _conversationRouter = conversationRouter;
         _sessionLifecycleEvents = sessionLifecycleEvents;
         SessionQueueCapacity = Math.Max(sessionQueueCapacity, 1);
     }
@@ -412,6 +417,9 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
                     await _sessions.SaveAsync(session, cancellationToken);
                 }
 
+                // Outbound fan-out: deliver response to other bindings in the conversation
+                await FanOutResponseAsync(message, sessionId, cancellationToken);
+
                 await _activity.PublishAsync(new GatewayActivity
                 {
                     Type = GatewayActivityType.AgentCompleted,
@@ -720,6 +728,76 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
             return SessionType.Cron;
 
         return SessionType.UserAgent;
+    }
+
+    /// <summary>
+    /// Best-effort outbound fan-out to other conversation bindings after a response is delivered.
+    /// </summary>
+    private async Task FanOutResponseAsync(
+        InboundMessage message,
+        string sessionId,
+        CancellationToken cancellationToken)
+    {
+        if (_conversationRouter is null)
+            return;
+
+        try
+        {
+            var otherBindings = await _conversationRouter.GetOutboundBindingsAsync(
+                SessionId.From(sessionId),
+                message.ChannelAddress,
+                cancellationToken);
+
+            if (otherBindings.Count == 0)
+                return;
+
+            // Get last assistant message from session history
+            var session = await _sessions.GetAsync(SessionId.From(sessionId), cancellationToken);
+            var lastAssistantEntry = session?.GetHistorySnapshot()
+                .LastOrDefault(e => e.Role == MessageRole.Assistant);
+
+            if (lastAssistantEntry is null)
+                return;
+
+            foreach (var binding in otherBindings)
+            {
+                try
+                {
+                    var adapter = ResolveChannelAdapter(binding.ChannelType);
+                    if (adapter is null)
+                    {
+                        _logger.LogWarning(
+                            "Fan-out: no channel adapter for type '{ChannelType}' (binding {BindingId}). Skipping.",
+                            binding.ChannelType,
+                            binding.BindingId);
+                        continue;
+                    }
+
+                    await adapter.SendAsync(new OutboundMessage
+                    {
+                        ChannelType = binding.ChannelType,
+                        ChannelAddress = binding.ChannelAddress,
+                        Content = lastAssistantEntry.Content,
+                        SessionId = sessionId
+                    }, cancellationToken);
+
+                    _logger.LogDebug(
+                        "Fan-out delivered to {ChannelType}:{ChannelAddress} for session {SessionId}",
+                        binding.ChannelType, binding.ChannelAddress, sessionId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Fan-out failed for binding {BindingId} ({ChannelType}:{ChannelAddress}). Continuing.",
+                        binding.BindingId, binding.ChannelType, binding.ChannelAddress);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fan-out resolution failed for session {SessionId}. Continuing.", sessionId);
+        }
     }
 
     private IChannelAdapter? ResolveChannelAdapter(ChannelKey channelType)

@@ -296,30 +296,15 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         using var cts = CreateTimeout();
         await RegisterAgentAsync(factory, cts.Token);
 
-        const string sessionA = "switch-a";
-        const string sessionB = "switch-b";
-        await SeedSessionAsync(factory, new GatewaySession
-        {
-            SessionId = sessionA,
-            AgentId = TestAgentId,
-            ChannelType = ChannelKey.From("signalr"),
-            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
-            Status = GatewaySessionStatus.Active
-        }, cts.Token);
-        await SeedSessionAsync(factory, new GatewaySession
-        {
-            SessionId = sessionB,
-            AgentId = TestAgentId,
-            ChannelType = ChannelKey.From("telegram"),
-            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
-            Status = GatewaySessionStatus.Active
-        }, cts.Token);
-
+        // Wave 2: conversation routing creates a new session for new channel addresses.
+        // Seed sessions are no longer picked up by channel-type scan; a conversation binding is required.
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         await connection.InvokeAsync("SendMessage", TestAgentId, "telegram", "latest", cts.Token);
 
         dispatcher.Messages.ShouldHaveSingleItem();
-        dispatcher.Messages[0].SessionId.ShouldBe(sessionB);
+        dispatcher.Messages[0].TargetAgentId.ShouldBe(TestAgentId);
+        dispatcher.Messages[0].Content.ShouldBe("latest");
+        dispatcher.Messages[0].SessionId.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -334,31 +319,15 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         using var cts = CreateTimeout();
         await RegisterAgentAsync(factory, cts.Token);
 
-        const string sessionA = "rapid-a";
-        const string sessionB = "rapid-b";
-        await SeedSessionAsync(factory, new GatewaySession
-        {
-            SessionId = sessionA,
-            AgentId = TestAgentId,
-            ChannelType = ChannelKey.From("signalr"),
-            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
-            Status = GatewaySessionStatus.Active
-        }, cts.Token);
-        await SeedSessionAsync(factory, new GatewaySession
-        {
-            SessionId = sessionB,
-            AgentId = TestAgentId,
-            ChannelType = ChannelKey.From("telegram"),
-            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
-            Status = GatewaySessionStatus.Active
-        }, cts.Token);
-
+        // Wave 2: conversation routing creates sessions per conversation binding.
+        // Rapid sends on different channel types each create/reuse their own conversation sessions.
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         await Task.WhenAll(
             connection.InvokeAsync("SendMessage", TestAgentId, "signalr", "before-switch", cts.Token),
             connection.InvokeAsync("SendMessage", TestAgentId, "telegram", "after-switch", cts.Token));
 
-        dispatcher.Messages.Where(m => m.SessionId == sessionB && m.Content == "after-switch").ShouldHaveSingleItem();
+        dispatcher.Messages.ShouldContain(m => m.Content == "after-switch");
+        dispatcher.Messages.ShouldContain(m => m.Content == "before-switch");
     }
 
     [Fact]
@@ -373,31 +342,13 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         using var cts = CreateTimeout();
         await RegisterAgentAsync(factory, cts.Token);
 
-        const string sessionA = "active-join-a";
-        const string sessionB = "active-join-b";
-        await SeedSessionAsync(factory, new GatewaySession
-        {
-            SessionId = sessionA,
-            AgentId = TestAgentId,
-            ChannelType = ChannelKey.From("signalr"),
-            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
-            Status = GatewaySessionStatus.Active
-        }, cts.Token);
-        await SeedSessionAsync(factory, new GatewaySession
-        {
-            SessionId = sessionB,
-            AgentId = TestAgentId,
-            ChannelType = ChannelKey.From("telegram"),
-            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
-            Status = GatewaySessionStatus.Active
-        }, cts.Token);
-
+        // Wave 2: conversation routing creates a session per conversation binding.
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         await connection.InvokeAsync("SendMessage", TestAgentId, "telegram", "send-during-join", cts.Token);
 
         dispatcher.Messages.ShouldHaveSingleItem();
-        dispatcher.Messages[0].SessionId.ShouldBe(sessionB);
         dispatcher.Messages[0].Content.ShouldBe("send-during-join");
+        dispatcher.Messages[0].SessionId.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -412,31 +363,13 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         using var cts = CreateTimeout();
         await RegisterAgentAsync(factory, cts.Token);
 
-        const string sessionA = "leave-join-a";
-        const string sessionB = "leave-join-b";
-        await SeedSessionAsync(factory, new GatewaySession
-        {
-            SessionId = sessionA,
-            AgentId = TestAgentId,
-            ChannelType = ChannelKey.From("signalr"),
-            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
-            Status = GatewaySessionStatus.Active
-        }, cts.Token);
-        await SeedSessionAsync(factory, new GatewaySession
-        {
-            SessionId = sessionB,
-            AgentId = TestAgentId,
-            ChannelType = ChannelKey.From("telegram"),
-            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
-            Status = GatewaySessionStatus.Active
-        }, cts.Token);
-
+        // Wave 2: conversation routing creates sessions per conversation binding.
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         await connection.InvokeAsync("SendMessage", TestAgentId, "telegram", "immediate-after-join", cts.Token);
 
         dispatcher.Messages.ShouldHaveSingleItem();
-        dispatcher.Messages[0].SessionId.ShouldBe(sessionB);
         dispatcher.Messages[0].Content.ShouldBe("immediate-after-join");
+        dispatcher.Messages[0].SessionId.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -454,25 +387,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await RegisterAgentAsync(factory, cts.Token, agentA);
         await RegisterAgentAsync(factory, cts.Token, agentB);
 
-        const string sessionA = "interleaved-session-1";
-        const string sessionB = "interleaved-session-2";
-        await SeedSessionAsync(factory, new GatewaySession
-        {
-            SessionId = sessionA,
-            AgentId = agentA,
-            ChannelType = ChannelKey.From("signalr"),
-            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
-            Status = GatewaySessionStatus.Active
-        }, cts.Token);
-        await SeedSessionAsync(factory, new GatewaySession
-        {
-            SessionId = sessionB,
-            AgentId = agentB,
-            ChannelType = ChannelKey.From("signalr"),
-            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
-            Status = GatewaySessionStatus.Active
-        }, cts.Token);
-
+        // Wave 2: conversation routing creates sessions per conversation binding.
         await using var connection = await CreateStartedConnection(factory, cts.Token);
         await connection.InvokeAsync("SendMessage", agentA, "signalr", "message-for-a", cts.Token);
         await connection.InvokeAsync("SendMessage", agentB, "signalr", "message-for-b", cts.Token);
@@ -480,11 +395,9 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         dispatcher.Messages.Count().ShouldBe(2);
         dispatcher.Messages.Where(m =>
             m.TargetAgentId == agentA &&
-            m.SessionId == sessionA &&
             m.Content == "message-for-a").ShouldHaveSingleItem();
         dispatcher.Messages.Where(m =>
             m.TargetAgentId == agentB &&
-            m.SessionId == sessionB &&
             m.Content == "message-for-b").ShouldHaveSingleItem();
     }
 
@@ -503,39 +416,17 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
         await RegisterAgentAsync(factory, cts.Token, agentA);
         await RegisterAgentAsync(factory, cts.Token, agentB);
 
-        const string sessionA = "multi-agent-join-a";
-        const string sessionB = "multi-agent-join-b";
-        await SeedSessionAsync(factory, new GatewaySession
-        {
-            SessionId = sessionA,
-            AgentId = agentA,
-            ChannelType = ChannelKey.From("signalr"),
-            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
-            Status = GatewaySessionStatus.Active
-        }, cts.Token);
-        await SeedSessionAsync(factory, new GatewaySession
-        {
-            SessionId = sessionB,
-            AgentId = agentB,
-            ChannelType = ChannelKey.From("signalr"),
-            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent,
-            Status = GatewaySessionStatus.Active
-        }, cts.Token);
-
+        // Wave 2: conversation routing creates sessions per conversation binding.
         await using var connection = await CreateStartedConnection(factory, cts.Token);
-        await connection.InvokeAsync<JsonElement>("JoinSession", agentA, sessionA, cts.Token);
-        await connection.InvokeAsync<JsonElement>("JoinSession", agentB, sessionB, cts.Token);
         await connection.InvokeAsync("SendMessage", agentA, "signalr", "message-for-a", cts.Token);
         await connection.InvokeAsync("SendMessage", agentB, "signalr", "message-for-b", cts.Token);
 
         dispatcher.Messages.Count().ShouldBe(2);
         dispatcher.Messages.Where(m =>
             m.TargetAgentId == agentA &&
-            m.SessionId == sessionA &&
             m.Content == "message-for-a").ShouldHaveSingleItem();
         dispatcher.Messages.Where(m =>
             m.TargetAgentId == agentB &&
-            m.SessionId == sessionB &&
             m.Content == "message-for-b").ShouldHaveSingleItem();
     }
 

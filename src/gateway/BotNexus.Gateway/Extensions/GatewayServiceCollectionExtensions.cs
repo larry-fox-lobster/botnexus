@@ -1,4 +1,6 @@
 using BotNexus.Gateway.Abstractions.Channels;
+using BotNexus.Gateway.Abstractions.Conversations;
+using BotNexus.Gateway.Conversations;
 using BotNexus.Gateway.Abstractions.Activity;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Hooks;
@@ -127,6 +129,8 @@ public static class GatewayServiceCollectionExtensions
         services.AddSingleton<IConfigPathResolver, ConfigPathResolver>();
         services.TryAddSingleton<IChannelManager, ChannelManager>();
         services.TryAddSingleton<ISessionStore, InMemorySessionStore>();
+        services.TryAddSingleton<IConversationStore, InMemoryConversationStore>();
+        services.TryAddSingleton<IConversationRouter, DefaultConversationRouter>();
         services.AddSingleton<InternalChannelAdapter>();
         services.AddSingleton<IChannelAdapter>(serviceProvider => serviceProvider.GetRequiredService<InternalChannelAdapter>());
         services.AddSingleton<ISessionCompactor, LlmSessionCompactor>();
@@ -251,6 +255,7 @@ public static class GatewayServiceCollectionExtensions
         }
 
         ConfigureSessionStore(services, config, configDirectory);
+        ConfigureConversationStore(services, config, configDirectory);
 
         var agentsDirectory = config.Gateway?.AgentsDirectory;
         if (!string.IsNullOrWhiteSpace(agentsDirectory))
@@ -358,6 +363,58 @@ public static class GatewayServiceCollectionExtensions
                 new SqliteSessionStore(
                     connectionString,
                     serviceProvider.GetRequiredService<ILogger<SqliteSessionStore>>())));
+            return;
+        }
+
+        throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), ["gateway.sessionStore.type must be either 'InMemory', 'File', or 'Sqlite'."]);
+    }
+
+    private static void ConfigureConversationStore(IServiceCollection services, PlatformConfig config, string configDirectory)
+    {
+        var sessionStore = config.Gateway?.SessionStore;
+        var explicitType = sessionStore?.Type?.Trim();
+        var sessionsDirectory = config.Gateway?.SessionsDirectory;
+        var resolvedType = !string.IsNullOrWhiteSpace(explicitType)
+            ? explicitType
+            : !string.IsNullOrWhiteSpace(sessionsDirectory)
+                ? "File"
+                : "InMemory";
+
+        if (resolvedType.Equals("InMemory", StringComparison.OrdinalIgnoreCase))
+        {
+            services.Replace(ServiceDescriptor.Singleton<IConversationStore, InMemoryConversationStore>());
+            return;
+        }
+
+        if (resolvedType.Equals("File", StringComparison.OrdinalIgnoreCase))
+        {
+            var configuredPath = sessionStore?.FilePath ?? sessionsDirectory;
+            if (string.IsNullOrWhiteSpace(configuredPath))
+                throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), ["gateway.sessionStore.filePath is required when gateway.sessionStore.type is 'File'."]);
+
+            var conversationsPath = Path.Combine(ResolveConfiguredPath(configDirectory, configuredPath), "conversations");
+            services.Replace(ServiceDescriptor.Singleton<IConversationStore>(serviceProvider =>
+            {
+                var fs = serviceProvider.GetRequiredService<IFileSystem>();
+                fs.Directory.CreateDirectory(conversationsPath);
+                return new FileConversationStore(
+                    conversationsPath,
+                    serviceProvider.GetRequiredService<ILogger<FileConversationStore>>(),
+                    fs);
+            }));
+            return;
+        }
+
+        if (resolvedType.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
+        {
+            var connectionString = sessionStore?.ConnectionString;
+            if (string.IsNullOrWhiteSpace(connectionString))
+                throw new OptionsValidationException(nameof(PlatformConfig), typeof(PlatformConfig), ["gateway.sessionStore.connectionString is required when gateway.sessionStore.type is 'Sqlite'."]);
+
+            services.Replace(ServiceDescriptor.Singleton<IConversationStore>(serviceProvider =>
+                new SqliteConversationStore(
+                    connectionString,
+                    serviceProvider.GetRequiredService<ILogger<SqliteConversationStore>>())));
             return;
         }
 
