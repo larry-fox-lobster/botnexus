@@ -10,10 +10,10 @@ internal sealed class InstallCommand
 
     public Command Build(Option<bool> verboseOption)
     {
-        var pathOption = new Option<string?>(
-            "--path",
+        var sourceOption = new Option<string?>(
+            "--source",
             () => null,
-            "Target directory for the clone. Defaults to USERPROFILE/botnexus.");
+            "Directory to clone into. Defaults to ~/botnexus.");
 
         var repoOption = new Option<string>(
             "--repo",
@@ -26,28 +26,26 @@ internal sealed class InstallCommand
 
         var command = new Command("install", "Clone the BotNexus repository and optionally build it.")
         {
-            pathOption,
+            sourceOption,
             repoOption,
             buildOption
         };
 
         command.SetHandler(async context =>
         {
-            var path = context.ParseResult.GetValueForOption(pathOption);
+            var source = context.ParseResult.GetValueForOption(sourceOption);
             var repo = context.ParseResult.GetValueForOption(repoOption)!;
             var build = context.ParseResult.GetValueForOption(buildOption);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteAsync(path, repo, build, verbose, context.GetCancellationToken());
+            context.ExitCode = await ExecuteAsync(source, repo, build, verbose, context.GetCancellationToken());
         });
 
         return command;
     }
 
-    private static async Task<int> ExecuteAsync(string? path, string repo, bool build, bool verbose, CancellationToken cancellationToken)
+    private static async Task<int> ExecuteAsync(string? source, string repo, bool build, bool verbose, CancellationToken cancellationToken)
     {
-        var targetPath = path ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "botnexus");
+        var targetPath = CliPaths.ResolveSource(source);
 
         if (Directory.Exists(Path.Combine(targetPath, ".git")))
         {
