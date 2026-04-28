@@ -2417,3 +2417,21 @@ details[open] > .thinking-summary::before {
     align-items: center;
     gap: 0.25rem;
 }
+
+/* ── Gateway build info (sidebar footer) ─────────────────────────────── */
+.gateway-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    padding-top: 0.4rem;
+}
+
+.gateway-commit {
+    font-family: monospace;
+    color: var(--text-muted);
+    text-decoration: none;
+}
+
+.gateway-commit:hover { color: var(--accent); }
