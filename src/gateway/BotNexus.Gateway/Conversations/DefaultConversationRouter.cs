@@ -1,0 +1,162 @@
+using BotNexus.Domain.Primitives;
+using BotNexus.Gateway.Abstractions.Conversations;
+using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Abstractions.Sessions;
+using Microsoft.Extensions.Logging;
+using SessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
+
+namespace BotNexus.Gateway.Conversations;
+
+/// <summary>
+/// Default implementation of <see cref="IConversationRouter"/>.
+/// Wires inbound messages to the appropriate conversation/session
+/// and provides outbound binding resolution for fan-out.
+/// </summary>
+public sealed class DefaultConversationRouter : IConversationRouter
+{
+    private readonly IConversationStore _conversationStore;
+    private readonly ISessionStore _sessionStore;
+    private readonly ILogger<DefaultConversationRouter> _logger;
+
+    public DefaultConversationRouter(
+        IConversationStore conversationStore,
+        ISessionStore sessionStore,
+        ILogger<DefaultConversationRouter> logger)
+    {
+        _conversationStore = conversationStore;
+        _sessionStore = sessionStore;
+        _logger = logger;
+    }
+
+    /// <inheritdoc />
+    public async Task<ConversationRoutingResult> ResolveInboundAsync(
+        AgentId agentId,
+        ChannelKey channelType,
+        string channelAddress,
+        string? threadId,
+        CancellationToken ct = default)
+    {
+        // 1. Try to find an existing conversation by binding
+        var conversation = await _conversationStore.ResolveByBindingAsync(
+            agentId, channelType, channelAddress, threadId, ct);
+
+        var addedBinding = false;
+        if (conversation is null)
+        {
+            // 2. Fall back to the agent's default conversation and add a binding
+            conversation = await _conversationStore.GetOrCreateDefaultAsync(agentId, ct);
+
+            var binding = new ChannelBinding
+            {
+                ChannelType = channelType,
+                ChannelAddress = channelAddress,
+                ThreadId = threadId,
+                Mode = BindingMode.Interactive
+            };
+            conversation.ChannelBindings.Add(binding);
+            addedBinding = true;
+
+            _logger.LogDebug(
+                "No conversation found for agent={AgentId} channel={ChannelType} address={ChannelAddress}. Using default conversation {ConversationId}",
+                agentId, channelType, channelAddress, conversation.ConversationId);
+        }
+
+        // 3. Resolve or create the active session
+        var isNewSession = false;
+        var conversationChanged = addedBinding;
+        SessionId sessionId;
+
+        if (conversation.ActiveSessionId.HasValue)
+        {
+            // Verify the active session is still usable (not sealed/archived)
+            var existingSession = await _sessionStore.GetAsync(conversation.ActiveSessionId.Value, ct);
+            if (existingSession is { Status: not SessionStatus.Sealed and not SessionStatus.Expired })
+            {
+                sessionId = conversation.ActiveSessionId.Value;
+                _logger.LogDebug("Reusing active session {SessionId} for conversation {ConversationId}", sessionId, conversation.ConversationId);
+            }
+            else
+            {
+                // Active session is sealed/expired — create a new one
+                sessionId = SessionId.Create();
+                isNewSession = true;
+                conversation.ActiveSessionId = null; // will be stamped below
+                conversationChanged = true;
+                _logger.LogDebug(
+                    "Active session {OldSessionId} is no longer usable; creating new session {NewSessionId} for conversation {ConversationId}",
+                    conversation.ActiveSessionId, sessionId, conversation.ConversationId);
+            }
+        }
+        else
+        {
+            sessionId = SessionId.Create();
+            isNewSession = true;
+            _logger.LogDebug("Creating new session {SessionId} for conversation {ConversationId}", sessionId, conversation.ConversationId);
+        }
+
+        var session = await _sessionStore.GetOrCreateAsync(sessionId, agentId, ct);
+        if (session.SessionId != sessionId)
+        {
+            // GetOrCreateAsync returned a different session — treat as new
+            sessionId = session.SessionId;
+            isNewSession = true;
+        }
+
+
+        // 4. Stamp ConversationId and ActiveSessionId if not already set
+        if (session.Session.ConversationId is null || session.Session.ConversationId != conversation.ConversationId)
+        {
+            session.Session.ConversationId = conversation.ConversationId;
+            await _sessionStore.SaveAsync(session, ct);
+        }
+
+        if (conversation.ActiveSessionId is null || conversation.ActiveSessionId != sessionId)
+        {
+            conversation.ActiveSessionId = sessionId;
+            conversationChanged = true;
+        }
+
+        if (conversationChanged)
+        {
+            conversation.UpdatedAt = DateTimeOffset.UtcNow;
+            await _conversationStore.SaveAsync(conversation, ct);
+        }
+
+        return new ConversationRoutingResult(conversation, sessionId, isNewSession);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ChannelBinding>> GetOutboundBindingsAsync(
+        SessionId sessionId,
+        string originatingChannelAddress,
+        CancellationToken ct = default)
+    {
+        // 1. Resolve the session to get ConversationId
+        var session = await _sessionStore.GetAsync(sessionId, ct);
+        if (session is null)
+        {
+            _logger.LogDebug("GetOutboundBindings: session {SessionId} not found — returning empty", sessionId);
+            return [];
+        }
+
+        var conversationId = session.Session.ConversationId;
+        if (conversationId is null)
+        {
+            _logger.LogDebug("GetOutboundBindings: session {SessionId} has no ConversationId — returning empty", sessionId);
+            return [];
+        }
+
+        var conversation = await _conversationStore.GetAsync(conversationId.Value, ct);
+        if (conversation is null)
+        {
+            _logger.LogDebug("GetOutboundBindings: conversation {ConversationId} not found — returning empty", conversationId);
+            return [];
+        }
+
+        // 2. Filter bindings: not muted, not the originating address
+        return conversation.ChannelBindings
+            .Where(b => b.Mode != BindingMode.Muted)
+            .Where(b => !string.Equals(b.ChannelAddress, originatingChannelAddress, StringComparison.Ordinal))
+            .ToList();
+    }
+}

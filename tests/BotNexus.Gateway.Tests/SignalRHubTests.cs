@@ -3,6 +3,9 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
+using BotNexus.Gateway.Abstractions.Conversations;
+using BotNexus.Gateway.Conversations;
+using BotNexus.Gateway.Sessions;
 using BotNexus.Extensions.Channels.SignalR;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
@@ -63,65 +66,29 @@ public sealed class SignalRHubTests
     [Fact]
     public async Task GatewayHub_SendMessage_UsesVisibleSessionForAgentChannel()
     {
-        var groups = new Mock<IGroupManager>();
-        groups.Setup(value => value.AddToGroupAsync("conn-1", "session:s1", It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var warmup = new Mock<ISessionWarmupService>();
-        warmup.Setup(value => value.GetAvailableSessionsAsync("agent-a", It.IsAny<CancellationToken>()))
-            .ReturnsAsync([
-                new SessionSummary("s1", "agent-a", ChannelKey.From("signalr"), SessionStatus.Active, SessionType.UserAgent, true, 3, DateTimeOffset.UtcNow.AddMinutes(-10), DateTimeOffset.UtcNow)
-            ]);
-
-        var existing = new GatewaySession
-        {
-            SessionId = BotNexus.Domain.Primitives.SessionId.From("s1"),
-            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
-            ChannelType = ChannelKey.From("signalr"),
-            SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent
-        };
-
-        var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("s1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(existing);
-
+        // Wave 2: conversation routing creates sessions per conversation binding.
+        // When SendMessage is called for agent-a on signalr, a new session is created.
         var dispatcher = new Mock<IChannelDispatcher>();
         dispatcher.Setup(value => value.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var hub = CreateHub(groups: groups.Object, sessions: sessions.Object, warmup: warmup.Object, dispatcher: dispatcher.Object, connectionId: "conn-1");
+        var hub = CreateHub(dispatcher: dispatcher.Object, connectionId: "conn-1");
 
-        var result = await hub.SendMessage("agent-a", "web chat", "hello");
+        var result = await hub.SendMessage("agent-a", "signalr", "hello");
 
-        groups.Verify(value => value.AddToGroupAsync("conn-1", "session:s1", It.IsAny<CancellationToken>()), Times.Once);
-        sessions.Verify(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("s1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()), Times.Once);
+        result.SessionId.ShouldNotBeNullOrWhiteSpace();
+        result.AgentId.ShouldBe("agent-a");
         dispatcher.Verify(value => value.DispatchAsync(
-            It.Is<InboundMessage>(m => m.SessionId == "s1" && m.TargetAgentId == "agent-a" && m.Content == "hello"),
+            It.Is<InboundMessage>(m => m.TargetAgentId == "agent-a" && m.Content == "hello"),
             CancellationToken.None), Times.Once);
-        result.SessionId.ShouldBe("s1");
     }
 
     [Fact]
     public async Task GatewayHub_SendMessage_NoVisibleSession_CreatesAndPersistsSession()
     {
+        // Wave 2: conversation routing always creates/resolves a session.
         var groups = new Mock<IGroupManager>();
         groups.Setup(value => value.AddToGroupAsync("conn-1", It.Is<string>(g => g.StartsWith("session:")), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var warmup = new Mock<ISessionWarmupService>();
-        warmup.Setup(value => value.GetAvailableSessionsAsync("agent-a", It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
-
-        GatewaySession? capturedSession = null;
-        var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.SessionId>(), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((BotNexus.Domain.Primitives.SessionId sid, BotNexus.Domain.Primitives.AgentId aid, CancellationToken _) => new GatewaySession
-            {
-                SessionId = sid,
-                AgentId = aid
-            });
-        sessions.Setup(value => value.SaveAsync(It.IsAny<GatewaySession>(), It.IsAny<CancellationToken>()))
-            .Callback<GatewaySession, CancellationToken>((s, _) => capturedSession = s)
             .Returns(Task.CompletedTask);
 
         InboundMessage? dispatched = null;
@@ -130,44 +97,27 @@ public sealed class SignalRHubTests
             .Callback<InboundMessage, CancellationToken>((m, _) => dispatched = m)
             .Returns(Task.CompletedTask);
 
-        var hub = CreateHub(groups: groups.Object, sessions: sessions.Object, warmup: warmup.Object, dispatcher: dispatcher.Object, connectionId: "conn-1");
+        var hub = CreateHub(groups: groups.Object, dispatcher: dispatcher.Object, connectionId: "conn-1");
 
         var result = await hub.SendMessage("agent-a", "signalr", "hello");
 
-        capturedSession.ShouldNotBeNull();
-        capturedSession!.ChannelType.ShouldBe(ChannelKey.From("signalr"));
+        result.SessionId.ShouldNotBeNullOrWhiteSpace();
+        result.ChannelType.ShouldBe("signalr");
         groups.Verify(value => value.AddToGroupAsync("conn-1", It.Is<string>(g => g.StartsWith("session:")), It.IsAny<CancellationToken>()), Times.Once);
-        sessions.Verify(value => value.SaveAsync(It.IsAny<GatewaySession>(), It.IsAny<CancellationToken>()), Times.Once);
         dispatched.ShouldNotBeNull();
         dispatched!.TargetAgentId.ShouldBe("agent-a");
         dispatched.Content.ShouldBe("hello");
-        result.SessionId.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
     public async Task GatewayHub_SendMessage_DispatchesThroughGateway()
     {
-        var warmup = new Mock<ISessionWarmupService>();
-        warmup.Setup(value => value.GetAvailableSessionsAsync("agent-a", It.IsAny<CancellationToken>()))
-            .ReturnsAsync([
-                new SessionSummary("session-1", "agent-a", ChannelKey.From("signalr"), SessionStatus.Active, SessionType.UserAgent, true, 0, DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow)
-            ]);
-
-        var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GatewaySession
-            {
-                SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"),
-                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
-                ChannelType = ChannelKey.From("signalr"),
-                SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent
-            });
-
+        // Wave 2: conversation routing creates a session; dispatcher is called with the correct message.
         var dispatcher = new Mock<IChannelDispatcher>();
         dispatcher.Setup(value => value.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var hub = CreateHub(dispatcher: dispatcher.Object, sessions: sessions.Object, warmup: warmup.Object, connectionId: "conn-1");
+        var hub = CreateHub(dispatcher: dispatcher.Object, connectionId: "conn-1");
 
         await hub.SendMessage("agent-a", "signalr", "hello");
 
@@ -175,8 +125,6 @@ public sealed class SignalRHubTests
                 It.Is<InboundMessage>(m =>
                     m.ChannelType == ChannelKey.From("signalr") &&
                     m.SenderId == "conn-1" &&
-                    m.ChannelAddress == "session-1" &&
-                    m.SessionId == "session-1" &&
                     m.TargetAgentId == "agent-a" &&
                     m.Content == "hello"),
                 CancellationToken.None),
@@ -186,78 +134,38 @@ public sealed class SignalRHubTests
     [Fact]
     public async Task GatewayHub_SendMessage_WithAgentAndChannelType_RoutesToExistingSession()
     {
-        var warmup = new Mock<ISessionWarmupService>();
-        warmup.Setup(value => value.GetAvailableSessionsAsync("agent-a", It.IsAny<CancellationToken>()))
-            .ReturnsAsync([
-                new SessionSummary("signalr-session", "agent-a", ChannelKey.From("signalr"), SessionStatus.Active, SessionType.UserAgent, true, 1, DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddMinutes(-4)),
-                new SessionSummary("telegram-session", "agent-a", ChannelKey.From("telegram"), SessionStatus.Active, SessionType.UserAgent, true, 2, DateTimeOffset.UtcNow.AddMinutes(-3), DateTimeOffset.UtcNow.AddMinutes(-2))
-            ]);
-
-        var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("telegram-session"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GatewaySession
-            {
-                SessionId = BotNexus.Domain.Primitives.SessionId.From("telegram-session"),
-                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
-                ChannelType = ChannelKey.From("telegram"),
-                SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent
-            });
-
+        // Wave 2: second message for same agent+channel+address reuses the existing conversation session.
         var dispatcher = new Mock<IChannelDispatcher>();
         dispatcher.Setup(value => value.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var hub = CreateHub(dispatcher: dispatcher.Object, sessions: sessions.Object, warmup: warmup.Object, connectionId: "conn-1");
+        var hub = CreateHub(dispatcher: dispatcher.Object, connectionId: "conn-1");
 
-        var result = await hub.SendMessage("agent-a", "telegram", "hello-telegram");
+        // First message creates the session
+        var result1 = await hub.SendMessage("agent-a", "telegram", "first");
+        // Second message should reuse the same session (same connection = same channel address)
+        var result2 = await hub.SendMessage("agent-a", "telegram", "second");
 
-        result.SessionId.ShouldBe("telegram-session");
-        dispatcher.Verify(value => value.DispatchAsync(
-                It.Is<InboundMessage>(m =>
-                    m.SessionId == "telegram-session" &&
-                    m.TargetAgentId == "agent-a" &&
-                    m.Content == "hello-telegram"),
-                CancellationToken.None),
-            Times.Once);
+        result1.SessionId.ShouldNotBeNullOrWhiteSpace();
+        result2.SessionId.ShouldBe(result1.SessionId);
     }
 
     [Fact]
     public async Task GatewayHub_SendMessage_WithNoSessionForChannel_AutoCreatesSession()
     {
-        var warmup = new Mock<ISessionWarmupService>();
-        warmup.Setup(value => value.GetAvailableSessionsAsync("agent-a", It.IsAny<CancellationToken>()))
-            .ReturnsAsync([
-                new SessionSummary("signalr-session", "agent-a", ChannelKey.From("signalr"), SessionStatus.Active, SessionType.UserAgent, true, 1, DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddMinutes(-4))
-            ]);
-
-        GatewaySession? capturedSession = null;
-        var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.SessionId>(), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((BotNexus.Domain.Primitives.SessionId sid, BotNexus.Domain.Primitives.AgentId aid, CancellationToken _) => new GatewaySession
-            {
-                SessionId = sid,
-                AgentId = aid
-            });
-        sessions.Setup(value => value.SaveAsync(It.IsAny<GatewaySession>(), It.IsAny<CancellationToken>()))
-            .Callback<GatewaySession, CancellationToken>((session, _) => capturedSession = session)
-            .Returns(Task.CompletedTask);
-
+        // Wave 2: sending on a new channel creates a session.
         var dispatcher = new Mock<IChannelDispatcher>();
         dispatcher.Setup(value => value.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var hub = CreateHub(dispatcher: dispatcher.Object, sessions: sessions.Object, warmup: warmup.Object, connectionId: "conn-1");
+        var hub = CreateHub(dispatcher: dispatcher.Object, connectionId: "conn-1");
 
         var result = await hub.SendMessage("agent-a", "telegram", "needs-new-session");
 
-        var createdSessionId = result.SessionId;
-        createdSessionId.ShouldNotBeNullOrWhiteSpace();
+        result.SessionId.ShouldNotBeNullOrWhiteSpace();
         result.ChannelType.ShouldBe("telegram");
-        capturedSession.ShouldNotBeNull();
-        capturedSession!.ChannelType.ShouldBe(ChannelKey.From("telegram"));
         dispatcher.Verify(value => value.DispatchAsync(
                 It.Is<InboundMessage>(m =>
-                    m.SessionId == createdSessionId &&
                     m.TargetAgentId == "agent-a" &&
                     m.Content == "needs-new-session"),
                 CancellationToken.None),
@@ -267,35 +175,18 @@ public sealed class SignalRHubTests
     [Fact]
     public async Task GatewayHub_SendMessage_WhitespaceIds_DispatchesNormalizedIds()
     {
-        var warmup = new Mock<ISessionWarmupService>();
-        warmup.Setup(value => value.GetAvailableSessionsAsync("agent-a", It.IsAny<CancellationToken>()))
-            .ReturnsAsync([
-                new SessionSummary("session-1", "agent-a", ChannelKey.From("signalr"), SessionStatus.Active, SessionType.UserAgent, true, 0, DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow)
-            ]);
-
-        var sessions = new Mock<ISessionStore>();
-        sessions.Setup(value => value.GetOrCreateAsync(BotNexus.Domain.Primitives.SessionId.From("session-1"), BotNexus.Domain.Primitives.AgentId.From("agent-a"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GatewaySession
-            {
-                SessionId = BotNexus.Domain.Primitives.SessionId.From("session-1"),
-                AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
-                ChannelType = ChannelKey.From("signalr"),
-                SessionType = BotNexus.Domain.Primitives.SessionType.UserAgent
-            });
-
+        // Wave 2: whitespace in agentId/channelType is normalized before routing.
         var dispatcher = new Mock<IChannelDispatcher>();
         dispatcher.Setup(value => value.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var hub = CreateHub(dispatcher: dispatcher.Object, sessions: sessions.Object, warmup: warmup.Object, connectionId: "conn-1");
+        var hub = CreateHub(dispatcher: dispatcher.Object, connectionId: "conn-1");
 
         await hub.SendMessage("  agent-a  ", "  signalr  ", "hello");
 
         dispatcher.Verify(value => value.DispatchAsync(
                 It.Is<InboundMessage>(m =>
                     m.ChannelType == ChannelKey.From("signalr") &&
-                    m.ChannelAddress == "session-1" &&
-                    m.SessionId == "session-1" &&
                     m.TargetAgentId == "agent-a"),
                 CancellationToken.None),
             Times.Once);
@@ -402,16 +293,24 @@ public sealed class SignalRHubTests
         ISessionCompactor? compactor = null,
         ISessionWarmupService? warmup = null,
         IOptionsMonitor<CompactionOptions>? compactionOptions = null,
+        IConversationRouter? conversationRouter = null,
         string connectionId = "conn-test")
     {
+        var sessionStore = sessions ?? new InMemorySessionStore();
+        var router = conversationRouter ?? new DefaultConversationRouter(
+            new InMemoryConversationStore(),
+            sessionStore,
+            NullLogger<DefaultConversationRouter>.Instance);
+
         var hub = new GatewayHub(
             supervisor ?? Mock.Of<IAgentSupervisor>(),
             registry ?? Mock.Of<IAgentRegistry>(),
-            sessions ?? Mock.Of<ISessionStore>(),
+            sessionStore,
             dispatcher ?? Mock.Of<IChannelDispatcher>(),
             activity ?? Mock.Of<IActivityBroadcaster>(),
             compactor ?? Mock.Of<ISessionCompactor>(),
             warmup ?? Mock.Of<ISessionWarmupService>(),
+            router,
             compactionOptions ?? new TestOptionsMonitor<CompactionOptions>(new CompactionOptions()),
             NullLogger<GatewayHub>.Instance)
         {
