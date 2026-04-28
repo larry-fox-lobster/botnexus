@@ -213,7 +213,7 @@ public sealed class CopilotIntegrationTests
         {
             ChannelType = ChannelKey.From("web"),
             SenderId = "integration-user",
-            ConversationId = "copilot-integration-conversation",
+            ChannelAddress = "copilot-integration-conversation",
             Content = content,
             SessionId = BotNexus.Domain.Primitives.SessionId.From("integration-session")
         };

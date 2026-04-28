@@ -65,7 +65,7 @@ public sealed class CrossWorldChannelAdapter(
                 SourceAgentId = sourceAgentId,
                 TargetAgentId = targetAgentId,
                 Message = message.Content,
-                ConversationId = conversationId,
+                ChannelAddress = conversationId,
                 SourceSessionId = sourceSessionId,
                 RemoteSessionId = remoteSessionId
             }, options: JsonOptions)

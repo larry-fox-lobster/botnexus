@@ -74,7 +74,7 @@ public sealed class TelegramChannelAdapterTests
         dispatcher.Invocations
             .Where(i => i.Method.Name == nameof(IChannelDispatcher.DispatchAsync))
             .Select(i => (InboundMessage)i.Arguments[0])
-            .Where(m => m.ConversationId == "42" && m.Content == "hello")
+            .Where(m => m.ChannelAddress == "42" && m.Content == "hello")
             .ShouldHaveSingleItem();
     }
 
@@ -99,7 +99,7 @@ public sealed class TelegramChannelAdapterTests
         await adapter.SendAsync(new OutboundMessage
         {
             ChannelType = ChannelKey.From("telegram"),
-            ConversationId = "42",
+            ChannelAddress = "42",
             Content = new string('a', 5000)
         });
 
@@ -130,7 +130,7 @@ public sealed class TelegramChannelAdapterTests
         await adapter.SendAsync(new OutboundMessage
         {
             ChannelType = ChannelKey.From("telegram"),
-            ConversationId = "42",
+            ChannelAddress = "42",
             Content = "_*[]()~`>#+-=|{}.!\\"
         });
 
@@ -371,7 +371,7 @@ public sealed class TelegramChannelAdapterTests
         Func<Task> act = () => adapter.SendAsync(new OutboundMessage
         {
             ChannelType = ChannelKey.From("telegram"),
-            ConversationId = "99",
+            ChannelAddress = "99",
             Content = "blocked"
         });
 

@@ -100,7 +100,7 @@ public sealed class DefaultMessageRouterTests
         {
             ChannelType = ChannelKey.From("web"),
             SenderId = "sender-1",
-            ConversationId = "conv-1",
+            ChannelAddress = "conv-1",
             Content = "hello",
             TargetAgentId = targetAgentId,
             SessionId = sessionId

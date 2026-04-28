@@ -116,12 +116,12 @@ public sealed class TelegramChannelAdapter(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!TryParseChatId(message.ConversationId, out var chatId))
+        if (!TryParseChatId(message.ChannelAddress, out var chatId))
         {
             _logger.LogWarning(
                 "{DisplayName} send requested with invalid conversation id '{ConversationId}'",
                 DisplayName,
-                message.ConversationId);
+                message.ChannelAddress);
             return;
         }
 
@@ -284,7 +284,7 @@ public sealed class TelegramChannelAdapter(
         {
             ChannelType = ChannelType,
             SenderId = senderId,
-            ConversationId = chatIdText,
+            ChannelAddress = chatIdText,
             Content = message.Text,
             Metadata = new Dictionary<string, object?>
             {

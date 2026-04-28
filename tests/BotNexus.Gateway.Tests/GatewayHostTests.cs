@@ -830,7 +830,7 @@ public sealed class GatewayHostTests
         {
             ChannelType = channelType,
             SenderId = "sender-1",
-            ConversationId = conversationId,
+            ChannelAddress = conversationId,
             Content = content,
             SessionId = sessionId,
             Metadata = metadata ?? new Dictionary<string, object?>()

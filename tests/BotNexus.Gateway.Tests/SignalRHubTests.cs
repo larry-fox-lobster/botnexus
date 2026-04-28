@@ -175,7 +175,7 @@ public sealed class SignalRHubTests
                 It.Is<InboundMessage>(m =>
                     m.ChannelType == ChannelKey.From("signalr") &&
                     m.SenderId == "conn-1" &&
-                    m.ConversationId == "session-1" &&
+                    m.ChannelAddress == "session-1" &&
                     m.SessionId == "session-1" &&
                     m.TargetAgentId == "agent-a" &&
                     m.Content == "hello"),
@@ -294,7 +294,7 @@ public sealed class SignalRHubTests
         dispatcher.Verify(value => value.DispatchAsync(
                 It.Is<InboundMessage>(m =>
                     m.ChannelType == ChannelKey.From("signalr") &&
-                    m.ConversationId == "session-1" &&
+                    m.ChannelAddress == "session-1" &&
                     m.SessionId == "session-1" &&
                     m.TargetAgentId == "agent-a"),
                 CancellationToken.None),
