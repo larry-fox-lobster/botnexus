@@ -139,7 +139,8 @@ internal sealed class GatewayCommand
         var options = new GatewayStartOptions(
             ExecutablePath: gatewayDll,
             Arguments: $"--urls \"{gatewayUrl}\" --environment Development",
-            Attached: false
+            Attached: false,
+            HomePath: home
         );
 
         var result = await _processManager.StartAsync(options, cancellationToken);
@@ -240,7 +241,7 @@ internal sealed class GatewayCommand
 
     private async Task<int> StopAsync(string home, bool verbose, CancellationToken cancellationToken)
     {
-        var result = await _processManager.StopAsync(cancellationToken);
+        var result = await _processManager.StopAsync(home, cancellationToken);
 
         if (result.Success)
         {
@@ -256,7 +257,7 @@ internal sealed class GatewayCommand
 
     private async Task<int> StatusAsync(string home, bool verbose, CancellationToken cancellationToken)
     {
-        var status = await _processManager.GetStatusAsync(cancellationToken);
+        var status = await _processManager.GetStatusAsync(home, cancellationToken);
 
         switch (status.State)
         {
