@@ -3,8 +3,21 @@
 <div class="chat-panel">
     <header class="chat-header">
         <div class="chat-header-left">
-            <h3>@State.DisplayName</h3>
-            <span class="agent-id-label">@State.AgentId</span>
+            <div class="chat-title-stack">
+                <h3>@State.DisplayName</h3>
+                @if (State.ActiveConversationId is not null)
+                {
+                    <div class="conversation-title-row">
+                        <span class="conversation-title">@State.ActiveConversationTitle</span>
+                        @if (State.Conversations.TryGetValue(State.ActiveConversationId, out var activeConversation) && activeConversation.IsDefault)
+                        {
+                            <span class="conversation-default-badge">Default</span>
+                        }
+                    </div>
+                }
+                <span class="agent-id-label">@State.AgentId</span>
+            </div>
+
             @if (State.IsStreaming)
             {
                 <span class="streaming-badge">Streaming…</span>
@@ -56,9 +69,24 @@
             </div>
         }
 
+        @if (State.ActiveConversationId is null && !State.IsLoadingConversations)
+        {
+            <div class="chat-empty-state">
+                Select a conversation or start a new one.
+            </div>
+        }
+
         @foreach (var msg in State.Messages)
         {
-            @if (msg.Role == "System")
+            @if (msg.IsBoundary)
+            {
+                <div class="session-boundary" role="separator" aria-label="Session boundary">
+                    <span class="session-boundary-line"></span>
+                    <span class="session-boundary-label">@msg.BoundaryLabel</span>
+                    <span class="session-boundary-line"></span>
+                </div>
+            }
+            else if (msg.Role == "System")
             {
                 <div class="system-message">@msg.Content</div>
             }

@@ -27,7 +27,7 @@ public sealed class MainLayoutTests : IDisposable
         _ctx.Services.AddSingleton(_manager);
         _ctx.Services.AddSingleton(_manager.Hub);
         _ctx.Services.AddSingleton(new HttpClient());
-        _ctx.Services.AddScoped<GatewayInfoService>();
+        _ctx.Services.AddScoped(sp => new GatewayInfoService(sp.GetRequiredService<HttpClient>(), _manager));
         _ctx.JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
