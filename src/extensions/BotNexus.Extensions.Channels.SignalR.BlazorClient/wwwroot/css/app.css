@@ -2435,3 +2435,194 @@ details[open] > .thinking-summary::before {
 }
 
 .gateway-commit:hover { color: var(--accent); }
+
+/* ── Conversation UI — Wave 2 ─────────────────────────────────────────────── */
+
+/* Sidebar container */
+.agent-conversation-list {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.agent-conversation-list-header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.4rem 0.6rem;
+}
+
+.agent-conversation-list-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+/* New conversation button */
+.conversation-new-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) / 2);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.conversation-new-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(0, 180, 216, 0.08);
+}
+
+.conversation-new-btn-icon {
+    font-size: 1rem;
+    line-height: 1;
+    font-weight: 400;
+}
+
+.conversation-new-btn-label {
+    line-height: 1;
+}
+
+/* Loading / empty states */
+.conversation-list-loading,
+.conversation-list-empty {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    font-style: italic;
+    color: var(--text-muted);
+}
+
+/* Individual conversation item */
+.conversation-list-item {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0.45rem 0.75rem;
+    background: transparent;
+    border: none;
+    border-left: 3px solid transparent;
+    border-radius: 0;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    gap: 0.2rem;
+}
+
+.conversation-list-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+}
+
+.conversation-list-item.active {
+    border-left-color: var(--accent);
+    background: rgba(0, 180, 216, 0.07);
+    color: var(--text-primary);
+}
+
+/* Item main row: title + badge */
+.conversation-list-item-main {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.conversation-list-item-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* "Default" pill badge */
+.conversation-default-badge {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0 4px;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+/* Item meta row: unread dot + timestamp */
+.conversation-list-item-meta {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: auto;
+}
+
+.conversation-unread-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+}
+
+.conversation-updated-at {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* ── Session Boundary Divider ─────────────────────────────────────────────── */
+
+.session-boundary {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    margin: 0.5rem 0;
+}
+
+.session-boundary-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+.session-boundary-label {
+    padding: 0 0.5rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+}
+
+/* ── Chat Header — Conversation Title Row ─────────────────────────────────── */
+
+.conversation-title-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.1rem;
+}
+
+.conversation-title {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
