@@ -19,6 +19,7 @@
 ## ✨ Features
 
 ### 🟠 High
+- [Conversation Model for Omnichannel Continuity](feature-conversation-topics/design-spec.md) — `ready` 📄
 - [ask_user Tool](feature-ask-user-tool/design-spec.md) — `design`
 
 ### 🟡 Medium
