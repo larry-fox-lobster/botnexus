@@ -178,7 +178,7 @@ public sealed class InProcessIsolationStrategy : IIsolationStrategy
                 tools.Add(new SubAgentManageTool(subAgentManager, context.SessionId));
         }
 
-        var conversationService = _serviceProvider.GetService<IAgentConversationService>();
+        var conversationService = _serviceProvider.GetService<IAgentExchangeService>();
         if (conversationService is not null && sessionStore is not null)
         {
             var includeConverse = descriptor.ToolIds.Count == 0

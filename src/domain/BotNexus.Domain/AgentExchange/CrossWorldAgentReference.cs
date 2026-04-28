@@ -1,6 +1,6 @@
 using BotNexus.Domain.Primitives;
 
-namespace BotNexus.Domain.Conversations;
+namespace BotNexus.Domain.AgentExchange;
 
 /// <summary>
 /// Represents cross world agent reference.

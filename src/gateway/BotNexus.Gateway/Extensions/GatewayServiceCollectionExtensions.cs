@@ -109,7 +109,7 @@ public static class GatewayServiceCollectionExtensions
          services.TryAddSingleton<IAgentConfigurationWriter, NoOpAgentConfigurationWriter>();
         services.AddSingleton<IAgentSupervisor, DefaultAgentSupervisor>();
         services.AddSingleton<IAgentCommunicator, DefaultAgentCommunicator>();
-        services.AddSingleton<IAgentConversationService, AgentConversationService>();
+        services.AddSingleton<IAgentExchangeService, AgentExchangeService>();
         services.AddSingleton<CrossWorldInboundAuthService>();
         services.TryAddSingleton<CrossWorldChannelOptions>();
         services.AddSingleton<CrossWorldChannelAdapter>(serviceProvider =>

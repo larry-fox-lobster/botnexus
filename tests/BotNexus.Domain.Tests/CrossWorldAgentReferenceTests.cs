@@ -1,4 +1,4 @@
-using BotNexus.Domain.Conversations;
+using BotNexus.Domain.AgentExchange;
 using BotNexus.Domain.Primitives;
 
 namespace BotNexus.Domain.Tests;

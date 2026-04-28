@@ -1,6 +1,6 @@
 using BotNexus.Agent.Core.Tools;
 using BotNexus.Agent.Core.Types;
-using BotNexus.Domain.Conversations;
+using BotNexus.Domain.AgentExchange;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
@@ -15,7 +15,7 @@ public sealed class AgentConverseToolTests
     [Fact]
     public void Tool_HasExpectedNameAndLabel()
     {
-        var tool = new AgentConverseTool(Mock.Of<IAgentConversationService>(), new InMemorySessionStore(), "nova", "session-1");
+        var tool = new AgentConverseTool(Mock.Of<IAgentExchangeService>(), new InMemorySessionStore(), "nova", "session-1");
         tool.Name.ShouldBe("agent_converse");
         tool.Label.ShouldBe("Agent Converse");
     }
@@ -23,7 +23,7 @@ public sealed class AgentConverseToolTests
     [Fact]
     public async Task PrepareArgumentsAsync_WhenRequiredArgsMissing_Throws()
     {
-        var tool = new AgentConverseTool(Mock.Of<IAgentConversationService>(), new InMemorySessionStore(), "nova", "session-1");
+        var tool = new AgentConverseTool(Mock.Of<IAgentExchangeService>(), new InMemorySessionStore(), "nova", "session-1");
 
         Func<Task> action = () => tool.PrepareArgumentsAsync(new Dictionary<string, object?>());
 
@@ -31,13 +31,13 @@ public sealed class AgentConverseToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenSessionHasCallChain_ForwardsChainToConversationRequest()
+    public async Task ExecuteAsync_WhenSessionHasCallChain_ForwardsChainToAgentExchangeRequest()
     {
-        ConversationRequest? captured = null;
-        var service = new Mock<IAgentConversationService>();
-        service.Setup(s => s.ConverseAsync(It.IsAny<ConversationRequest>(), It.IsAny<CancellationToken>()))
-            .Callback<ConversationRequest, CancellationToken>((request, _) => captured = request)
-            .ReturnsAsync(new AgentConversationResult
+        AgentExchangeRequest? captured = null;
+        var service = new Mock<IAgentExchangeService>();
+        service.Setup(s => s.ConverseAsync(It.IsAny<AgentExchangeRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<AgentExchangeRequest, CancellationToken>((request, _) => captured = request)
+            .ReturnsAsync(new AgentExchangeResult
             {
                 SessionId = "nova::agent-agent::leela::abc123",
                 Status = "sealed",
@@ -65,11 +65,11 @@ public sealed class AgentConverseToolTests
     [Fact]
     public async Task ExecuteAsync_WhenNoCallChain_UsesInitiatorAsDefaultChain()
     {
-        ConversationRequest? captured = null;
-        var service = new Mock<IAgentConversationService>();
-        service.Setup(s => s.ConverseAsync(It.IsAny<ConversationRequest>(), It.IsAny<CancellationToken>()))
-            .Callback<ConversationRequest, CancellationToken>((request, _) => captured = request)
-            .ReturnsAsync(new AgentConversationResult
+        AgentExchangeRequest? captured = null;
+        var service = new Mock<IAgentExchangeService>();
+        service.Setup(s => s.ConverseAsync(It.IsAny<AgentExchangeRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<AgentExchangeRequest, CancellationToken>((request, _) => captured = request)
+            .ReturnsAsync(new AgentExchangeResult
             {
                 SessionId = "nova::agent-agent::leela::abc123",
                 Status = "sealed",

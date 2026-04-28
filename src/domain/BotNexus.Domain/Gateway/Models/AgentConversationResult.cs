@@ -5,7 +5,7 @@ namespace BotNexus.Gateway.Abstractions.Models;
 /// <summary>
 /// Result payload for an agent-to-agent conversation.
 /// </summary>
-public sealed record AgentConversationResult
+public sealed record AgentExchangeResult
 {
     /// <summary>
     /// Conversation session identifier.
@@ -30,7 +30,7 @@ public sealed record AgentConversationResult
     /// <summary>
     /// Full conversation transcript.
     /// </summary>
-    public IReadOnlyList<AgentConversationTranscriptEntry> Transcript { get; init; } = [];
+    public IReadOnlyList<AgentExchangeTranscriptEntry> Transcript { get; init; } = [];
 }
 
 /// <summary>
@@ -38,4 +38,4 @@ public sealed record AgentConversationResult
 /// </summary>
 /// <param name="Role">Message role.</param>
 /// <param name="Content">Message content.</param>
-public sealed record AgentConversationTranscriptEntry(string Role, string Content);
+public sealed record AgentExchangeTranscriptEntry(string Role, string Content);
