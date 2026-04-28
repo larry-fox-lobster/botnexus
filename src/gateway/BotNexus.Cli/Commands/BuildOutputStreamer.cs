@@ -17,13 +17,14 @@ internal static partial class BuildOutputStreamer
     internal static async Task<int> RunAsync(
         string solution,
         string workingDirectory,
+        string commitSha,
         bool verbose,
         CancellationToken cancellationToken)
     {
         var psi = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"build \"{solution}\" -c Release --nologo --tl:off /p:SkipTests=true",
+            Arguments = $"build \"{solution}\" -c Release --nologo --tl:off /p:SkipTests=true /p:SourceRevisionId={commitSha}",
             WorkingDirectory = workingDirectory,
             UseShellExecute = false,
             RedirectStandardOutput = true,
