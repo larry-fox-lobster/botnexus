@@ -18,10 +18,6 @@ public sealed class GatewayProcessManagerTests : IDisposable
 
         _healthChecker = Substitute.For<IHealthChecker>();
         _manager = new GatewayProcessManager(_healthChecker, NullLogger<GatewayProcessManager>.Instance);
-
-        // Use reflection to set the PID file path to our test directory
-        var pidFileField = typeof(GatewayProcessManager).GetField("_pidFilePath", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        pidFileField!.SetValue(_manager, Path.Combine(_testPidDirectory, "gateway.pid"));
     }
 
     public void Dispose()
@@ -41,7 +37,8 @@ public sealed class GatewayProcessManagerTests : IDisposable
 
         var options = new GatewayStartOptions(
             ExecutablePath: "BotNexus.Gateway.Api.dll",
-            Arguments: null);
+            Arguments: null,
+            HomePath: _testPidDirectory);
 
         var result = await _manager.StartAsync(options);
 
@@ -69,7 +66,8 @@ public sealed class GatewayProcessManagerTests : IDisposable
 
         var options = new GatewayStartOptions(
             ExecutablePath: "BotNexus.Gateway.Api.dll",
-            Arguments: null);
+            Arguments: null,
+            HomePath: _testPidDirectory);
 
         var result = await _manager.StartAsync(options);
 
@@ -81,7 +79,7 @@ public sealed class GatewayProcessManagerTests : IDisposable
     [Fact]
     public async Task StopAsync_WhenNotRunning_ReturnsNotRunningResult()
     {
-        var result = await _manager.StopAsync();
+        var result = await _manager.StopAsync(_testPidDirectory);
 
         result.Success.ShouldBeTrue();
         result.Message.ShouldContain("not running");
@@ -93,11 +91,11 @@ public sealed class GatewayProcessManagerTests : IDisposable
         // Write a PID file with a definitely-dead PID
         await WritePidFileAsync(99999);
 
-        var result = await _manager.StopAsync();
+        var result = await _manager.StopAsync(_testPidDirectory);
 
         result.Success.ShouldBeTrue();
         result.Message.ShouldContain("stale PID");
-        
+
         // PID file should be cleaned up
         var pidFilePath = GetPidFilePath();
         File.Exists(pidFilePath).ShouldBeFalse();
@@ -123,7 +121,7 @@ public sealed class GatewayProcessManagerTests : IDisposable
             // Write the PID file
             await WritePidFileAsync(process.Id);
 
-            var result = await _manager.StopAsync();
+            var result = await _manager.StopAsync(_testPidDirectory);
 
             result.Success.ShouldBeTrue();
             result.Message.ShouldContain("stopped");
@@ -152,7 +150,7 @@ public sealed class GatewayProcessManagerTests : IDisposable
     [Fact]
     public async Task GetStatusAsync_WhenNotRunning_ReturnsNotRunningStatus()
     {
-        var status = await _manager.GetStatusAsync();
+        var status = await _manager.GetStatusAsync(_testPidDirectory);
 
         status.State.ShouldBe(GatewayState.NotRunning);
         status.Pid.ShouldBeNull();
@@ -166,7 +164,7 @@ public sealed class GatewayProcessManagerTests : IDisposable
         // Write a PID file with a definitely-dead PID
         await WritePidFileAsync(99999);
 
-        var status = await _manager.GetStatusAsync();
+        var status = await _manager.GetStatusAsync(_testPidDirectory);
 
         status.State.ShouldBe(GatewayState.NotRunning);
         status.Pid.ShouldBeNull();
@@ -201,7 +199,7 @@ public sealed class GatewayProcessManagerTests : IDisposable
 
             await WritePidFileAsync(process.Id);
 
-            var status = await _manager.GetStatusAsync();
+            var status = await _manager.GetStatusAsync(_testPidDirectory);
 
             // If process is still running, should be detected
             if (!process.HasExited)
@@ -237,22 +235,12 @@ public sealed class GatewayProcessManagerTests : IDisposable
     [Fact]
     public async Task GetStatusAsync_WhenDotnetProcessRunning_ReturnsRunningWithUptime()
     {
-        // Start a long-running dotnet process (name check requires "dotnet" or "BotNexus")
-        var psi = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            Arguments = "--version",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-        };
-
         // dotnet --version exits immediately; use the current test process instead
         // as it is definitely alive and the name check accepts any dotnet process
         var currentProcess = Process.GetCurrentProcess();
         await WritePidFileAsync(currentProcess.Id);
 
-        var status = await _manager.GetStatusAsync();
+        var status = await _manager.GetStatusAsync(_testPidDirectory);
 
         // Current process is alive and named "dotnet" (test runner)
         status.State.ShouldBe(GatewayState.Running);
@@ -264,15 +252,10 @@ public sealed class GatewayProcessManagerTests : IDisposable
     [Fact]
     public async Task GetStatusAsync_WhenPidRecycled_ReturnsNotRunning()
     {
-        // Simulate PID recycling: write a PID that belongs to a non-gateway process.
-        // The current process is "dotnet" (test runner) so use a process with a different name.
-        // We write a dead PID (99999) — the manager will report "stale PID" which is also
-        // a NotRunning state, equivalent to recycling detection for this cross-platform test.
-        // On Windows we can use notepad; on Linux any short-lived non-dotnet process exits fast
-        // so we just verify the outcome: state is NotRunning and PID file is cleaned.
+        // Simulate PID recycling: write a dead PID — state is NotRunning.
         await WritePidFileAsync(99999);
 
-        var status = await _manager.GetStatusAsync();
+        var status = await _manager.GetStatusAsync(_testPidDirectory);
 
         status.State.ShouldBe(GatewayState.NotRunning);
         status.Pid.ShouldBeNull();
@@ -285,7 +268,7 @@ public sealed class GatewayProcessManagerTests : IDisposable
     [Fact]
     public void IsRunning_WhenNoPidFile_ReturnsFalse()
     {
-        _manager.IsRunning.ShouldBeFalse();
+        _manager.IsRunning(_testPidDirectory).ShouldBeFalse();
     }
 
     [Fact]
@@ -295,7 +278,7 @@ public sealed class GatewayProcessManagerTests : IDisposable
         var currentProcess = Process.GetCurrentProcess();
         await WritePidFileAsync(currentProcess.Id);
 
-        _manager.IsRunning.ShouldBeTrue();
+        _manager.IsRunning(_testPidDirectory).ShouldBeTrue();
     }
 
     [Fact]
@@ -304,17 +287,78 @@ public sealed class GatewayProcessManagerTests : IDisposable
         // Write a PID file with a definitely-dead PID
         await WritePidFileAsync(99999);
 
-        _manager.IsRunning.ShouldBeFalse();
+        _manager.IsRunning(_testPidDirectory).ShouldBeFalse();
     }
 
     [Fact]
     public async Task GetStatusAsync_ConsecutiveCalls_ConsistentResults()
     {
-        var status1 = await _manager.GetStatusAsync();
-        var status2 = await _manager.GetStatusAsync();
+        var status1 = await _manager.GetStatusAsync(_testPidDirectory);
+        var status2 = await _manager.GetStatusAsync(_testPidDirectory);
 
         status1.State.ShouldBe(status2.State);
         status1.Pid.ShouldBe(status2.Pid);
+    }
+
+    [Fact]
+    public async Task GatewayStop_WithTarget_UsesCorrectPidFile()
+    {
+        // Arrange: create a separate target directory to verify target isolation
+        var altTarget = Path.Combine(Path.GetTempPath(), $"botnexus-alt-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(altTarget);
+
+        try
+        {
+            // Write PID to alt target
+            var altPidPath = Path.Combine(altTarget, "gateway.pid");
+            await File.WriteAllTextAsync(altPidPath, "99999");
+
+            // Stop using alt target — should find and clean the stale PID there
+            var result = await _manager.StopAsync(altTarget);
+
+            result.Success.ShouldBeTrue();
+            result.Message.ShouldContain("stale PID");
+            File.Exists(altPidPath).ShouldBeFalse();
+
+            // Default target should be unaffected
+            var defaultPidPath = GetPidFilePath();
+            File.Exists(defaultPidPath).ShouldBeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(altTarget))
+                Directory.Delete(altTarget, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task GatewayStatus_WithTarget_ReadsCorrectPidFile()
+    {
+        // Arrange: create a separate target directory
+        var altTarget = Path.Combine(Path.GetTempPath(), $"botnexus-alt-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(altTarget);
+
+        try
+        {
+            // Write current PID to alt target (process is running)
+            var currentPid = Process.GetCurrentProcess().Id;
+            var altPidPath = Path.Combine(altTarget, "gateway.pid");
+            await File.WriteAllTextAsync(altPidPath, currentPid.ToString());
+
+            // Status for alt target should find the process
+            var altStatus = await _manager.GetStatusAsync(altTarget);
+            altStatus.State.ShouldBe(GatewayState.Running);
+            altStatus.Pid.ShouldBe(currentPid);
+
+            // Status for test target (no PID file) should be NotRunning
+            var defaultStatus = await _manager.GetStatusAsync(_testPidDirectory);
+            defaultStatus.State.ShouldBe(GatewayState.NotRunning);
+        }
+        finally
+        {
+            if (Directory.Exists(altTarget))
+                Directory.Delete(altTarget, recursive: true);
+        }
     }
 
     private async Task WritePidFileAsync(int pid)
@@ -328,9 +372,5 @@ public sealed class GatewayProcessManagerTests : IDisposable
         await File.WriteAllTextAsync(pidFilePath, pid.ToString());
     }
 
-    private string GetPidFilePath()
-    {
-        var pidFileField = typeof(GatewayProcessManager).GetField("_pidFilePath", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        return (string)pidFileField!.GetValue(_manager)!;
-    }
+    private string GetPidFilePath() => Path.Combine(_testPidDirectory, "gateway.pid");
 }

@@ -9,7 +9,8 @@ namespace BotNexus.Cli.Services;
 public record GatewayStartOptions(
     string ExecutablePath,
     string? Arguments = null,
-    bool Attached = false
+    bool Attached = false,
+    string? HomePath = null   // BotNexus home — PID file written here. Defaults to ~/.botnexus.
 );
 
 /// <summary>
