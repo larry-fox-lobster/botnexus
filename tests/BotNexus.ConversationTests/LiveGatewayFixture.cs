@@ -9,12 +9,12 @@ namespace BotNexus.ConversationTests;
 public class LiveGatewayCollection : ICollectionFixture<LiveGatewayFixture> { }
 
 /// <summary>
-/// Fixture that connects to the live dev gateway at http://localhost:5005.
+/// Fixture that connects to the live dev gateway at http://localhost:5006.
 /// Sets IsAvailable=false if the gateway is not running — all tests skip cleanly.
 /// </summary>
 public class LiveGatewayFixture : IAsyncLifetime
 {
-    private const string BaseUrl = "http://localhost:5005";
+    private const string BaseUrl = "http://localhost:5006";
     private TestLogger? _logger;
     private TestSignalRClient? _signalR;
 

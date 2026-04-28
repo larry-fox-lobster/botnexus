@@ -18,7 +18,7 @@ public class ConversationRestApiTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave3")]
     public async Task GetConversations_ReturnsOk()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         var response = await fixture.Conversations.GetConversationsAsync("assistant");
         Skip.If(response.StatusCode == HttpStatusCode.NotFound,
             "GET /api/conversations not yet live (Wave 3 — Fry)");
@@ -29,7 +29,7 @@ public class ConversationRestApiTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave3")]
     public async Task GetConversations_ReturnsArray()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         var response = await fixture.Conversations.GetConversationsAsync("assistant");
         Skip.If(response.StatusCode == HttpStatusCode.NotFound,
             "GET /api/conversations not yet live (Wave 3 — Fry)");
@@ -43,7 +43,7 @@ public class ConversationRestApiTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave3")]
     public async Task GetConversations_EachItemHasRequiredFields()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         var response = await fixture.Conversations.GetConversationsAsync("assistant");
         Skip.If(response.StatusCode == HttpStatusCode.NotFound,
             "GET /api/conversations not yet live (Wave 3 — Fry)");
@@ -65,7 +65,7 @@ public class ConversationRestApiTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave3")]
     public async Task GetConversations_DefaultConversationExistsForAgent()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         var response = await fixture.Conversations.GetConversationsAsync("assistant");
         Skip.If(response.StatusCode == HttpStatusCode.NotFound,
             "GET /api/conversations not yet live (Wave 3 — Fry)");
@@ -83,7 +83,7 @@ public class ConversationRestApiTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave3")]
     public async Task CreateConversation_Returns201WithBody()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         var response = await fixture.Conversations.CreateConversationAsync("assistant", "Test Conversation");
         Skip.If(response.StatusCode == HttpStatusCode.NotFound,
             "POST /api/conversations not yet live (Wave 3 — Fry)");
@@ -103,7 +103,7 @@ public class ConversationRestApiTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave3")]
     public async Task GetConversation_Returns200ForKnownConversation()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         // Try to create first to get an ID
         var create = await fixture.Conversations.CreateConversationAsync("assistant", "Fetch Test");
         Skip.If(create.StatusCode == HttpStatusCode.NotFound,
@@ -120,7 +120,7 @@ public class ConversationRestApiTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave3")]
     public async Task GetConversation_Returns404ForUnknownId()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         var response = await fixture.Conversations.GetConversationAsync("00000000-0000-0000-0000-000000000000");
         // If the endpoint itself doesn't exist, skip rather than fail
         Skip.If(response.StatusCode == HttpStatusCode.MethodNotAllowed,
@@ -134,7 +134,7 @@ public class ConversationRestApiTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave3")]
     public async Task GetConversationHistory_Returns200WithEntriesArray()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         var create = await fixture.Conversations.CreateConversationAsync("assistant", "History Test");
         Skip.If(create.StatusCode == HttpStatusCode.NotFound,
             "POST /api/conversations not yet live (Wave 3 — Fry)");
@@ -154,7 +154,7 @@ public class ConversationRestApiTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave3")]
     public async Task GetConversationHistory_BoundaryEntriesHaveRequiredFields()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         var create = await fixture.Conversations.CreateConversationAsync("assistant", "Boundary Test");
         Skip.If(create.StatusCode == HttpStatusCode.NotFound,
             "POST /api/conversations not yet live (Wave 3 — Fry)");

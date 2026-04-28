@@ -6,7 +6,7 @@ Live integration tests for the Conversation Model feature. Requires the dev gate
 
 Start the gateway first:
 ```
-dotnet run --project src/gateway/BotNexus.Gateway.Api -- --urls http://0.0.0.0:5005
+dotnet run --project src/gateway/BotNexus.Gateway.Api -- --urls http://0.0.0.0:5006
 ```
 
 Then run all tests:

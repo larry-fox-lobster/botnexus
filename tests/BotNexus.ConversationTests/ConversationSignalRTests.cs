@@ -15,7 +15,7 @@ public class ConversationSignalRTests(LiveGatewayFixture fixture, ITestOutputHel
     [SkippableFact]
     public async Task SubscribeAll_ReturnsSessions()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var result = await fixture.SignalR.SubscribeAllAsync(cts.Token);
 
@@ -28,7 +28,7 @@ public class ConversationSignalRTests(LiveGatewayFixture fixture, ITestOutputHel
     [SkippableFact]
     public async Task SubscribeAll_DocumentsConversationListIsFutureExtension()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var result = await fixture.SignalR.SubscribeAllAsync(cts.Token);
 
@@ -43,7 +43,7 @@ public class ConversationSignalRTests(LiveGatewayFixture fixture, ITestOutputHel
     [SkippableFact]
     public async Task SendMessage_RoutesToAssistantAndRaisesMessageStart()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await fixture.SignalR.SubscribeAllAsync(cts.Token);
 
@@ -62,7 +62,7 @@ public class ConversationSignalRTests(LiveGatewayFixture fixture, ITestOutputHel
     [SkippableFact]
     public async Task SendMessage_SessionHasConversationIdField_DocumentedFutureState()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await fixture.SignalR.SubscribeAllAsync(cts.Token);
 
@@ -96,7 +96,7 @@ public class ConversationSignalRTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave2")]
     public async Task SendMessage_SessionConversationIdIsStampedAfterWave2()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await fixture.SignalR.SubscribeAllAsync(cts.Token);
 

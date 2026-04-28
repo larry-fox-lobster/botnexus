@@ -18,7 +18,7 @@ public class ConversationBindingTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave2")]
     public async Task DefaultConversation_HasNoBindingsInitially()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
 
         // Get the default conversation for assistant
         var listResponse = await fixture.Conversations.GetConversationsAsync("assistant");
@@ -57,7 +57,7 @@ public class ConversationBindingTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave2")]
     public async Task AddBinding_Returns201WithBindingId()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         var convId = await GetOrCreateConversationIdAsync();
         Skip.If(convId is null, "Could not obtain conversationId — Wave 3 endpoint not live");
 
@@ -76,7 +76,7 @@ public class ConversationBindingTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave2")]
     public async Task GetConversation_AfterBinding_IncludesBindingInArray()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         var convId = await GetOrCreateConversationIdAsync();
         Skip.If(convId is null, "Could not obtain conversationId — Wave 3 endpoint not live");
 
@@ -101,7 +101,7 @@ public class ConversationBindingTests(LiveGatewayFixture fixture, ITestOutputHel
     [Trait("Phase", "Wave2")]
     public async Task DeleteBinding_Returns204()
     {
-        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5005");
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         var convId = await GetOrCreateConversationIdAsync();
         Skip.If(convId is null, "Could not obtain conversationId — Wave 3 endpoint not live");
 
