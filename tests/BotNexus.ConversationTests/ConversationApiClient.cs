@@ -45,4 +45,33 @@ public class ConversationApiClient(HttpClient http)
 
     public Task<HttpResponseMessage> DeleteBindingAsync(string conversationId, string bindingId, CancellationToken ct = default) =>
         http.DeleteAsync($"/api/conversations/{Uri.EscapeDataString(conversationId)}/bindings/{Uri.EscapeDataString(bindingId)}", ct);
+
+    public Task<HttpResponseMessage> PatchConversationAsync(string conversationId, string? title, CancellationToken ct = default)
+    {
+        var body = JsonSerializer.Serialize(new { title });
+        var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+        var request = new HttpRequestMessage(HttpMethod.Patch,
+            $"/api/conversations/{Uri.EscapeDataString(conversationId)}") { Content = content };
+        return http.SendAsync(request, ct);
+    }
+
+    public Task<HttpResponseMessage> CreateConversationRawAsync(object body, CancellationToken ct = default)
+    {
+        var json = JsonSerializer.Serialize(body);
+        var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        return http.PostAsync("/api/conversations", content, ct);
+    }
+
+    public Task<HttpResponseMessage> AddBindingFullAsync(
+        string conversationId,
+        string channelType,
+        string channelAddress,
+        string? threadId,
+        string? threadingMode,
+        CancellationToken ct = default)
+    {
+        var body = JsonSerializer.Serialize(new { channelType, channelAddress, threadId, threadingMode });
+        var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+        return http.PostAsync($"/api/conversations/{Uri.EscapeDataString(conversationId)}/bindings", content, ct);
+    }
 }

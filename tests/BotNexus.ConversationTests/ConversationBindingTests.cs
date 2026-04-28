@@ -5,136 +5,174 @@ using Xunit.Abstractions;
 namespace BotNexus.ConversationTests;
 
 /// <summary>
-/// Tests for conversation channel binding behavior.
-/// These will be live after Wave 2 ships.
-/// All are marked [Trait("Phase", "Wave2")] or [Trait("Phase", "Wave3")].
+/// Functional tests for conversation channel binding endpoints.
+/// Each test uses unique agentIds to prevent state bleed.
 /// </summary>
 [Collection("LiveGateway")]
 public class ConversationBindingTests(LiveGatewayFixture fixture, ITestOutputHelper output)
 {
-    // ── Default conversation bindings ─────────────────────────────────────────
+    // ── POST /api/conversations/{id}/bindings ─────────────────────────────────
 
     [SkippableFact]
-    [Trait("Phase", "Wave2")]
-    public async Task DefaultConversation_HasNoBindingsInitially()
+    public async Task AddBinding_Returns201WithCorrectData()
     {
         Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
 
-        // Get the default conversation for assistant
-        var listResponse = await fixture.Conversations.GetConversationsAsync("assistant");
-        Skip.If(listResponse.StatusCode != HttpStatusCode.OK,
-            "Conversations endpoint not yet live (Wave 3)");
+        var convId = await CreateConversationAsync();
+        var response = await fixture.Conversations.AddBindingAsync(
+            convId, "telegram", "5067802539", "Single");
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
 
-        var items = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync())
-            .RootElement.EnumerateArray().ToList();
-        var defaultConv = items.FirstOrDefault(i =>
-            i.TryGetProperty("isDefault", out var v) && v.GetBoolean());
-        Skip.If(defaultConv.ValueKind == JsonValueKind.Undefined,
-            "No default conversation found — gateway may need to initialise");
+        var json = await response.Content.ReadAsStringAsync();
+        output.WriteLine($"AddBinding response: {json}");
+        var doc = JsonDocument.Parse(json).RootElement;
 
-        var convId = defaultConv.GetProperty("conversationId").GetString()!;
-        var bindingsResponse = await fixture.Conversations.GetConversationBindingsAsync(convId);
+        doc.TryGetProperty("bindingId", out var bindingId).ShouldBeTrue();
+        var bidStr = bindingId.GetString()!;
+        bidStr.ShouldNotBeNullOrEmpty();
+        bidStr.Length.ShouldBe(32, "bindingId should be 32-char hex (no hyphens)");
+        bidStr.ShouldNotContain("-");
 
-        // Document: either 200 with empty array, or 404 if not yet implemented
-        output.WriteLine($"Bindings response: {bindingsResponse.StatusCode}");
-        if (bindingsResponse.StatusCode == HttpStatusCode.OK)
-        {
-            var json = await bindingsResponse.Content.ReadAsStringAsync();
-            var arr = JsonDocument.Parse(json).RootElement;
-            arr.ValueKind.ShouldBe(JsonValueKind.Array);
-            arr.GetArrayLength().ShouldBe(0, "default conversation should have no bindings initially");
-        }
-        else
-        {
-            bindingsResponse.StatusCode.ShouldBe(HttpStatusCode.NotFound,
-                "expected either 200+empty-array or 404 when no bindings");
-        }
+        doc.GetProperty("channelType").GetString().ShouldBe("telegram");
+        doc.GetProperty("channelAddress").GetString().ShouldBe("5067802539");
+
+        doc.TryGetProperty("threadId", out var threadId).ShouldBeTrue();
+        threadId.ValueKind.ShouldBe(JsonValueKind.Null);
+
+        doc.GetProperty("mode").GetString().ShouldBe("Interactive");
+        doc.GetProperty("threadingMode").GetString().ShouldBe("Single");
     }
 
-    // ── Add binding ───────────────────────────────────────────────────────────
-
     [SkippableFact]
-    [Trait("Phase", "Wave2")]
-    public async Task AddBinding_Returns201WithBindingId()
+    public async Task AddBinding_UnknownConversationId_Returns404()
     {
         Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
-        var convId = await GetOrCreateConversationIdAsync();
-        Skip.If(convId is null, "Could not obtain conversationId — Wave 3 endpoint not live");
 
         var response = await fixture.Conversations.AddBindingAsync(
-            convId!, "signalr", "test-address", "Single");
-
-        output.WriteLine($"AddBinding response: {response.StatusCode}");
-        response.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonDocument.Parse(json).RootElement;
-        doc.TryGetProperty("bindingId", out var bindingId).ShouldBeTrue("expected bindingId in response");
-        bindingId.GetString().ShouldNotBeNullOrEmpty();
+            "c_doesnotexist", "telegram", "5067802539", "Single");
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [SkippableFact]
-    [Trait("Phase", "Wave2")]
-    public async Task GetConversation_AfterBinding_IncludesBindingInArray()
+    public async Task AddBinding_NativeThreadWithThreadId_PreservesThreadId()
     {
         Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
-        var convId = await GetOrCreateConversationIdAsync();
-        Skip.If(convId is null, "Could not obtain conversationId — Wave 3 endpoint not live");
 
+        var convId = await CreateConversationAsync();
+        var response = await fixture.Conversations.AddBindingFullAsync(
+            convId, "teams", "channel-abc", "thread-xyz", "NativeThread");
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        doc.GetProperty("threadId").GetString().ShouldBe("thread-xyz");
+        doc.GetProperty("threadingMode").GetString().ShouldBe("NativeThread");
+        var bindingId = doc.GetProperty("bindingId").GetString()!;
+
+        // Fetch conversation and verify binding is preserved
+        var convResponse = await fixture.Conversations.GetConversationAsync(convId);
+        convResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var convDoc = JsonDocument.Parse(await convResponse.Content.ReadAsStringAsync()).RootElement;
+        var binding = convDoc.GetProperty("bindings").EnumerateArray()
+            .FirstOrDefault(b => b.TryGetProperty("bindingId", out var bid) && bid.GetString() == bindingId);
+        binding.ValueKind.ShouldNotBe(JsonValueKind.Undefined);
+        binding.GetProperty("threadId").GetString().ShouldBe("thread-xyz");
+        binding.GetProperty("threadingMode").GetString().ShouldBe("NativeThread");
+    }
+
+    // ── GET conversation after add ────────────────────────────────────────────
+
+    [SkippableFact]
+    public async Task GetConversation_AfterAddBinding_BindingAppearsInArray()
+    {
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
+
+        var convId = await CreateConversationAsync();
         var addResponse = await fixture.Conversations.AddBindingAsync(
-            convId!, "signalr", "test-address-get", "Single");
-        Skip.If(addResponse.StatusCode != HttpStatusCode.Created,
-            "AddBinding not yet live (Wave 2)");
-
+            convId, "telegram", "5067802539", "Single");
+        addResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
         var bindingId = JsonDocument.Parse(await addResponse.Content.ReadAsStringAsync())
             .RootElement.GetProperty("bindingId").GetString()!;
 
-        var convResponse = await fixture.Conversations.GetConversationAsync(convId!);
+        var convResponse = await fixture.Conversations.GetConversationAsync(convId);
         convResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
         var doc = JsonDocument.Parse(await convResponse.Content.ReadAsStringAsync()).RootElement;
-        doc.TryGetProperty("bindings", out var bindings).ShouldBeTrue("expected bindings array on conversation");
-        bindings.EnumerateArray()
-            .Any(b => b.TryGetProperty("bindingId", out var bid) && bid.GetString() == bindingId)
-            .ShouldBeTrue("new binding should appear in conversation bindings");
+
+        doc.TryGetProperty("bindings", out var bindings).ShouldBeTrue();
+        bindings.ValueKind.ShouldBe(JsonValueKind.Array);
+        bindings.GetArrayLength().ShouldBe(1);
+
+        var binding = bindings.EnumerateArray().First();
+        binding.GetProperty("bindingId").GetString().ShouldBe(bindingId);
+        binding.GetProperty("channelType").GetString().ShouldBe("telegram");
+        binding.GetProperty("channelAddress").GetString().ShouldBe("5067802539");
     }
 
     [SkippableFact]
-    [Trait("Phase", "Wave2")]
-    public async Task DeleteBinding_Returns204()
+    public async Task GetConversationsList_AfterAddBinding_BindingCountIsOne()
     {
         Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
-        var convId = await GetOrCreateConversationIdAsync();
-        Skip.If(convId is null, "Could not obtain conversationId — Wave 3 endpoint not live");
 
+        var agentId = $"test-agent-{Guid.NewGuid():N}";
+        var createResponse = await fixture.Conversations.CreateConversationAsync(agentId, "BindingCount Test");
+        createResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var convId = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync())
+            .RootElement.GetProperty("conversationId").GetString()!;
+
+        var addResponse = await fixture.Conversations.AddBindingAsync(convId, "telegram", "5067802539", "Single");
+        addResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var listResponse = await fixture.Conversations.GetConversationsAsync(agentId);
+        listResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var items = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync())
+            .RootElement.EnumerateArray().ToList();
+        var match = items.FirstOrDefault(i =>
+            i.TryGetProperty("conversationId", out var id) && id.GetString() == convId);
+        match.ValueKind.ShouldNotBe(JsonValueKind.Undefined);
+        match.GetProperty("bindingCount").GetInt32().ShouldBe(1);
+    }
+
+    // ── DELETE /api/conversations/{id}/bindings/{bindingId} ───────────────────
+
+    [SkippableFact]
+    public async Task DeleteBinding_Returns204AndBindingIsGone()
+    {
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
+
+        var convId = await CreateConversationAsync();
         var addResponse = await fixture.Conversations.AddBindingAsync(
-            convId!, "signalr", "test-address-delete", "Single");
-        Skip.If(addResponse.StatusCode != HttpStatusCode.Created,
-            "AddBinding not yet live (Wave 2)");
-
+            convId, "telegram", "5067802539", "Single");
+        addResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
         var bindingId = JsonDocument.Parse(await addResponse.Content.ReadAsStringAsync())
             .RootElement.GetProperty("bindingId").GetString()!;
 
-        var deleteResponse = await fixture.Conversations.DeleteBindingAsync(convId!, bindingId);
+        var deleteResponse = await fixture.Conversations.DeleteBindingAsync(convId, bindingId);
         deleteResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        // Verify binding is gone
+        var convResponse = await fixture.Conversations.GetConversationAsync(convId);
+        convResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var doc = JsonDocument.Parse(await convResponse.Content.ReadAsStringAsync()).RootElement;
+        doc.GetProperty("bindings").GetArrayLength().ShouldBe(0);
+    }
+
+    [SkippableFact]
+    public async Task DeleteBinding_UnknownBindingId_Returns404()
+    {
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
+
+        var convId = await CreateConversationAsync();
+        var response = await fixture.Conversations.DeleteBindingAsync(convId, "doesnotexist");
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private async Task<string?> GetOrCreateConversationIdAsync()
+    private async Task<string> CreateConversationAsync()
     {
-        var listResponse = await fixture.Conversations.GetConversationsAsync("assistant");
-        if (listResponse.StatusCode == HttpStatusCode.OK)
-        {
-            var items = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync())
-                .RootElement.EnumerateArray().ToList();
-            if (items.Count > 0)
-                return items[0].GetProperty("conversationId").GetString();
-        }
-
-        var createResponse = await fixture.Conversations.CreateConversationAsync("assistant", "Binding Test");
-        if (createResponse.StatusCode == HttpStatusCode.Created)
-            return JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync())
-                .RootElement.GetProperty("conversationId").GetString();
-
-        return null;
+        var agentId = $"test-agent-{Guid.NewGuid():N}";
+        var response = await fixture.Conversations.CreateConversationAsync(agentId, "Binding Test");
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        return JsonDocument.Parse(await response.Content.ReadAsStringAsync())
+            .RootElement.GetProperty("conversationId").GetString()!;
     }
 }

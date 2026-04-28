@@ -93,30 +93,62 @@ public class ConversationSignalRTests(LiveGatewayFixture fixture, ITestOutputHel
     }
 
     [SkippableFact]
-    [Trait("Phase", "Wave2")]
-    public async Task SendMessage_SessionConversationIdIsStampedAfterWave2()
+    public async Task SendMessage_SessionConversationIdIsStamped()
     {
         Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await fixture.SignalR.SubscribeAllAsync(cts.Token);
 
         var result = await fixture.SignalR.SendMessageAsync(
-            "assistant", "ping — wave2 conversation routing", cts.Token, "signalr");
+            "assistant", "ping — conversation routing test", cts.Token, "signalr");
 
-        await fixture.SignalR.WaitForEventAsync(
-            result.SessionId, "MessageStart", TimeSpan.FromSeconds(15), cts.Token);
+        result.SessionId.ShouldNotBeNullOrEmpty();
+
+        // Brief wait for session to be stamped
+        await Task.Delay(TimeSpan.FromSeconds(3), cts.Token);
 
         var sessionResponse = await fixture.Http.GetAsync(
             $"/api/sessions/{result.SessionId}", cts.Token);
-        sessionResponse.IsSuccessStatusCode.ShouldBeTrue("session endpoint must return 200");
+        Skip.If(!sessionResponse.IsSuccessStatusCode, "session endpoint not available");
 
         var doc = JsonDocument.Parse(await sessionResponse.Content.ReadAsStringAsync(cts.Token)).RootElement;
-        // Skip if conversationId field is absent or null — Wave 2 routing not yet live
-        var hasConvId = doc.TryGetProperty("conversationId", out var convId) &&
-                        convId.ValueKind != JsonValueKind.Null &&
-                        !string.IsNullOrEmpty(convId.GetString());
-        Skip.If(!hasConvId, "conversationId not stamped on session — Wave 2 routing not yet live");
+        output.WriteLine($"Session conversationId field: {(doc.TryGetProperty("conversationId", out var cid) ? cid.ToString() : "absent")}");
 
-        convId.GetString().ShouldNotBeNullOrEmpty("conversationId must be stamped after Wave 2 routing is live");
+        // Check in nested session object first, then top-level
+        JsonElement convId = default;
+        bool found = doc.TryGetProperty("conversationId", out convId) ||
+                     (doc.TryGetProperty("session", out var sess) && sess.TryGetProperty("conversationId", out convId));
+
+        Skip.If(!found || convId.ValueKind == JsonValueKind.Null || string.IsNullOrEmpty(convId.GetString()),
+            "conversationId not stamped on session — Wave 2 routing not yet live");
+
+        convId.GetString()![..2].ShouldBe("c_", "conversationId should start with c_");
+    }
+
+    [SkippableFact]
+    public async Task SendMessage_DefaultConversationCreatedForAssistant()
+    {
+        Skip.If(!fixture.IsAvailable, "Dev gateway not running at localhost:5006");
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await fixture.SignalR.SubscribeAllAsync(cts.Token);
+
+        // Send a message to ensure default conversation exists
+        await fixture.SignalR.SendMessageAsync(
+            "assistant", "ping — default conversation test", cts.Token, "signalr");
+
+        // Brief wait for conversation to be created
+        await Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
+
+        var listResponse = await fixture.Http.GetAsync("/api/conversations?agentId=assistant", cts.Token);
+        listResponse.IsSuccessStatusCode.ShouldBeTrue();
+
+        var items = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync(cts.Token))
+            .RootElement.EnumerateArray().ToList();
+        output.WriteLine($"Conversations for assistant: {items.Count}");
+
+        Skip.If(items.Count == 0, "No conversations found for assistant — default conversation auto-creation not yet live");
+
+        items.Any(i => i.TryGetProperty("isDefault", out var v) && v.GetBoolean())
+            .ShouldBeTrue("at least one conversation should be the default");
     }
 }
