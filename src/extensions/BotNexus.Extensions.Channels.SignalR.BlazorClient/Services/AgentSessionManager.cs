@@ -88,8 +88,7 @@ public sealed class AgentSessionManager : IDisposable
                 await LoadConversationsAsync(agentId);
             }
             else if (state.ActiveConversationId is not null
-                && state.Conversations.TryGetValue(state.ActiveConversationId, out var conv)
-                && !conv.HistoryLoaded && !conv.IsLoadingHistory)
+                && !state.ConversationHistoryLoaded.Contains(state.ActiveConversationId))
             {
                 await LoadConversationHistoryAsync(agentId, state.ActiveConversationId);
             }
@@ -104,7 +103,7 @@ public sealed class AgentSessionManager : IDisposable
         if (!_sessions.TryGetValue(agentId, out var state))
             return;
 
-        state.Messages.Add(new ChatMessage("User", content, DateTimeOffset.UtcNow));
+        GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("User", content, DateTimeOffset.UtcNow));
         OnStateChanged?.Invoke();
 
         try
@@ -114,7 +113,7 @@ public sealed class AgentSessionManager : IDisposable
         }
         catch (Exception ex)
         {
-            state.Messages.Add(new ChatMessage("Error", $"Send failed: {ex.Message}", DateTimeOffset.UtcNow));
+            GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("Error", $"Send failed: {ex.Message}", DateTimeOffset.UtcNow));
             OnStateChanged?.Invoke();
         }
     }
@@ -125,7 +124,7 @@ public sealed class AgentSessionManager : IDisposable
         if (!_sessions.TryGetValue(agentId, out var state) || state.SessionId is null)
             return;
 
-        state.Messages.Add(new ChatMessage("User", $"🔀 {content}", DateTimeOffset.UtcNow));
+        GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("User", $"🔀 {content}", DateTimeOffset.UtcNow));
         OnStateChanged?.Invoke();
 
         try
@@ -134,7 +133,7 @@ public sealed class AgentSessionManager : IDisposable
         }
         catch (Exception ex)
         {
-            state.Messages.Add(new ChatMessage("Error", $"Steer failed: {ex.Message}", DateTimeOffset.UtcNow));
+            GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("Error", $"Steer failed: {ex.Message}", DateTimeOffset.UtcNow));
             OnStateChanged?.Invoke();
         }
     }
@@ -145,7 +144,7 @@ public sealed class AgentSessionManager : IDisposable
         if (!_sessions.TryGetValue(agentId, out var state) || state.SessionId is null)
             return;
 
-        state.Messages.Add(new ChatMessage("User", content, DateTimeOffset.UtcNow));
+        GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("User", content, DateTimeOffset.UtcNow));
         OnStateChanged?.Invoke();
 
         try
@@ -154,7 +153,7 @@ public sealed class AgentSessionManager : IDisposable
         }
         catch (Exception ex)
         {
-            state.Messages.Add(new ChatMessage("Error", $"Follow-up failed: {ex.Message}", DateTimeOffset.UtcNow));
+            GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("Error", $"Follow-up failed: {ex.Message}", DateTimeOffset.UtcNow));
             OnStateChanged?.Invoke();
         }
     }
@@ -171,12 +170,10 @@ public sealed class AgentSessionManager : IDisposable
         }
         catch (Exception ex)
         {
-            state.Messages.Add(new ChatMessage("Error", $"Abort failed: {ex.Message}", DateTimeOffset.UtcNow));
+            GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("Error", $"Abort failed: {ex.Message}", DateTimeOffset.UtcNow));
             OnStateChanged?.Invoke();
         }
     }
-
-    /// <summary>Reset (archive) the agent's current session.</summary>
     public async Task ResetSessionAsync(string agentId)
     {
         if (!_sessions.TryGetValue(agentId, out var state) || state.SessionId is null)
@@ -189,12 +186,10 @@ public sealed class AgentSessionManager : IDisposable
         }
         catch (Exception ex)
         {
-            state.Messages.Add(new ChatMessage("Error", $"Reset failed: {ex.Message}", DateTimeOffset.UtcNow));
+            GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("Error", $"Reset failed: {ex.Message}", DateTimeOffset.UtcNow));
             OnStateChanged?.Invoke();
         }
     }
-
-    /// <summary>Compact the agent's current session to reduce token usage.</summary>
     public async Task<CompactSessionResult?> CompactSessionAsync(string agentId)
     {
         if (!_sessions.TryGetValue(agentId, out var state) || state.SessionId is null)
@@ -203,7 +198,7 @@ public sealed class AgentSessionManager : IDisposable
         try
         {
             var result = await _hub.CompactSessionAsync(agentId, state.SessionId);
-            state.Messages.Add(new ChatMessage("System",
+            GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("System",
                 $"Session compacted: {result.Summarized} messages summarized, {result.Preserved} preserved. " +
                 $"Tokens: {result.TokensBefore} → {result.TokensAfter}",
                 DateTimeOffset.UtcNow));
@@ -212,7 +207,7 @@ public sealed class AgentSessionManager : IDisposable
         }
         catch (Exception ex)
         {
-            state.Messages.Add(new ChatMessage("Error", $"Compact failed: {ex.Message}", DateTimeOffset.UtcNow));
+            GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("Error", $"Compact failed: {ex.Message}", DateTimeOffset.UtcNow));
             OnStateChanged?.Invoke();
             return null;
         }
@@ -223,8 +218,12 @@ public sealed class AgentSessionManager : IDisposable
     {
         if (_sessions.TryGetValue(agentId, out var state))
         {
-            state.Messages.Clear();
-            state.Messages.Add(new ChatMessage("System", "Local messages cleared.", DateTimeOffset.UtcNow));
+            var store = GetOrCreateMessageStore(state, state.ActiveConversationId);
+            store.Clear();
+            store.Add(new ChatMessage("System", "Local messages cleared.", DateTimeOffset.UtcNow));
+            // Allow history to be re-fetched for this conversation
+            if (state.ActiveConversationId is not null)
+                state.ConversationHistoryLoaded.Remove(state.ActiveConversationId);
             OnStateChanged?.Invoke();
         }
     }
@@ -349,6 +348,10 @@ public sealed class AgentSessionManager : IDisposable
 
             state.ConversationsLoaded = true;
 
+            // Pre-create message stores for all known conversations (Change 6)
+            foreach (var conv in state.Conversations.Values)
+                state.ConversationMessageStores.TryAdd(conv.ConversationId, new List<ChatMessage>());
+
             // If this is the currently visible agent, load history now
             if (agentId == ActiveAgentId && state.ActiveConversationId is not null)
             {
@@ -377,21 +380,6 @@ public sealed class AgentSessionManager : IDisposable
         if (!state.Conversations.TryGetValue(conversationId, out var conv))
             return;
 
-        // Clear messages when switching conversations so we don't show stale history
-        if (state.ActiveConversationId != conversationId)
-        {
-            state.Messages.Clear();
-            // Reset history flags so the new conversation's history will be loaded
-            foreach (var c in state.Conversations.Values)
-            {
-                if (c.ConversationId == conversationId)
-                {
-                    c.HistoryLoaded = false;
-                    c.IsLoadingHistory = false;
-                }
-            }
-        }
-
         state.ActiveConversationId = conversationId;
 
         // Sync active session to the selected conversation's live session
@@ -401,10 +389,12 @@ public sealed class AgentSessionManager : IDisposable
         // Clear conversation unread count
         conv.UnreadCount = 0;
 
-        OnStateChanged?.Invoke();
-
-        if (!conv.HistoryLoaded && !conv.IsLoadingHistory)
+        // Lazy-load history ONLY if we have never loaded this conversation before.
+        // Do NOT clear messages — if they're already there (from streaming) keep them.
+        if (!state.ConversationHistoryLoaded.Contains(conversationId))
             await LoadConversationHistoryAsync(agentId, conversationId);
+
+        OnStateChanged?.Invoke();
     }
 
     /// <summary>Create a new conversation for the given agent.</summary>
@@ -434,11 +424,12 @@ public sealed class AgentSessionManager : IDisposable
                 UpdatedAt = dto.UpdatedAt
             };
 
+            // Initialise an empty store for the new conversation (Change 4)
+            state.ConversationMessageStores[dto.ConversationId] = new List<ChatMessage>();
+            state.ConversationHistoryLoaded.Add(dto.ConversationId); // brand new — nothing to load
+
             if (select)
             {
-                // New conversation — clear messages so we don't inherit previous history
-                if (_sessions.TryGetValue(agentId, out var st))
-                    st.Messages.Clear();
                 await SelectConversationAsync(agentId, dto.ConversationId);
             }
             else
@@ -570,8 +561,6 @@ public sealed class AgentSessionManager : IDisposable
                 var fallback = state.Conversations.Values.FirstOrDefault(c => c.IsDefault)
                     ?? state.Conversations.Values.OrderByDescending(c => c.UpdatedAt).FirstOrDefault();
                 state.ActiveConversationId = fallback?.ConversationId;
-                if (state.ActiveConversationId is null)
-                    state.Messages.Clear();
             }
         }
         catch (Exception ex)
@@ -606,8 +595,22 @@ public sealed class AgentSessionManager : IDisposable
             return;
         if (!state.Conversations.TryGetValue(conversationId, out var conv))
             return;
-        if (conv.HistoryLoaded || conv.IsLoadingHistory)
+        if (conv.IsLoadingHistory)
             return;
+
+        // Get or create the store for this conversation
+        if (!state.ConversationMessageStores.TryGetValue(conversationId, out var messages))
+        {
+            messages = new List<ChatMessage>();
+            state.ConversationMessageStores[conversationId] = messages;
+        }
+
+        // Only load if empty — never overwrite existing messages (streaming may have already populated it)
+        if (messages.Count > 0)
+        {
+            state.ConversationHistoryLoaded.Add(conversationId);
+            return;
+        }
 
         conv.IsLoadingHistory = true;
         OnStateChanged?.Invoke();
@@ -619,39 +622,34 @@ public sealed class AgentSessionManager : IDisposable
 
             if (response?.Entries is { Count: > 0 })
             {
-                // Only replace messages if this conversation is still active
-                if (state.ActiveConversationId == conversationId)
+                foreach (var entry in response.Entries)
                 {
-                    state.Messages.Clear();
-                    foreach (var entry in response.Entries)
+                    if (entry.Kind == "boundary")
                     {
-                        if (entry.Kind == "boundary")
+                        var label = $"Session \u00b7 {entry.Timestamp.ToLocalTime():MMM d HH:mm} \u00b7 {entry.SessionId}";
+                        messages.Add(new ChatMessage("System", string.Empty, entry.Timestamp)
                         {
-                            var label = $"Session \u00b7 {entry.Timestamp.ToLocalTime():MMM d HH:mm} \u00b7 {entry.SessionId}";
-                            state.Messages.Add(new ChatMessage("System", string.Empty, entry.Timestamp)
-                            {
-                                Kind = "boundary",
-                                BoundaryLabel = label,
-                                BoundarySessionId = entry.SessionId
-                            });
-                        }
-                        else
+                            Kind = "boundary",
+                            BoundaryLabel = label,
+                            BoundarySessionId = entry.SessionId
+                        });
+                    }
+                    else
+                    {
+                        messages.Add(new ChatMessage(
+                            MapRole(entry.Role ?? "system"),
+                            entry.Content ?? string.Empty,
+                            entry.Timestamp)
                         {
-                            state.Messages.Add(new ChatMessage(
-                                MapRole(entry.Role ?? "system"),
-                                entry.Content ?? string.Empty,
-                                entry.Timestamp)
-                            {
-                                ToolName = entry.ToolName,
-                                ToolCallId = entry.ToolCallId,
-                                IsToolCall = entry.ToolName is not null
-                            });
-                        }
+                            ToolName = entry.ToolName,
+                            ToolCallId = entry.ToolCallId,
+                            IsToolCall = entry.ToolName is not null
+                        });
                     }
                 }
             }
 
-            conv.HistoryLoaded = true;
+            state.ConversationHistoryLoaded.Add(conversationId);
 
             // Sync SessionId from the conversation after loading
             if (state.ActiveConversationId == conversationId && conv.ActiveSessionId is not null)
@@ -660,7 +658,7 @@ public sealed class AgentSessionManager : IDisposable
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to load history for conversation {conversationId}: {ex.Message}");
-            conv.HistoryLoaded = true; // Don't retry on failure
+            state.ConversationHistoryLoaded.Add(conversationId); // Don't retry on failure
         }
         finally
         {
@@ -832,6 +830,10 @@ public sealed class AgentSessionManager : IDisposable
         var state = FindStateBySessionId(evt.SessionId);
         if (state is null) return;
 
+        var convId = FindConversationIdForSession(state, evt.SessionId) ?? state.ActiveConversationId;
+        if (convId is null) return;
+        var msgs = GetOrCreateMessageStore(state, convId);
+
         var toolCallId = evt.ToolCallId ?? Guid.NewGuid().ToString("N");
         var argsJson = evt.ToolArgs is not null
             ? JsonSerializer.Serialize(evt.ToolArgs, s_jsonOptions)
@@ -845,7 +847,7 @@ public sealed class AgentSessionManager : IDisposable
             IsToolCall = true
         };
 
-        state.Messages.Add(msg);
+        msgs.Add(msg);
         state.ActiveToolCalls[toolCallId] = new ActiveToolCall
         {
             ToolCallId = toolCallId,
@@ -853,6 +855,9 @@ public sealed class AgentSessionManager : IDisposable
             StartedAt = DateTimeOffset.UtcNow,
             MessageId = msg.Id
         };
+
+        if (convId != state.ActiveConversationId && state.Conversations.TryGetValue(convId, out var inactiveConv))
+            inactiveConv.UnreadCount++;
 
         state.ProcessingStage = $"🔧 Using tool: {evt.ToolName}";
         OnStateChanged?.Invoke();
@@ -862,6 +867,10 @@ public sealed class AgentSessionManager : IDisposable
     {
         var state = FindStateBySessionId(evt.SessionId);
         if (state is null) return;
+
+        var convId = FindConversationIdForSession(state, evt.SessionId) ?? state.ActiveConversationId;
+        if (convId is null) return;
+        var msgs = GetOrCreateMessageStore(state, convId);
 
         var toolCallId = evt.ToolCallId;
         TimeSpan? duration = null;
@@ -877,11 +886,11 @@ public sealed class AgentSessionManager : IDisposable
         // Try to update the ToolStart message in-place with result and duration
         if (messageId is not null)
         {
-            var index = state.Messages.FindIndex(m => m.Id == messageId);
+            var index = msgs.FindIndex(m => m.Id == messageId);
             if (index >= 0)
             {
-                var original = state.Messages[index];
-                state.Messages[index] = original with
+                var original = msgs[index];
+                msgs[index] = original with
                 {
                     Content = evt.ToolIsError == true
                         ? $"❌ {evt.ToolName} failed"
@@ -891,7 +900,6 @@ public sealed class AgentSessionManager : IDisposable
                     ToolDuration = duration
                 };
 
-                // Update processing stage — back to responding if still streaming
                 state.ProcessingStage = state.IsStreaming ? "🤖 Agent is responding…" : null;
                 OnStateChanged?.Invoke();
                 return;
@@ -899,7 +907,7 @@ public sealed class AgentSessionManager : IDisposable
         }
 
         // Fallback: add as a new message if the original was not found
-        state.Messages.Add(new ChatMessage("Tool",
+        msgs.Add(new ChatMessage("Tool",
             evt.ToolIsError == true ? $"❌ {evt.ToolName} failed" : $"✅ {evt.ToolName} completed",
             DateTimeOffset.UtcNow)
         {
@@ -911,6 +919,9 @@ public sealed class AgentSessionManager : IDisposable
             ToolDuration = duration
         });
 
+        if (convId != state.ActiveConversationId && state.Conversations.TryGetValue(convId, out var inactiveConv))
+            inactiveConv.UnreadCount++;
+
         state.ProcessingStage = state.IsStreaming ? "🤖 Agent is responding…" : null;
         OnStateChanged?.Invoke();
     }
@@ -920,12 +931,16 @@ public sealed class AgentSessionManager : IDisposable
         var state = FindStateBySessionId(evt.SessionId);
         if (state is null) return;
 
+        var convId = FindConversationIdForSession(state, evt.SessionId) ?? state.ActiveConversationId;
+        if (convId is null) return;
+        var msgs = GetOrCreateMessageStore(state, convId);
+
         // Finalize the thinking buffer + stream buffer into a single assistant message
         var thinkingContent = string.IsNullOrEmpty(state.ThinkingBuffer) ? null : state.ThinkingBuffer;
 
         if (!string.IsNullOrEmpty(state.CurrentStreamBuffer))
         {
-            state.Messages.Add(new ChatMessage("Assistant", state.CurrentStreamBuffer, DateTimeOffset.UtcNow)
+            msgs.Add(new ChatMessage("Assistant", state.CurrentStreamBuffer, DateTimeOffset.UtcNow)
             {
                 ThinkingContent = thinkingContent
             });
@@ -933,7 +948,7 @@ public sealed class AgentSessionManager : IDisposable
         else if (thinkingContent is not null)
         {
             // Thinking only, no visible content — still attach it
-            state.Messages.Add(new ChatMessage("Assistant", "", DateTimeOffset.UtcNow)
+            msgs.Add(new ChatMessage("Assistant", "", DateTimeOffset.UtcNow)
             {
                 ThinkingContent = thinkingContent
             });
@@ -946,17 +961,10 @@ public sealed class AgentSessionManager : IDisposable
 
         // Track unread for non-active agents, and per-conversation for non-active conversations
         if (state.AgentId != ActiveAgentId)
-        {
             state.UnreadCount++;
-        }
 
-        // Increment conversation unread count for the conversation whose live session fired this event
-        var activeConv = state.Conversations.Values
-            .FirstOrDefault(c => c.ActiveSessionId == evt.SessionId);
-        if (activeConv is not null && activeConv.ConversationId != state.ActiveConversationId)
-        {
+        if (convId != state.ActiveConversationId && state.Conversations.TryGetValue(convId, out var activeConv))
             activeConv.UnreadCount++;
-        }
 
         OnStateChanged?.Invoke();
     }
@@ -966,7 +974,8 @@ public sealed class AgentSessionManager : IDisposable
         var state = FindStateBySessionId(evt.SessionId);
         if (state is null) return;
 
-        state.Messages.Add(new ChatMessage("Error", evt.ErrorMessage ?? "An unknown error occurred.", DateTimeOffset.UtcNow));
+        var convId = FindConversationIdForSession(state, evt.SessionId) ?? state.ActiveConversationId;
+        GetOrCreateMessageStore(state, convId).Add(new ChatMessage("Error", evt.ErrorMessage ?? "An unknown error occurred.", DateTimeOffset.UtcNow));
         state.IsStreaming = false;
         state.CurrentStreamBuffer = "";
         state.ThinkingBuffer = "";
@@ -982,7 +991,6 @@ public sealed class AgentSessionManager : IDisposable
                 _sessionToAgent.Remove(state.SessionId);
 
             state.SessionId = null;
-            state.Messages.Clear();
             state.IsStreaming = false;
             state.CurrentStreamBuffer = "";
             state.ThinkingBuffer = "";
@@ -992,7 +1000,15 @@ public sealed class AgentSessionManager : IDisposable
             state.SubAgents.Clear();
             state.ProcessingStage = null;
 
-            state.Messages.Add(new ChatMessage("System", "Session reset. Start a new conversation.", DateTimeOffset.UtcNow));
+            // Clear the active conversation's store (session was reset, history is gone)
+            if (state.ActiveConversationId is not null)
+            {
+                state.ConversationMessageStores.TryGetValue(state.ActiveConversationId, out var store);
+                store?.Clear();
+                state.ConversationHistoryLoaded.Remove(state.ActiveConversationId);
+                GetOrCreateMessageStore(state, state.ActiveConversationId)
+                    .Add(new ChatMessage("System", "Session reset. Start a new conversation.", DateTimeOffset.UtcNow));
+            }
         }
 
         OnStateChanged?.Invoke();
@@ -1019,7 +1035,7 @@ public sealed class AgentSessionManager : IDisposable
         // Register the sub-agent's session in the session-to-agent mapping
         _sessionToAgent[payload.SubAgentId] = payload.SubAgentId;
 
-        state.Messages.Add(new ChatMessage("System",
+        GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("System",
             $"🔄 Sub-agent spawned: {payload.Name ?? payload.SubAgentId} — {payload.Task}",
             DateTimeOffset.UtcNow));
 
@@ -1038,7 +1054,7 @@ public sealed class AgentSessionManager : IDisposable
             sub.ResultSummary = payload.ResultSummary;
         }
 
-        state.Messages.Add(new ChatMessage("System",
+        GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("System",
             $"✅ Sub-agent completed: {payload.Name ?? payload.SubAgentId}" +
             (payload.ResultSummary is not null ? $" — {payload.ResultSummary}" : ""),
             DateTimeOffset.UtcNow));
@@ -1058,7 +1074,7 @@ public sealed class AgentSessionManager : IDisposable
             sub.ResultSummary = payload.ResultSummary;
         }
 
-        state.Messages.Add(new ChatMessage("System",
+        GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("System",
             $"❌ Sub-agent failed: {payload.Name ?? payload.SubAgentId}" +
             (payload.ResultSummary is not null ? $" — {payload.ResultSummary}" : ""),
             DateTimeOffset.UtcNow));
@@ -1077,7 +1093,7 @@ public sealed class AgentSessionManager : IDisposable
             sub.CompletedAt = payload.CompletedAt;
         }
 
-        state.Messages.Add(new ChatMessage("System",
+        GetOrCreateMessageStore(state, state.ActiveConversationId).Add(new ChatMessage("System",
             $"⛔ Sub-agent killed: {payload.Name ?? payload.SubAgentId}",
             DateTimeOffset.UtcNow));
 
@@ -1151,6 +1167,27 @@ public sealed class AgentSessionManager : IDisposable
             && _sessions.TryGetValue(agentId, out var state)
             ? state
             : null;
+    }
+
+    /// <summary>Find the conversation ID whose active session matches the given session ID.</summary>
+    private static string? FindConversationIdForSession(AgentSessionState state, string? sessionId)
+    {
+        if (sessionId is null) return null;
+        return state.Conversations.Values
+            .FirstOrDefault(c => c.ActiveSessionId == sessionId)
+            ?.ConversationId;
+    }
+
+    /// <summary>Get or create the message store for a conversation.</summary>
+    private static List<ChatMessage> GetOrCreateMessageStore(AgentSessionState state, string? convId)
+    {
+        if (convId is null) return [];
+        if (!state.ConversationMessageStores.TryGetValue(convId, out var msgs))
+        {
+            msgs = new List<ChatMessage>();
+            state.ConversationMessageStores[convId] = msgs;
+        }
+        return msgs;
     }
 
     private static string MapRole(string role) => role.ToLowerInvariant() switch
