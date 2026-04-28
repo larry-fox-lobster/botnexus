@@ -4,10 +4,11 @@
 #   PROD: ~/botnexus-prod  (sytone/botnexus main) -> ~/.botnexus/     -> port 5005
 #   DEV:  ~/projects/botnexus (fork main)          -> ~/.botnexus-dev/ -> port 5006
 #
-# NOTE: The CLI's `gateway start` is single-instance (hardcoded to ~/.botnexus).
-# This script handles two-instance management directly. When the CLI gains a
-# --home flag (see improvement-cli-multi-instance), both instances can delegate
-# to the CLI fully. Until then, this script mirrors what the CLI does internally.
+# Handles build, extension deploy, and process lifecycle directly.
+# The CLI's `gateway start` cannot manage two instances yet because
+# GatewayProcessManager uses a single hardcoded PID file (issue #36).
+# Once #36 ships this becomes:
+#   botnexus gateway start --source <repo> --target <home> --port <n>
 #
 # Runs every 15 min via cron. Logs to ~/logs/botnexus-sync.log
 
@@ -15,8 +16,9 @@ $ErrorActionPreference = 'Stop'
 
 $env:PATH        = "$env:HOME/.dotnet:$env:HOME/.dotnet/tools:" + $env:PATH
 $env:DOTNET_ROOT = "$env:HOME/.dotnet"
-$DOTNET          = "$env:HOME/.dotnet/dotnet"
+$env:DOTNET_SYSTEM_GLOBALIZATION_INVARIANT = '1'
 
+$DOTNET = "$env:HOME/.dotnet/dotnet"
 $LogDir  = "$env:HOME/logs"
 $LogFile = "$LogDir/botnexus-sync.log"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
@@ -39,7 +41,8 @@ try {
 }
 
 function Test-GatewayRunning {
-    param([string]$PidFile)
+    param([string]$BnHome)
+    $PidFile = "$BnHome/gateway.pid"
     if (-not (Test-Path $PidFile)) { return $false }
     $GwPid = [int](Get-Content $PidFile -Raw).Trim()
     try { return $null -ne (Get-Process -Id $GwPid -ErrorAction Stop) }
@@ -47,7 +50,8 @@ function Test-GatewayRunning {
 }
 
 function Stop-Gateway {
-    param([string]$PidFile, [string]$Label)
+    param([string]$BnHome, [string]$Label)
+    $PidFile = "$BnHome/gateway.pid"
     if (-not (Test-Path $PidFile)) { return }
     $GwPid = [int](Get-Content $PidFile -Raw).Trim()
     Write-Log "[$Label] Stopping gateway (pid $GwPid)..."
@@ -58,12 +62,13 @@ function Stop-Gateway {
 }
 
 function Start-Gateway {
-    param([string]$Dll, [string]$BnHome, [int]$Port, [string]$PidFile, [string]$GwLog, [string]$Label)
+    param([string]$Dll, [string]$BnHome, [int]$Port, [string]$Label)
+    $PidFile = "$BnHome/gateway.pid"
+    $GwLog   = "$LogDir/botnexus-gateway-$Label.log"
     Write-Log "[$Label] Starting gateway (port $Port)..."
     $env:BOTNEXUS_HOME = $BnHome
-    $env:DOTNET_SYSTEM_GLOBALIZATION_INVARIANT = '1'
-    # stdout and stderr must go to separate files — Start-Process on Linux
-    # does not support redirecting both to the same file path
+    # stdout and stderr go to separate files — Start-Process on Linux cannot
+    # redirect both to the same path
     $proc = Start-Process -FilePath $DOTNET `
         -ArgumentList "$Dll --urls http://0.0.0.0:$Port" `
         -RedirectStandardOutput $GwLog `
@@ -71,7 +76,7 @@ function Start-Gateway {
         -NoNewWindow -PassThru
     $proc.Id | Set-Content $PidFile
     Start-Sleep -Seconds 4
-    if (Test-GatewayRunning $PidFile) {
+    if (Test-GatewayRunning $BnHome) {
         Write-Log "[$Label] Started (pid $($proc.Id))"
     } else {
         Write-Log "[$Label] ERROR: Exited immediately — check $GwLog"
@@ -81,44 +86,40 @@ function Start-Gateway {
 }
 
 function Deploy-Extensions {
+    # Mirrors what the CLI's ServeCommand.DeployExtensions does:
+    # publish extensions, publish Blazor client, copy to BnHome/extensions/
     param([string]$Repo, [string]$BnHome, [string]$Label)
-    # Mirror what ServeCommand.DeployExtensions does:
-    # 1. Build + publish each extension project
-    # 2. Copy DLLs to BnHome/extensions/{name}/
-    # 3. Publish Blazor client and copy wwwroot to extensions/botnexus-signalr/blazor/
-
     Write-Log "[$Label] Deploying extensions..."
-    $CliDll = "$Repo/src/gateway/BotNexus.Cli/bin/Release/net10.0/BotNexus.Cli.dll"
 
-    # Use the CLI to deploy — it reads from the repo and writes to ~/.botnexus by default.
-    # Copy the result to BnHome if it differs.
-    $DefaultHome = "$env:HOME/.botnexus"
-    $env:BOTNEXUS_HOME = $DefaultHome
-    & $DOTNET $CliDll gateway start --path $Repo --port 0 2>&1 | Add-Content $LogFile
+    # Publish Blazor client (wwwroot static assets)
+    & $DOTNET publish "$Repo/src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient" `
+        -c Release --nologo 2>&1 | Add-Content $LogFile
 
-    # Immediately stop what the CLI started (we only wanted the deploy step)
-    $DefaultPid = "$DefaultHome/gateway.pid"
-    if (Test-Path $DefaultPid) {
-        $GwPid = [int](Get-Content $DefaultPid -Raw).Trim()
-        Stop-Process -Id $GwPid -Force -ErrorAction SilentlyContinue
-        Remove-Item $DefaultPid -Force -ErrorAction SilentlyContinue
+    $BlazorPublish = "$Repo/src/extensions/BotNexus.Extensions.Channels.SignalR.BlazorClient/bin/Release/net10.0/publish/wwwroot"
+    if (Test-Path $BlazorPublish) {
+        Remove-Item "$BnHome/extensions/botnexus-signalr/blazor" -Recurse -Force -ErrorAction SilentlyContinue
+        Copy-Item $BlazorPublish "$BnHome/extensions/botnexus-signalr/blazor" -Recurse -Force
     }
 
-    # Copy deployed extensions to BnHome if different from default
-    if ($BnHome -ne $DefaultHome -and (Test-Path "$DefaultHome/extensions")) {
-        New-Item -ItemType Directory -Force -Path "$BnHome/extensions" | Out-Null
-        Copy-Item "$DefaultHome/extensions/*" "$BnHome/extensions/" -Recurse -Force
+    # Copy extension DLLs — published alongside the gateway build
+    $ExtSrc = "$Repo/src/extensions"
+    foreach ($extDir in (Get-ChildItem $ExtSrc -Directory)) {
+        $publishDir = "$($extDir.FullName)/bin/Release/net10.0/publish"
+        if (-not (Test-Path $publishDir)) { continue }
+        $extName = $extDir.Name.ToLower() -replace 'botnexus\.', 'botnexus-'
+        $extDest = "$BnHome/extensions/$extName"
+        New-Item -ItemType Directory -Force -Path $extDest | Out-Null
+        Copy-Item "$publishDir/*" $extDest -Recurse -Force -ErrorAction SilentlyContinue
     }
+
     Write-Log "[$Label] Extensions deployed."
 }
 
 function Sync-Instance {
     param([string]$Repo, [string]$Remote, [string]$BnHome, [int]$Port, [string]$Label)
 
-    $PidFile = "$BnHome/gateway.pid"
-    $Dll     = "$Repo/src/gateway/BotNexus.Gateway.Api/bin/Release/net10.0/BotNexus.Gateway.Api.dll"
-    $GwLog   = "$LogDir/botnexus-gateway-$Label.log"
-
+    # Release build — same as CLI gateway start
+    $Dll = "$Repo/src/gateway/BotNexus.Gateway.Api/bin/Release/net10.0/BotNexus.Gateway.Api.dll"
     Set-Location $Repo
 
     & git fetch $Remote main 2>&1 | Add-Content $LogFile
@@ -127,10 +128,10 @@ function Sync-Instance {
 
     if ($LocalSha -eq $RemoteSha) {
         Write-Log "[$Label] Up to date ($LocalSha)."
-        if (-not (Test-GatewayRunning $PidFile)) {
+        if (-not (Test-GatewayRunning $BnHome)) {
             Write-Log "[$Label] Gateway not running — starting..."
             Deploy-Extensions $Repo $BnHome $Label
-            Start-Gateway $Dll $BnHome $Port $PidFile $GwLog $Label
+            Start-Gateway $Dll $BnHome $Port $Label
         }
         return
     }
@@ -149,17 +150,17 @@ function Sync-Instance {
 
     Deploy-Extensions $Repo $BnHome $Label
 
-    if (Test-GatewayRunning $PidFile) { Stop-Gateway $PidFile $Label }
-    Start-Gateway $Dll $BnHome $Port $PidFile $GwLog $Label
+    if (Test-GatewayRunning $BnHome) { Stop-Gateway $BnHome $Label }
+    Start-Gateway $Dll $BnHome $Port $Label
 }
 
 try {
     Write-Log "=== BotNexus sync started ==="
 
-    # PROD: sytone/botnexus -> ~/.botnexus -> port 5005
+    # PROD: sytone/botnexus (--source) -> ~/.botnexus (--target) -> port 5005
     Sync-Instance "$env:HOME/botnexus-prod" "origin" "$env:HOME/.botnexus" 5005 "prod"
 
-    # DEV: fork -> ~/.botnexus-dev -> port 5006
+    # DEV: fork (--source) -> ~/.botnexus-dev (--target) -> port 5006
     Sync-Instance "$env:HOME/projects/botnexus" "fork" "$env:HOME/.botnexus-dev" 5006 "dev"
 
     Write-Log "=== Done ==="
