@@ -9,6 +9,7 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Conversations;
+using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Sessions;
 using BotNexus.Gateway.Api;
 using BotNexus.Extensions.Channels.SignalR;
