@@ -6,6 +6,8 @@ namespace BotNexus.Extensions.Channels.SignalR.BlazorClient.Pages;
 
 public partial class Configuration : IDisposable
 {
+    [Parameter] public string? Section { get; set; }
+
     private JsonObject? _config;
     private bool _loading = true;
     private bool _saving;
