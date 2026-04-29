@@ -24,8 +24,17 @@ internal static class CliPaths
         string.IsNullOrWhiteSpace(explicitSource) ? DefaultSource : explicitSource;
 
     /// <summary>
-    /// Resolve the target (BotNexus home) directory. Explicit path wins; otherwise DefaultTarget.
+    /// Resolve the target (BotNexus home) directory. Explicit path wins; then BOTNEXUS_HOME env var; otherwise DefaultTarget.
     /// </summary>
-    public static string ResolveTarget(string? explicitTarget) =>
-        string.IsNullOrWhiteSpace(explicitTarget) ? DefaultTarget : explicitTarget;
+    public static string ResolveTarget(string? explicitTarget)
+    {
+        if (!string.IsNullOrWhiteSpace(explicitTarget))
+            return explicitTarget;
+
+        var homeOverride = Environment.GetEnvironmentVariable("BOTNEXUS_HOME");
+        if (!string.IsNullOrWhiteSpace(homeOverride))
+            return homeOverride;
+
+        return DefaultTarget;
+    }
 }
