@@ -365,6 +365,8 @@
 
     private bool _forceScrollNext;
     private bool _wasActive;
+    private string? _lastActiveConversationId;
+    private int _lastRenderedMessageCount;
 
     // ── Toggle state ──────────────────────────────────────────────────────
 
@@ -521,6 +523,27 @@
             if (isActive && !_wasActive)
                 _forceScrollNext = true;
             _wasActive = isActive;
+
+            // Force-scroll when the active conversation changes or history batch-loads.
+            // A large jump in message count means history arrived — scroll to bottom.
+            var currentConvId = State.ActiveConversationId;
+            var currentCount = State.Messages.Count;
+            if (currentConvId != _lastActiveConversationId)
+            {
+                _forceScrollNext = true;
+                _lastActiveConversationId = currentConvId;
+                _lastRenderedMessageCount = currentCount;
+            }
+            else if (currentCount > _lastRenderedMessageCount + 5)
+            {
+                // More than 5 new messages at once = history batch load, not streaming
+                _forceScrollNext = true;
+                _lastRenderedMessageCount = currentCount;
+            }
+            else
+            {
+                _lastRenderedMessageCount = currentCount;
+            }
 
             // Force-scroll on first render, after sending, or on session switch.
             // Otherwise smart-scroll (only if near bottom).
