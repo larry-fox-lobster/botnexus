@@ -167,9 +167,23 @@ public sealed class GatewayHub : Hub<IGatewayHubClient>
     /// <param name="agentId">The agent id.</param>
     /// <param name="channelType">The channel type.</param>
     /// <param name="content">The content.</param>
-    /// <param name="conversationId">Optional explicit conversation ID. When supplied, routes into that conversation rather than resolving by channel binding.</param>
     /// <returns>The send message result.</returns>
-    public async Task<SendMessageResult> SendMessage(AgentId agentId, ChannelKey channelType, string content, string? conversationId = null)
+    public Task<SendMessageResult> SendMessage(AgentId agentId, ChannelKey channelType, string content)
+        => SendMessageCore(agentId, channelType, content, null);
+
+    /// <summary>
+    /// Sends a message routing into a specific conversation by ID.
+    /// Use this overload from portal clients that track the active conversation.
+    /// </summary>
+    /// <param name="agentId">The target agent.</param>
+    /// <param name="channelType">The channel type.</param>
+    /// <param name="content">The message content.</param>
+    /// <param name="conversationId">Explicit conversation ID to route into.</param>
+    /// <returns>The send message result.</returns>
+    public Task<SendMessageResult> SendMessageToConversation(AgentId agentId, ChannelKey channelType, string content, string conversationId)
+        => SendMessageCore(agentId, channelType, content, conversationId);
+
+    private async Task<SendMessageResult> SendMessageCore(AgentId agentId, ChannelKey channelType, string content, string? conversationId)
     {
         var typedAgentId = NormalizeAgentId(agentId);
         var typedChannelType = NormalizeChannelKey(channelType);

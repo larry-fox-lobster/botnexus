@@ -118,7 +118,11 @@ public sealed class GatewayHubConnection : IAsyncDisposable
 
     /// <summary>Send a message to the specified agent.</summary>
     public async Task<SendMessageResult> SendMessageAsync(string agentId, string channelType, string content, string? conversationId = null)
-        => await _connection!.InvokeAsync<SendMessageResult>("SendMessage", agentId, channelType, content, conversationId);
+    {
+        if (!string.IsNullOrWhiteSpace(conversationId))
+            return await _connection!.InvokeAsync<SendMessageResult>("SendMessageToConversation", agentId, channelType, content, conversationId);
+        return await _connection!.InvokeAsync<SendMessageResult>("SendMessage", agentId, channelType, content);
+    }
 
     /// <summary>Steer an in-progress agent response.</summary>
     public async Task SteerAsync(string agentId, string sessionId, string content)

@@ -16,6 +16,7 @@ using BotNexus.Extensions.Channels.SignalR;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Tests.Helpers;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR;
