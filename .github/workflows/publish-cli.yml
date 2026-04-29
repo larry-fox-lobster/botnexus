@@ -1,43 +1,134 @@
-name: Publish CLI to NuGet
+name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish (e.g. 0.1.0)'
+        description: 'Version to release (e.g. 0.1.0)'
         required: true
+      prerelease:
+        description: 'Mark as pre-release?'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # full history for changelog generation
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Set version
-        id: version
+      - name: Configure git
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-          else
-            VERSION=${{ github.event.inputs.version }}
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Pack
+      - name: Bump version in Directory.Build.props
         run: |
+          VERSION="${{ github.event.inputs.version }}"
+          sed -i "s|<Version>.*</Version>|<Version>${VERSION}</Version>|" Directory.Build.props
+          sed -i "s|<InformationalVersion>.*</InformationalVersion>|<InformationalVersion>${VERSION}</InformationalVersion>|" Directory.Build.props
+          echo "Bumped version to ${VERSION}"
+          grep "<Version>" Directory.Build.props
+
+      - name: Commit version bump
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          git add Directory.Build.props
+          git diff --staged --quiet || git commit -m "chore(release): bump version to ${VERSION}"
+
+      - name: Tag release
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          git tag "v${VERSION}" -m "Release v${VERSION}"
+          git push origin HEAD:main
+          git push origin "v${VERSION}"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          PREV_TAG=$(git tag --sort=-version:refname | grep '^v' | sed -n '2p')
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag — including all commits"
+            RANGE="HEAD"
+          else
+            echo "Changelog from ${PREV_TAG} to HEAD"
+            RANGE="${PREV_TAG}..HEAD"
+          fi
+
+          # Group by conventional commit type
+          {
+            echo "## What's Changed"
+            echo ""
+
+            FEATURES=$(git log $RANGE --pretty=format:"%s" | grep -E "^feat(\(.+\))?:" | sed 's/^feat[^:]*: //')
+            FIXES=$(git log $RANGE --pretty=format:"%s" | grep -E "^fix(\(.+\))?:" | sed 's/^fix[^:]*: //')
+            IMPROVEMENTS=$(git log $RANGE --pretty=format:"%s" | grep -E "^(refactor|perf|improvement)(\(.+\))?:" | sed 's/^[^:]*: //')
+            DOCS=$(git log $RANGE --pretty=format:"%s" | grep -E "^docs(\(.+\))?:" | sed 's/^docs[^:]*: //')
+            OTHER=$(git log $RANGE --pretty=format:"%s" | grep -vE "^(feat|fix|refactor|perf|improvement|docs|chore|test|ci)(\(.+\))?:" | grep -v "^Merge")
+
+            if [ -n "$FEATURES" ]; then
+              echo "### ✨ New Features"
+              echo "$FEATURES" | while read -r line; do echo "- $line"; done
+              echo ""
+            fi
+
+            if [ -n "$FIXES" ]; then
+              echo "### 🐛 Bug Fixes"
+              echo "$FIXES" | while read -r line; do echo "- $line"; done
+              echo ""
+            fi
+
+            if [ -n "$IMPROVEMENTS" ]; then
+              echo "### 🔧 Improvements"
+              echo "$IMPROVEMENTS" | while read -r line; do echo "- $line"; done
+              echo ""
+            fi
+
+            if [ -n "$DOCS" ]; then
+              echo "### 📚 Documentation"
+              echo "$DOCS" | while read -r line; do echo "- $line"; done
+              echo ""
+            fi
+
+            echo "**Full changelog:** https://github.com/${{ github.repository }}/compare/${PREV_TAG}...v${VERSION}"
+          } > RELEASE_NOTES.md
+
+          cat RELEASE_NOTES.md
+          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
+          cat RELEASE_NOTES.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Build and pack
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
           dotnet pack src/gateway/BotNexus.Cli \
             -c Release \
             --nologo \
-            -p:Version=${{ steps.version.outputs.VERSION }} \
+            -p:Version=${VERSION} \
             -p:SourceRevisionId=${{ github.sha }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: v${{ github.event.inputs.version }}
+          body: ${{ steps.changelog.outputs.NOTES }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: src/gateway/BotNexus.Cli/bin/Release/*.nupkg
 
       - name: Push to NuGet
         run: |
