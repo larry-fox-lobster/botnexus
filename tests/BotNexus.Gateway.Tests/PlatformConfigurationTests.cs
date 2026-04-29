@@ -550,7 +550,7 @@ public sealed class PlatformConfigurationTests
     }
 
     [Fact]
-    public void AddPlatformConfiguration_WithNoSessionStoreConfigured_DefaultsToInMemory()
+    public void AddPlatformConfiguration_WithNoSessionStoreConfigured_DefaultsToSqlite()
     {
         var root = Path.Combine(Path.GetTempPath(), "botnexus-platform-config-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -567,7 +567,7 @@ public sealed class PlatformConfigurationTests
 
             using var provider = services.BuildServiceProvider();
             var sessionStore = provider.GetRequiredService<ISessionStore>();
-            sessionStore.ShouldBeOfType<InMemorySessionStore>();
+            sessionStore.ShouldBeOfType<SqliteSessionStore>();
         }
         finally
         {

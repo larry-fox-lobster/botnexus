@@ -6,7 +6,8 @@ using BotNexus.Domain.Primitives;
 using BotNexus.Gateway;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
-using BotNexus.Gateway.Abstractions.Sessions;
+using BotNexus.Gateway.Abstractions.Conversations;
+using BotNexus.Gateway.Sessions;
 using BotNexus.Gateway.Api;
 using BotNexus.Extensions.Channels.SignalR;
 using BotNexus.Gateway.Configuration;
@@ -230,6 +231,10 @@ public sealed class SessionSwitchingTests : IAsyncDisposable
                         services.Remove(descriptor);
 
                     services.AddSignalRChannelForTests();
+
+                    // Tests always use InMemory stores for isolation
+                    services.Replace(ServiceDescriptor.Singleton<ISessionStore, InMemorySessionStore>());
+                    services.Replace(ServiceDescriptor.Singleton<IConversationStore, InMemoryConversationStore>());
 
                     services.RemoveAll<IAgentConfigurationWriter>();
                     services.AddSingleton<IAgentConfigurationWriter, NoOpAgentConfigurationWriter>();

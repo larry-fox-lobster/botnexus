@@ -8,7 +8,8 @@ using BotNexus.Gateway.Abstractions.Activity;
 using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
-using BotNexus.Gateway.Abstractions.Sessions;
+using BotNexus.Gateway.Abstractions.Conversations;
+using BotNexus.Gateway.Sessions;
 using BotNexus.Gateway.Api;
 using BotNexus.Extensions.Channels.SignalR;
 using BotNexus.Gateway.Configuration;
@@ -807,6 +808,10 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
                     services.AddSingleton<IAgentConfigurationWriter, NoOpAgentConfigurationWriter>();
 
                     services.AddSignalRChannelForTests();
+
+                    // Tests always use InMemory stores for isolation
+                    services.Replace(ServiceDescriptor.Singleton<ISessionStore, InMemorySessionStore>());
+                    services.Replace(ServiceDescriptor.Singleton<IConversationStore, InMemoryConversationStore>());
 
                     configureServices?.Invoke(services);
                 });

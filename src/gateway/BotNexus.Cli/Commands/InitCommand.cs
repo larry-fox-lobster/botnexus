@@ -45,7 +45,12 @@ internal sealed class InitCommand
             Gateway = new GatewaySettingsConfig
             {
                 ListenUrl = "http://localhost:5005",
-                DefaultAgentId = "assistant"
+                DefaultAgentId = "assistant",
+                SessionStore = new SessionStoreConfig
+                {
+                    Type = "Sqlite",
+                    ConnectionString = $"Data Source={Path.Combine(homePath, "sessions.sqlite")}"
+                }
             },
             Cron = new CronConfig
             {
