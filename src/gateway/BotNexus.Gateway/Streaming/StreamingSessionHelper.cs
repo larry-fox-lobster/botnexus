@@ -46,7 +46,10 @@ public static class StreamingSessionHelper
                         Role = MessageRole.Tool,
                         Content = $"Tool '{evt.ToolName ?? "unknown"}' started.",
                         ToolName = evt.ToolName,
-                        ToolCallId = evt.ToolCallId
+                        ToolCallId = evt.ToolCallId,
+                        ToolArgs = evt.ToolArgs is { Count: > 0 }
+                            ? System.Text.Json.JsonSerializer.Serialize(evt.ToolArgs)
+                            : null
                     });
                     break;
                 case AgentStreamEventType.ToolEnd when evt.ToolCallId is not null || evt.ToolName is not null:
@@ -55,7 +58,8 @@ public static class StreamingSessionHelper
                         Role = MessageRole.Tool,
                         Content = evt.ToolResult ?? (evt.ToolIsError == true ? "Tool execution failed." : "Tool execution completed."),
                         ToolName = evt.ToolName,
-                        ToolCallId = evt.ToolCallId
+                        ToolCallId = evt.ToolCallId,
+                        ToolIsError = evt.ToolIsError == true
                     });
                     break;
                 case AgentStreamEventType.Error when options.IncludeErrorsInHistory && !string.IsNullOrWhiteSpace(evt.ErrorMessage):

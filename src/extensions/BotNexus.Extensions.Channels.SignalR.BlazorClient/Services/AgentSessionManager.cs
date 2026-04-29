@@ -669,7 +669,9 @@ public sealed class AgentSessionManager : IDisposable
                             IsToolCall = isToolCall,
                             // When restoring tool history, Content IS the result text.
                             // Set ToolResult so ChatPanel renders it correctly (not as pending hourglass).
-                            ToolResult = isToolCall ? entry.Content : null
+                            ToolResult = isToolCall ? entry.Content : null,
+                            ToolArgs = entry.ToolArgs,
+                            ToolIsError = entry.ToolIsError
                         });
                     }
                 }
