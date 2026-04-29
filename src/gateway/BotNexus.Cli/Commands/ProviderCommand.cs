@@ -32,35 +32,53 @@ internal sealed class ProviderCommand
         var command = new Command("provider", "Configure and authenticate LLM providers.");
 
         var setupCommand = new Command("setup", "Interactively add and authenticate a new provider.");
+        var setupTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
+        setupCommand.Add(setupTargetOption);
         setupCommand.SetHandler(async context =>
         {
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteSetupAsync(verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(setupTargetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteSetupAsync(configPath, home, verbose, CancellationToken.None);
         });
 
         var listCommand = new Command("list", "List configured providers.");
+        var listTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
+        listCommand.Add(listTargetOption);
         listCommand.SetHandler(async context =>
         {
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteListAsync(verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(listTargetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteListAsync(configPath, verbose, CancellationToken.None);
         });
 
         command.AddCommand(setupCommand);
         command.AddCommand(listCommand);
 
         // Default to setup when no subcommand given
+        var defaultTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
+        command.Add(defaultTargetOption);
         command.SetHandler(async context =>
         {
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteDefaultAsync(verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(defaultTargetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteDefaultAsync(configPath, home, verbose, CancellationToken.None);
         });
 
         return command;
     }
 
     internal async Task<int> ExecuteDefaultAsync(bool verbose, CancellationToken cancellationToken)
+        => await ExecuteDefaultAsync(PlatformConfigLoader.DefaultConfigPath, PlatformConfigLoader.DefaultHomePath, verbose, cancellationToken);
+
+    internal async Task<int> ExecuteDefaultAsync(string configPath, string home, bool verbose, CancellationToken cancellationToken)
     {
-        var config = await LoadOrCreateConfigAsync(cancellationToken);
+        var config = await LoadOrCreateConfigAsync(configPath, cancellationToken);
         var existingProviders = config.Providers?
             .Where(p => p.Value.Enabled)
             .Select(p => p.Key)
@@ -70,15 +88,18 @@ internal sealed class ProviderCommand
         {
             AnsiConsole.MarkupLine("[yellow]No providers configured.[/]");
             AnsiConsole.MarkupLine("Starting provider setup wizard...\n");
-            return await ExecuteSetupAsync(verbose, cancellationToken);
+            return await ExecuteSetupAsync(configPath, home, verbose, cancellationToken);
         }
 
-        return await ExecuteListAsync(verbose, cancellationToken);
+        return await ExecuteListAsync(configPath, verbose, cancellationToken);
     }
 
     internal async Task<int> ExecuteListAsync(bool verbose, CancellationToken cancellationToken)
+        => await ExecuteListAsync(PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    internal async Task<int> ExecuteListAsync(string configPath, bool verbose, CancellationToken cancellationToken)
     {
-        var config = await LoadOrCreateConfigAsync(cancellationToken);
+        var config = await LoadOrCreateConfigAsync(configPath, cancellationToken);
         if (config.Providers is null || config.Providers.Count == 0)
         {
             AnsiConsole.MarkupLine("[yellow]No providers configured.[/] Run [green]botnexus provider setup[/] to add one.");
@@ -108,13 +129,17 @@ internal sealed class ProviderCommand
     }
 
     internal async Task<int> ExecuteSetupAsync(bool verbose, CancellationToken cancellationToken)
+        => await ExecuteSetupAsync(PlatformConfigLoader.DefaultConfigPath, PlatformConfigLoader.DefaultHomePath, verbose, cancellationToken);
+
+    internal async Task<int> ExecuteSetupAsync(string configPath, string home, bool verbose, CancellationToken cancellationToken)
     {
-        var config = await LoadOrCreateConfigAsync(cancellationToken);
+        var config = await LoadOrCreateConfigAsync(configPath, cancellationToken);
 
         // Seed the wizard context with the loaded config
         var ctx = new WizardContext();
         ctx.Set("config", config);
         ctx.Set("verbose", verbose);
+        ctx.Set("home", home);
 
         var wizard = new WizardBuilder()
             .AskSelection("pick-provider", "Which provider do you want to configure?", "provider",
@@ -159,10 +184,10 @@ internal sealed class ProviderCommand
                     DefaultModel = c.TryGet<string>("defaultModel", out var model) ? model : null
                 };
 
-                await SaveConfigAsync(cfg, ct);
+                await SaveConfigAsync(cfg, configPath, ct);
 
                 AnsiConsole.MarkupLine($"[green]✓[/] Provider [green]{providerName}[/] configured successfully.");
-                AnsiConsole.MarkupLine($"  Config saved to: {PlatformConfigLoader.DefaultConfigPath}");
+                AnsiConsole.MarkupLine($"  Config saved to: {configPath}");
 
                 if (c.Get<bool>("verbose"))
                 {
@@ -187,7 +212,8 @@ internal sealed class ProviderCommand
         public async Task<StepResult> ExecuteAsync(WizardContext context, CancellationToken cancellationToken)
         {
             var providerName = context.Get<string>("provider");
-            var credentials = await RunOAuthFlowAsync(providerName, cancellationToken);
+            var homePath = context.TryGet<string>("home", out var h) ? h : PlatformConfigLoader.DefaultHomePath;
+            var credentials = await RunOAuthFlowAsync(providerName, homePath, cancellationToken);
             if (credentials is null)
                 return StepResult.Abort();
 
@@ -237,6 +263,9 @@ internal sealed class ProviderCommand
     }
 
     private static async Task<OAuthCredentials?> RunOAuthFlowAsync(string providerName, CancellationToken cancellationToken)
+        => await RunOAuthFlowAsync(providerName, PlatformConfigLoader.DefaultHomePath, cancellationToken);
+
+    private static async Task<OAuthCredentials?> RunOAuthFlowAsync(string providerName, string homePath, CancellationToken cancellationToken)
     {
         OAuthCredentials? credentials = null;
 
@@ -273,7 +302,7 @@ internal sealed class ProviderCommand
         var refreshed = await CopilotOAuth.RefreshAsync(credentials, cancellationToken);
 
         // Save to auth.json
-        SaveAuthEntry(providerName, refreshed);
+        SaveAuthEntry(providerName, refreshed, homePath);
         AnsiConsole.MarkupLine("[green]✓[/] OAuth credentials saved to auth.json\n");
 
         return refreshed;
@@ -281,7 +310,12 @@ internal sealed class ProviderCommand
 
     private static void SaveAuthEntry(string providerName, OAuthCredentials credentials)
     {
-        var authPath = Path.Combine(PlatformConfigLoader.DefaultHomePath, "auth.json");
+        SaveAuthEntry(providerName, credentials, PlatformConfigLoader.DefaultHomePath);
+    }
+
+    private static void SaveAuthEntry(string providerName, OAuthCredentials credentials, string homePath)
+    {
+        var authPath = Path.Combine(homePath, "auth.json");
         var entries = new Dictionary<string, AuthFileEntry>(StringComparer.OrdinalIgnoreCase);
 
         if (File.Exists(authPath))
@@ -315,8 +349,10 @@ internal sealed class ProviderCommand
     }
 
     private static async Task<PlatformConfig> LoadOrCreateConfigAsync(CancellationToken cancellationToken)
+        => await LoadOrCreateConfigAsync(PlatformConfigLoader.DefaultConfigPath, cancellationToken);
+
+    private static async Task<PlatformConfig> LoadOrCreateConfigAsync(string configPath, CancellationToken cancellationToken)
     {
-        var configPath = PlatformConfigLoader.DefaultConfigPath;
         if (!File.Exists(configPath))
             return new PlatformConfig();
 
@@ -331,9 +367,11 @@ internal sealed class ProviderCommand
     }
 
     private static async Task SaveConfigAsync(PlatformConfig config, CancellationToken cancellationToken)
+        => await SaveConfigAsync(config, PlatformConfigLoader.DefaultConfigPath, cancellationToken);
+
+    private static async Task SaveConfigAsync(PlatformConfig config, string configPath, CancellationToken cancellationToken)
     {
-        var configPath = PlatformConfigLoader.DefaultConfigPath;
-        PlatformConfigLoader.EnsureConfigDirectory();
+        PlatformConfigLoader.EnsureConfigDirectory(Path.GetDirectoryName(configPath) ?? PlatformConfigLoader.DefaultHomePath);
         var json = JsonSerializer.Serialize(config, WriteJsonOptions);
         await File.WriteAllTextAsync(configPath, json, cancellationToken);
     }

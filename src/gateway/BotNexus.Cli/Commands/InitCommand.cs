@@ -12,25 +12,31 @@ internal sealed class InitCommand
     public Command Build(Option<bool> verboseOption)
     {
         var forceOption = new Option<bool>("--force", "Overwrite existing config.json.");
+        var targetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
         var command = new Command("init", "Initialize ~/.botnexus with a default config and required directories.")
         {
-            forceOption
+            forceOption,
+            targetOption
         };
 
         command.SetHandler(async context =>
         {
             var force = context.ParseResult.GetValueForOption(forceOption);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteAsync(force, verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(targetOption);
+            var home = CliPaths.ResolveTarget(target);
+            context.ExitCode = await ExecuteAsync(home, force, verbose, CancellationToken.None);
         });
 
         return command;
     }
 
     public async Task<int> ExecuteAsync(bool force, bool verbose, CancellationToken cancellationToken)
+        => await ExecuteAsync(PlatformConfigLoader.DefaultHomePath, force, verbose, cancellationToken);
+
+    public async Task<int> ExecuteAsync(string homePath, bool force, bool verbose, CancellationToken cancellationToken)
     {
-        var homePath = PlatformConfigLoader.DefaultHomePath;
-        var configPath = PlatformConfigLoader.DefaultConfigPath;
+        var configPath = Path.Combine(homePath, "config.json");
         PlatformConfigLoader.EnsureConfigDirectory(homePath);
 
         if (File.Exists(configPath) && !force)
@@ -84,7 +90,7 @@ internal sealed class InitCommand
 
     private static async Task WriteConfigAsync(PlatformConfig config, string configPath, CancellationToken cancellationToken)
     {
-        PlatformConfigLoader.EnsureConfigDirectory(PlatformConfigLoader.DefaultHomePath);
+        PlatformConfigLoader.EnsureConfigDirectory(Path.GetDirectoryName(configPath) ?? PlatformConfigLoader.DefaultHomePath);
         var json = SerializeWithAgentDefaults(config);
         await File.WriteAllTextAsync(configPath, json, cancellationToken);
     }

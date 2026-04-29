@@ -17,17 +17,22 @@ internal sealed class MemoryCommands
         var command = new Command("memory", "Memory store operations.");
 
         var agentOption = new Option<string?>("--agent", "Backfill only this agent. If omitted, backfill all agents.");
+        var targetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
 
         var backfillCommand = new Command("backfill", "Index conversation turns from existing sessions into memory stores.")
         {
-            agentOption
+            agentOption,
+            targetOption
         };
 
         backfillCommand.SetHandler(async context =>
         {
             var agentId = context.ParseResult.GetValueForOption(agentOption);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteBackfillAsync(agentId, verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(targetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteBackfillAsync(agentId, configPath, verbose, CancellationToken.None);
         });
 
         command.AddCommand(backfillCommand);
@@ -35,12 +40,15 @@ internal sealed class MemoryCommands
     }
 
     private static async Task<int> ExecuteBackfillAsync(string? agentFilter, bool verbose, CancellationToken ct)
+        => await ExecuteBackfillAsync(agentFilter, PlatformConfigLoader.DefaultConfigPath, verbose, ct);
+
+    private static async Task<int> ExecuteBackfillAsync(string? agentFilter, string configPath, bool verbose, CancellationToken ct)
     {
-        var config = await LoadConfigRequiredAsync(ct);
+        var config = await LoadConfigRequiredAsync(configPath, ct);
         if (config is null)
             return 1;
 
-        var home = new BotNexusHome();
+        var home = new BotNexusHome(Path.GetDirectoryName(configPath));
         var fileSystem = new FileSystem();
 
         // Resolve session store from config
@@ -128,8 +136,10 @@ internal sealed class MemoryCommands
     }
 
     private static async Task<PlatformConfig?> LoadConfigRequiredAsync(CancellationToken cancellationToken)
+        => await LoadConfigRequiredAsync(PlatformConfigLoader.DefaultConfigPath, cancellationToken);
+
+    private static async Task<PlatformConfig?> LoadConfigRequiredAsync(string configPath, CancellationToken cancellationToken)
     {
-        var configPath = PlatformConfigLoader.DefaultConfigPath;
         if (!File.Exists(configPath))
         {
             AnsiConsole.MarkupLine($"[red]Error:[/] Config file not found at [dim]{Markup.Escape(configPath)}[/]. Run [green]botnexus init[/] first.");

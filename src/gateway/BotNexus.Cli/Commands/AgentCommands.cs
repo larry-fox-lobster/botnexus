@@ -16,10 +16,15 @@ internal sealed class AgentCommands
         var command = new Command("agent", "Manage configured agents.");
 
         var listCommand = new Command("list", "List configured agents.");
+        var listTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
+        listCommand.Add(listTargetOption);
         listCommand.SetHandler(async context =>
         {
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteListAsync(verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(listTargetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteListAsync(configPath, verbose, CancellationToken.None);
         });
 
         var idArgument = new Argument<string>("id", "Agent ID.");
@@ -27,12 +32,14 @@ internal sealed class AgentCommands
         var modelOption = new Option<string>("--model", () => "gpt-4.1", "Agent model name.");
         var enabledOption = new Option<bool>("--enabled", () => true, "Whether the agent is enabled.");
 
+        var addTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
         var addCommand = new Command("add", "Add an agent to config.json.")
         {
             idArgument,
             providerOption,
             modelOption,
-            enabledOption
+            enabledOption,
+            addTargetOption
         };
         addCommand.SetHandler(async context =>
         {
@@ -41,25 +48,40 @@ internal sealed class AgentCommands
             var model = context.ParseResult.GetValueForOption(modelOption) ?? "gpt-4.1";
             var enabled = context.ParseResult.GetValueForOption(enabledOption);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteAddAsync(id, provider, model, enabled, verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(addTargetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteAddAsync(id, provider, model, enabled, configPath, verbose, CancellationToken.None);
         });
 
+        var removeTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
         var removeCommand = new Command("remove", "Remove an agent from config.json.")
         {
-            idArgument
+            idArgument,
+            removeTargetOption
         };
         removeCommand.SetHandler(async context =>
         {
             var id = context.ParseResult.GetValueForArgument(idArgument);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteRemoveAsync(id, verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(removeTargetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteRemoveAsync(id, configPath, verbose, CancellationToken.None);
         });
 
-        var wizardCommand = new Command("wizard", "Interactively create a new agent using a step-by-step wizard.");
+        var wizardTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
+        var wizardCommand = new Command("wizard", "Interactively create a new agent using a step-by-step wizard.")
+        {
+            wizardTargetOption
+        };
         wizardCommand.SetHandler(async context =>
         {
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteWizardAsync(verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(wizardTargetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteWizardAsync(configPath, verbose, CancellationToken.None);
         });
 
         command.AddCommand(listCommand);
@@ -70,8 +92,11 @@ internal sealed class AgentCommands
     }
 
     public async Task<int> ExecuteListAsync(bool verbose, CancellationToken cancellationToken)
+        => await ExecuteListAsync(PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    public async Task<int> ExecuteListAsync(string configPath, bool verbose, CancellationToken cancellationToken)
     {
-        var config = await LoadConfigRequiredAsync(cancellationToken);
+        var config = await LoadConfigRequiredAsync(configPath, cancellationToken);
         if (config is null)
             return 1;
 
@@ -99,14 +124,17 @@ internal sealed class AgentCommands
         AnsiConsole.Write(table);
 
         if (verbose)
-            AnsiConsole.MarkupLine($"[dim]Loaded from: {Markup.Escape(PlatformConfigLoader.DefaultConfigPath)}[/]");
+            AnsiConsole.MarkupLine($"[dim]Loaded from: {Markup.Escape(configPath)}[/]");
 
         return 0;
     }
 
     public async Task<int> ExecuteWizardAsync(bool verbose, CancellationToken cancellationToken)
+        => await ExecuteWizardAsync(PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    public async Task<int> ExecuteWizardAsync(string configPath, bool verbose, CancellationToken cancellationToken)
     {
-        var config = await LoadConfigRequiredAsync(cancellationToken);
+        var config = await LoadConfigRequiredAsync(configPath, cancellationToken);
         if (config is null)
             return 1;
 
@@ -171,7 +199,7 @@ internal sealed class AgentCommands
             Enabled = enabled
         };
 
-        var saveCode = await SaveAndValidateAsync(config, verbose, cancellationToken);
+        var saveCode = await SaveAndValidateAsync(config, configPath, verbose, cancellationToken);
         if (saveCode != 0)
             return saveCode;
 
@@ -180,6 +208,9 @@ internal sealed class AgentCommands
     }
 
     public async Task<int> ExecuteAddAsync(string id, string provider, string model, bool enabled, bool verbose, CancellationToken cancellationToken)
+        => await ExecuteAddAsync(id, provider, model, enabled, PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    public async Task<int> ExecuteAddAsync(string id, string provider, string model, bool enabled, string configPath, bool verbose, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(id))
         {
@@ -187,7 +218,7 @@ internal sealed class AgentCommands
             return 1;
         }
 
-        var config = await LoadConfigRequiredAsync(cancellationToken);
+        var config = await LoadConfigRequiredAsync(configPath, cancellationToken);
         if (config is null)
             return 1;
 
@@ -205,7 +236,7 @@ internal sealed class AgentCommands
             Enabled = enabled
         };
 
-        var saveCode = await SaveAndValidateAsync(config, verbose, cancellationToken);
+        var saveCode = await SaveAndValidateAsync(config, configPath, verbose, cancellationToken);
         if (saveCode != 0)
             return saveCode;
 
@@ -214,6 +245,9 @@ internal sealed class AgentCommands
     }
 
     public async Task<int> ExecuteRemoveAsync(string id, bool verbose, CancellationToken cancellationToken)
+        => await ExecuteRemoveAsync(id, PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    public async Task<int> ExecuteRemoveAsync(string id, string configPath, bool verbose, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(id))
         {
@@ -221,7 +255,7 @@ internal sealed class AgentCommands
             return 1;
         }
 
-        var config = await LoadConfigRequiredAsync(cancellationToken);
+        var config = await LoadConfigRequiredAsync(configPath, cancellationToken);
         if (config is null)
             return 1;
 
@@ -239,7 +273,7 @@ internal sealed class AgentCommands
         }
 
         config.Agents.Remove(matchedId);
-        var saveCode = await SaveAndValidateAsync(config, verbose, cancellationToken);
+        var saveCode = await SaveAndValidateAsync(config, configPath, verbose, cancellationToken);
         if (saveCode != 0)
             return saveCode;
 
@@ -248,8 +282,10 @@ internal sealed class AgentCommands
     }
 
     private static async Task<PlatformConfig?> LoadConfigRequiredAsync(CancellationToken cancellationToken)
+        => await LoadConfigRequiredAsync(PlatformConfigLoader.DefaultConfigPath, cancellationToken);
+
+    private static async Task<PlatformConfig?> LoadConfigRequiredAsync(string configPath, CancellationToken cancellationToken)
     {
-        var configPath = PlatformConfigLoader.DefaultConfigPath;
         if (!File.Exists(configPath))
         {
             AnsiConsole.MarkupLine($"[red]Error:[/] Config file not found at [dim]{Markup.Escape(configPath)}[/]. Run [green]botnexus init[/] first.");
@@ -268,8 +304,10 @@ internal sealed class AgentCommands
     }
 
     private static async Task<int> SaveAndValidateAsync(PlatformConfig config, bool verbose, CancellationToken cancellationToken)
+        => await SaveAndValidateAsync(config, PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    private static async Task<int> SaveAndValidateAsync(PlatformConfig config, string configPath, bool verbose, CancellationToken cancellationToken)
     {
-        var configPath = PlatformConfigLoader.DefaultConfigPath;
         await WriteConfigAsync(config, configPath, cancellationToken);
 
         var reloaded = await PlatformConfigLoader.LoadAsync(configPath, cancellationToken, validateOnLoad: false);
@@ -290,7 +328,7 @@ internal sealed class AgentCommands
 
     private static async Task WriteConfigAsync(PlatformConfig config, string configPath, CancellationToken cancellationToken)
     {
-        PlatformConfigLoader.EnsureConfigDirectory(PlatformConfigLoader.DefaultHomePath);
+        PlatformConfigLoader.EnsureConfigDirectory(Path.GetDirectoryName(configPath) ?? PlatformConfigLoader.DefaultHomePath);
         await File.WriteAllTextAsync(configPath, JsonSerializer.Serialize(config, CreateWriteJsonOptions()), cancellationToken);
     }
 

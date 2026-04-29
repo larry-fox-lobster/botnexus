@@ -11,10 +11,12 @@ internal sealed class ValidateCommand
     {
         var remoteOption = new Option<bool>("--remote", "Validate using the running gateway /api/config/validate endpoint.");
         var gatewayUrlOption = new Option<string?>("--gateway-url", "Gateway base URL override for remote validation.");
+        var targetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
         var command = new Command("validate", "Validate BotNexus platform configuration.")
         {
             remoteOption,
-            gatewayUrlOption
+            gatewayUrlOption,
+            targetOption
         };
 
         command.SetHandler(async context =>
@@ -22,17 +24,22 @@ internal sealed class ValidateCommand
             var remote = context.ParseResult.GetValueForOption(remoteOption);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
             var gatewayUrlOverride = context.ParseResult.GetValueForOption(gatewayUrlOption);
+            var target = context.ParseResult.GetValueForOption(targetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
             context.ExitCode = remote
                 ? await ExecuteRemoteAsync(gatewayUrlOverride, verbose, CancellationToken.None)
-                : await ExecuteAsync(verbose, CancellationToken.None);
+                : await ExecuteAsync(configPath, verbose, CancellationToken.None);
         });
 
         return command;
     }
 
     public async Task<int> ExecuteAsync(bool verbose, CancellationToken cancellationToken)
+        => await ExecuteAsync(PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    public async Task<int> ExecuteAsync(string configPath, bool verbose, CancellationToken cancellationToken)
     {
-        var configPath = PlatformConfigLoader.DefaultConfigPath;
         AnsiConsole.MarkupLine("BotNexus config validation [dim](local)[/]");
         AnsiConsole.MarkupLine($"Config path: [dim]{Markup.Escape(configPath)}[/]");
 

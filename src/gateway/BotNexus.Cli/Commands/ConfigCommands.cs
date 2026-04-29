@@ -14,29 +14,39 @@ internal sealed class ConfigCommands(IConfigPathResolver configPathResolver)
         var command = new Command("config", "Read and update BotNexus configuration.");
 
         var keyArgument = new Argument<string>("key", "Dotted config key path (example: gateway.listenUrl).");
+        var getTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
         var getCommand = new Command("get", "Get a config value by dotted key.")
         {
-            keyArgument
+            keyArgument,
+            getTargetOption
         };
         getCommand.SetHandler(async context =>
         {
             var key = context.ParseResult.GetValueForArgument(keyArgument);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteGetAsync(key, verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(getTargetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteGetAsync(key, configPath, verbose, CancellationToken.None);
         });
 
         var valueArgument = new Argument<string>("value", "Value to set.");
+        var setTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
         var setCommand = new Command("set", "Set a config value by dotted key.")
         {
             keyArgument,
-            valueArgument
+            valueArgument,
+            setTargetOption
         };
         setCommand.SetHandler(async context =>
         {
             var key = context.ParseResult.GetValueForArgument(keyArgument);
             var value = context.ParseResult.GetValueForArgument(valueArgument);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteSetAsync(key, value, verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(setTargetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteSetAsync(key, value, configPath, verbose, CancellationToken.None);
         });
 
         var schemaOutputOption = new Option<string>("--output", () => "docs\\botnexus-config.schema.json", "Schema output path.");
@@ -58,8 +68,11 @@ internal sealed class ConfigCommands(IConfigPathResolver configPathResolver)
     }
 
     public async Task<int> ExecuteGetAsync(string keyPath, bool verbose, CancellationToken cancellationToken)
+        => await ExecuteGetAsync(keyPath, PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    public async Task<int> ExecuteGetAsync(string keyPath, string configPath, bool verbose, CancellationToken cancellationToken)
     {
-        var config = await LoadConfigRequiredAsync(cancellationToken);
+        var config = await LoadConfigRequiredAsync(configPath, cancellationToken);
         if (config is null)
             return 1;
 
@@ -77,8 +90,11 @@ internal sealed class ConfigCommands(IConfigPathResolver configPathResolver)
     }
 
     public async Task<int> ExecuteSetAsync(string keyPath, string rawValue, bool verbose, CancellationToken cancellationToken)
+        => await ExecuteSetAsync(keyPath, rawValue, PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    public async Task<int> ExecuteSetAsync(string keyPath, string rawValue, string configPath, bool verbose, CancellationToken cancellationToken)
     {
-        var config = await LoadConfigRequiredAsync(cancellationToken);
+        var config = await LoadConfigRequiredAsync(configPath, cancellationToken);
         if (config is null)
             return 1;
 
@@ -88,7 +104,7 @@ internal sealed class ConfigCommands(IConfigPathResolver configPathResolver)
             return 1;
         }
 
-        var saveCode = await SaveAndValidateAsync(config, verbose, cancellationToken);
+        var saveCode = await SaveAndValidateAsync(config, configPath, verbose, cancellationToken);
         if (saveCode != 0)
             return saveCode;
 
@@ -121,8 +137,10 @@ internal sealed class ConfigCommands(IConfigPathResolver configPathResolver)
     }
 
     private static async Task<PlatformConfig?> LoadConfigRequiredAsync(CancellationToken cancellationToken)
+        => await LoadConfigRequiredAsync(PlatformConfigLoader.DefaultConfigPath, cancellationToken);
+
+    private static async Task<PlatformConfig?> LoadConfigRequiredAsync(string configPath, CancellationToken cancellationToken)
     {
-        var configPath = PlatformConfigLoader.DefaultConfigPath;
         if (!File.Exists(configPath))
         {
             AnsiConsole.MarkupLine($"[red]Error:[/] Config file not found at [dim]{Markup.Escape(configPath)}[/]. Run [green]botnexus init[/] first.");
@@ -141,8 +159,10 @@ internal sealed class ConfigCommands(IConfigPathResolver configPathResolver)
     }
 
     private static async Task<int> SaveAndValidateAsync(PlatformConfig config, bool verbose, CancellationToken cancellationToken)
+        => await SaveAndValidateAsync(config, PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    private static async Task<int> SaveAndValidateAsync(PlatformConfig config, string configPath, bool verbose, CancellationToken cancellationToken)
     {
-        var configPath = PlatformConfigLoader.DefaultConfigPath;
         await WriteConfigAsync(config, configPath, cancellationToken);
 
         var reloaded = await PlatformConfigLoader.LoadAsync(configPath, cancellationToken, validateOnLoad: false);
@@ -163,7 +183,7 @@ internal sealed class ConfigCommands(IConfigPathResolver configPathResolver)
 
     private static async Task WriteConfigAsync(PlatformConfig config, string configPath, CancellationToken cancellationToken)
     {
-        PlatformConfigLoader.EnsureConfigDirectory(PlatformConfigLoader.DefaultHomePath);
+        PlatformConfigLoader.EnsureConfigDirectory(Path.GetDirectoryName(configPath) ?? PlatformConfigLoader.DefaultHomePath);
         await File.WriteAllTextAsync(configPath, JsonSerializer.Serialize(config, CreateWriteJsonOptions()), cancellationToken);
     }
 
