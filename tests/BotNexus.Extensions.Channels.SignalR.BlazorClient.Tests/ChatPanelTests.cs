@@ -65,7 +65,8 @@ public sealed class ChatPanelTests : IDisposable
                 .ToList();
 
             identifiers.ShouldContain("BotNexus.renderMarkdown");
-            identifiers.ShouldContainAny("chatScroll.scrollToBottom", "chatScroll.forceScrollToBottom");
+            (identifiers.Contains("chatScroll.scrollToBottom") ||
+             identifiers.Contains("chatScroll.forceScrollToBottom")).ShouldBeTrue("Expected a scroll call");
 
             var markdownIndex = identifiers.IndexOf("BotNexus.renderMarkdown");
             var scrollIndex = Math.Min(
