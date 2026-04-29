@@ -235,6 +235,23 @@
                 StateHasChanged();
             });
         }
+
+        // Ensure conversations are loaded for the active agent on the Blazor thread.
+        // This handles the race where HandleConnected fires before the component is ready,
+        // or where Task.Run in AgentSessionManager fires OnStateChanged off-thread before
+        // history has finished loading.
+        if (Manager.ApiBaseUrl is not null && Manager.ActiveAgentId is not null
+            && Manager.Sessions.TryGetValue(Manager.ActiveAgentId, out var activeState)
+            && !activeState.ConversationsLoaded && !activeState.IsLoadingConversations)
+        {
+            var agentId = Manager.ActiveAgentId;
+            _ = InvokeAsync(async () =>
+            {
+                await Manager.LoadConversationsAsync(agentId);
+                StateHasChanged();
+            });
+        }
+
         InvokeAsync(StateHasChanged);
     }
 

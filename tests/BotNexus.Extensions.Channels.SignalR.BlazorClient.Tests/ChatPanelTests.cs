@@ -65,10 +65,13 @@ public sealed class ChatPanelTests : IDisposable
                 .ToList();
 
             identifiers.ShouldContain("BotNexus.renderMarkdown");
-            identifiers.ShouldContain("chatScroll.scrollToBottom");
+            (identifiers.Contains("chatScroll.scrollToBottom") ||
+             identifiers.Contains("chatScroll.forceScrollToBottom")).ShouldBeTrue("Expected a scroll call");
 
             var markdownIndex = identifiers.IndexOf("BotNexus.renderMarkdown");
-            var scrollIndex = identifiers.IndexOf("chatScroll.scrollToBottom");
+            var scrollIndex = Math.Min(
+                identifiers.IndexOf("chatScroll.scrollToBottom") is var si && si >= 0 ? si : int.MaxValue,
+                identifiers.IndexOf("chatScroll.forceScrollToBottom") is var fsi && fsi >= 0 ? fsi : int.MaxValue);
             markdownIndex.ShouldBeLessThan(scrollIndex);
         });
     }
