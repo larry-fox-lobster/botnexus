@@ -16,10 +16,15 @@ internal sealed class LocationsCommand
         var command = new Command("locations", "Manage configured locations.");
 
         var listCommand = new Command("list", "List all registered locations.");
+        var listTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
+        listCommand.Add(listTargetOption);
         listCommand.SetHandler(async context =>
         {
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteListAsync(verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(listTargetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteListAsync(configPath, verbose, CancellationToken.None);
         });
 
         var nameArgument = new Argument<string>("name", "Location name.");
@@ -35,6 +40,7 @@ internal sealed class LocationsCommand
         var connectionStringOption = new Option<string?>("--connection-string", "Connection string for database locations.");
         var descriptionOption = new Option<string?>("--description", "Location description.");
 
+        var addTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
         var addCommand = new Command("add", "Add a location to config.json.")
         {
             nameArgument,
@@ -42,7 +48,8 @@ internal sealed class LocationsCommand
             pathOption,
             endpointOption,
             connectionStringOption,
-            descriptionOption
+            descriptionOption,
+            addTargetOption
         };
         addCommand.SetHandler(async context =>
         {
@@ -53,18 +60,23 @@ internal sealed class LocationsCommand
             var connectionString = context.ParseResult.GetValueForOption(connectionStringOption);
             var description = context.ParseResult.GetValueForOption(descriptionOption);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteAddAsync(name, type, path, endpoint, connectionString, description, verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(addTargetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteAddAsync(name, type, path, endpoint, connectionString, description, configPath, verbose, CancellationToken.None);
         });
 
         var updatePathOption = new Option<string?>("--path", "Updated path.");
         var updateEndpointOption = new Option<string?>("--endpoint", "Updated endpoint.");
         var updateDescriptionOption = new Option<string?>("--description", "Updated description.");
+        var updateTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
         var updateCommand = new Command("update", "Update an existing location.")
         {
             nameArgument,
             updatePathOption,
             updateEndpointOption,
-            updateDescriptionOption
+            updateDescriptionOption,
+            updateTargetOption
         };
         updateCommand.SetHandler(async context =>
         {
@@ -73,18 +85,26 @@ internal sealed class LocationsCommand
             var endpoint = context.ParseResult.GetValueForOption(updateEndpointOption);
             var description = context.ParseResult.GetValueForOption(updateDescriptionOption);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteUpdateAsync(name, path, endpoint, description, verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(updateTargetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteUpdateAsync(name, path, endpoint, description, configPath, verbose, CancellationToken.None);
         });
 
+        var deleteTargetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
         var deleteCommand = new Command("delete", "Delete a location from config.json.")
         {
-            nameArgument
+            nameArgument,
+            deleteTargetOption
         };
         deleteCommand.SetHandler(async context =>
         {
             var name = context.ParseResult.GetValueForArgument(nameArgument);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteDeleteAsync(name, verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(deleteTargetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteDeleteAsync(name, configPath, verbose, CancellationToken.None);
         });
 
         command.AddCommand(listCommand);
@@ -95,8 +115,11 @@ internal sealed class LocationsCommand
     }
 
     public async Task<int> ExecuteListAsync(bool verbose, CancellationToken cancellationToken)
+        => await ExecuteListAsync(PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    public async Task<int> ExecuteListAsync(string configPath, bool verbose, CancellationToken cancellationToken)
     {
-        var config = await LoadConfigRequiredAsync(cancellationToken);
+        var config = await LoadConfigRequiredAsync(configPath, cancellationToken);
         if (config is null)
             return 1;
 
@@ -138,7 +161,7 @@ internal sealed class LocationsCommand
         var autoDerivedCount = locations.Length - declaredCount;
         AnsiConsole.MarkupLine($"\n{locations.Length} locations ([green]{declaredCount} declared[/], [dim]{autoDerivedCount} auto-derived[/])");
         if (verbose)
-            AnsiConsole.MarkupLine($"[dim]Loaded from: {Markup.Escape(PlatformConfigLoader.DefaultConfigPath)}[/]");
+            AnsiConsole.MarkupLine($"[dim]Loaded from: {Markup.Escape(configPath)}[/]");
 
         return 0;
     }
@@ -152,6 +175,18 @@ internal sealed class LocationsCommand
         string? description,
         bool verbose,
         CancellationToken cancellationToken)
+        => await ExecuteAddAsync(name, type, path, endpoint, connectionString, description, PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    public async Task<int> ExecuteAddAsync(
+        string name,
+        string type,
+        string path,
+        string? endpoint,
+        string? connectionString,
+        string? description,
+        string configPath,
+        bool verbose,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -159,7 +194,7 @@ internal sealed class LocationsCommand
             return 1;
         }
 
-        var config = await LoadConfigRequiredAsync(cancellationToken);
+        var config = await LoadConfigRequiredAsync(configPath, cancellationToken);
         if (config is null)
             return 1;
 
@@ -214,7 +249,7 @@ internal sealed class LocationsCommand
         }
 
         config.Gateway.Locations[normalizedName] = locationConfig;
-        var saveCode = await SaveAndValidateAsync(config, verbose, cancellationToken);
+        var saveCode = await SaveAndValidateAsync(config, configPath, verbose, cancellationToken);
         if (saveCode != 0)
             return saveCode;
 
@@ -229,6 +264,16 @@ internal sealed class LocationsCommand
         string? description,
         bool verbose,
         CancellationToken cancellationToken)
+        => await ExecuteUpdateAsync(name, path, endpoint, description, PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    public async Task<int> ExecuteUpdateAsync(
+        string name,
+        string? path,
+        string? endpoint,
+        string? description,
+        string configPath,
+        bool verbose,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -236,7 +281,7 @@ internal sealed class LocationsCommand
             return 1;
         }
 
-        var config = await LoadConfigRequiredAsync(cancellationToken);
+        var config = await LoadConfigRequiredAsync(configPath, cancellationToken);
         if (config is null)
             return 1;
 
@@ -267,7 +312,7 @@ internal sealed class LocationsCommand
             return 1;
         }
 
-        var saveCode = await SaveAndValidateAsync(config, verbose, cancellationToken);
+        var saveCode = await SaveAndValidateAsync(config, configPath, verbose, cancellationToken);
         if (saveCode != 0)
             return saveCode;
 
@@ -276,6 +321,9 @@ internal sealed class LocationsCommand
     }
 
     public async Task<int> ExecuteDeleteAsync(string name, bool verbose, CancellationToken cancellationToken)
+        => await ExecuteDeleteAsync(name, PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    public async Task<int> ExecuteDeleteAsync(string name, string configPath, bool verbose, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -283,7 +331,7 @@ internal sealed class LocationsCommand
             return 1;
         }
 
-        var config = await LoadConfigRequiredAsync(cancellationToken);
+        var config = await LoadConfigRequiredAsync(configPath, cancellationToken);
         if (config is null)
             return 1;
 
@@ -303,7 +351,7 @@ internal sealed class LocationsCommand
         }
 
         declaredLocations.Remove(matchedName);
-        var saveCode = await SaveAndValidateAsync(config, verbose, cancellationToken);
+        var saveCode = await SaveAndValidateAsync(config, configPath, verbose, cancellationToken);
         if (saveCode != 0)
             return saveCode;
 
@@ -422,8 +470,10 @@ internal sealed class LocationsCommand
     }
 
     private static async Task<PlatformConfig?> LoadConfigRequiredAsync(CancellationToken cancellationToken)
+        => await LoadConfigRequiredAsync(PlatformConfigLoader.DefaultConfigPath, cancellationToken);
+
+    private static async Task<PlatformConfig?> LoadConfigRequiredAsync(string configPath, CancellationToken cancellationToken)
     {
-        var configPath = PlatformConfigLoader.DefaultConfigPath;
         if (!File.Exists(configPath))
         {
             AnsiConsole.MarkupLine($"[red]Error:[/] Config file not found at [dim]{Markup.Escape(configPath)}[/]. Run [green]botnexus init[/] first.");
@@ -442,8 +492,10 @@ internal sealed class LocationsCommand
     }
 
     private static async Task<int> SaveAndValidateAsync(PlatformConfig config, bool verbose, CancellationToken cancellationToken)
+        => await SaveAndValidateAsync(config, PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    private static async Task<int> SaveAndValidateAsync(PlatformConfig config, string configPath, bool verbose, CancellationToken cancellationToken)
     {
-        var configPath = PlatformConfigLoader.DefaultConfigPath;
         await WriteConfigAsync(config, configPath, cancellationToken);
 
         var reloaded = await PlatformConfigLoader.LoadAsync(configPath, cancellationToken, validateOnLoad: false);
@@ -464,7 +516,7 @@ internal sealed class LocationsCommand
 
     private static async Task WriteConfigAsync(PlatformConfig config, string configPath, CancellationToken cancellationToken)
     {
-        PlatformConfigLoader.EnsureConfigDirectory(PlatformConfigLoader.DefaultHomePath);
+        PlatformConfigLoader.EnsureConfigDirectory(Path.GetDirectoryName(configPath) ?? PlatformConfigLoader.DefaultHomePath);
         await File.WriteAllTextAsync(configPath, JsonSerializer.Serialize(config, CreateWriteJsonOptions()), cancellationToken);
     }
 

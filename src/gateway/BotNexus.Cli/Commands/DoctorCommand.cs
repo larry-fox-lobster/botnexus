@@ -11,11 +11,18 @@ internal sealed class DoctorCommand
     public Command Build(Option<bool> verboseOption)
     {
         var command = new Command("doctor", "Run CLI diagnostics.");
-        var locationsCommand = new Command("locations", "Check location accessibility.");
+        var targetOption = new Option<string?>("--target", () => null, "BotNexus home directory (config, workspace, extensions). Defaults to ~/.botnexus.");
+        var locationsCommand = new Command("locations", "Check location accessibility.")
+        {
+            targetOption
+        };
         locationsCommand.SetHandler(async context =>
         {
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            context.ExitCode = await ExecuteLocationsAsync(verbose, CancellationToken.None);
+            var target = context.ParseResult.GetValueForOption(targetOption);
+            var home = CliPaths.ResolveTarget(target);
+            var configPath = Path.Combine(home, "config.json");
+            context.ExitCode = await ExecuteLocationsAsync(configPath, verbose, CancellationToken.None);
         });
 
         command.AddCommand(locationsCommand);
@@ -23,8 +30,11 @@ internal sealed class DoctorCommand
     }
 
     public async Task<int> ExecuteLocationsAsync(bool verbose, CancellationToken cancellationToken)
+        => await ExecuteLocationsAsync(PlatformConfigLoader.DefaultConfigPath, verbose, cancellationToken);
+
+    public async Task<int> ExecuteLocationsAsync(string configPath, bool verbose, CancellationToken cancellationToken)
     {
-        var config = await LoadConfigRequiredAsync(cancellationToken);
+        var config = await LoadConfigRequiredAsync(configPath, cancellationToken);
         if (config is null)
             return 1;
 
@@ -75,7 +85,7 @@ internal sealed class DoctorCommand
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine($"Results: [green]{healthyCount} healthy[/], [yellow]{warningCount} warning[/], [red]{errorCount} error[/]");
         if (verbose)
-            AnsiConsole.MarkupLine($"[dim]Loaded from: {Markup.Escape(PlatformConfigLoader.DefaultConfigPath)}[/]");
+            AnsiConsole.MarkupLine($"[dim]Loaded from: {Markup.Escape(configPath)}[/]");
 
         return errorCount == 0 ? 0 : 1;
     }
@@ -252,9 +262,8 @@ internal sealed class DoctorCommand
         return path;
     }
 
-    private static async Task<PlatformConfig?> LoadConfigRequiredAsync(CancellationToken cancellationToken)
+    private static async Task<PlatformConfig?> LoadConfigRequiredAsync(string configPath, CancellationToken cancellationToken)
     {
-        var configPath = PlatformConfigLoader.DefaultConfigPath;
         if (!File.Exists(configPath))
         {
             AnsiConsole.MarkupLine($"[red]Error:[/] Config file not found at [dim]{Markup.Escape(configPath)}[/]. Run [green]botnexus init[/] first.");
