@@ -48,12 +48,29 @@
             <button class="config-btn" @onclick="OpenConfig" title="Agent configuration">
                 ⚙
             </button>
-            <button class="new-chat-btn" @onclick="NewChat" title="New chat (reset session)">
-                ✚
+            <button class="new-chat-btn" @onclick="ConfirmNewSession" title="Start a new session in this conversation"
+                    disabled="@State.IsStreaming">
+                ↺ New session
             </button>
         </div>
         <SessionControls State="@State" Manager="@Manager" />
     </header>
+
+    @* ── New session confirmation dialog ─────────────────────────────── *@
+    @if (_showNewSessionConfirm)
+    {
+        <div class="reset-confirm-overlay" @onclick="CancelNewSession">
+            <div class="reset-confirm-dialog" @onclick:stopPropagation="true">
+                <p>Start a new session for <strong>@State.DisplayName</strong>?</p>
+                <p class="text-muted">The current session will be sealed. History stays in this conversation.</p>
+                <div class="reset-confirm-actions">
+                    <button class="cancel-btn" @onclick="CancelNewSession">Cancel</button>
+                    <button class="confirm-btn" @onclick="DoNewSession">New session</button>
+                </div>
+            </div>
+        </div>
+    }
+
 
     @* ── Read-only banner for sub-agent sessions ──────────────────── *@
     @if (State.IsReadOnly)
@@ -451,8 +468,14 @@
             await _configPanel.Open();
     }
 
-    private async Task NewChat()
+    private bool _showNewSessionConfirm;
+
+    private void ConfirmNewSession() => _showNewSessionConfirm = true;
+    private void CancelNewSession() => _showNewSessionConfirm = false;
+
+    private async Task DoNewSession()
     {
+        _showNewSessionConfirm = false;
         await Manager.ResetSessionAsync(State.AgentId);
     }
 
