@@ -809,7 +809,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
 
                     services.AddSignalRChannelForTests();
 
-                    // Tests always use InMemory stores for isolation
+                    // Force InMemory stores in tests — prevents SQLite file creation and ensures isolation
                     services.Replace(ServiceDescriptor.Singleton<ISessionStore, InMemorySessionStore>());
                     services.Replace(ServiceDescriptor.Singleton<IConversationStore, InMemoryConversationStore>());
 

@@ -8,6 +8,7 @@ using AgentId = BotNexus.Domain.Primitives.AgentId;
 using ChannelKey = BotNexus.Domain.Primitives.ChannelKey;
 using ParticipantType = BotNexus.Domain.Primitives.ParticipantType;
 using SessionId = BotNexus.Domain.Primitives.SessionId;
+using ConversationId = BotNexus.Domain.Primitives.ConversationId;
 using SessionParticipant = BotNexus.Domain.Primitives.SessionParticipant;
 using SessionType = BotNexus.Domain.Primitives.SessionType;
 using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
@@ -166,14 +167,17 @@ public sealed class GatewayHub : Hub<IGatewayHubClient>
     /// <param name="agentId">The agent id.</param>
     /// <param name="channelType">The channel type.</param>
     /// <param name="content">The content.</param>
+    /// <param name="conversationId">Optional explicit conversation ID. When supplied, routes into that conversation rather than resolving by channel binding.</param>
     /// <returns>The send message result.</returns>
-    public async Task<SendMessageResult> SendMessage(AgentId agentId, ChannelKey channelType, string content)
+    public async Task<SendMessageResult> SendMessage(AgentId agentId, ChannelKey channelType, string content, string? conversationId = null)
     {
         var typedAgentId = NormalizeAgentId(agentId);
         var typedChannelType = NormalizeChannelKey(channelType);
         ArgumentException.ThrowIfNullOrWhiteSpace(content);
 
-        var session = await ResolveOrCreateSessionAsync(typedAgentId, typedChannelType);
+        var session = string.IsNullOrWhiteSpace(conversationId)
+            ? await ResolveOrCreateSessionAsync(typedAgentId, typedChannelType)
+            : await ResolveOrCreateSessionByConversationAsync(typedAgentId, typedChannelType, conversationId);
         await SubscribeInternalAsync(session.SessionId);
 
         var connectionId = Context.ConnectionId;
@@ -529,6 +533,49 @@ public sealed class GatewayHub : Hub<IGatewayHubClient>
             Context.ConnectionId,
             GetSessionGroup(sessionId),
             Context.ConnectionAborted);
+    }
+
+    private async Task<GatewaySession> ResolveOrCreateSessionByConversationAsync(AgentId agentId, ChannelKey channelType, string conversationId)
+    {
+        var routingResult = await _conversationRouter.ResolveInboundByConversationAsync(
+            ConversationId.From(conversationId),
+            agentId,
+            channelType,
+            Context.ConnectionId,
+            Context.ConnectionAborted);
+
+        var session = await _sessions.GetOrCreateAsync(routingResult.SessionId, agentId, Context.ConnectionAborted);
+
+        var needsSave = false;
+        if (session.Status == SessionStatus.Expired)
+        {
+            session.Status = SessionStatus.Active;
+            session.ExpiresAt = null;
+            needsSave = true;
+        }
+
+        if (!session.ChannelType.HasValue || !ChannelMatches(session.ChannelType.Value, channelType))
+        {
+            session.ChannelType = channelType;
+            needsSave = true;
+        }
+
+        if (!session.SessionType.Equals(SessionType.UserAgent))
+        {
+            session.SessionType = SessionType.UserAgent;
+            needsSave = true;
+        }
+
+        if (session.Participants.Count == 0)
+        {
+            session.Participants.Add(new SessionParticipant { Type = ParticipantType.User, Id = Context.ConnectionId });
+            needsSave = true;
+        }
+
+        if (needsSave)
+            await _sessions.SaveAsync(session, Context.ConnectionAborted);
+
+        return session;
     }
 
     private async Task<GatewaySession> ResolveOrCreateSessionAsync(AgentId agentId, ChannelKey channelType)

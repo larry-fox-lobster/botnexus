@@ -125,7 +125,7 @@ public sealed class AgentSessionManager : IDisposable
 
         try
         {
-            var result = await _hub.SendMessageAsync(agentId, state.ChannelType ?? "signalr", content);
+            var result = await _hub.SendMessageAsync(agentId, state.ChannelType ?? "signalr", content, state.ActiveConversationId);
             RegisterSession(agentId, result.SessionId, result.ChannelType);
 
             // Refresh conversation list so the server-assigned ActiveSessionId is picked up.

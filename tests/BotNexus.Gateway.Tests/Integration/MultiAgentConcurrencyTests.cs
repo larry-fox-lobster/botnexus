@@ -6,6 +6,9 @@ using BotNexus.Agent.Core.Types;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway;
 using BotNexus.Gateway.Abstractions.Agents;
+using BotNexus.Gateway.Abstractions.Conversations;
+using BotNexus.Gateway.Abstractions.Sessions;
+using BotNexus.Gateway.Sessions;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Api;
@@ -488,6 +491,9 @@ public sealed class MultiAgentConcurrencyTests : IAsyncDisposable
                         services.Remove(descriptor);
 
                     services.AddSignalRChannelForTests();
+
+                    services.Replace(ServiceDescriptor.Singleton<ISessionStore, InMemorySessionStore>());
+                    services.Replace(ServiceDescriptor.Singleton<IConversationStore, InMemoryConversationStore>());
 
                     services.RemoveAll<IAgentConfigurationWriter>();
                     services.AddSingleton<IAgentConfigurationWriter, NoOpAgentConfigurationWriter>();

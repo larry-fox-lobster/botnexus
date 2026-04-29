@@ -19,7 +19,7 @@ internal static class ToolCallTestExtensions
         bool isError = false,
         TimeSpan? duration = null)
     {
-        state.Messages.Add(new ChatMessage("Tool", $"✅ {toolName} completed", DateTimeOffset.UtcNow)
+        EnsureConversationStore(state).Add(new ChatMessage("Tool", $"✅ {toolName} completed", DateTimeOffset.UtcNow)
         {
             ToolName = toolName,
             ToolCallId = Guid.NewGuid().ToString("N"),
@@ -40,7 +40,7 @@ internal static class ToolCallTestExtensions
         this AgentSessionState state,
         string toolName = "run_query")
     {
-        state.Messages.Add(new ChatMessage("Tool", $"⏳ Calling {toolName}…", DateTimeOffset.UtcNow)
+        EnsureConversationStore(state).Add(new ChatMessage("Tool", $"⏳ Calling {toolName}…", DateTimeOffset.UtcNow)
         {
             ToolName = toolName,
             ToolCallId = Guid.NewGuid().ToString("N"),
@@ -48,5 +48,19 @@ internal static class ToolCallTestExtensions
         });
 
         return state;
+    }
+
+    private static List<ChatMessage> EnsureConversationStore(AgentSessionState state)
+    {
+        if (state.ActiveConversationId is null)
+        {
+            state.ActiveConversationId = "test-conv-1";
+        }
+        if (!state.ConversationMessageStores.TryGetValue(state.ActiveConversationId, out var msgs))
+        {
+            msgs = new List<ChatMessage>();
+            state.ConversationMessageStores[state.ActiveConversationId] = msgs;
+        }
+        return msgs;
     }
 }
