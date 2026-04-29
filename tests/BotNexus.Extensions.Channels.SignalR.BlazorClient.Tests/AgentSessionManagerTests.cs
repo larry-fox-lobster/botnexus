@@ -229,7 +229,10 @@ public sealed class AgentSessionManagerHistoryMappingTests : IDisposable
         _handler = new FakeHttpHandler();
         var http = new HttpClient(_handler) { BaseAddress = new Uri("http://test") };
         var hub = new GatewayHubConnection();
-        _manager = new AgentSessionManager(hub, http);
+        var js = NSubstitute.Substitute.For<Microsoft.JSInterop.IJSRuntime>();
+        var historyCache = new ConversationHistoryCache(js);
+        var featureFlags = new FeatureFlagsService(js);
+        _manager = new AgentSessionManager(hub, http, historyCache, featureFlags);
         // Set _apiBaseUrl via reflection since InitializeAsync would require a real hub
         var field = typeof(AgentSessionManager).GetField("_apiBaseUrl", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
         field.SetValue(_manager, "http://test/api/");

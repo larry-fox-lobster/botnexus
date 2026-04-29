@@ -13,5 +13,6 @@ builder.Services.AddScoped<AgentSessionManager>();
 builder.Services.AddScoped<PlatformConfigService>();
 builder.Services.AddScoped<GatewayInfoService>();
 builder.Services.AddScoped<FeatureFlagsService>();
+builder.Services.AddScoped<ConversationHistoryCache>();
 
 await builder.Build().RunAsync();

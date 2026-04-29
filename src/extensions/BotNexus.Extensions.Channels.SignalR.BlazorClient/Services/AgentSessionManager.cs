@@ -14,6 +14,8 @@ public sealed class AgentSessionManager : IDisposable
 
     private readonly GatewayHubConnection _hub;
     private readonly HttpClient _http;
+    private readonly ConversationHistoryCache _historyCache;
+    private readonly FeatureFlagsService _featureFlags;
     private readonly Dictionary<string, AgentSessionState> _sessions = new();
     private readonly Dictionary<string, string> _sessionToAgent = new(); // sessionId → agentId
     private readonly HashSet<string> _streamingWhenDisconnected = new();
@@ -35,10 +37,13 @@ public sealed class AgentSessionManager : IDisposable
     /// <summary>The base URL for REST API calls.</summary>
     public string? ApiBaseUrl => _apiBaseUrl;
 
-    public AgentSessionManager(GatewayHubConnection hub, HttpClient http)
+    public AgentSessionManager(GatewayHubConnection hub, HttpClient http,
+        ConversationHistoryCache historyCache, FeatureFlagsService featureFlags)
     {
         _hub = hub;
         _http = http;
+        _historyCache = historyCache;
+        _featureFlags = featureFlags;
         _hub.OnConnected += HandleConnected;
         _hub.OnMessageStart += HandleMessageStart;
         _hub.OnContentDelta += HandleContentDelta;
@@ -649,6 +654,25 @@ public sealed class AgentSessionManager : IDisposable
             return;
         }
 
+        // --- CACHE PATH (feature-flagged) ---
+        if (_featureFlags.ConversationHistoryCache)
+        {
+            var cached = await _historyCache.GetAsync(conversationId);
+            if (cached is not null && cached.Messages.Count > 0)
+            {
+                // Render from cache immediately
+                foreach (var msg in cached.Messages)
+                    messages.Add(msg);
+
+                state.ConversationHistoryLoaded.Add(conversationId);
+                conv.IsLoadingHistory = false;
+                OnStateChanged?.Invoke();
+
+                // Fall through — server fetch still runs to refresh cache
+            }
+        }
+        // --- END CACHE PATH ---
+
         conv.IsLoadingHistory = true;
         OnStateChanged?.Invoke();
 
@@ -694,7 +718,9 @@ public sealed class AgentSessionManager : IDisposable
 
             state.ConversationHistoryLoaded.Add(conversationId);
 
-            // Sync SessionId from the conversation after loading
+            // Update cache after successful server fetch
+            if (_featureFlags.ConversationHistoryCache && messages.Count > 0)
+                await _historyCache.SetAsync(conversationId, messages.ToList());
             if (state.ActiveConversationId == conversationId && conv.ActiveSessionId is not null)
                 state.SessionId = conv.ActiveSessionId;
         }
@@ -1056,6 +1082,8 @@ public sealed class AgentSessionManager : IDisposable
                 state.ConversationMessageStores.TryGetValue(state.ActiveConversationId, out var store);
                 store?.Clear();
                 state.ConversationHistoryLoaded.Remove(state.ActiveConversationId);
+                if (_featureFlags.ConversationHistoryCache)
+                    _ = _historyCache.InvalidateAsync(state.ActiveConversationId);
                 GetOrCreateMessageStore(state, state.ActiveConversationId)
                     .Add(new ChatMessage("System", "Session reset. Start a new conversation.", DateTimeOffset.UtcNow));
             }

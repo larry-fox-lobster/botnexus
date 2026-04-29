@@ -18,7 +18,10 @@ internal static class TestSessionFactory
     {
         var hub = new GatewayHubConnection();
         var http = new HttpClient { BaseAddress = new Uri("http://localhost") };
-        return new AgentSessionManager(hub, http);
+        var js = Substitute.For<Microsoft.JSInterop.IJSRuntime>();
+        var historyCache = new ConversationHistoryCache(js);
+        var featureFlags = new FeatureFlagsService(js);
+        return new AgentSessionManager(hub, http, historyCache, featureFlags);
     }
 
     /// <summary>
