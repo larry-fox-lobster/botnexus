@@ -1,11 +1,15 @@
 using System.Text.Json.Nodes;
 using BotNexus.Extensions.Channels.SignalR.BlazorClient.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Routing;
 
 namespace BotNexus.Extensions.Channels.SignalR.BlazorClient.Pages;
 
 public partial class Configuration : IDisposable
 {
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    private string? _activeSection;
     private JsonObject? _config;
     private bool _loading = true;
     private bool _saving;
@@ -17,7 +21,21 @@ public partial class Configuration : IDisposable
 
     protected override async Task OnInitializedAsync()
     {
+        Nav.LocationChanged += OnLocationChanged;
+        _activeSection = GetFragment(Nav.Uri);
         await LoadConfig();
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _activeSection = GetFragment(e.Location);
+        StateHasChanged();
+    }
+
+    private static string? GetFragment(string uri)
+    {
+        var idx = uri.IndexOf('#');
+        return idx >= 0 ? uri[(idx + 1)..] : null;
     }
 
     private async Task LoadConfig()
@@ -499,6 +517,7 @@ public partial class Configuration : IDisposable
 
     public void Dispose()
     {
+        Nav.LocationChanged -= OnLocationChanged;
         _statusTimer?.Stop();
         _statusTimer?.Dispose();
     }

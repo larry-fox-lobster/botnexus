@@ -24,11 +24,29 @@
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public bool StartExpanded { get; set; }
 
+    /// <summary>
+    /// When set by the parent (e.g. from a URL fragment), overrides the internal
+    /// collapsed state. Null means the section manages its own state.
+    /// </summary>
+    [Parameter] public bool? IsExpanded { get; set; }
+
     private bool _collapsed;
+    private bool? _lastIsExpanded;
 
     protected override void OnInitialized()
     {
         _collapsed = !StartExpanded;
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Only override collapsed state when IsExpanded actually changes
+        // so user toggles within a session still work.
+        if (IsExpanded.HasValue && IsExpanded != _lastIsExpanded)
+        {
+            _collapsed = !IsExpanded.Value;
+            _lastIsExpanded = IsExpanded;
+        }
     }
 
     private void Toggle() => _collapsed = !_collapsed;
