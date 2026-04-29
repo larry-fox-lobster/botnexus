@@ -51,10 +51,15 @@ internal static class TestSessionFactory
         params (string Role, string Content)[] messages)
     {
         var state = CreateAgentState(agentId, displayName, isConnected: isConnected);
+
+        // Set up a default conversation so Messages computed property returns the right store
+        const string testConvId = "test-conv-1";
+        state.ActiveConversationId = testConvId;
+        var store = new System.Collections.Generic.List<ChatMessage>();
+        state.ConversationMessageStores[testConvId] = store;
+
         foreach (var (role, content) in messages)
-        {
-            state.Messages.Add(new ChatMessage(role, content, DateTimeOffset.UtcNow));
-        }
+            store.Add(new ChatMessage(role, content, DateTimeOffset.UtcNow));
 
         return state;
     }

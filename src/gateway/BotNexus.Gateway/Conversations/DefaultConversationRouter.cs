@@ -126,6 +126,72 @@ public sealed class DefaultConversationRouter : IConversationRouter
     }
 
     /// <inheritdoc />
+    public async Task<ConversationRoutingResult> ResolveInboundByConversationAsync(
+        ConversationId conversationId,
+        AgentId agentId,
+        ChannelKey channelType,
+        string channelAddress,
+        CancellationToken ct = default)
+    {
+        var conversation = await _conversationStore.GetAsync(conversationId, ct);
+        if (conversation is null)
+        {
+            _logger.LogWarning(
+                "ResolveInboundByConversation: conversation {ConversationId} not found — falling back to default routing",
+                conversationId);
+            return await ResolveInboundAsync(agentId, channelType, channelAddress, null, ct);
+        }
+
+        // Resolve or create session for this conversation
+        var isNewSession = false;
+        SessionId sessionId;
+
+        if (conversation.ActiveSessionId.HasValue)
+        {
+            var existingSession = await _sessionStore.GetAsync(conversation.ActiveSessionId.Value, ct);
+            if (existingSession is { Status: not SessionStatus.Sealed and not SessionStatus.Expired })
+            {
+                sessionId = conversation.ActiveSessionId.Value;
+            }
+            else
+            {
+                sessionId = SessionId.Create();
+                isNewSession = true;
+                conversation.ActiveSessionId = null;
+            }
+        }
+        else
+        {
+            sessionId = SessionId.Create();
+            isNewSession = true;
+        }
+
+        var session = await _sessionStore.GetOrCreateAsync(sessionId, agentId, ct);
+        sessionId = session.SessionId;
+
+        var changed = false;
+        if (session.Session.ConversationId is null || session.Session.ConversationId != conversation.ConversationId)
+        {
+            session.Session.ConversationId = conversation.ConversationId;
+            await _sessionStore.SaveAsync(session, ct);
+        }
+
+        if (conversation.ActiveSessionId is null || conversation.ActiveSessionId != sessionId)
+        {
+            conversation.ActiveSessionId = sessionId;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            conversation.UpdatedAt = DateTimeOffset.UtcNow;
+            await _conversationStore.SaveAsync(conversation, ct);
+        }
+
+        return new ConversationRoutingResult(conversation, sessionId, isNewSession);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<ChannelBinding>> GetOutboundBindingsAsync(
         SessionId sessionId,
         string originatingChannelAddress,

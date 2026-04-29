@@ -8,10 +8,23 @@
                 @if (State.ActiveConversationId is not null)
                 {
                     <div class="conversation-title-row">
-                        <span class="conversation-title">@State.ActiveConversationTitle</span>
-                        @if (State.Conversations.TryGetValue(State.ActiveConversationId, out var activeConversation) && activeConversation.IsDefault)
+                        @if (_editingTitle)
                         {
-                            <span class="conversation-default-badge">Default</span>
+                            <input class="conversation-title-input"
+                                   @bind="_titleDraft"
+                                   @bind:event="oninput"
+                                   @onblur="SaveTitle"
+                                   @onkeydown="TitleKeyDown"
+                                   @ref="_titleInput"
+                                   maxlength="200" />
+                        }
+                        else
+                        {
+                            <span class="conversation-title editable" @onclick="StartEditTitle" title="Click to rename">@State.ActiveConversationTitle</span>
+                            @if (State.Conversations.TryGetValue(State.ActiveConversationId, out var activeConversation) && activeConversation.IsDefault)
+                            {
+                                <span class="conversation-default-badge">Default</span>
+                            }
                         }
                     </div>
                 }
@@ -258,8 +271,48 @@
     private string _inputText = "";
     private ElementReference _messagesContainer;
     private ElementReference _inputElement;
+    private ElementReference _titleInput;
     private bool _enterPreventionBound;
     private AgentConfigPanel? _configPanel;
+
+    // ── Inline title editing ──────────────────────────────────────────────
+
+    private bool _editingTitle;
+    private string _titleDraft = "";
+
+    private void StartEditTitle()
+    {
+        _titleDraft = State.ActiveConversationTitle ?? "";
+        _editingTitle = true;
+        _ = InvokeAsync(async () =>
+        {
+            StateHasChanged();
+            await Task.Delay(50);
+            try { await JS.InvokeVoidAsync("eval", "document.querySelector('.conversation-title-input')?.focus()"); }
+            catch { /* JS interop may fail during disposal */ }
+        });
+    }
+
+    private async Task SaveTitle()
+    {
+        _editingTitle = false;
+        var draft = _titleDraft.Trim();
+        if (!string.IsNullOrWhiteSpace(draft) && draft != State.ActiveConversationTitle)
+            await Manager.RenameConversationAsync(State.AgentId, State.ActiveConversationId, draft);
+        else
+            StateHasChanged();
+    }
+
+    private async Task TitleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SaveTitle();
+        else if (e.Key == "Escape")
+        {
+            _editingTitle = false;
+            StateHasChanged();
+        }
+    }
 
     // ── Markdown rendering cache ──────────────────────────────────────────
 

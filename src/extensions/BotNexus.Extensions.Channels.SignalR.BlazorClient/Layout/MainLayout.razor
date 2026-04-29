@@ -4,6 +4,7 @@
 @inject GatewayInfoService GatewayInfo
 @inject IJSRuntime JS
 @implements IDisposable
+@implements IAsyncDisposable
 
 <div class="app-shell">
     @* Top bar with burger + logo *@
@@ -77,7 +78,7 @@
                             <div class="agent-conversation-list-header">
                                 <span class="agent-conversation-list-title">Conversations</span>
                                 <button class="conversation-new-btn"
-                                        @onclick="() => CreateConversationAndClose(activeState.AgentId)"
+                                        @onclick="() => CreateConversationAsync(activeState.AgentId)"
                                         title="Start a new conversation">
                                     <span class="conversation-new-btn-icon">+</span>
                                     <span class="conversation-new-btn-label">New</span>
@@ -99,7 +100,7 @@
                                     .ThenByDescending(c => c.UpdatedAt))
                                 {
                                     <button class="conversation-list-item @(conversation.ConversationId == activeState.ActiveConversationId ? "active" : "")"
-                                            @onclick="() => SelectConversationAndClose(activeState.AgentId, conversation.ConversationId)">
+                                            @onclick="() => SelectConversationAsync(activeState.AgentId, conversation.ConversationId)">
                                         <span class="conversation-list-item-main">
                                             <span class="conversation-list-item-title">@conversation.Title</span>
 
@@ -129,7 +130,7 @@
                                 .Where(s => s.Status is "Running" or "Completed"))
                             {
                                 <div class="agent-session-item @(IsSubAgentActive(sub) ? "active" : "")"
-                                     @onclick="() => ViewSubAgentAndClose(sub)"
+                                     @onclick="() => ViewSubAgentAsync(sub)"
                                      style="cursor: pointer;"
                                      title="@sub.Task">
                                     <span>@SubAgentIcon(sub.Status)</span>
@@ -195,11 +196,13 @@
     private List<Announcement> _announcements = [];
     private bool _restarting;
     private bool _sidebarOpen = false;
+    private bool _isMobile = false;
     private const string SidebarKey = "botnexus-sidebar-open";
 
     protected override void OnInitialized()
     {
         Manager.OnStateChanged += HandleStateChanged;
+        Nav.LocationChanged += OnLocationChanged;
     }
 
     protected override async Task OnInitializedAsync()
@@ -214,6 +217,7 @@
         {
             var stored = await JS.InvokeAsync<string?>("localStorage.getItem", SidebarKey);
             _sidebarOpen = stored == "true";
+            _isMobile = await JS.InvokeAsync<bool>("chatScroll.isMobileView");
             StateHasChanged();
         }
     }
@@ -240,12 +244,31 @@
         await JS.InvokeVoidAsync("localStorage.setItem", SidebarKey, _sidebarOpen ? "true" : "false");
     }
 
-    private void CloseSidebar() => _sidebarOpen = false;
+    private void CloseSidebar()
+    {
+        if (_isMobile)
+            _sidebarOpen = false;
+    }
 
     private void OnNavClick()
     {
-        // Close sidebar after navigation on mobile
-        _sidebarOpen = false;
+        // Close sidebar after navigation on mobile only
+        if (_isMobile)
+            _sidebarOpen = false;
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        // When navigating back to chat from configuration/agents, refresh agent list
+        var relative = Nav.ToBaseRelativePath(e.Location).TrimEnd('/');
+        if (relative == "")
+        {
+            _ = InvokeAsync(async () =>
+            {
+                await Manager.RefreshAgentsAsync();
+                StateHasChanged();
+            });
+        }
     }
 
     private string NavClass(string page)
@@ -264,7 +287,11 @@
     {
         var agentId = e.Value?.ToString();
         if (!string.IsNullOrEmpty(agentId))
+        {
             await Manager.SetActiveAgentAsync(agentId);
+            if (_isMobile)
+                _sidebarOpen = false;
+        }
     }
 
     private static string SubAgentIcon(string status) => status switch
@@ -274,10 +301,11 @@
         _           => "🤖"
     };
 
-    private async Task ViewSubAgentAndClose(SubAgentInfo sub)
+    private async Task ViewSubAgentAsync(SubAgentInfo sub)
     {
         await Manager.ViewSubAgentAsync(sub);
-        _sidebarOpen = false;
+        if (_isMobile)
+            _sidebarOpen = false;
     }
 
     private bool IsSubAgentActive(SubAgentInfo sub)
@@ -285,16 +313,18 @@
         return Manager.ActiveAgentId == sub.SubAgentId;
     }
 
-    private async Task SelectConversationAndClose(string agentId, string conversationId)
+    private async Task SelectConversationAsync(string agentId, string conversationId)
     {
         await Manager.SelectConversationAsync(agentId, conversationId);
-        _sidebarOpen = false;
+        if (_isMobile)
+            _sidebarOpen = false;
     }
 
-    private async Task CreateConversationAndClose(string agentId)
+    private async Task CreateConversationAsync(string agentId)
     {
         await Manager.CreateConversationAsync(agentId);
-        _sidebarOpen = false;
+        if (_isMobile)
+            _sidebarOpen = false;
     }
 
     private static string FormatConversationTimestamp(DateTimeOffset ts)
@@ -338,5 +368,8 @@
     public void Dispose()
     {
         Manager.OnStateChanged -= HandleStateChanged;
+        Nav.LocationChanged -= OnLocationChanged;
     }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

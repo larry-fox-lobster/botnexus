@@ -23,6 +23,18 @@ public interface IConversationRouter
         CancellationToken ct = default);
 
     /// <summary>
+    /// Resolves the conversation and session for an inbound message using an explicit conversation ID.
+    /// Use this when the client specifies which conversation a message belongs to (e.g. portal multi-conversation).
+    /// Creates a new session for the conversation if it has none active.
+    /// </summary>
+    Task<ConversationRoutingResult> ResolveInboundByConversationAsync(
+        ConversationId conversationId,
+        AgentId agentId,
+        ChannelKey channelType,
+        string channelAddress,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Returns channel bindings that should receive outbound fan-out for a session.
     /// Excludes the originating binding from fan-out to prevent echo.
     /// Only returns bindings with BindingMode.Interactive or BindingMode.NotifyOnly.

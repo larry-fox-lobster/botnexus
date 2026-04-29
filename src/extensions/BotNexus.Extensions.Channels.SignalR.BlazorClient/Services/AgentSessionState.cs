@@ -27,8 +27,24 @@ public sealed class AgentSessionState
     /// </summary>
     public bool IsReadOnly => SessionType == "agent-subagent";
 
-    /// <summary>All messages in this session, in chronological order.</summary>
-    public List<ChatMessage> Messages { get; } = [];
+    // ── Per-conversation message stores ──────────────────────────────────────
+
+    /// <summary>Per-conversation message stores, keyed by conversation ID.
+    /// SignalR events are always routed here — messages are never discarded on conversation switch.</summary>
+    public Dictionary<string, List<ChatMessage>> ConversationMessageStores { get; } = new();
+
+    /// <summary>Set of conversation IDs whose history has been loaded from REST.
+    /// Once in this set, we never re-fetch — streaming messages already buffered are preserved.</summary>
+    public HashSet<string> ConversationHistoryLoaded { get; } = new();
+
+    /// <summary>Messages for the currently active conversation (computed).
+    /// Read-only view — append via <see cref="ConversationMessageStores"/> directly.</summary>
+    public List<ChatMessage> Messages =>
+        ActiveConversationId is not null && ConversationMessageStores.TryGetValue(ActiveConversationId, out var msgs)
+            ? msgs
+            : _emptyMessages;
+
+    private static readonly List<ChatMessage> _emptyMessages = [];
 
     /// <summary>Whether the agent is currently streaming a response.</summary>
     public bool IsStreaming { get; set; }

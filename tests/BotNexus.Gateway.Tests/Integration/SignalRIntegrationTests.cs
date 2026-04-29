@@ -9,12 +9,14 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Channels;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Conversations;
+using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Gateway.Sessions;
 using BotNexus.Gateway.Api;
 using BotNexus.Extensions.Channels.SignalR;
 using BotNexus.Gateway.Configuration;
 using BotNexus.Gateway.Tests.Helpers;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR;
@@ -809,7 +811,7 @@ public sealed class SignalRIntegrationTests : IAsyncDisposable
 
                     services.AddSignalRChannelForTests();
 
-                    // Tests always use InMemory stores for isolation
+                    // Force InMemory stores in tests — prevents SQLite file creation and ensures isolation
                     services.Replace(ServiceDescriptor.Singleton<ISessionStore, InMemorySessionStore>());
                     services.Replace(ServiceDescriptor.Singleton<IConversationStore, InMemoryConversationStore>());
 

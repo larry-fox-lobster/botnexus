@@ -19,6 +19,9 @@ public sealed record CreateConversationRequestDto(
     [property: JsonPropertyName("agentId")] string AgentId,
     [property: JsonPropertyName("title")] string? Title);
 
+public sealed record PatchConversationRequestDto(
+    [property: JsonPropertyName("title")] string Title);
+
 public sealed record ConversationResponseDto(
     [property: JsonPropertyName("conversationId")] string ConversationId,
     [property: JsonPropertyName("agentId")] string AgentId,
