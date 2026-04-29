@@ -264,7 +264,9 @@ public sealed class SqliteSessionStore : SessionStoreBase
                  {
                      ("tool_name", "TEXT"),
                      ("tool_call_id", "TEXT"),
-                     ("is_compaction_summary", "INTEGER NOT NULL DEFAULT 0")
+                     ("is_compaction_summary", "INTEGER NOT NULL DEFAULT 0"),
+                     ("tool_args", "TEXT"),
+                     ("tool_is_error", "INTEGER NOT NULL DEFAULT 0")
                  })
         {
             try
@@ -352,7 +354,7 @@ public sealed class SqliteSessionStore : SessionStoreBase
 
         await using var historyCommand = connection.CreateCommand();
         historyCommand.CommandText = """
-            SELECT role, content, timestamp, tool_name, tool_call_id, is_compaction_summary
+            SELECT role, content, timestamp, tool_name, tool_call_id, is_compaction_summary, tool_args, tool_is_error
             FROM session_history
             WHERE session_id = $sessionId
             ORDER BY id ASC
@@ -370,7 +372,9 @@ public sealed class SqliteSessionStore : SessionStoreBase
                 Timestamp = ParseTimestamp(historyReader.IsDBNull(2) ? null : historyReader.GetString(2)),
                 ToolName = historyReader.IsDBNull(3) ? null : historyReader.GetString(3),
                 ToolCallId = historyReader.IsDBNull(4) ? null : historyReader.GetString(4),
-                IsCompactionSummary = !historyReader.IsDBNull(5) && historyReader.GetInt64(5) != 0
+                IsCompactionSummary = !historyReader.IsDBNull(5) && historyReader.GetInt64(5) != 0,
+                ToolArgs = historyReader.FieldCount > 6 && !historyReader.IsDBNull(6) ? historyReader.GetString(6) : null,
+                ToolIsError = historyReader.FieldCount > 7 && !historyReader.IsDBNull(7) && historyReader.GetInt64(7) != 0
             });
         }
 
@@ -431,8 +435,8 @@ public sealed class SqliteSessionStore : SessionStoreBase
             await using var insertCommand = connection.CreateCommand();
             insertCommand.Transaction = transaction;
             insertCommand.CommandText = """
-                INSERT INTO session_history (session_id, role, content, timestamp, tool_name, tool_call_id, is_compaction_summary)
-                VALUES ($sessionId, $role, $content, $timestamp, $toolName, $toolCallId, $isCompactionSummary)
+                INSERT INTO session_history (session_id, role, content, timestamp, tool_name, tool_call_id, is_compaction_summary, tool_args, tool_is_error)
+                VALUES ($sessionId, $role, $content, $timestamp, $toolName, $toolCallId, $isCompactionSummary, $toolArgs, $toolIsError)
                 """;
             insertCommand.Parameters.AddWithValue("$sessionId", session.SessionId.Value);
             insertCommand.Parameters.AddWithValue("$role", entry.Role.Value);
@@ -441,6 +445,8 @@ public sealed class SqliteSessionStore : SessionStoreBase
             insertCommand.Parameters.AddWithValue("$toolName", (object?)entry.ToolName ?? DBNull.Value);
             insertCommand.Parameters.AddWithValue("$toolCallId", (object?)entry.ToolCallId ?? DBNull.Value);
             insertCommand.Parameters.AddWithValue("$isCompactionSummary", entry.IsCompactionSummary ? 1 : 0);
+            insertCommand.Parameters.AddWithValue("$toolArgs", (object?)entry.ToolArgs ?? DBNull.Value);
+            insertCommand.Parameters.AddWithValue("$toolIsError", entry.ToolIsError ? 1 : 0);
             await insertCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
