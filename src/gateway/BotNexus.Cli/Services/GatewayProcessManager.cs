@@ -98,6 +98,10 @@ public sealed class GatewayProcessManager : IGatewayProcessManager
             RedirectStandardError = false,
         };
 
+        // Set BOTNEXUS_HOME so the gateway reads config from the correct home directory
+        if (!string.IsNullOrWhiteSpace(options.HomePath))
+            psi.Environment["BOTNEXUS_HOME"] = options.HomePath;
+
         _logger.LogInformation("Starting gateway process: {FileName} {Arguments}", psi.FileName, psi.Arguments);
 
         Process process;
