@@ -87,6 +87,21 @@ public sealed class AgentSessionManager : IDisposable
             {
                 await LoadConversationsAsync(agentId);
             }
+            else if (!state.ConversationsLoaded && state.IsLoadingConversations)
+            {
+                // Loading already in progress (from HandleConnected retry)
+                // Poll briefly — it should complete within a few hundred ms
+                for (var i = 0; i < 20 && !state.ConversationsLoaded; i++)
+                    await Task.Delay(100);
+
+                // Select default conversation if loaded
+                if (state.ConversationsLoaded && state.ActiveConversationId is null && state.Conversations.Count > 0)
+                {
+                    var defaultConv = state.Conversations.Values.FirstOrDefault(c => c.IsDefault)
+                        ?? state.Conversations.Values.OrderByDescending(c => c.UpdatedAt).First();
+                    await SelectConversationAsync(agentId, defaultConv.ConversationId);
+                }
+            }
             else if (state.ActiveConversationId is not null
                 && !state.ConversationHistoryLoaded.Contains(state.ActiveConversationId))
             {
@@ -809,22 +824,20 @@ public sealed class AgentSessionManager : IDisposable
             };
         }
 
-        // Retry loading conversations for the active agent if not yet loaded.
-        // Use Task.Run but capture the agentId to avoid closure issues.
-        // OnStateChanged is fired inside LoadConversationsAsync so the component
-        // re-renders when data arrives.
-        if (ActiveAgentId is not null
-            && _sessions.TryGetValue(ActiveAgentId, out var activeState)
-            && !activeState.ConversationsLoaded)
+        // Retry loading conversations for ALL sessions — on first page load ActiveAgentId
+        // may not be set yet when HandleConnected fires, so iterate all sessions and
+        // pre-load conversations for any that haven't been loaded yet.
+        if (_apiBaseUrl is not null)
         {
-            var agentIdToLoad = ActiveAgentId;
-            _ = Task.Run(async () =>
+            foreach (var agentId in _sessions.Keys.ToList())
             {
-                await LoadConversationsAsync(agentIdToLoad);
-                // Fire an extra StateChanged after history loads so the component
-                // re-renders even if it missed the one from inside LoadConversationsAsync.
-                OnStateChanged?.Invoke();
-            });
+                var state = _sessions[agentId];
+                if (!state.ConversationsLoaded && !state.IsLoadingConversations)
+                {
+                    var id = agentId;
+                    _ = Task.Run(() => LoadConversationsAsync(id));
+                }
+            }
         }
 
         OnStateChanged?.Invoke();
