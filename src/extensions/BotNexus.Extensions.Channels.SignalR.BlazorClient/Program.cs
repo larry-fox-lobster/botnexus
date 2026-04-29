@@ -12,5 +12,6 @@ builder.Services.AddScoped<GatewayHubConnection>();
 builder.Services.AddScoped<AgentSessionManager>();
 builder.Services.AddScoped<PlatformConfigService>();
 builder.Services.AddScoped<GatewayInfoService>();
+builder.Services.AddScoped<FeatureFlagsService>();
 
 await builder.Build().RunAsync();
