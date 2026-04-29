@@ -803,13 +803,22 @@ public sealed class AgentSessionManager : IDisposable
             };
         }
 
-        // Retry loading conversations for the active agent if not yet loaded
-        // (handles race where SetActiveAgentAsync was called before _apiBaseUrl was set)
+        // Retry loading conversations for the active agent if not yet loaded.
+        // Use Task.Run but capture the agentId to avoid closure issues.
+        // OnStateChanged is fired inside LoadConversationsAsync so the component
+        // re-renders when data arrives.
         if (ActiveAgentId is not null
             && _sessions.TryGetValue(ActiveAgentId, out var activeState)
             && !activeState.ConversationsLoaded)
         {
-            _ = Task.Run(() => LoadConversationsAsync(ActiveAgentId));
+            var agentIdToLoad = ActiveAgentId;
+            _ = Task.Run(async () =>
+            {
+                await LoadConversationsAsync(agentIdToLoad);
+                // Fire an extra StateChanged after history loads so the component
+                // re-renders even if it missed the one from inside LoadConversationsAsync.
+                OnStateChanged?.Invoke();
+            });
         }
 
         OnStateChanged?.Invoke();
