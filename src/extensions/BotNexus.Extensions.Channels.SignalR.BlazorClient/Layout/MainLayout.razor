@@ -2,6 +2,7 @@
 @inject NavigationManager Nav
 @inject AgentSessionManager Manager
 @inject GatewayInfoService GatewayInfo
+@inject FeatureFlagsService FeatureFlags
 @inject IJSRuntime JS
 @implements IDisposable
 @implements IAsyncDisposable
@@ -216,6 +217,7 @@
     {
         if (firstRender)
         {
+            await FeatureFlags.InitializeAsync();
             var stored = await JS.InvokeAsync<string?>("localStorage.getItem", SidebarKey);
             _sidebarOpen = stored == "true";
             _isMobile = await JS.InvokeAsync<bool>("chatScroll.isMobileView");
