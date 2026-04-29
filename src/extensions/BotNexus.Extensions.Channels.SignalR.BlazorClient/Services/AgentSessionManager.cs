@@ -403,9 +403,10 @@ public sealed class AgentSessionManager : IDisposable
 
         state.ActiveConversationId = conversationId;
 
-        // Sync active session to the selected conversation's live session
-        if (conv.ActiveSessionId is not null)
-            state.SessionId = conv.ActiveSessionId;
+        // Sync active session to the selected conversation's live session.
+        // If the conversation has no session yet (brand new), clear the stale previous session ID
+        // so the UI doesn't show the wrong session until the first message is sent.
+        state.SessionId = conv.ActiveSessionId;
 
         // Clear conversation unread count
         conv.UnreadCount = 0;
