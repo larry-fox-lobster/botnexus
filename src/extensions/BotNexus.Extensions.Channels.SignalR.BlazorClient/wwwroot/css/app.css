@@ -2626,3 +2626,18 @@ details[open] > .thinking-summary::before {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* ── Config Panel Layout ──────────────────────────────────────────────────── */
+
+.config-page {
+    display: flex;
+    flex-direction: row;
+    gap: 0;
+    height: 100%;
+}
+
+.config-panel-canvas {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+}

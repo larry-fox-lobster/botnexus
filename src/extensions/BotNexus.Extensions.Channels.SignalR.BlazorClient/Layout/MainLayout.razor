@@ -151,11 +151,12 @@
                 @if (IsOnPage("configuration"))
                 {
                     <div class="sidebar-subnav">
-                        <a href="configuration#cfg-gateway"  class="sidebar-subnav-item" @onclick="CloseSidebar">🌐 Gateway</a>
-                        <a href="configuration#cfg-providers" class="sidebar-subnav-item" @onclick="CloseSidebar">🔌 Providers</a>
-                        <a href="configuration#cfg-channels"  class="sidebar-subnav-item" @onclick="CloseSidebar">📡 Channels</a>
-                        <a href="configuration#cfg-cron"      class="sidebar-subnav-item" @onclick="CloseSidebar">⏰ Cron</a>
-                        <a href="configuration#cfg-apikey"    class="sidebar-subnav-item" @onclick="CloseSidebar">🔑 Global API Key</a>
+                        <a href="configuration/gateway"   class="sidebar-subnav-item" @onclick="CloseSidebar">🌐 Gateway</a>
+                        <a href="configuration/providers" class="sidebar-subnav-item" @onclick="CloseSidebar">🔌 Providers</a>
+                        <a href="configuration/channels"  class="sidebar-subnav-item" @onclick="CloseSidebar">📡 Channels</a>
+                        <a href="configuration/world"     class="sidebar-subnav-item" @onclick="CloseSidebar">🌍 World Settings</a>
+                        <a href="configuration/cron"      class="sidebar-subnav-item" @onclick="CloseSidebar">⏰ Cron</a>
+                        <a href="configuration/apikey"    class="sidebar-subnav-item" @onclick="CloseSidebar">🔑 Global API Key</a>
                     </div>
                 }
 
@@ -281,7 +282,8 @@
     private bool IsOnPage(string page)
     {
         var uri = Nav.ToBaseRelativePath(Nav.Uri).TrimEnd('/');
-        return string.Equals(uri, page, StringComparison.OrdinalIgnoreCase);
+        return uri.Equals(page, StringComparison.OrdinalIgnoreCase)
+            || uri.StartsWith(page + "/", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task OnAgentSelected(ChangeEventArgs e)

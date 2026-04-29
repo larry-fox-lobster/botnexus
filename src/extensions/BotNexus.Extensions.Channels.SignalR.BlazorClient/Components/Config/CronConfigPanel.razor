@@ -1,0 +1,123 @@
+@using System.Text.Json.Nodes
+
+@{ var cron = GetObject(Config, "cron"); }
+
+<BoolField Label="Enabled" Value="@GetBool(cron, "enabled")" ValueChanged="@(v => SetNestedBool("cron", "enabled", v))" />
+<NumberField Label="Tick Interval (seconds)" Value="@GetNullableInt(cron, "tickIntervalSeconds")" ValueChanged="@(v => SetNestedNum("cron", "tickIntervalSeconds", v))" />
+
+<DictionarySection Title="Jobs" SectionPath="cron.jobs" Entries="@GetDict(cron, "jobs")"
+                   OnAddEntry="@((string key) => AddNestedDictEntry("cron", "jobs", key))"
+                   OnDeleteEntry="@((string key) => DeleteNestedDictEntry("cron", "jobs", key))">
+    <EntryTemplate Context="entry">
+        <TextField Label="Job Name" Value="@GetStr(entry.Value, "name")" ValueChanged="@(v => SetCronJobField(entry.Key, "name", v))" />
+        <TextField Label="Schedule (cron)" Value="@GetStr(entry.Value, "schedule")" ValueChanged="@(v => SetCronJobField(entry.Key, "schedule", v))" />
+        <SelectField Label="Action Type" Value="@GetStr(entry.Value, "actionType")" ValueChanged="@(v => SetCronJobField(entry.Key, "actionType", v))"
+                     Options="@(new[] { "agent-chat", "webhook", "shell" })" />
+        <TextField Label="Agent ID" Value="@GetStr(entry.Value, "agentId")" ValueChanged="@(v => SetCronJobField(entry.Key, "agentId", v))" />
+        <TextField Label="Message" Value="@GetStr(entry.Value, "message")" ValueChanged="@(v => SetCronJobField(entry.Key, "message", v))" />
+        <TextField Label="Webhook URL" Value="@GetStr(entry.Value, "webhookUrl")" ValueChanged="@(v => SetCronJobField(entry.Key, "webhookUrl", v))" />
+        <TextField Label="Shell Command" Value="@GetStr(entry.Value, "shellCommand")" ValueChanged="@(v => SetCronJobField(entry.Key, "shellCommand", v))" />
+        <BoolField Label="Enabled" Value="@GetBool(entry.Value, "enabled")" ValueChanged="@(v => SetCronJobBool(entry.Key, "enabled", v))" />
+        <TextField Label="Created By" Value="@GetStr(entry.Value, "createdBy")" ValueChanged="@(v => SetCronJobField(entry.Key, "createdBy", v))" />
+    </EntryTemplate>
+</DictionarySection>
+
+@code {
+    [Parameter] public JsonObject? Config { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private void MarkDirty() => OnChanged.InvokeAsync();
+
+    private static JsonObject? GetObject(JsonObject? parent, string key) => parent?[key] as JsonObject;
+
+    private static string GetStr(JsonObject? obj, string key)
+    {
+        var node = obj?[key];
+        if (node is JsonValue jv) { var raw = jv.ToString(); return raw == "***" ? "" : raw; }
+        return "";
+    }
+
+    private static bool GetBool(JsonObject? obj, string key)
+    {
+        if (obj?[key] is JsonValue jv && jv.TryGetValue<bool>(out var b)) return b;
+        return false;
+    }
+
+    private static int? GetNullableInt(JsonObject? obj, string key)
+    {
+        if (obj?[key] is JsonValue jv && jv.TryGetValue<int>(out var i)) return i;
+        return null;
+    }
+
+    private static Dictionary<string, JsonObject?> GetDict(JsonObject? obj, string key)
+    {
+        if (obj?[key] is JsonObject dict) return dict.ToDictionary(kv => kv.Key, kv => kv.Value as JsonObject);
+        return new();
+    }
+
+    private void SetNestedBool(string section, string key, bool value)
+    {
+        EnsureObject(section);
+        var obj = Config![section] as JsonObject;
+        if (obj is null) return;
+        obj[key] = value;
+        MarkDirty();
+    }
+
+    private void SetNestedNum(string section, string key, int? value)
+    {
+        EnsureObject(section);
+        var obj = Config![section] as JsonObject;
+        if (obj is null) return;
+        obj[key] = value.HasValue ? JsonValue.Create(value.Value) : null;
+        MarkDirty();
+    }
+
+    private void SetCronJobField(string jobKey, string field, string? value)
+    {
+        var cron = Config?["cron"] as JsonObject;
+        var jobs = cron?["jobs"] as JsonObject;
+        var job = jobs?[jobKey] as JsonObject;
+        if (job is null) return;
+        job[field] = string.IsNullOrEmpty(value) ? null : value;
+        MarkDirty();
+    }
+
+    private void SetCronJobBool(string jobKey, string field, bool value)
+    {
+        var cron = Config?["cron"] as JsonObject;
+        var jobs = cron?["jobs"] as JsonObject;
+        var job = jobs?[jobKey] as JsonObject;
+        if (job is null) return;
+        job[field] = value;
+        MarkDirty();
+    }
+
+    private void AddNestedDictEntry(string section, string dict, string key)
+    {
+        if (Config is null || string.IsNullOrWhiteSpace(key)) return;
+        EnsureObject(section);
+        var parent = Config[section] as JsonObject;
+        if (parent is null) return;
+        if (parent[dict] is not JsonObject dictObj) { dictObj = new JsonObject(); parent[dict] = dictObj; }
+        dictObj[key] = new JsonObject();
+        MarkDirty();
+        StateHasChanged();
+    }
+
+    private void DeleteNestedDictEntry(string section, string dict, string key)
+    {
+        var parent = Config?[section] as JsonObject;
+        var dictObj = parent?[dict] as JsonObject;
+        if (dictObj is null) return;
+        dictObj.Remove(key);
+        MarkDirty();
+        StateHasChanged();
+    }
+
+    private void EnsureObject(string key)
+    {
+        if (Config is null) return;
+        if (Config[key] is not JsonObject) Config[key] = new JsonObject();
+    }
+}
