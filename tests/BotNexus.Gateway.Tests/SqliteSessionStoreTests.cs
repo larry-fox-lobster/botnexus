@@ -428,6 +428,136 @@ public sealed class SqliteSessionStoreTests
         mode.ShouldBe("wal", StringCompareShould.IgnoreCase);
     }
 
+    // ── Tool field persistence tests ─────────────────────────────────────────
+
+    [Fact]
+    public async Task SaveAsync_WithToolArgsAndToolIsError_RoundTripsCorrectly()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var session = await store.GetOrCreateAsync("s-tool", "agent-a");
+        session.AddEntries([
+            new SessionEntry { Role = MessageRole.Tool, Content = "started", ToolName = "search", ToolCallId = "tc1", ToolArgs = "{\"query\":\"dotnet\"}" },
+            new SessionEntry { Role = MessageRole.Tool, Content = "result", ToolName = "search", ToolCallId = "tc1", ToolIsError = false }
+        ]);
+
+        await store.SaveAsync(session);
+        var reloaded = await fixture.CreateStore().GetAsync("s-tool");
+
+        reloaded.ShouldNotBeNull();
+        var startEntry = reloaded!.History.First(e => e.ToolArgs is not null);
+        startEntry.ToolArgs.ShouldBe("{\"query\":\"dotnet\"}");
+        var endEntry = reloaded.History.First(e => e.Content == "result");
+        endEntry.ToolIsError.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task SaveAsync_ToolIsErrorTrue_PersistedAndReadBackAsTrue()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var session = await store.GetOrCreateAsync("s-iserr", "agent-a");
+        session.AddEntry(new SessionEntry { Role = MessageRole.Tool, Content = "fail", ToolName = "run", ToolCallId = "tc2", ToolIsError = true });
+
+        await store.SaveAsync(session);
+        var reloaded = await fixture.CreateStore().GetAsync("s-iserr");
+
+        reloaded.ShouldNotBeNull();
+        reloaded!.History.ShouldHaveSingleItem();
+        reloaded.History[0].ToolIsError.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task SaveAsync_ToolIsErrorFalse_PersistedAndReadBackAsFalse()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var session = await store.GetOrCreateAsync("s-noerr", "agent-a");
+        session.AddEntry(new SessionEntry { Role = MessageRole.Tool, Content = "ok", ToolName = "run", ToolCallId = "tc3", ToolIsError = false });
+
+        await store.SaveAsync(session);
+        var reloaded = await fixture.CreateStore().GetAsync("s-noerr");
+
+        reloaded.ShouldNotBeNull();
+        reloaded!.History[0].ToolIsError.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task SaveAsync_ToolArgsJsonString_RoundTripsThroughSqlite()
+    {
+        using var fixture = new StoreFixture();
+        var store = fixture.CreateStore();
+        var session = await store.GetOrCreateAsync("s-toolargs", "agent-a");
+        const string args = "{\"key\":\"value\",\"num\":42}";
+        session.AddEntry(new SessionEntry { Role = MessageRole.Tool, Content = "started", ToolName = "fn", ToolCallId = "tc4", ToolArgs = args });
+
+        await store.SaveAsync(session);
+        var reloaded = await fixture.CreateStore().GetAsync("s-toolargs");
+
+        reloaded.ShouldNotBeNull();
+        reloaded!.History[0].ToolArgs.ShouldBe(args);
+    }
+
+    [Fact]
+    public async Task GetAsync_WithLegacySchema_MigratesToolColumns()
+    {
+        using var fixture = new StoreFixture();
+        // Create a pre-existing DB without tool_args / tool_is_error columns
+        await using (var connection = new SqliteConnection(fixture.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE sessions (
+                    id TEXT PRIMARY KEY,
+                    agent_id TEXT,
+                    channel_type TEXT,
+                    caller_id TEXT,
+                    status TEXT,
+                    metadata TEXT,
+                    created_at TEXT,
+                    updated_at TEXT
+                );
+
+                CREATE TABLE session_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT,
+                    role TEXT,
+                    content TEXT,
+                    timestamp TEXT,
+                    tool_name TEXT,
+                    tool_call_id TEXT,
+                    is_compaction_summary INTEGER NOT NULL DEFAULT 0
+                );
+                """;
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        // Open with current store — migration should add the new columns
+        var store = fixture.CreateStore();
+        var session = await store.GetOrCreateAsync("s-migrate", "agent-a");
+        session.AddEntry(new SessionEntry { Role = MessageRole.Tool, Content = "ok", ToolName = "fn", ToolCallId = "tc5", ToolArgs = "{}", ToolIsError = false });
+        await store.SaveAsync(session);
+
+        // Verify columns now exist
+        await using var verifyConnection = new SqliteConnection(fixture.ConnectionString);
+        await verifyConnection.OpenAsync();
+        await using var colCmd = verifyConnection.CreateCommand();
+        colCmd.CommandText = "PRAGMA table_info(session_history)";
+        var columns = new List<string>();
+        await using var colReader = await colCmd.ExecuteReaderAsync();
+        while (await colReader.ReadAsync())
+            columns.Add(colReader.GetString(1));
+
+        columns.ShouldContain("tool_args");
+        columns.ShouldContain("tool_is_error");
+
+        // And values were saved
+        var reloaded = await fixture.CreateStore().GetAsync("s-migrate");
+        reloaded.ShouldNotBeNull();
+        reloaded!.History[0].ToolArgs.ShouldBe("{}");
+    }
+
     private sealed class StoreFixture : IDisposable
     {
         public StoreFixture()
