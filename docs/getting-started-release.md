@@ -4,6 +4,27 @@
 
 ---
 
+## Install
+
+```bash
+# Install the CLI as a global dotnet tool
+dotnet tool install -g BotNexus.Cli
+
+# Clone and build the platform (one-time setup)
+botnexus install
+
+# Set up your home directory and configure a provider
+botnexus init
+botnexus provider setup
+
+# Start the gateway
+botnexus gateway start
+
+# Open the portal at http://localhost:5005
+```
+
+---
+
 ## Prerequisites
 
 | Requirement | Details |
