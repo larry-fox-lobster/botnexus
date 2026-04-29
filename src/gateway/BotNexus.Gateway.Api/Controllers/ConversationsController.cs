@@ -268,7 +268,9 @@ public sealed class ConversationsController : ControllerBase
                     Content = entry.Content,
                     Timestamp = entry.Timestamp,
                     ToolName = entry.ToolName,
-                    ToolCallId = entry.ToolCallId
+                    ToolCallId = entry.ToolCallId,
+                    ToolArgs = entry.ToolArgs,
+                    ToolIsError = entry.ToolIsError
                 });
             }
         }

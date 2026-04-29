@@ -70,6 +70,12 @@ public sealed class ConversationHistoryEntry
     /// <summary>Tool call correlation ID (for kind = "message" with tool role).</summary>
     public string? ToolCallId { get; init; }
 
+    /// <summary>Serialized JSON tool arguments (for ToolStart entries).</summary>
+    public string? ToolArgs { get; init; }
+
+    /// <summary>True if the tool call returned an error.</summary>
+    public bool ToolIsError { get; init; }
+
     /// <summary>Reason for the boundary (for kind = "boundary").</summary>
     public string? Reason { get; init; }
 }

@@ -658,6 +658,7 @@ public sealed class AgentSessionManager : IDisposable
                     }
                     else
                     {
+                        var isToolCall = entry.ToolName is not null;
                         messages.Add(new ChatMessage(
                             MapRole(entry.Role ?? "system"),
                             entry.Content ?? string.Empty,
@@ -665,7 +666,12 @@ public sealed class AgentSessionManager : IDisposable
                         {
                             ToolName = entry.ToolName,
                             ToolCallId = entry.ToolCallId,
-                            IsToolCall = entry.ToolName is not null
+                            IsToolCall = isToolCall,
+                            // When restoring tool history, Content IS the result text.
+                            // Set ToolResult so ChatPanel renders it correctly (not as pending hourglass).
+                            ToolResult = isToolCall ? entry.Content : null,
+                            ToolArgs = entry.ToolArgs,
+                            ToolIsError = entry.ToolIsError
                         });
                     }
                 }

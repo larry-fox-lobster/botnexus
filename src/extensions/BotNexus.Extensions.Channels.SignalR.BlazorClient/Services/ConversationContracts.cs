@@ -73,6 +73,12 @@ public sealed class ConversationHistoryEntryDto
     [JsonPropertyName("toolCallId")]
     public string? ToolCallId { get; init; }
 
+    [JsonPropertyName("toolArgs")]
+    public string? ToolArgs { get; init; }
+
+    [JsonPropertyName("toolIsError")]
+    public bool ToolIsError { get; init; }
+
     [JsonPropertyName("reason")]
     public string? Reason { get; init; }
 }

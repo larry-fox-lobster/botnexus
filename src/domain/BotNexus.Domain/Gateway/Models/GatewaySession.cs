@@ -244,6 +244,12 @@ public sealed record SessionEntry
     /// <summary>Tool call ID for correlating requests and results.</summary>
     public string? ToolCallId { get; init; }
 
+    /// <summary>Serialized JSON args for tool call (when Role is <see cref="MessageRole.Tool"/> and this is a ToolStart entry).</summary>
+    public string? ToolArgs { get; init; }
+
+    /// <summary>True if the tool call resulted in an error.</summary>
+    public bool ToolIsError { get; init; }
+
     /// <summary>True if this entry is a compaction summary (not a real conversation message).</summary>
     public bool IsCompactionSummary { get; init; }
 }
