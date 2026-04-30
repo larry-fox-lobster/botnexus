@@ -57,23 +57,6 @@ public sealed class AgentSessionManager : IDisposable
         _hub.OnSubAgentKilled += HandleSubAgentKilled;
     }
 
-    /// <summary>
-    /// Connects to the hub and subscribes to all active sessions.
-    /// Creates an <see cref="AgentSessionState"/> for each agent reported by the server.
-    /// </summary>
-    public async Task InitializeAsync(string hubUrl)
-    {
-        _apiBaseUrl = new Uri(new Uri(hubUrl), "/api/").ToString();
-        await _hub.ConnectAsync(hubUrl);
-
-        // SubscribeAll returns existing sessions — map them to agents
-        var result = await _hub.SubscribeAllAsync();
-        foreach (var session in result.Sessions)
-        {
-            RegisterSession(session.AgentId, session.SessionId, session.ChannelType);
-        }
-    }
-
     /// <summary>Set the active agent tab, clear its unread count, and load conversations if needed.</summary>
     public async Task SetActiveAgentAsync(string? agentId)
     {

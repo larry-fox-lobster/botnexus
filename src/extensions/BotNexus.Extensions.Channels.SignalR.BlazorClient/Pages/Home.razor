@@ -1,48 +1,71 @@
 @page "/"
 @inject AgentSessionManager Manager
+@inject IPortalLoadService PortalLoad
 @inject NavigationManager Nav
 @implements IDisposable
 
 <PageTitle>BotNexus</PageTitle>
 
-@if (Manager.ActiveAgentId is null)
+@if (!PortalLoad.IsReady)
 {
-    <div class="empty-state">
-        <p>Select an agent from the sidebar to start chatting.</p>
+    <div class="portal-loading">
+        @if (PortalLoad.LoadError is not null)
+        {
+            <div class="portal-load-error">⚠ @PortalLoad.LoadError</div>
+        }
+        else
+        {
+            <div class="portal-load-spinner">Connecting…</div>
+        }
     </div>
 }
-
-@foreach (var (agentId, state) in Manager.Sessions)
+else
 {
-    <div class="chat-panel-wrapper @(agentId == Manager.ActiveAgentId ? "active" : "hidden")">
-        <ChatPanel State="@state" Manager="@Manager" />
-    </div>
+    @if (Manager.ActiveAgentId is null)
+    {
+        <div class="empty-state">
+            <p>Select an agent from the sidebar to start chatting.</p>
+        </div>
+    }
+
+    @foreach (var (agentId, state) in Manager.Sessions)
+    {
+        <div class="chat-panel-wrapper @(agentId == Manager.ActiveAgentId ? "active" : "hidden")">
+            <ChatPanel State="@state" Manager="@Manager" />
+        </div>
+    }
 }
 
 @code {
+    protected override void OnInitialized()
+    {
+        PortalLoad.OnReadyChanged += HandleReadyChanged;
+        Manager.OnStateChanged += HandleStateChanged;
+    }
+
     protected override async Task OnInitializedAsync()
     {
-        Manager.OnStateChanged += HandleStateChanged;
-
-        if (!Manager.Hub.IsConnected)
+        if (!PortalLoad.IsReady && !PortalLoad.IsLoading)
         {
             try
             {
                 var baseUri = new Uri(Nav.BaseUri);
                 var hubUrl = new Uri(baseUri, "/hub/gateway").ToString();
-                await Manager.InitializeAsync(hubUrl);
+                await PortalLoad.InitializeAsync(hubUrl);
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Hub connection failed: {ex.Message}");
+                Console.Error.WriteLine($"Portal initialization failed: {ex.Message}");
             }
         }
     }
 
+    private void HandleReadyChanged() => InvokeAsync(StateHasChanged);
     private void HandleStateChanged() => InvokeAsync(StateHasChanged);
 
     public void Dispose()
     {
+        PortalLoad.OnReadyChanged -= HandleReadyChanged;
         Manager.OnStateChanged -= HandleStateChanged;
     }
 }

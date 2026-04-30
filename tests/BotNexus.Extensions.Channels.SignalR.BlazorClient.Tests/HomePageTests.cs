@@ -26,6 +26,12 @@ public sealed class HomePageTests : IDisposable
         _ctx.Services.AddSingleton(_manager);
         _ctx.Services.AddSingleton(_manager.Hub);
 
+        // Register a ready IPortalLoadService mock so the page shows content
+        var portalLoad = Substitute.For<IPortalLoadService>();
+        portalLoad.IsReady.Returns(true);
+        portalLoad.IsLoading.Returns(false);
+        _ctx.Services.AddSingleton(portalLoad);
+
         // Home page uses JS interop for scrolling
         _ctx.JSInterop.Mode = JSRuntimeMode.Loose;
     }

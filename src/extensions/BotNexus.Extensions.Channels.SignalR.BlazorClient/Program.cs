@@ -10,6 +10,8 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 builder.Services.AddScoped<GatewayHubConnection>();
 builder.Services.AddScoped<AgentSessionManager>();
+builder.Services.AddScoped<IGatewayRestClient, GatewayRestClient>();
+builder.Services.AddScoped<IPortalLoadService, PortalLoadService>();
 builder.Services.AddScoped<PlatformConfigService>();
 builder.Services.AddScoped<GatewayInfoService>();
 builder.Services.AddScoped<FeatureFlagsService>();
