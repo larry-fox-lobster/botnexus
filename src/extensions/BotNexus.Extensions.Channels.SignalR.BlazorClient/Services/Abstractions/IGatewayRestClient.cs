@@ -1,0 +1,30 @@
+namespace BotNexus.Extensions.Channels.SignalR.BlazorClient.Services;
+
+/// <summary>
+/// All portal REST traffic. Nothing else.
+/// </summary>
+public interface IGatewayRestClient
+{
+    /// <summary>Set the API base URL derived from the hub URL.</summary>
+    void Configure(string apiBaseUrl);
+
+    /// <summary>GET /api/agents</summary>
+    Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>GET /api/conversations?agentId={agentId}</summary>
+    Task<IReadOnlyList<ConversationSummaryDto>> GetConversationsAsync(
+        string agentId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>GET /api/conversations/{conversationId}/history?limit={limit}&amp;offset={offset}</summary>
+    Task<ConversationHistoryResponseDto?> GetHistoryAsync(
+        string conversationId,
+        int limit = 50,
+        int offset = 0,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>GET /api/conversations/{conversationId}</summary>
+    Task<ConversationResponseDto?> GetConversationAsync(
+        string conversationId,
+        CancellationToken cancellationToken = default);
+}
