@@ -977,3 +977,172 @@ The simplification is:
 That is enough. Do not add more layers.
 
 The implementation should optimize for deleting code, not preserving class names.
+
+---
+
+## Sequence Diagrams
+
+### 1. Site Startup — Page Load to IsReady
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant MainLayout
+    participant PortalLoadService
+    participant RestClient
+    participant SignalR
+    participant Gateway
+
+    Browser->>MainLayout: OnInitializedAsync
+    MainLayout->>PortalLoadService: InitializeAsync()
+    MainLayout-->>Browser: render loading spinner (IsReady=false)
+
+    PortalLoadService->>RestClient: GetAgentsAsync()
+    RestClient->>Gateway: GET /api/agents
+    Gateway-->>RestClient: [agent list]
+    RestClient-->>PortalLoadService: agents
+
+    par for each agent
+        PortalLoadService->>RestClient: GetConversationsAsync(agentId)
+        RestClient->>Gateway: GET /api/conversations?agentId=
+        Gateway-->>RestClient: [conversation list]
+        RestClient-->>PortalLoadService: conversations
+    end
+
+    PortalLoadService->>SignalR: ConnectAsync()
+    SignalR->>Gateway: WS connect + SubscribeAll
+    Gateway-->>SignalR: Connected payload
+    SignalR-->>PortalLoadService: connected
+
+    PortalLoadService->>StateStore: Seed(agents, conversations)
+    PortalLoadService-->>MainLayout: IsReady = true
+    MainLayout-->>Browser: hide spinner, render UI
+```
+
+---
+
+### 2. Agent + Conversation Select
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Sidebar
+    participant StateStore
+    participant RestClient
+    participant ChatPanel
+    participant Gateway
+
+    User->>Sidebar: click conversation
+    Sidebar->>StateStore: SetActiveConversation(agentId, convId)
+
+    alt history not cached
+        StateStore->>RestClient: GetHistoryAsync(convId, limit=50)
+        RestClient->>Gateway: GET /api/conversations/{id}/history?limit=50
+        Gateway-->>RestClient: { entries, totalCount }
+        RestClient-->>StateStore: history entries
+        StateStore-->>ChatPanel: OnStateChanged
+        ChatPanel-->>User: render messages, scroll to bottom
+    else history cached (feature flag)
+        StateStore-->>ChatPanel: OnStateChanged (from cache)
+        ChatPanel-->>User: render immediately
+        StateStore->>RestClient: GetHistoryAsync() in background
+        RestClient-->>StateStore: update if changed
+    end
+```
+
+---
+
+### 3. Outbound Message — User Sends to Response Rendered
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant ChatPanel
+    participant StateStore
+    participant SignalR
+    participant Gateway
+    participant Agent
+
+    User->>ChatPanel: type + send
+    ChatPanel->>StateStore: AddUserMessage(convId, text)
+    StateStore-->>ChatPanel: render user message
+    ChatPanel->>SignalR: SendMessageToConversation(agentId, convId, text)
+    SignalR->>Gateway: hub invoke
+    Gateway->>Agent: dispatch message
+
+    loop streaming
+        Agent-->>Gateway: ContentDelta
+        Gateway-->>SignalR: ContentDelta event
+        SignalR-->>StateStore: HandleContentDelta
+        StateStore-->>ChatPanel: OnStateChanged (stream buffer)
+        ChatPanel-->>User: render streaming text
+    end
+
+    Agent-->>Gateway: MessageEnd
+    Gateway-->>SignalR: MessageEnd event
+    SignalR-->>StateStore: HandleMessageEnd (commit message)
+    StateStore-->>ChatPanel: OnStateChanged (final message)
+    ChatPanel-->>User: render complete response
+```
+
+---
+
+### 4. Inbound SignalR Event — Live Update
+
+```mermaid
+sequenceDiagram
+    participant Gateway
+    participant SignalR
+    participant EventHandler
+    participant StateStore
+    participant ChatPanel
+    participant Sidebar
+
+    Gateway-->>SignalR: event (ContentDelta / ToolStart / etc.)
+    SignalR->>EventHandler: route event by type
+    EventHandler->>StateStore: mutate state (FindConversation by sessionId)
+    
+    alt active conversation
+        StateStore-->>ChatPanel: OnStateChanged
+        ChatPanel-->>ChatPanel: re-render canvas
+    else inactive conversation
+        StateStore-->>Sidebar: OnStateChanged (unread badge++)
+    end
+```
+
+---
+
+### 5. External Conversation — Arrives from Telegram
+
+```mermaid
+sequenceDiagram
+    participant TelegramUser
+    participant TelegramAdapter
+    participant Gateway
+    participant SignalR
+    participant EventHandler
+    participant StateStore
+    participant RestClient
+    participant Sidebar
+
+    TelegramUser->>TelegramAdapter: sends message
+    TelegramAdapter->>Gateway: InboundMessage (telegram channel)
+    Gateway->>Gateway: route to agent, create/find conversation
+    Gateway-->>SignalR: ConversationUpdated event (convId, agentId)
+    SignalR->>EventHandler: HandleConversationUpdated
+    
+    alt conversation known to client
+        EventHandler->>StateStore: mark conversation dirty
+    else new conversation
+        EventHandler->>RestClient: GetConversationAsync(convId)
+        RestClient->>Gateway: GET /api/conversations/{id}
+        Gateway-->>RestClient: conversation details
+        RestClient-->>StateStore: add conversation
+    end
+
+    Gateway-->>SignalR: ContentDelta (for the agent response)
+    SignalR->>EventHandler: route to conversation store
+    StateStore-->>Sidebar: OnStateChanged (new conv + unread badge)
+    Sidebar-->>Sidebar: show new conversation with unread dot
+```
+
