@@ -9,6 +9,7 @@ public sealed class PortalLoadService : IPortalLoadService
     private readonly IGatewayRestClient _restClient;
     private readonly GatewayHubConnection _hub;
     private readonly AgentSessionManager _manager;
+    private readonly IClientStateStore _store;
 
     /// <inheritdoc />
     public bool IsReady { get; private set; }
@@ -25,11 +26,13 @@ public sealed class PortalLoadService : IPortalLoadService
     public PortalLoadService(
         IGatewayRestClient restClient,
         GatewayHubConnection hub,
-        AgentSessionManager manager)
+        AgentSessionManager manager,
+        IClientStateStore store)
     {
         _restClient = restClient;
         _hub = hub;
         _manager = manager;
+        _store = store;
     }
 
     /// <inheritdoc />
@@ -59,14 +62,16 @@ public sealed class PortalLoadService : IPortalLoadService
 
             foreach (var agent in agents)
             {
+                _store.UpsertAgent(new AgentState
+                {
+                    AgentId = agent.AgentId,
+                    DisplayName = agent.DisplayName,
+                    IsConnected = true
+                });
+
                 if (!sessions.ContainsKey(agent.AgentId))
                 {
-                    sessions[agent.AgentId] = new AgentSessionState
-                    {
-                        AgentId = agent.AgentId,
-                        DisplayName = agent.DisplayName,
-                        IsConnected = true
-                    };
+                    sessions[agent.AgentId] = new AgentSessionState(_store, agent.AgentId);
                 }
                 else
                 {

@@ -14,6 +14,7 @@ public sealed class AgentSessionManager : IDisposable
 
     private readonly GatewayHubConnection _hub;
     private readonly HttpClient _http;
+    private readonly IClientStateStore _store;
     private readonly Dictionary<string, AgentSessionState> _sessions = new();
     private readonly Dictionary<string, string> _sessionToAgent = new(); // sessionId → agentId
     private readonly HashSet<string> _streamingWhenDisconnected = new();
@@ -36,9 +37,16 @@ public sealed class AgentSessionManager : IDisposable
     public string? ApiBaseUrl => _apiBaseUrl;
 
     public AgentSessionManager(GatewayHubConnection hub, HttpClient http)
+        : this(hub, http, new ClientStateStore())
+    {
+    }
+
+    public AgentSessionManager(GatewayHubConnection hub, HttpClient http, IClientStateStore store)
     {
         _hub = hub;
         _http = http;
+        _store = store;
+        _store.OnChanged += HandleStoreChanged;
         _hub.OnConnected += HandleConnected;
         _hub.OnMessageStart += HandleMessageStart;
         _hub.OnContentDelta += HandleContentDelta;
@@ -61,6 +69,7 @@ public sealed class AgentSessionManager : IDisposable
     public async Task SetActiveAgentAsync(string? agentId)
     {
         ActiveAgentId = agentId;
+        _store.ActiveAgentId = agentId;
         if (agentId is not null && _sessions.TryGetValue(agentId, out var state))
         {
             state.UnreadCount = 0;
@@ -481,12 +490,13 @@ public sealed class AgentSessionManager : IDisposable
             {
                 if (!_sessions.ContainsKey(agent.AgentId))
                 {
-                    _sessions[agent.AgentId] = new AgentSessionState
+                    _store.UpsertAgent(new AgentState
                     {
                         AgentId = agent.AgentId,
                         DisplayName = agent.DisplayName,
                         IsConnected = true
-                    };
+                    });
+                    _sessions[agent.AgentId] = new AgentSessionState(_store, agent.AgentId);
                 }
                 else
                 {
@@ -704,14 +714,15 @@ public sealed class AgentSessionManager : IDisposable
         // Register or reuse the sub-agent's session state
         if (!_sessions.TryGetValue(subAgentId, out var state))
         {
-            state = new AgentSessionState
+            _store.UpsertAgent(new AgentState
             {
                 AgentId = subAgentId,
                 DisplayName = subAgent.Name ?? $"Sub-agent {subAgentId[..Math.Min(8, subAgentId.Length)]}",
-                SessionId = subAgentId, // For sub-agents, session ID == sub-agent ID
+                SessionId = subAgentId,
                 SessionType = "agent-subagent",
                 IsConnected = true
-            };
+            });
+            state = new AgentSessionState(_store, subAgentId);
             _sessions[subAgentId] = state;
             _sessionToAgent[subAgentId] = subAgentId;
         }
@@ -799,12 +810,13 @@ public sealed class AgentSessionManager : IDisposable
 
         foreach (var agent in payload.Agents)
         {
-            _sessions[agent.AgentId] = new AgentSessionState
+            _store.UpsertAgent(new AgentState
             {
                 AgentId = agent.AgentId,
                 DisplayName = agent.DisplayName,
                 IsConnected = true
-            };
+            });
+            _sessions[agent.AgentId] = new AgentSessionState(_store, agent.AgentId);
         }
 
         // Retry loading conversations for ALL sessions — on first page load ActiveAgentId
@@ -1252,5 +1264,8 @@ public sealed class AgentSessionManager : IDisposable
         _hub.OnSubAgentCompleted -= HandleSubAgentCompleted;
         _hub.OnSubAgentFailed -= HandleSubAgentFailed;
         _hub.OnSubAgentKilled -= HandleSubAgentKilled;
+        _store.OnChanged -= HandleStoreChanged;
     }
+
+    private void HandleStoreChanged() => OnStateChanged?.Invoke();
 }

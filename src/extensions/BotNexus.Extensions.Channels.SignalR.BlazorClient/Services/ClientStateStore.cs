@@ -1,0 +1,272 @@
+namespace BotNexus.Extensions.Channels.SignalR.BlazorClient.Services;
+
+/// <summary>
+/// Scoped in-memory state store for the portal. Single source of truth for all agent,
+/// conversation, and message state. UI components subscribe to <see cref="OnChanged"/> to re-render.
+/// </summary>
+public sealed class ClientStateStore : IClientStateStore
+{
+    private readonly Dictionary<string, AgentState> _agents = new();
+
+    // ── IClientStateStore ────────────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public event Action? OnChanged;
+
+    /// <inheritdoc />
+    public IReadOnlyDictionary<string, AgentState> Agents => _agents;
+
+    /// <inheritdoc />
+    public string? ActiveAgentId { get; set; }
+
+    /// <inheritdoc />
+    public void SeedAgents(IEnumerable<AgentSummary> agents)
+    {
+        foreach (var a in agents)
+        {
+            if (!_agents.TryGetValue(a.AgentId, out var existing))
+            {
+                _agents[a.AgentId] = new AgentState
+                {
+                    AgentId = a.AgentId,
+                    DisplayName = a.DisplayName,
+                    IsConnected = true
+                };
+            }
+            else
+            {
+                existing.DisplayName = a.DisplayName;
+            }
+        }
+
+        NotifyChanged();
+    }
+
+    /// <inheritdoc />
+    public AgentState? GetAgent(string agentId) =>
+        _agents.GetValueOrDefault(agentId);
+
+    /// <inheritdoc />
+    public void UpsertAgent(AgentState agent)
+    {
+        _agents[agent.AgentId] = agent;
+        NotifyChanged();
+    }
+
+    /// <inheritdoc />
+    public void SeedConversations(string agentId, IEnumerable<ConversationSummaryDto> conversations)
+    {
+        if (!_agents.TryGetValue(agentId, out var agent))
+            return;
+
+        var incoming = conversations.ToList();
+
+        foreach (var dto in incoming)
+        {
+            if (agent.Conversations.TryGetValue(dto.ConversationId, out var existing))
+            {
+                // Preserve local-only state; update server-sourced fields
+                existing.Title = dto.Title;
+                existing.IsDefault = dto.IsDefault;
+                existing.Status = dto.Status;
+                existing.ActiveSessionId = dto.ActiveSessionId;
+                existing.CreatedAt = dto.CreatedAt;
+                existing.UpdatedAt = dto.UpdatedAt;
+            }
+            else
+            {
+                agent.Conversations[dto.ConversationId] = new ConversationState
+                {
+                    ConversationId = dto.ConversationId,
+                    Title = dto.Title,
+                    IsDefault = dto.IsDefault,
+                    Status = dto.Status,
+                    ActiveSessionId = dto.ActiveSessionId,
+                    CreatedAt = dto.CreatedAt,
+                    UpdatedAt = dto.UpdatedAt
+                };
+            }
+        }
+
+        // Remove conversations no longer in the list
+        var incomingIds = incoming.Select(d => d.ConversationId).ToHashSet();
+        foreach (var id in agent.Conversations.Keys.Where(k => !incomingIds.Contains(k)).ToList())
+            agent.Conversations.Remove(id);
+
+        // Auto-select a conversation if none is selected
+        if (agent.ActiveConversationId is null && agent.Conversations.Count > 0)
+        {
+            var defaultConv = agent.Conversations.Values.FirstOrDefault(c => c.IsDefault)
+                ?? agent.Conversations.Values.OrderByDescending(c => c.UpdatedAt).First();
+            agent.ActiveConversationId = defaultConv.ConversationId;
+            if (defaultConv.ActiveSessionId is not null)
+                agent.SessionId = defaultConv.ActiveSessionId;
+        }
+
+        agent.ConversationsLoaded = true;
+        agent.IsLoadingConversations = false;
+
+        NotifyChanged();
+    }
+
+    /// <inheritdoc />
+    public ConversationState? GetConversation(string conversationId)
+    {
+        foreach (var agent in _agents.Values)
+        {
+            if (agent.Conversations.TryGetValue(conversationId, out var conv))
+                return conv;
+        }
+
+        return null;
+    }
+
+    /// <inheritdoc />
+    public void SetActiveConversation(string agentId, string conversationId)
+    {
+        if (!_agents.TryGetValue(agentId, out var agent))
+            return;
+
+        agent.ActiveConversationId = conversationId;
+
+        if (agent.Conversations.TryGetValue(conversationId, out var conv))
+        {
+            conv.UnreadCount = 0;
+            agent.SessionId = conv.ActiveSessionId;
+        }
+
+        NotifyChanged();
+    }
+
+    /// <inheritdoc />
+    public string? ActiveConversationId =>
+        ActiveAgentId is not null && _agents.TryGetValue(ActiveAgentId, out var a)
+            ? a.ActiveConversationId
+            : null;
+
+    // ── Message operations ───────────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public IReadOnlyList<ChatMessage> GetMessages(string conversationId)
+    {
+        var conv = GetConversation(conversationId);
+        return conv?.Messages ?? (IReadOnlyList<ChatMessage>)[];
+    }
+
+    /// <inheritdoc />
+    public void AppendMessage(string conversationId, ChatMessage message)
+    {
+        var conv = GetConversation(conversationId);
+        if (conv is null)
+            return;
+
+        conv.Messages.Add(message);
+        NotifyChanged();
+    }
+
+    /// <inheritdoc />
+    public void PrependMessages(string conversationId, IEnumerable<ChatMessage> messages)
+    {
+        var conv = GetConversation(conversationId);
+        if (conv is null)
+            return;
+
+        conv.Messages.InsertRange(0, messages);
+        NotifyChanged();
+    }
+
+    /// <inheritdoc />
+    public void ClearMessages(string conversationId)
+    {
+        var conv = GetConversation(conversationId);
+        if (conv is null)
+            return;
+
+        conv.Messages.Clear();
+        conv.HistoryLoaded = false;
+        NotifyChanged();
+    }
+
+    // ── Streaming state ──────────────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public ConversationStreamState GetStreamState(string conversationId)
+    {
+        var conv = GetConversation(conversationId);
+        return conv?.StreamState ?? new ConversationStreamState();
+    }
+
+    /// <inheritdoc />
+    public void SetStreaming(string conversationId, bool streaming)
+    {
+        var conv = GetConversation(conversationId);
+        if (conv is null)
+            return;
+
+        conv.StreamState.IsStreaming = streaming;
+
+        // Keep agent-level IsStreaming in sync
+        foreach (var agent in _agents.Values)
+        {
+            if (agent.Conversations.ContainsKey(conversationId))
+            {
+                agent.IsStreaming = streaming;
+                break;
+            }
+        }
+
+        NotifyChanged();
+    }
+
+    /// <inheritdoc />
+    public void AppendStreamBuffer(string conversationId, string delta)
+    {
+        var conv = GetConversation(conversationId);
+        if (conv is null)
+            return;
+
+        conv.StreamState.Buffer += delta;
+        NotifyChanged();
+    }
+
+    /// <inheritdoc />
+    public void CommitStreamBuffer(string conversationId, string? thinkingContent = null)
+    {
+        var conv = GetConversation(conversationId);
+        if (conv is null)
+            return;
+
+        var buffer = conv.StreamState.Buffer;
+        var thinking = thinkingContent ?? (string.IsNullOrEmpty(conv.StreamState.ThinkingBuffer)
+            ? null
+            : conv.StreamState.ThinkingBuffer);
+
+        if (!string.IsNullOrEmpty(buffer) || thinking is not null)
+        {
+            conv.Messages.Add(new ChatMessage("Assistant", buffer ?? "", DateTimeOffset.UtcNow)
+            {
+                ThinkingContent = thinking
+            });
+        }
+
+        conv.StreamState.Buffer = "";
+        conv.StreamState.ThinkingBuffer = "";
+        conv.StreamState.IsStreaming = false;
+
+        // Keep agent-level state in sync
+        foreach (var agent in _agents.Values)
+        {
+            if (agent.Conversations.ContainsKey(conversationId))
+            {
+                agent.IsStreaming = false;
+                break;
+            }
+        }
+
+        NotifyChanged();
+    }
+
+    // ── Internal helpers ─────────────────────────────────────────────────────
+
+    private void NotifyChanged() => OnChanged?.Invoke();
+}

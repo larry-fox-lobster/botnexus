@@ -31,14 +31,29 @@ internal static class TestSessionFactory
         bool isConnected = true,
         bool isStreaming = false)
     {
-        return new AgentSessionState
+        const string testConvId = "test-conv-1";
+
+        var state = new AgentSessionState
         {
             AgentId = agentId,
             DisplayName = displayName,
             SessionId = sessionId,
             IsConnected = isConnected,
-            IsStreaming = isStreaming
+            IsStreaming = isStreaming,
+            ActiveConversationId = testConvId
         };
+
+        state.Conversations[testConvId] = new ConversationListItemState
+        {
+            ConversationId = testConvId,
+            Title = "Test conversation",
+            ActiveSessionId = sessionId,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        state.ConversationMessageStores[testConvId] = [];
+        return state;
     }
 
     /// <summary>
@@ -52,11 +67,7 @@ internal static class TestSessionFactory
     {
         var state = CreateAgentState(agentId, displayName, isConnected: isConnected);
 
-        // Set up a default conversation so Messages computed property returns the right store
-        const string testConvId = "test-conv-1";
-        state.ActiveConversationId = testConvId;
-        var store = new System.Collections.Generic.List<ChatMessage>();
-        state.ConversationMessageStores[testConvId] = store;
+        var store = state.ConversationMessageStores[state.ActiveConversationId!];
 
         foreach (var (role, content) in messages)
             store.Add(new ChatMessage(role, content, DateTimeOffset.UtcNow));
