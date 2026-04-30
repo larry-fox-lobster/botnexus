@@ -1,11 +1,13 @@
 @inject IJSRuntime JS
+@inject IClientStateStore Store
+@inject IAgentInteractionService Interaction
 
 <div class="chat-panel">
     <header class="chat-header">
         <div class="chat-header-left">
             <div class="chat-title-stack">
-                <h3>@State.DisplayName</h3>
-                @if (State.ActiveConversationId is not null)
+                <h3>@DisplayName</h3>
+                @if (ActiveConversationId is not null)
                 {
                     <div class="conversation-title-row">
                         @if (_editingTitle)
@@ -15,33 +17,32 @@
                                    @bind:event="oninput"
                                    @onblur="SaveTitle"
                                    @onkeydown="TitleKeyDown"
-                                   @ref="_titleInput"
                                    maxlength="200" />
                         }
                         else
                         {
-                            <span class="conversation-title editable" @onclick="StartEditTitle" title="Click to rename">@State.ActiveConversationTitle</span>
-                            @if (State.Conversations.TryGetValue(State.ActiveConversationId, out var activeConversation) && activeConversation.IsDefault)
+                            <span class="conversation-title editable" @onclick="StartEditTitle" title="Click to rename">@ActiveConversationTitle</span>
+                            @if (ActiveConversation?.IsDefault == true)
                             {
                                 <span class="conversation-default-badge">Default</span>
                             }
                         }
                     </div>
                 }
-                <span class="agent-id-label">@State.AgentId</span>
+                <span class="agent-id-label">@AgentId</span>
             </div>
 
-            @if (State.IsStreaming)
+            @if (IsStreaming)
             {
                 <span class="streaming-badge">Streaming…</span>
             }
         </div>
         <div class="chat-header-actions">
-            <button class="toggle-btn @(!State.ShowThinking ? "toggled-off" : "")"
+            <button class="toggle-btn @(!ShowThinking ? "toggled-off" : "")"
                     @onclick="ToggleThinking" title="Toggle thinking visibility">
                 💭
             </button>
-            <button class="toggle-btn @(!State.ShowTools ? "toggled-off" : "")"
+            <button class="toggle-btn @(!ShowTools ? "toggled-off" : "")"
                     @onclick="ToggleTools" title="Toggle tool visibility">
                 🔧
             </button>
@@ -49,19 +50,18 @@
                 ⚙
             </button>
             <button class="new-chat-btn" @onclick="ConfirmNewSession" title="Start a new session in this conversation"
-                    disabled="@State.IsStreaming">
+                    disabled="@IsStreaming">
                 ↺ New session
             </button>
         </div>
-        <SessionControls State="@State" Manager="@Manager" />
+        <SessionControls AgentId="@AgentId" />
     </header>
 
-    @* ── New session confirmation dialog ─────────────────────────────── *@
     @if (_showNewSessionConfirm)
     {
         <div class="reset-confirm-overlay" @onclick="CancelNewSession">
             <div class="reset-confirm-dialog" @onclick:stopPropagation="true">
-                <p>Start a new session for <strong>@State.DisplayName</strong>?</p>
+                <p>Start a new session for <strong>@DisplayName</strong>?</p>
                 <p class="text-muted">The current session will be sealed. History stays in this conversation.</p>
                 <div class="reset-confirm-actions">
                     <button class="cancel-btn" @onclick="CancelNewSession">Cancel</button>
@@ -71,27 +71,24 @@
         </div>
     }
 
-
-    @* ── Read-only banner for sub-agent sessions ──────────────────── *@
-    @if (State.IsReadOnly)
+    @if (IsReadOnly)
     {
         <div class="read-only-banner" role="status" aria-label="Read-only sub-agent session view">
             <span class="read-only-badge">🔍 Sub-agent session</span>
-            <span class="read-only-status @(State.IsStreaming ? "" : "completed")">@GetSubAgentStatus()</span>
+            <span class="read-only-status @(IsStreaming ? "" : "completed")">@GetSubAgentStatus()</span>
             <span class="read-only-label">Read-only — you can observe but not interact</span>
         </div>
     }
 
-    @* ── Processing status bar ────────────────────────────────────── *@
-    @if (State.IsStreaming && State.ProcessingStage is not null)
+    @if (IsStreaming && ProcessingStage is not null)
     {
         <div class="processing-status-bar">
-            @State.ProcessingStage
+            @ProcessingStage
         </div>
     }
 
     <div class="messages-container" @ref="_messagesContainer">
-        @if (State.IsLoadingHistory)
+        @if (IsLoadingHistory)
         {
             <div class="history-loading">
                 <div class="loading-spinner small"></div>
@@ -99,14 +96,14 @@
             </div>
         }
 
-        @if (State.ActiveConversationId is null && !State.IsLoadingConversations)
+        @if (ActiveConversationId is null && !IsLoadingConversations)
         {
             <div class="chat-empty-state">
                 Select a conversation or start a new one.
             </div>
         }
 
-        @foreach (var msg in State.Messages)
+        @foreach (var msg in Messages)
         {
             @if (msg.IsBoundary)
             {
@@ -122,8 +119,8 @@
             }
             else if (msg.IsToolCall)
             {
-                <div class="message tool @(msg.ToolIsError == true ? "tool-error" : "") @(!State.ShowTools ? "visibility-hidden" : "")"
-                     style="@(!State.ShowTools ? "display:none" : "")">
+                <div class="message tool @(msg.ToolIsError == true ? "tool-error" : "") @(!ShowTools ? "visibility-hidden" : "")"
+                     style="@(!ShowTools ? "display:none" : "")">
                     <div class="tool-header" @onclick="() => ToggleToolDetails(msg.Id)">
                         <span class="tool-icon">@(msg.ToolResult is null ? "⏳" : (msg.ToolIsError == true ? "❌" : "✅"))</span>
                         <span class="tool-name">@msg.ToolName</span>
@@ -156,11 +153,10 @@
             }
             else
             {
-                @* ── Thinking block (collapsible) above assistant message ─── *@
                 @if (msg.Role == "Assistant" && !string.IsNullOrEmpty(msg.ThinkingContent))
                 {
-                    <div class="thinking-block @(!State.ShowThinking ? "visibility-hidden" : "")"
-                         style="@(!State.ShowThinking ? "display:none" : "")">
+                    <div class="thinking-block @(!ShowThinking ? "visibility-hidden" : "")"
+                         style="@(!ShowThinking ? "display:none" : "")">
                         <details>
                             <summary class="thinking-summary">💭 Thinking…</summary>
                             <div class="thinking-content">@msg.ThinkingContent</div>
@@ -185,32 +181,30 @@
             }
         }
 
-        @* ── Live thinking block during streaming ────────────────── *@
-        @if (State.IsStreaming && !string.IsNullOrEmpty(State.ThinkingBuffer))
+        @if (IsStreaming && !string.IsNullOrEmpty(ThinkingBuffer))
         {
-            <div class="thinking-block live @(!State.ShowThinking ? "visibility-hidden" : "")"
-                 style="@(!State.ShowThinking ? "display:none" : "")">
+            <div class="thinking-block live @(!ShowThinking ? "visibility-hidden" : "")"
+                 style="@(!ShowThinking ? "display:none" : "")">
                 <details open>
                     <summary class="thinking-summary">💭 Thinking… <span class="streaming-indicator">●</span></summary>
-                    <div class="thinking-content">@State.ThinkingBuffer</div>
+                    <div class="thinking-content">@ThinkingBuffer</div>
                 </details>
             </div>
         }
 
-        @if (State.IsStreaming && !string.IsNullOrEmpty(State.CurrentStreamBuffer))
+        @if (IsStreaming && !string.IsNullOrEmpty(CurrentStreamBuffer))
         {
             <div class="message assistant streaming">
                 <div class="message-header">
                     <span class="message-role">Assistant</span>
                     <span class="message-time">now</span>
                 </div>
-                <div class="message-content">@State.CurrentStreamBuffer</div>
+                <div class="message-content">@CurrentStreamBuffer</div>
                 <span class="streaming-indicator">●</span>
             </div>
         }
     </div>
 
-    @* ── Command palette (slash commands) ─────────────────────────── *@
     @if (_showCommandPalette)
     {
         <div class="command-palette">
@@ -226,7 +220,7 @@
     }
 
     <div class="chat-input-area">
-        @if (!State.IsReadOnly)
+        @if (!IsReadOnly)
         {
             <textarea class="chat-input"
                       @ref="_inputElement"
@@ -234,7 +228,7 @@
                       @bind:event="oninput"
                       @onkeydown="HandleKeyDown"
                       placeholder="@InputPlaceholder"
-                      disabled="@(!State.IsConnected)" />
+                      disabled="@(!IsConnected)" />
             @if (_isRecording)
             {
                 <button class="recording-btn" @onclick="StopRecording" title="Stop recording">
@@ -244,11 +238,11 @@
             else
             {
                 <button class="mic-btn" @onclick="StartRecording" title="Record audio message"
-                        disabled="@(!State.IsConnected)">
+                        disabled="@(!IsConnected)">
                     🎤
                 </button>
             }
-            @if (State.IsStreaming)
+            @if (IsStreaming)
             {
                 <button class="steer-btn"
                         @onclick="SteerAgent"
@@ -266,7 +260,7 @@
             {
                 <button class="send-btn"
                         @onclick="SendMessage"
-                        disabled="@(!State.IsConnected || string.IsNullOrWhiteSpace(_inputText))">
+                        disabled="@(!IsConnected || string.IsNullOrWhiteSpace(_inputText))">
                     Send
                 </button>
             }
@@ -274,39 +268,70 @@
     </div>
 </div>
 
-<AgentConfigPanel @ref="_configPanel" State="@State" Manager="@Manager" />
+<AgentConfigPanel @ref="_configPanel" AgentId="@AgentId" />
 
 @code {
-    /// <summary>Per-agent session state — the panel reads from and displays this.</summary>
     [Parameter, EditorRequired]
-    public AgentSessionState State { get; set; } = default!;
+    public string AgentId { get; set; } = default!;
 
-    /// <summary>Session manager for sending messages.</summary>
-    [Parameter, EditorRequired]
-    public AgentSessionManager Manager { get; set; } = default!;
+    private AgentState? Agent => Store.GetAgent(AgentId);
+    private ConversationState? ActiveConversation =>
+        Agent?.ActiveConversationId is not null ? Agent.Conversations.GetValueOrDefault(Agent.ActiveConversationId) : null;
+
+    private string DisplayName => Agent?.DisplayName ?? AgentId;
+    private string? ActiveConversationId => Agent?.ActiveConversationId;
+    private string? ActiveConversationTitle => ActiveConversation?.Title;
+    private bool IsStreaming => Agent?.IsStreaming ?? false;
+    private bool IsReadOnly => Agent?.IsReadOnly ?? false;
+    private bool IsConnected => Agent?.IsConnected ?? false;
+    private bool ShowThinking => Agent?.ShowThinking ?? true;
+    private bool ShowTools => Agent?.ShowTools ?? true;
+    private bool IsLoadingConversations => Agent?.IsLoadingConversations ?? false;
+    private bool IsLoadingHistory => ActiveConversation?.IsLoadingHistory ?? false;
+    private string? ProcessingStage => Agent?.ProcessingStage;
+    private IReadOnlyList<ChatMessage> Messages => ActiveConversation?.Messages ?? [];
+    private string ThinkingBuffer => ActiveConversation?.StreamState.ThinkingBuffer ?? string.Empty;
+    private string CurrentStreamBuffer => ActiveConversation?.StreamState.Buffer ?? string.Empty;
 
     private string _inputText = "";
     private ElementReference _messagesContainer;
     private ElementReference _inputElement;
-    private ElementReference _titleInput;
     private bool _enterPreventionBound;
     private AgentConfigPanel? _configPanel;
-
-    // ── Inline title editing ──────────────────────────────────────────────
-
     private bool _editingTitle;
     private string _titleDraft = "";
+    private readonly Dictionary<string, string> _markdownCache = new();
+    private readonly HashSet<string> _expandedTools = new();
+    private bool _isRecording;
+    private bool _showCommandPalette;
+    private string _selectedCommand = "";
+    private bool _forceScrollNext;
+    private bool _wasActive;
+    private string? _lastActiveConversationId;
+    private int _lastRenderedMessageCount;
+    private bool _showNewSessionConfirm;
+
+    private sealed record SlashCommand(string Name, string Description);
+
+    private static readonly SlashCommand[] s_allCommands =
+    [
+        new("/new", "Reset session and start fresh"),
+        new("/compact", "Compact session to reduce tokens"),
+        new("/clear", "Clear local messages")
+    ];
+
+    private SlashCommand[] _filteredCommands = [];
 
     private void StartEditTitle()
     {
-        _titleDraft = State.ActiveConversationTitle ?? "";
+        _titleDraft = ActiveConversationTitle ?? "";
         _editingTitle = true;
         _ = InvokeAsync(async () =>
         {
             StateHasChanged();
             await Task.Delay(50);
             try { await JS.InvokeVoidAsync("eval", "document.querySelector('.conversation-title-input')?.focus()"); }
-            catch { /* JS interop may fail during disposal */ }
+            catch { }
         });
     }
 
@@ -314,8 +339,8 @@
     {
         _editingTitle = false;
         var draft = _titleDraft.Trim();
-        if (!string.IsNullOrWhiteSpace(draft) && draft != State.ActiveConversationTitle)
-            await Manager.RenameConversationAsync(State.AgentId, State.ActiveConversationId, draft);
+        if (!string.IsNullOrWhiteSpace(draft) && draft != ActiveConversationTitle)
+            await Interaction.RenameConversationAsync(AgentId, ActiveConversationId, draft);
         else
             StateHasChanged();
     }
@@ -331,14 +356,6 @@
         }
     }
 
-    // ── Markdown rendering cache ──────────────────────────────────────────
-
-    private readonly Dictionary<string, string> _markdownCache = new();
-
-    // ── Tool details expansion ────────────────────────────────────────────
-
-    private readonly HashSet<string> _expandedTools = new();
-
     private void ToggleToolDetails(string messageId)
     {
         if (!_expandedTools.Remove(messageId))
@@ -353,29 +370,28 @@
     {
         var local = ts.ToLocalTime();
         var now = DateTimeOffset.Now;
-        // Today: just time. Older: date + time.
         return local.Date == now.Date
             ? local.ToString("h:mm tt")
             : local.ToString("MMM d, h:mm tt");
     }
 
-    private string InputPlaceholder => State.IsStreaming
+    private string InputPlaceholder => IsStreaming
         ? "Type to steer the response…"
         : "Type a message… (/ for commands, Shift+Enter for newline)";
 
-    private bool _forceScrollNext;
-    private bool _wasActive;
-    private string? _lastActiveConversationId;
-    private int _lastRenderedMessageCount;
+    private void ToggleTools()
+    {
+        if (Agent is null) return;
+        Agent.ShowTools = !Agent.ShowTools;
+        Store.NotifyChanged();
+    }
 
-    // ── Toggle state ──────────────────────────────────────────────────────
-
-    private void ToggleTools() => State.ShowTools = !State.ShowTools;
-    private void ToggleThinking() => State.ShowThinking = !State.ShowThinking;
-
-    // ── Audio recording ───────────────────────────────────────────────────
-
-    private bool _isRecording;
+    private void ToggleThinking()
+    {
+        if (Agent is null) return;
+        Agent.ShowThinking = !Agent.ShowThinking;
+        Store.NotifyChanged();
+    }
 
     private async Task StartRecording()
     {
@@ -397,10 +413,7 @@
             var base64Audio = await JS.InvokeAsync<string?>("BotNexusAudio.stopRecording");
             _isRecording = false;
             if (base64Audio is not null)
-            {
-                // Send as a special message indicating audio content
-                await Manager.SendMessageAsync(State.AgentId, $"[audio:webm;base64,{base64Audio}]");
-            }
+                await Interaction.SendMessageAsync(AgentId, $"[audio:webm;base64,{base64Audio}]");
         }
         catch (Exception ex)
         {
@@ -408,22 +421,6 @@
             _isRecording = false;
         }
     }
-
-    // ── Command palette ───────────────────────────────────────────────────
-
-    private bool _showCommandPalette;
-    private string _selectedCommand = "";
-
-    private sealed record SlashCommand(string Name, string Description);
-
-    private static readonly SlashCommand[] s_allCommands =
-    [
-        new("/new", "Reset session and start fresh"),
-        new("/compact", "Compact session to reduce tokens"),
-        new("/clear", "Clear local messages")
-    ];
-
-    private SlashCommand[] _filteredCommands = [];
 
     private void UpdateCommandPalette()
     {
@@ -451,18 +448,16 @@
         switch (cmd.Name)
         {
             case "/new":
-                await Manager.ResetSessionAsync(State.AgentId);
+                await Interaction.ResetSessionAsync(AgentId);
                 break;
             case "/compact":
-                await Manager.CompactSessionAsync(State.AgentId);
+                await Interaction.CompactSessionAsync(AgentId);
                 break;
             case "/clear":
-                Manager.ClearLocalMessages(State.AgentId);
+                Interaction.ClearLocalMessages(AgentId);
                 break;
         }
     }
-
-    // ── Config panel ──────────────────────────────────────────────────────
 
     private async Task OpenConfig()
     {
@@ -470,37 +465,27 @@
             await _configPanel.Open();
     }
 
-    private bool _showNewSessionConfirm;
-
     private void ConfirmNewSession() => _showNewSessionConfirm = true;
     private void CancelNewSession() => _showNewSessionConfirm = false;
 
     private async Task DoNewSession()
     {
         _showNewSessionConfirm = false;
-        await Manager.ResetSessionAsync(State.AgentId);
+        await Interaction.ResetSessionAsync(AgentId);
     }
-
-    // ── Lifecycle ─────────────────────────────────────────────────────────
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         try
         {
-            // Bind JS-side Enter-key prevention once
             if (!_enterPreventionBound)
             {
                 await JS.InvokeVoidAsync("chatScroll.preventEnterSubmit", _inputElement);
                 _enterPreventionBound = true;
             }
 
-            // 1. Render markdown for any un-rendered assistant messages FIRST.
-            //    If new markdown was rendered the DOM content will change, so we
-            //    trigger a re-render and defer scrolling until the DOM is stable.
-            //    Snapshot the list — SignalR callbacks can add messages during the
-            //    JS interop awaits, which would invalidate the List<T> enumerator.
             var needsRender = false;
-            foreach (var msg in State.Messages.ToList())
+            foreach (var msg in Messages.ToList())
             {
                 if (msg.Role == "Assistant" && !_markdownCache.ContainsKey(msg.Id))
                 {
@@ -513,21 +498,16 @@
             if (needsRender)
             {
                 StateHasChanged();
-                return; // Let re-render settle before scrolling
+                return;
             }
 
-            // 2. DOM is stable — scroll now.
-
-            // Detect when this panel just became visible (agent selected)
-            var isActive = State.AgentId == Manager.ActiveAgentId;
+            var isActive = AgentId == Store.ActiveAgentId;
             if (isActive && !_wasActive)
                 _forceScrollNext = true;
             _wasActive = isActive;
 
-            // Force-scroll when the active conversation changes or history batch-loads.
-            // A large jump in message count means history arrived — scroll to bottom.
-            var currentConvId = State.ActiveConversationId;
-            var currentCount = State.Messages.Count;
+            var currentConvId = ActiveConversationId;
+            var currentCount = Messages.Count;
             if (currentConvId != _lastActiveConversationId)
             {
                 _forceScrollNext = true;
@@ -536,7 +516,6 @@
             }
             else if (currentCount > _lastRenderedMessageCount + 5)
             {
-                // More than 5 new messages at once = history batch load, not streaming
                 _forceScrollNext = true;
                 _lastRenderedMessageCount = currentCount;
             }
@@ -545,8 +524,6 @@
                 _lastRenderedMessageCount = currentCount;
             }
 
-            // Force-scroll on first render, after sending, or on session switch.
-            // Otherwise smart-scroll (only if near bottom).
             if (firstRender || _forceScrollNext)
             {
                 _forceScrollNext = false;
@@ -554,34 +531,28 @@
             }
             else
             {
-                await JS.InvokeVoidAsync("chatScroll.scrollToBottom", _messagesContainer, State.IsStreaming);
+                await JS.InvokeVoidAsync("chatScroll.scrollToBottom", _messagesContainer, IsStreaming);
             }
         }
         catch (JSDisconnectedException)
         {
-            // Component disposed during async call — safe to ignore
         }
     }
 
-    // ── Input handling ────────────────────────────────────────────────────
-
     private async Task HandleKeyDown(KeyboardEventArgs e)
     {
-        // Update command palette on every keystroke
         UpdateCommandPalette();
 
         if (e is { Key: "Enter", ShiftKey: false })
         {
-            // If command palette is open, execute selected command
             if (_showCommandPalette && _filteredCommands.Length > 0)
             {
-                var cmd = _filteredCommands.FirstOrDefault(c => c.Name == _selectedCommand)
-                    ?? _filteredCommands[0];
+                var cmd = _filteredCommands.FirstOrDefault(c => c.Name == _selectedCommand) ?? _filteredCommands[0];
                 await ExecuteCommand(cmd);
                 return;
             }
 
-            if (State.IsStreaming)
+            if (IsStreaming)
                 await SteerAgent();
             else
                 await SendMessage();
@@ -589,17 +560,12 @@
         else if (e is { Key: "Escape" })
         {
             if (_showCommandPalette)
-            {
                 _showCommandPalette = false;
-            }
-            else if (State.IsStreaming)
-            {
+            else if (IsStreaming)
                 await AbortAgent();
-            }
         }
         else if (e is { Key: "Tab" } && _showCommandPalette && _filteredCommands.Length > 0)
         {
-            // Tab-complete the selected command
             _inputText = _filteredCommands[0].Name + " ";
             _showCommandPalette = false;
         }
@@ -608,32 +574,26 @@
     private async Task SendMessage()
     {
         var text = _inputText?.Trim();
-        if (string.IsNullOrEmpty(text) || !State.IsConnected)
+        if (string.IsNullOrEmpty(text) || !IsConnected)
             return;
 
         _inputText = "";
         _showCommandPalette = false;
         _forceScrollNext = true;
-        await Manager.SendMessageAsync(State.AgentId, text);
+        await Interaction.SendMessageAsync(AgentId, text);
     }
 
     private async Task SteerAgent()
     {
         var text = _inputText?.Trim();
-        if (string.IsNullOrEmpty(text) || !State.IsConnected)
+        if (string.IsNullOrEmpty(text) || !IsConnected)
             return;
 
         _inputText = "";
-        await Manager.SteerAsync(State.AgentId, text);
+        await Interaction.SteerAsync(AgentId, text);
     }
 
-    private async Task AbortAgent()
-    {
-        await Manager.AbortAsync(State.AgentId);
-    }
+    private async Task AbortAgent() => await Interaction.AbortAsync(AgentId);
 
-    private string GetSubAgentStatus()
-    {
-        return State.IsStreaming ? "⏳ Running" : "✅ Completed";
-    }
+    private string GetSubAgentStatus() => IsStreaming ? "⏳ Running" : "✅ Completed";
 }

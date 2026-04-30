@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using BotNexus.Extensions.Channels.SignalR.BlazorClient.Services;
-using BotNexus.Extensions.Channels.SignalR.BlazorClient.Tests.Helpers;
 
 namespace BotNexus.Extensions.Channels.SignalR.BlazorClient.Tests;
 

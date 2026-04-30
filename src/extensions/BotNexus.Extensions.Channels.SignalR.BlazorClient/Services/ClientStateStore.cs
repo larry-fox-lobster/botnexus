@@ -7,6 +7,7 @@ namespace BotNexus.Extensions.Channels.SignalR.BlazorClient.Services;
 public sealed class ClientStateStore : IClientStateStore
 {
     private readonly Dictionary<string, AgentState> _agents = new();
+    private readonly Dictionary<string, string> _sessionToAgent = new(); // sessionId → agentId
 
     // ── IClientStateStore ────────────────────────────────────────────────────
 
@@ -266,7 +267,42 @@ public sealed class ClientStateStore : IClientStateStore
         NotifyChanged();
     }
 
+    // ── Session resolution ─────────────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public void RegisterSession(string agentId, string sessionId, string? channelType = null, string? sessionType = null)
+    {
+        _sessionToAgent[sessionId] = agentId;
+        if (!_agents.TryGetValue(agentId, out var agent))
+            return;
+        agent.SessionId = sessionId;
+        if (channelType is not null)
+            agent.ChannelType = channelType;
+        if (sessionType is not null)
+            agent.SessionType = sessionType;
+    }
+
+    /// <inheritdoc />
+    public bool TryResolveAgentBySession(string? sessionId, out string? agentId)
+    {
+        if (sessionId is null) { agentId = null; return false; }
+        return _sessionToAgent.TryGetValue(sessionId, out agentId);
+    }
+
+    /// <inheritdoc />
+    public bool TryResolveConversationBySession(string agentId, string? sessionId, out string? conversationId)
+    {
+        conversationId = null;
+        if (sessionId is null) return false;
+        if (!_agents.TryGetValue(agentId, out var agent)) return false;
+        var conv = agent.Conversations.Values.FirstOrDefault(c => c.ActiveSessionId == sessionId);
+        if (conv is null) return false;
+        conversationId = conv.ConversationId;
+        return true;
+    }
+
     // ── Internal helpers ─────────────────────────────────────────────────────
 
-    private void NotifyChanged() => OnChanged?.Invoke();
+    /// <inheritdoc />
+    public void NotifyChanged() => OnChanged?.Invoke();
 }

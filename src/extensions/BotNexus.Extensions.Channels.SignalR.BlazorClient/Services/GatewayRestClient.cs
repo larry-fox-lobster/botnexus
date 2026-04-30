@@ -17,6 +17,9 @@ public sealed class GatewayRestClient : IGatewayRestClient
     }
 
     /// <inheritdoc />
+    public string? ApiBaseUrl => _apiBaseUrl;
+
+    /// <inheritdoc />
     public void Configure(string apiBaseUrl)
     {
         _apiBaseUrl = apiBaseUrl.TrimEnd('/') + "/";
@@ -66,6 +69,32 @@ public sealed class GatewayRestClient : IGatewayRestClient
         return await _http.GetFromJsonAsync<ConversationResponseDto>(
             $"{_apiBaseUrl}conversations/{Uri.EscapeDataString(conversationId)}",
             cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<ConversationResponseDto?> CreateConversationAsync(
+        CreateConversationRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureConfigured();
+        var response = await _http.PostAsJsonAsync($"{_apiBaseUrl}conversations", request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ConversationResponseDto>(cancellationToken: cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task RenameConversationAsync(
+        string conversationId,
+        string newTitle,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureConfigured();
+        var request = new PatchConversationRequestDto(newTitle);
+        var response = await _http.PatchAsJsonAsync(
+            $"{_apiBaseUrl}conversations/{Uri.EscapeDataString(conversationId)}",
+            request,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
     }
 
     private void EnsureConfigured()
