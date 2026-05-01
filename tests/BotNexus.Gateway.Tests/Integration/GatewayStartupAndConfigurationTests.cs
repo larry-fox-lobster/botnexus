@@ -255,7 +255,35 @@ public sealed class GatewayStartupAndConfigurationTests
         registeredApis.ShouldContain(copilotModel!.Api);
     }
 
-    private static WebApplicationFactory<Program> CreateTestFactory(string? appSettingsConfigPath = null)
+    [Fact]
+    public async Task ConfigEndpoint_ReturnsCronFields_WhenConfigured()
+    {
+        using var fixture = new GatewayStartupFixture();
+        fixture.WriteDefaultConfig("""
+            {
+              "cron": {
+                "enabled": true,
+                "tickIntervalSeconds": 30
+              }
+            }
+            """);
+
+        await fixture.WithEnvironmentAsync(async () =>
+        {
+            await using var factory = CreateTestFactory();
+            using var client = factory.CreateClient();
+
+            var response = await client.GetFromJsonAsync<JsonElement>("/api/config");
+
+            response.TryGetProperty("cron", out var cronProp).ShouldBeTrue("cron section should be present");
+            cronProp.TryGetProperty("enabled", out var enabledProp).ShouldBeTrue("cron.enabled should be present");
+            enabledProp.GetBoolean().ShouldBeTrue("cron.enabled should be true");
+            cronProp.TryGetProperty("tickIntervalSeconds", out var tickProp).ShouldBeTrue("cron.tickIntervalSeconds should be present");
+            tickProp.GetInt32().ShouldBe(30, "cron.tickIntervalSeconds should be 30");
+        });
+    }
+
+        private static WebApplicationFactory<Program> CreateTestFactory(string? appSettingsConfigPath = null)
         => new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {

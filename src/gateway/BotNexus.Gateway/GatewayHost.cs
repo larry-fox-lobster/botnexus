@@ -18,6 +18,7 @@ using ParticipantType = BotNexus.Domain.Primitives.ParticipantType;
 using SessionId = BotNexus.Domain.Primitives.SessionId;
 using SessionParticipant = BotNexus.Domain.Primitives.SessionParticipant;
 using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
+using ConversationId = BotNexus.Domain.Primitives.ConversationId;
 using SessionType = BotNexus.Domain.Primitives.SessionType;
 using BotNexus.Gateway.Diagnostics;
 using BotNexus.Gateway.Sessions;
@@ -253,6 +254,21 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
             using var getOrCreateActivity = GatewayDiagnostics.Source.StartActivity("session.get_or_create", ActivityKind.Internal);
             getOrCreateActivity?.SetTag("botnexus.session.id", sessionId);
             getOrCreateActivity?.SetTag("botnexus.agent.id", agentId);
+            // Stamp ConversationId on the session when a conversation router is available.
+            // Without this call Session.ConversationId remains null, breaking GatewayEventHandler routing.
+            ConversationId? resolvedConversationId = null;
+            if (_conversationRouter is not null)
+            {
+                var routingResult = await _conversationRouter.ResolveInboundAsync(
+                    AgentId.From(agentId),
+                    message.ChannelType,
+                    message.ChannelAddress ?? string.Empty,
+                    threadId: null,
+                    cancellationToken);
+                sessionId = routingResult.SessionId.Value;
+                resolvedConversationId = routingResult.Conversation.ConversationId;
+            }
+
             var existingSessionTask = _sessions.GetAsync(SessionId.From(sessionId), cancellationToken);
             var existingSession = existingSessionTask is null ? null : await existingSessionTask;
             var createdSession = existingSession is null;
@@ -264,6 +280,9 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
                     new KeyValuePair<string, object?>("botnexus.channel.type", message.ChannelType));
             }
             session.ChannelType ??= message.ChannelType;
+            // Stamp ConversationId from router when not already set on the session object
+            if (resolvedConversationId.HasValue && session.Session.ConversationId is null)
+                session.Session.ConversationId = resolvedConversationId.Value;
             session.CallerId ??= message.SenderId;
             session.SessionType = ResolveSessionType(session, message);
             EnsureCallerParticipant(session, message.SenderId);
