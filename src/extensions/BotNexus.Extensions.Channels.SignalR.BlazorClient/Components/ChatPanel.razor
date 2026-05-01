@@ -1,6 +1,7 @@
 @inject IJSRuntime JS
 @inject IClientStateStore Store
 @inject IAgentInteractionService Interaction
+@implements IDisposable
 
 <div class="chat-panel">
     <header class="chat-header">
@@ -275,6 +276,18 @@
     public string AgentId { get; set; } = default!;
 
     private AgentState? Agent => Store.GetAgent(AgentId);
+
+    protected override void OnInitialized()
+    {
+        Store.OnChanged += HandleStoreChanged;
+    }
+
+    private void HandleStoreChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Store.OnChanged -= HandleStoreChanged;
+    }
     private ConversationState? ActiveConversation =>
         Agent?.ActiveConversationId is not null ? Agent.Conversations.GetValueOrDefault(Agent.ActiveConversationId) : null;
 

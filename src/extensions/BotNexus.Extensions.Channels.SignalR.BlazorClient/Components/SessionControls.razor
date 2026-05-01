@@ -1,5 +1,6 @@
 @inject IJSRuntime JS
 @inject IClientStateStore Store
+@implements IDisposable
 
 <div class="session-controls">
     @if (Agent?.SessionId is not null)
@@ -17,6 +18,18 @@
 }
 
 @code {
+
+    protected override void OnInitialized()
+    {
+        Store.OnChanged += HandleStoreChanged;
+    }
+
+    private void HandleStoreChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Store.OnChanged -= HandleStoreChanged;
+    }
     [Parameter, EditorRequired]
     public string AgentId { get; set; } = default!;
 
