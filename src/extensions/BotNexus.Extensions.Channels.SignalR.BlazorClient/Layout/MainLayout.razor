@@ -1,8 +1,11 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Nav
-@inject AgentSessionManager Manager
+@inject IClientStateStore Store
+@inject IAgentInteractionService Interaction
+@inject IPortalLoadService PortalLoad
 @inject GatewayInfoService GatewayInfo
 @inject FeatureFlagsService FeatureFlags
+@inject GatewayHubConnection Hub
 @inject IJSRuntime JS
 @implements IDisposable
 @implements IAsyncDisposable
@@ -46,7 +49,7 @@
         <aside class="main-sidebar @(_sidebarOpen ? "sidebar-open" : "sidebar-closed")">
             @* Connection status *@
             <div class="sidebar-connection">
-                <ConnectionStatus Hub="@Manager.Hub" />
+                <ConnectionStatus Hub="@Hub" />
             </div>
 
             @* Nav links *@
@@ -54,54 +57,54 @@
                 <a href="" class="sidebar-nav-item @NavClass("")" @onclick="OnNavClick">💬 Chat</a>
 
                 @* Agent dropdown + session list nested under Chat *@
-                @if (Manager.Sessions.Count > 0)
+                @if (Store.Agents.Count > 0)
                 {
                     <div class="agent-dropdown-container">
                         <select class="agent-dropdown-select"
-                                value="@Manager.ActiveAgentId"
+                                value="@Store.ActiveAgentId"
                                 @onchange="OnAgentSelected">
                             <option value="">— select agent —</option>
-                            @foreach (var (agentId, state) in Manager.Sessions)
+                            @foreach (var (agentId, agent) in Store.Agents)
                             {
                                 <option value="@agentId">
-                                    @state.DisplayName
-                                    @if (state.IsStreaming) { <text> ●</text> }
-                                    @if (state.UnreadCount > 0) { <text> (@state.UnreadCount)</text> }
+                                    @agent.DisplayName
+                                    @if (agent.IsStreaming) { <text> ●</text> }
+                                    @if (agent.UnreadCount > 0) { <text> (@agent.UnreadCount)</text> }
                                 </option>
                             }
                         </select>
                     </div>
 
-                    @if (Manager.ActiveAgentId is not null &&
-                         Manager.Sessions.TryGetValue(Manager.ActiveAgentId, out var activeState))
+                    @if (Store.ActiveAgentId is not null &&
+                         Store.Agents.TryGetValue(Store.ActiveAgentId, out var activeAgent))
                     {
                         <div class="agent-conversation-list">
                             <div class="agent-conversation-list-header">
                                 <span class="agent-conversation-list-title">Conversations</span>
                                 <button class="conversation-new-btn"
-                                        @onclick="() => CreateConversationAsync(activeState.AgentId)"
+                                        @onclick="() => CreateConversationAsync(activeAgent.AgentId)"
                                         title="Start a new conversation">
                                     <span class="conversation-new-btn-icon">+</span>
                                     <span class="conversation-new-btn-label">New</span>
                                 </button>
                             </div>
 
-                            @if (activeState.IsLoadingConversations)
+                            @if (activeAgent.IsLoadingConversations)
                             {
                                 <div class="conversation-list-loading">Loading conversations…</div>
                             }
-                            else if (activeState.Conversations.Count == 0)
+                            else if (activeAgent.Conversations.Count == 0)
                             {
                                 <div class="conversation-list-empty">No conversations yet.</div>
                             }
                             else
                             {
-                                @foreach (var conversation in activeState.Conversations.Values
+                                @foreach (var conversation in activeAgent.Conversations.Values
                                     .OrderByDescending(c => c.IsDefault)
                                     .ThenByDescending(c => c.UpdatedAt))
                                 {
-                                    <button class="conversation-list-item @(conversation.ConversationId == activeState.ActiveConversationId ? "active" : "")"
-                                            @onclick="() => SelectConversationAsync(activeState.AgentId, conversation.ConversationId)">
+                                    <button class="conversation-list-item @(conversation.ConversationId == activeAgent.ActiveConversationId ? "active" : "")"
+                                            @onclick="() => SelectConversationAsync(activeAgent.AgentId, conversation.ConversationId)">
                                         <span class="conversation-list-item-main">
                                             <span class="conversation-list-item-title">@conversation.Title</span>
 
@@ -127,7 +130,7 @@
                             }
 
                             @* Sub-agent sessions *@
-                            @foreach (var sub in activeState.SubAgents.Values
+                            @foreach (var sub in activeAgent.SubAgents.Values
                                 .Where(s => s.Status is "Running" or "Completed"))
                             {
                                 <div class="agent-session-item @(IsSubAgentActive(sub) ? "active" : "")"
@@ -203,14 +206,9 @@
 
     protected override void OnInitialized()
     {
-        Manager.OnStateChanged += HandleStateChanged;
+        Store.OnChanged += HandleStateChanged;
         Nav.LocationChanged += OnLocationChanged;
-    }
-
-    protected override async Task OnInitializedAsync()
-    {
-        // GatewayInfo.LoadAsync() is called from HandleStateChanged once
-        // ApiBaseUrl is available (set after SignalR connects)
+        PortalLoad.OnReadyChanged += HandleReadyChanged;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -221,26 +219,38 @@
             var stored = await JS.InvokeAsync<string?>("localStorage.getItem", SidebarKey);
             _sidebarOpen = stored == "true";
             _isMobile = await JS.InvokeAsync<bool>("chatScroll.isMobileView");
+
+            // Load gateway info once portal is ready
+            if (PortalLoad.IsReady)
+                await LoadGatewayInfoAsync();
+
             StateHasChanged();
         }
     }
 
     private bool _gatewayInfoLoaded;
-    private void HandleStateChanged()
+
+    private void HandleReadyChanged()
     {
-        // Load gateway info once ApiBaseUrl is available (after SignalR connects)
-        if (!_gatewayInfoLoaded && Manager.ApiBaseUrl is not null)
+        if (PortalLoad.IsReady && !_gatewayInfoLoaded)
         {
-            _gatewayInfoLoaded = true;
             _ = InvokeAsync(async () =>
             {
-                await GatewayInfo.LoadAsync();
+                await LoadGatewayInfoAsync();
                 StateHasChanged();
             });
         }
 
         InvokeAsync(StateHasChanged);
     }
+
+    private async Task LoadGatewayInfoAsync()
+    {
+        _gatewayInfoLoaded = true;
+        await GatewayInfo.LoadAsync();
+    }
+
+    private void HandleStateChanged() => InvokeAsync(StateHasChanged);
 
     private async Task ToggleSidebar()
     {
@@ -256,20 +266,18 @@
 
     private void OnNavClick()
     {
-        // Close sidebar after navigation on mobile only
         if (_isMobile)
             _sidebarOpen = false;
     }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
     {
-        // When navigating back to chat from configuration/agents, refresh agent list
         var relative = Nav.ToBaseRelativePath(e.Location).TrimEnd('/');
         if (relative == "")
         {
             _ = InvokeAsync(async () =>
             {
-                await Manager.RefreshAgentsAsync();
+                await Interaction.RefreshAgentsAsync();
                 StateHasChanged();
             });
         }
@@ -293,7 +301,11 @@
         var agentId = e.Value?.ToString();
         if (!string.IsNullOrEmpty(agentId))
         {
-            await Manager.SetActiveAgentAsync(agentId);
+            Store.ActiveAgentId = agentId;
+            if (Store.GetAgent(agentId) is { } agent && agent.UnreadCount > 0)
+                agent.UnreadCount = 0;
+            Store.NotifyChanged();
+
             if (_isMobile)
                 _sidebarOpen = false;
         }
@@ -308,26 +320,26 @@
 
     private async Task ViewSubAgentAsync(SubAgentInfo sub)
     {
-        await Manager.ViewSubAgentAsync(sub);
+        await Interaction.ViewSubAgentAsync(sub);
         if (_isMobile)
             _sidebarOpen = false;
     }
 
     private bool IsSubAgentActive(SubAgentInfo sub)
     {
-        return Manager.ActiveAgentId == sub.SubAgentId;
+        return Store.ActiveAgentId == sub.SubAgentId;
     }
 
     private async Task SelectConversationAsync(string agentId, string conversationId)
     {
-        await Manager.SelectConversationAsync(agentId, conversationId);
+        await Interaction.SelectConversationAsync(agentId, conversationId);
         if (_isMobile)
             _sidebarOpen = false;
     }
 
     private async Task CreateConversationAsync(string agentId)
     {
-        await Manager.CreateConversationAsync(agentId);
+        await Interaction.CreateConversationAsync(agentId);
         if (_isMobile)
             _sidebarOpen = false;
     }
@@ -372,8 +384,9 @@
 
     public void Dispose()
     {
-        Manager.OnStateChanged -= HandleStateChanged;
+        Store.OnChanged -= HandleStateChanged;
         Nav.LocationChanged -= OnLocationChanged;
+        PortalLoad.OnReadyChanged -= HandleReadyChanged;
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;

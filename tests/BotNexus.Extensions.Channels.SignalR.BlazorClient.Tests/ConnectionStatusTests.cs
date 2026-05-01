@@ -2,7 +2,6 @@ using Bunit;
 using Microsoft.AspNetCore.SignalR.Client;
 using BotNexus.Extensions.Channels.SignalR.BlazorClient.Components;
 using BotNexus.Extensions.Channels.SignalR.BlazorClient.Services;
-using BotNexus.Extensions.Channels.SignalR.BlazorClient.Tests.Helpers;
 
 namespace BotNexus.Extensions.Channels.SignalR.BlazorClient.Tests;
 

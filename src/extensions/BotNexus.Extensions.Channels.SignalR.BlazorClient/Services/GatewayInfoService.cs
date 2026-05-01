@@ -9,28 +9,24 @@ namespace BotNexus.Extensions.Channels.SignalR.BlazorClient.Services;
 public sealed class GatewayInfoService
 {
     private readonly HttpClient _http;
-    private readonly AgentSessionManager _manager;
+    private readonly IGatewayRestClient _restClient;
     public GatewayInfo? Info { get; private set; }
 
-    public GatewayInfoService(HttpClient http, AgentSessionManager manager)
+    public GatewayInfoService(HttpClient http, IGatewayRestClient restClient)
     {
         _http = http;
-        _manager = manager;
+        _restClient = restClient;
     }
 
     public async Task LoadAsync()
     {
         try
         {
-            // Use the hub-derived API base URL — resolves correctly even behind
-            // reverse proxies like NetBird where HostEnvironment.BaseAddress differs
-            // from the actual gateway address.
-            var baseUrl = _manager.ApiBaseUrl;
+            var baseUrl = _restClient.ApiBaseUrl;
             if (string.IsNullOrEmpty(baseUrl)) return;
-
             Info = await _http.GetFromJsonAsync<GatewayInfo>($"{baseUrl}gateway/info");
         }
-        catch { /* non-fatal — portal works without it */ }
+        catch { }
     }
 }
 

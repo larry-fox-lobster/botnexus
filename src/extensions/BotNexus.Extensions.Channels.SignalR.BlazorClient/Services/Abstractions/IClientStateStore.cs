@@ -11,6 +11,9 @@ public interface IClientStateStore
     /// <summary>Fired whenever any state mutates. Components subscribe here for re-render.</summary>
     event Action? OnChanged;
 
+    /// <summary>Fire <see cref="OnChanged"/> to trigger UI re-render.</summary>
+    void NotifyChanged();
+
     // ── Agent-level ──────────────────────────────────────────────────────────
 
     /// <summary>All known agents keyed by agent ID.</summary>
@@ -55,6 +58,20 @@ public interface IClientStateStore
 
     /// <summary>Clear all messages for a conversation.</summary>
     void ClearMessages(string conversationId);
+
+    // ── Session resolution ─────────────────────────────────────────────────────
+
+    /// <summary>Register or update a session-ID → agent-ID mapping.</summary>
+    void RegisterSession(string agentId, string sessionId, string? channelType = null, string? sessionType = null);
+
+    /// <summary>Resolve a session ID to the agent ID that owns it. Returns false if unknown.</summary>
+    bool TryResolveAgentBySession(string? sessionId, out string? agentId);
+
+    /// <summary>
+    /// Resolve a session ID to the conversation ID on the given agent whose
+    /// <c>ActiveSessionId</c> matches.
+    /// </summary>
+    bool TryResolveConversationBySession(string agentId, string? sessionId, out string? conversationId);
 
     // ── Streaming state ──────────────────────────────────────────────────────
 

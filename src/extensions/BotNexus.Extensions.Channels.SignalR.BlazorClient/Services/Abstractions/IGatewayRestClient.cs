@@ -27,4 +27,18 @@ public interface IGatewayRestClient
     Task<ConversationResponseDto?> GetConversationAsync(
         string conversationId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>POST /api/conversations</summary>
+    Task<ConversationResponseDto?> CreateConversationAsync(
+        CreateConversationRequestDto request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>PATCH /api/conversations/{conversationId}</summary>
+    Task RenameConversationAsync(
+        string conversationId,
+        string newTitle,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Current API base URL (set via Configure). Null if not yet configured.</summary>
+    string? ApiBaseUrl { get; }
 }

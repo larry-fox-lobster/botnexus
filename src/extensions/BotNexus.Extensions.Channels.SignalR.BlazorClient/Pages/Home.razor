@@ -1,5 +1,5 @@
 @page "/"
-@inject AgentSessionManager Manager
+@inject IClientStateStore Store
 @inject IPortalLoadService PortalLoad
 @inject NavigationManager Nav
 @implements IDisposable
@@ -21,17 +21,17 @@
 }
 else
 {
-    @if (Manager.ActiveAgentId is null)
+    @if (Store.ActiveAgentId is null)
     {
         <div class="empty-state">
             <p>Select an agent from the sidebar to start chatting.</p>
         </div>
     }
 
-    @foreach (var (agentId, state) in Manager.Sessions)
+    @foreach (var (agentId, _) in Store.Agents)
     {
-        <div class="chat-panel-wrapper @(agentId == Manager.ActiveAgentId ? "active" : "hidden")">
-            <ChatPanel State="@state" Manager="@Manager" />
+        <div class="chat-panel-wrapper @(agentId == Store.ActiveAgentId ? "active" : "hidden")">
+            <ChatPanel AgentId="@agentId" />
         </div>
     }
 }
@@ -40,7 +40,7 @@ else
     protected override void OnInitialized()
     {
         PortalLoad.OnReadyChanged += HandleReadyChanged;
-        Manager.OnStateChanged += HandleStateChanged;
+        Store.OnChanged += HandleStateChanged;
     }
 
     protected override async Task OnInitializedAsync()
@@ -66,6 +66,6 @@ else
     public void Dispose()
     {
         PortalLoad.OnReadyChanged -= HandleReadyChanged;
-        Manager.OnStateChanged -= HandleStateChanged;
+        Store.OnChanged -= HandleStateChanged;
     }
 }
