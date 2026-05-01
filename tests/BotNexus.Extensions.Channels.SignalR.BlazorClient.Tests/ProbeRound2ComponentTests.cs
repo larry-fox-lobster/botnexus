@@ -1,0 +1,197 @@
+using Bunit;
+using BotNexus.Extensions.Channels.SignalR.BlazorClient.Components;
+using BotNexus.Extensions.Channels.SignalR.BlazorClient.Layout;
+using BotNexus.Extensions.Channels.SignalR.BlazorClient.Services;
+using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
+
+namespace BotNexus.Extensions.Channels.SignalR.BlazorClient.Tests;
+
+/// <summary>
+/// Probe Round 2 bUnit tests covering interaction service call verification,
+/// session confirmation dialog, and conversation routing.
+/// </summary>
+public sealed class ProbeRound2ComponentTests : IDisposable
+{
+    private readonly BunitContext _ctx = new();
+    private readonly ClientStateStore _store;
+    private readonly IAgentInteractionService _interaction;
+
+    public ProbeRound2ComponentTests()
+    {
+        _store = new ClientStateStore();
+        _interaction = Substitute.For<IAgentInteractionService>();
+
+        _ctx.Services.AddSingleton<IClientStateStore>(_store);
+        _ctx.Services.AddSingleton(_interaction);
+        _ctx.Services.AddSingleton(Substitute.For<IGatewayRestClient>());
+        _ctx.Services.AddSingleton(new HttpClient());
+        _ctx.JSInterop.Mode = JSRuntimeMode.Loose;
+    }
+
+    public void Dispose() => _ctx.Dispose();
+
+    private static ConversationSummaryDto MakeConv(string convId, string agentId, string title = "Test") =>
+        new(convId, agentId, title, false, "Active", null, 0, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+
+    private AgentState SeedConnectedAgent(string agentId)
+    {
+        var agent = new AgentState { AgentId = agentId, DisplayName = agentId, IsConnected = true };
+        _store.UpsertAgent(agent);
+        return agent;
+    }
+
+    // ── ChatPanel: Sending a message calls IAgentInteractionService.SendMessageAsync ──
+
+    [Fact]
+    public async Task ChatPanel_SendMessage_CallsInteractionServiceWithCorrectArgs()
+    {
+        SeedConnectedAgent("agent-1");
+        _store.SeedConversations("agent-1", [MakeConv("conv-1", "agent-1")]);
+        _store.SetActiveConversation("agent-1", "conv-1");
+
+        var cut = _ctx.Render<ChatPanel>(p => p.Add(c => c.AgentId, "agent-1"));
+
+        // Type a message into the textarea
+        var textarea = cut.Find(".chat-input");
+        await cut.InvokeAsync(() => textarea.Input("Hello from test!"));
+
+        // Click send button
+        var sendBtn = cut.Find(".send-btn");
+        await cut.InvokeAsync(() => sendBtn.Click());
+
+        await _interaction.Received(1).SendMessageAsync("agent-1", "Hello from test!");
+    }
+
+    // ── ChatPanel: New session button click triggers confirmation dialog ───────
+
+    [Fact]
+    public void ChatPanel_NewSessionButton_Click_ShowsConfirmationDialog()
+    {
+        SeedConnectedAgent("agent-1");
+
+        var cut = _ctx.Render<ChatPanel>(p => p.Add(c => c.AgentId, "agent-1"));
+
+        // Confirm dialog should not be visible initially
+        Assert.Empty(cut.FindAll(".reset-confirm-overlay"));
+
+        // Click new session button
+        cut.Find(".new-chat-btn").Click();
+
+        // Confirmation dialog should now appear
+        cut.Find(".reset-confirm-overlay");
+        cut.Find(".confirm-btn");
+        cut.Find(".cancel-btn");
+    }
+
+    // ── ChatPanel: Confirming new session calls IAgentInteractionService.ResetSessionAsync ──
+
+    [Fact]
+    public async Task ChatPanel_ConfirmNewSession_CallsResetSessionAsync()
+    {
+        SeedConnectedAgent("agent-1");
+
+        var cut = _ctx.Render<ChatPanel>(p => p.Add(c => c.AgentId, "agent-1"));
+
+        // Open confirmation dialog
+        cut.Find(".new-chat-btn").Click();
+
+        // Click confirm
+        var confirmBtn = cut.Find(".confirm-btn");
+        await cut.InvokeAsync(() => confirmBtn.Click());
+
+        await _interaction.Received(1).ResetSessionAsync("agent-1");
+    }
+
+    // ── ChatPanel: Cancelling new session dialog hides dialog without calling service ──
+
+    [Fact]
+    public async Task ChatPanel_CancelNewSession_HidesDialogWithoutCallingService()
+    {
+        SeedConnectedAgent("agent-1");
+
+        var cut = _ctx.Render<ChatPanel>(p => p.Add(c => c.AgentId, "agent-1"));
+
+        cut.Find(".new-chat-btn").Click();
+        cut.Find(".cancel-btn").Click();
+
+        Assert.Empty(cut.FindAll(".reset-confirm-overlay"));
+        await _interaction.DidNotReceive().ResetSessionAsync(Arg.Any<string>());
+    }
+
+    // ── MainLayout: Clicking conversation calls IAgentInteractionService.SelectConversationAsync ──
+
+    [Fact]
+    public async Task MainLayout_ClickConversation_CallsSelectConversationAsync()
+    {
+        var portalLoad = Substitute.For<IPortalLoadService>();
+        portalLoad.IsReady.Returns(false);
+        portalLoad.IsLoading.Returns(true);
+        portalLoad.LoadError.Returns((string?)null);
+
+        var hub = new GatewayHubConnection();
+        var restClient = Substitute.For<IGatewayRestClient>();
+        restClient.ApiBaseUrl.Returns("");
+        var http = new HttpClient { BaseAddress = new Uri("http://localhost/") };
+        var gatewayInfo = new GatewayInfoService(http, restClient);
+        var featureFlags = new FeatureFlagsService(_ctx.JSInterop.JSRuntime);
+
+        _ctx.Services.AddSingleton(portalLoad);
+        _ctx.Services.AddSingleton(hub);
+        _ctx.Services.AddSingleton(gatewayInfo);
+        _ctx.Services.AddSingleton(featureFlags);
+        _ctx.Services.AddSingleton(restClient);
+        _ctx.Services.AddSingleton(http);
+
+        _store.SeedAgents([new AgentSummary("a-1", "Agent One")]);
+        _store.SeedConversations("a-1", [
+            new ConversationSummaryDto("c-1", "a-1", "Click Me", false, "Active", null, 0, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)
+        ]);
+        _store.ActiveAgentId = "a-1";
+
+        var cut = _ctx.Render<MainLayout>(p => p
+            .Add(c => c.Body, (Microsoft.AspNetCore.Components.RenderFragment)(_ => { })));
+
+        var convItem = cut.Find(".conversation-list-item");
+        await cut.InvokeAsync(() => convItem.Click());
+
+        await _interaction.Received(1).SelectConversationAsync("a-1", "c-1");
+    }
+
+    // ── MainLayout: Clicking new conversation button calls CreateConversationAsync ──
+
+    [Fact]
+    public async Task MainLayout_NewConversationButton_CallsCreateConversationAsync()
+    {
+        var portalLoad = Substitute.For<IPortalLoadService>();
+        portalLoad.IsReady.Returns(false);
+        portalLoad.IsLoading.Returns(true);
+        portalLoad.LoadError.Returns((string?)null);
+
+        var hub = new GatewayHubConnection();
+        var restClient = Substitute.For<IGatewayRestClient>();
+        restClient.ApiBaseUrl.Returns("");
+        var http = new HttpClient { BaseAddress = new Uri("http://localhost/") };
+        var gatewayInfo = new GatewayInfoService(http, restClient);
+        var featureFlags = new FeatureFlagsService(_ctx.JSInterop.JSRuntime);
+
+        _ctx.Services.AddSingleton(portalLoad);
+        _ctx.Services.AddSingleton(hub);
+        _ctx.Services.AddSingleton(gatewayInfo);
+        _ctx.Services.AddSingleton(featureFlags);
+        _ctx.Services.AddSingleton(restClient);
+        _ctx.Services.AddSingleton(http);
+
+        _store.SeedAgents([new AgentSummary("a-1", "Agent One")]);
+        _store.SeedConversations("a-1", []);
+        _store.ActiveAgentId = "a-1";
+
+        var cut = _ctx.Render<MainLayout>(p => p
+            .Add(c => c.Body, (Microsoft.AspNetCore.Components.RenderFragment)(_ => { })));
+
+        var newConvBtn = cut.Find(".conversation-new-btn");
+        await cut.InvokeAsync(() => newConvBtn.Click());
+
+        await _interaction.Received(1).CreateConversationAsync("a-1");
+    }
+}
