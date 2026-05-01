@@ -751,6 +751,45 @@ public sealed class SessionsControllerTests
         session.UpdatedAt.ShouldBeGreaterThan(pastTimestamp);
     }
 
+
+    [Fact]
+    public async Task GetSessions_ReturnsConversationId_WhenSet()
+    {
+        var store = new InMemorySessionStore();
+        var session = await store.GetOrCreateAsync("s-conv-1", "agent-a");
+        var knownConvId = BotNexus.Domain.Primitives.ConversationId.From("c_testconvid123");
+        session.Session.ConversationId = knownConvId;
+        await store.SaveAsync(session);
+        var controller = new SessionsController(store);
+
+        var actionResult = await controller.List(null, CancellationToken.None);
+
+        var okResult = actionResult.ShouldBeOfType<OkObjectResult>();
+        var json = System.Text.Json.JsonSerializer.Serialize(okResult!.Value);
+        var doc = System.Text.Json.JsonDocument.Parse(json);
+        var first = doc.RootElement.EnumerateArray().First();
+        first.TryGetProperty("conversationId", out var convIdProp).ShouldBeTrue("conversationId property should be present in List response");
+        convIdProp.GetString().ShouldBe("c_testconvid123");
+    }
+
+    [Fact]
+    public async Task GetSession_ById_ReturnsConversationId()
+    {
+        var store = new InMemorySessionStore();
+        var session = await store.GetOrCreateAsync("s-conv-2", "agent-a");
+        var knownConvId = BotNexus.Domain.Primitives.ConversationId.From("c_testconvid456");
+        session.Session.ConversationId = knownConvId;
+        await store.SaveAsync(session);
+        var controller = new SessionsController(store);
+
+        var actionResult = await controller.Get("s-conv-2", CancellationToken.None);
+
+        var okResult = actionResult.Result.ShouldBeOfType<OkObjectResult>();
+        var result = okResult!.Value.ShouldBeOfType<GatewaySession>();
+        result.Session.ConversationId.ShouldNotBeNull("ConversationId must be set on the returned session");
+        result.Session.ConversationId!.Value.Value.ShouldBe("c_testconvid456");
+    }
+
     private static ControllerContext CreateControllerContext(string callerId)
     {
         var httpContext = new DefaultHttpContext();
@@ -765,4 +804,3 @@ public sealed class SessionsControllerTests
         };
     }
 }
-

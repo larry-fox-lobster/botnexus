@@ -37,19 +37,55 @@ Design specs and bug specs live in `docs/planning/`. Each item is a folder conta
 
 ### Rules
 
-1. **Run the full test suite** before committing any code change:
+1. **Write tests before implementation (TDD).** When adding new behaviour:
+   - Write the test first — it must fail before the implementation exists
+   - Implement until the test passes
+   - Never write implementation code to make a pre-existing test pass by deleting the test
+
+2. **Run the full test suite** before committing any code change:
 
    ```shell
    dotnet test BotNexus.slnx --nologo --tl:off
    ```
 
-2. **Zero failures required.** If any test fails, diagnose and fix the issue before proceeding. Do not commit code with failing tests.
+3. **Zero failures required.** If any test fails, diagnose and fix the issue before proceeding. Do not commit code with failing tests.
 
-3. **Do not skip or disable tests** to make the suite pass. If a test is failing, the production code or the test itself must be fixed — not removed.
+4. **Do not skip or disable tests** to make the suite pass. If a test is failing, the production code or the test itself must be fixed — not removed.
 
-4. **Do not use `--no-verify`** for code changes. The pre-commit hook runs the test suite and must pass.
+5. **Do not use `--no-verify`** for code changes. The pre-commit hook runs the test suite and must pass.
 
-5. **If you introduce new behavior**, add corresponding tests. If you change existing behavior, update affected tests to match.
+6. **If you introduce new behaviour**, add corresponding tests first (see rule 1).
+
+7. **If you delete a class or service**, you MUST rewrite its tests for the replacement — not delete them.
+   - Old class deleted → old test file deleted AND new test file created for the replacement
+   - Tests are never net-deleted; they are migrated
+   - A refactor that reduces test coverage is a regression
+
+8. **Component tests (bUnit) are mandatory** for all Blazor components. Every `.razor` component must have a corresponding test covering:
+   - Rendering in default/empty state
+   - Rendering with data
+   - User interactions (clicks, input)
+   - Edge cases (loading, error, empty lists)
+
+## Git Workflow
+
+**Always use worktrees for independent branches.** Never work directly on `main` and never branch off a feature branch for independent work.
+
+```bash
+# Create a worktree for new work (N = GitHub issue number)
+git worktree add ../botnexus-wt-N -b <type>/N-<short-slug>
+
+# Work in the worktree — main repo always stays on main
+cd ../botnexus-wt-N
+
+# Clean up after PR merges
+git worktree remove ../botnexus-wt-N
+```
+
+- `~/projects/botnexus` — always on `main`
+- `../botnexus-wt-N` — dedicated worktree per issue/PR
+- Branch naming: `<type>/<issue-number>-<short-slug>` (e.g. `fix/64-history-first-load`)
+- PRs always target `main`; never branch off a feature branch
 
 ## Build
 

@@ -862,6 +862,63 @@ public sealed class GatewayHostTests
             yield break;
         }
     }
+
+    [Fact]
+    public async Task ProcessInboundMessage_StampsSessionWithConversationId()
+    {
+        var router = new Mock<IMessageRouter>();
+        router.Setup(r => r.ResolveAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["agent-a"]);
+        var handle = CreatePromptHandle("agent-a", "web:addr-1:agent-a", "response");
+        var supervisor = new Mock<IAgentSupervisor>();
+        supervisor.Setup(s => s.GetOrCreateAsync(It.IsAny<BotNexus.Domain.Primitives.AgentId>(), It.IsAny<BotNexus.Domain.Primitives.SessionId>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(handle.Object);
+
+        var sessions = new InMemorySessionStore();
+        var expectedConvId = BotNexus.Domain.Primitives.ConversationId.From("c_stamptest1");
+        var expectedSessionId = BotNexus.Domain.Primitives.SessionId.From("web:addr-1:agent-a");
+        await sessions.GetOrCreateAsync(expectedSessionId, BotNexus.Domain.Primitives.AgentId.From("agent-a"));
+
+        var conversation = new BotNexus.Gateway.Abstractions.Models.Conversation
+        {
+            ConversationId = expectedConvId,
+            AgentId = BotNexus.Domain.Primitives.AgentId.From("agent-a"),
+        };
+        var convRouter = new Mock<BotNexus.Gateway.Abstractions.Conversations.IConversationRouter>();
+        convRouter
+            .Setup(r => r.ResolveInboundAsync(
+                It.IsAny<BotNexus.Domain.Primitives.AgentId>(),
+                It.IsAny<BotNexus.Domain.Primitives.ChannelKey>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BotNexus.Gateway.Abstractions.Conversations.ConversationRoutingResult(
+                conversation, expectedSessionId, false));
+
+        var channel = CreateChannelAdapter("web", supportsStreaming: false);
+        await using var host = new GatewayHost(
+            supervisor.Object,
+            router.Object,
+            sessions,
+            new RecordingActivityBroadcaster(),
+            CreateChannelManager(channel.Object),
+            Mock.Of<ISessionCompactor>(),
+            new TestOptionsMonitor<CompactionOptions>(new CompactionOptions()),
+            NullLogger<GatewayHost>.Instance,
+            conversationRouter: convRouter.Object);
+
+        await host.DispatchAsync(CreateMessage("hello", channelType: "web", conversationId: "addr-1"));
+
+        convRouter.Verify(r => r.ResolveInboundAsync(
+            It.IsAny<BotNexus.Domain.Primitives.AgentId>(),
+            It.IsAny<BotNexus.Domain.Primitives.ChannelKey>(),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.AtLeastOnce, "IConversationRouter.ResolveInboundAsync must be called");
+
+        var savedSession = await sessions.GetAsync(expectedSessionId, CancellationToken.None);
+        savedSession.ShouldNotBeNull();
+        savedSession!.Session.ConversationId.ShouldNotBeNull("Session.ConversationId must be stamped after inbound message");
+        savedSession.Session.ConversationId!.Value.Value.ShouldBe("c_stamptest1");
+    }
 }
-
-
