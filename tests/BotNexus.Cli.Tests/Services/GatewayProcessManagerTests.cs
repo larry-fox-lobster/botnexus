@@ -266,6 +266,47 @@ public sealed class GatewayProcessManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task StopAsync_WhenProcessDoesNotExitInTime_ReturnsFailed()
+    {
+        // The GatewayProcessManager supports an injectable waitForExitOverride for testability.
+        // We inject a delegate that always returns false (process never exits) so the !exited
+        // path is reliably triggered without relying on OS-level timing.
+        // This test FAILS before the fix because StopAsync currently returns Success=true
+        // even when !exited.
+        var neverExitsManager = new GatewayProcessManager(
+            _healthChecker,
+            NullLogger<GatewayProcessManager>.Instance,
+            waitForExitTimeout: TimeSpan.FromMilliseconds(1),
+            waitForExitOverride: (_, _) => false); // always report: process did not exit
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sleep",
+            Arguments = OperatingSystem.IsWindows() ? "/c timeout /t 30" : "30",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        var process = Process.Start(psi);
+        process.ShouldNotBeNull();
+
+        try
+        {
+            await WritePidFileAsync(process.Id);
+
+            var result = await neverExitsManager.StopAsync(_testPidDirectory);
+
+            // Process reported as still running (override returned false) — MUST return failure.
+            result.Success.ShouldBeFalse();
+            result.Message.ShouldContain("did not exit");
+        }
+        finally
+        {
+            try { if (!process.HasExited) process.Kill(); } catch { }
+        }
+    }
+
+    [Fact]
     public void IsRunning_WhenNoPidFile_ReturnsFalse()
     {
         _manager.IsRunning(_testPidDirectory).ShouldBeFalse();
