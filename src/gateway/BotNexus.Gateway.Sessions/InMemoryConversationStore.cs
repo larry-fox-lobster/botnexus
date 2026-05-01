@@ -102,7 +102,10 @@ public sealed class InMemoryConversationStore : IConversationStore
             ? _conversations.Values
             : _conversations.Values.Where(c => c.AgentId == agentId.Value);
 
-        IReadOnlyList<ConversationSummary> summaries = [.. source.Select(ToSummary)];
+        // Archived conversations are excluded from the active list.
+        IReadOnlyList<ConversationSummary> summaries = [.. source
+            .Where(c => c.Status != ConversationStatus.Archived)
+            .Select(ToSummary)];
         return Task.FromResult(summaries);
     }
 

@@ -2,6 +2,7 @@ using BotNexus.Gateway.Abstractions.Agents;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using BotNexus.Domain.Primitives;
+using GatewaySessionStatus = BotNexus.Gateway.Abstractions.Models.SessionStatus;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BotNexus.Gateway.Api.Controllers;
@@ -56,9 +57,22 @@ public sealed class ChatController : ControllerBase
                 ? Guid.NewGuid().ToString("N")
                 : request.SessionId;
 
-            // Use CancellationToken.None for agent work — client disconnect should not kill the agent
             var typedAgentId = AgentId.From(request.AgentId);
             var typedSessionId = SessionId.From(sessionId);
+
+            // Reject messages to sessions that are no longer accepting input.
+            if (!string.IsNullOrWhiteSpace(request.SessionId))
+            {
+                var existingSession = await _sessions.GetAsync(typedSessionId, CancellationToken.None);
+                if (existingSession is not null &&
+                    (existingSession.Status == GatewaySessionStatus.Sealed ||
+                     existingSession.Status == GatewaySessionStatus.Suspended))
+                {
+                    return Conflict(new { error = $"Session '{sessionId}' is {existingSession.Status} and cannot accept new messages." });
+                }
+            }
+
+            // Use CancellationToken.None for agent work — client disconnect should not kill the agent
             var handle = await _supervisor.GetOrCreateAsync(typedAgentId, typedSessionId, CancellationToken.None);
 
             // If agent is already running, queue as follow-up instead of failing

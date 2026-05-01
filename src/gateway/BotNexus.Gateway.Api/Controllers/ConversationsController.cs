@@ -105,19 +105,24 @@ public sealed class ConversationsController : ControllerBase
     /// <returns>200 with the updated conversation, or 404 if not found.</returns>
     [HttpPatch("{conversationId}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Patch(
         string conversationId,
         [FromBody] PatchConversationRequest request,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.Title))
+            return BadRequest(new { error = "title must not be empty." });
+
+        if (request.Title!.Length > 500)
+            return BadRequest(new { error = "title must be 500 characters or fewer." });
+
         var conversation = await _conversations.GetAsync(ConversationId.From(conversationId), cancellationToken);
         if (conversation is null)
             return NotFound();
 
-        if (!string.IsNullOrWhiteSpace(request.Title))
-            conversation.Title = request.Title;
-
+        conversation.Title = request.Title;
         conversation.UpdatedAt = DateTimeOffset.UtcNow;
         await _conversations.SaveAsync(conversation, cancellationToken);
         return Ok(ToResponse(conversation));
