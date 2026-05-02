@@ -87,6 +87,9 @@ public sealed class ChatPanelTests : IDisposable
     public void New_session_button_is_disabled_while_streaming()
     {
         CreateAndSeedAgent("agent-1", isStreaming: true);
+        _store.SeedConversations("agent-1", [MakeConvDto("conv-1", "agent-1")]);
+        _store.SetActiveConversation("agent-1", "conv-1");
+        _store.SetStreaming("conv-1", true); // IsStreaming now reads per-conversation
 
         var cut = _ctx.Render<ChatPanel>(p => p.Add(c => c.AgentId, "agent-1"));
 
