@@ -13,11 +13,23 @@ public sealed class GatewayProcessManager : IGatewayProcessManager
 {
     private readonly IHealthChecker _healthChecker;
     private readonly ILogger<GatewayProcessManager> _logger;
+    // Timeout for WaitForExit after Kill(). Defaults to 5 seconds in production;
+    // injectable for tests to simulate the timeout path without actually waiting.
+    private readonly TimeSpan _waitForExitTimeout;
+    // Allows tests to inject a custom WaitForExit implementation to simulate timeout scenarios
+    // without relying on OS-level process termination timing.
+    private readonly Func<Process, int, bool>? _waitForExitOverride;
 
-    public GatewayProcessManager(IHealthChecker healthChecker, ILogger<GatewayProcessManager> logger)
+    public GatewayProcessManager(
+        IHealthChecker healthChecker,
+        ILogger<GatewayProcessManager> logger,
+        TimeSpan? waitForExitTimeout = null,
+        Func<Process, int, bool>? waitForExitOverride = null)
     {
         _healthChecker = healthChecker;
         _logger = logger;
+        _waitForExitTimeout = waitForExitTimeout ?? TimeSpan.FromSeconds(5);
+        _waitForExitOverride = waitForExitOverride;
     }
 
     /// <summary>
@@ -213,11 +225,20 @@ public sealed class GatewayProcessManager : IGatewayProcessManager
                 Message: $"Gateway process {pid.Value} already exited");
         }
 
-        // Wait up to 5 seconds for exit
-        var exited = await Task.Run(() => process.WaitForExit(5000), cancellationToken);
+        // Wait for process to exit after kill
+        var timeoutMs = (int)_waitForExitTimeout.TotalMilliseconds;
+        var exited = _waitForExitOverride is not null
+            ? _waitForExitOverride(process, timeoutMs)
+            : await Task.Run(() => process.WaitForExit(timeoutMs), cancellationToken);
         if (!exited)
         {
-            _logger.LogWarning("Gateway process {Pid} did not exit within 5 seconds", pid.Value);
+            _logger.LogWarning("Gateway process {Pid} did not exit within {Timeout}s", pid.Value, _waitForExitTimeout.TotalSeconds);
+            // Do NOT clean up the PID file — the process is still running.
+            // Returning success here would be incorrect and would allow StartAsync
+            // to launch a second gateway that conflicts on the same port.
+            return new GatewayStopResult(
+                Success: false,
+                Message: $"Gateway process {pid.Value} did not exit within {_waitForExitTimeout.TotalSeconds}s. It may still be running.");
         }
         else
         {

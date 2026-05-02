@@ -1,6 +1,6 @@
 using System.CommandLine;
 using System.Diagnostics;
-using BotNexus.Cli.Services;
+using System.Net.Sockets;
 using BotNexus.Cli.Services;
 using Spectre.Console;
 
@@ -9,7 +9,7 @@ namespace BotNexus.Cli.Commands;
 /// <summary>
 /// Update command: pull latest source, build, deploy extensions, and restart the gateway.
 /// </summary>
-internal sealed class UpdateCommand
+internal class UpdateCommand
 {
     private readonly IGatewayProcessManager _processManager;
 
@@ -46,6 +46,20 @@ internal sealed class UpdateCommand
     }
 
     internal async Task<int> ExecuteAsync(string repoRoot, string home, int port, bool verbose, CancellationToken cancellationToken)
+    {
+        // Steps 1–3: git pull, build, deploy extensions
+        var preStopResult = await RunPreStopStepsAsync(repoRoot, home, verbose, cancellationToken);
+        if (preStopResult != 0)
+            return preStopResult;
+
+        return await RunRestartAsync(home, port, repoRoot, cancellationToken);
+    }
+
+    /// <summary>
+    /// Runs git pull, build, and extension deploy steps before the gateway restart.
+    /// Protected virtual so tests can override it to skip real git/build operations.
+    /// </summary>
+    protected virtual async Task<int> RunPreStopStepsAsync(string repoRoot, string home, bool verbose, CancellationToken cancellationToken)
     {
         // Step 1: git pull
         AnsiConsole.MarkupLine("[blue][[update]][/] Checking for updates...");
@@ -87,11 +101,29 @@ internal sealed class UpdateCommand
         ServeCommand.DeployExtensions(repoRoot, home, verbose);
         AnsiConsole.MarkupLine("[blue][[update]][/] [green]\u2713[/] Extensions deployed");
 
-        // Step 4: Stop old gateway
+        return 0;
+    }
+
+    private async Task<int> RunRestartAsync(string home, int port, string repoRoot, CancellationToken cancellationToken)
+    {
         AnsiConsole.MarkupLine("[blue][[update]][/] Restarting gateway...");
-        await _processManager.StopAsync(home, cancellationToken);
+        var stopResult = await _processManager.StopAsync(home, cancellationToken);
+        if (!stopResult.Success)
+        {
+            AnsiConsole.MarkupLine($"[red][[update]][/] \u2717 Failed to stop gateway: {Markup.Escape(stopResult.Message ?? "Unknown")}");
+            AnsiConsole.MarkupLine("[yellow][[update]][/] Tip: try 'botnexus gateway stop' manually first.");
+            return 1;
+        }
 
         await Task.Delay(1000, cancellationToken);
+
+        // Step 4b: Verify the port is actually free before starting new gateway
+        if (!IsPortAvailable(port))
+        {
+            AnsiConsole.MarkupLine($"[red][[update]][/] \u2717 Port {port} is still in use after stopping gateway.");
+            AnsiConsole.MarkupLine("[yellow][[update]][/] Tip: try 'botnexus gateway stop' manually or kill the process on that port.");
+            return 1;
+        }
 
         // Step 5: Start new gateway
         var gatewayDll = Path.Combine(repoRoot, "src", "gateway", "BotNexus.Gateway.Api", "bin", "Release", "net10.0", "BotNexus.Gateway.Api.dll");
@@ -201,4 +233,24 @@ internal sealed class UpdateCommand
     }
 
     private static string Short(string sha) => sha.Length >= 7 ? sha[..7] : sha;
+
+    /// <summary>
+    /// Checks if a TCP port is available for binding. Mirrors ServeCommand.IsPortAvailable.
+    /// Used to verify the port is free before starting the new gateway process.
+    /// </summary>
+    internal static bool IsPortAvailable(int port)
+    {
+        try
+        {
+            using var listener = new TcpListener(System.Net.IPAddress.Loopback, port);
+            listener.Server.ExclusiveAddressUse = true;
+            listener.Start();
+            listener.Stop();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }

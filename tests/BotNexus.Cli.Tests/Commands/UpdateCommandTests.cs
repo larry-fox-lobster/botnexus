@@ -7,6 +7,18 @@ namespace BotNexus.Cli.Tests.Commands;
 
 public class UpdateCommandTests
 {
+    /// <summary>
+    /// Test subclass that bypasses git pull and build steps so unit tests
+    /// can focus on the stop/restart logic without running real git/dotnet build.
+    /// </summary>
+    private sealed class NoOpPreStopUpdateCommand(IGatewayProcessManager processManager)
+        : UpdateCommand(processManager)
+    {
+        protected override Task<int> RunPreStopStepsAsync(
+            string repoRoot, string home, bool verbose, CancellationToken cancellationToken)
+            => Task.FromResult(0);
+    }
+
     private static UpdateCommand BuildCommand()
     {
         var pm = Substitute.For<IGatewayProcessManager>();
@@ -36,6 +48,72 @@ public class UpdateCommandTests
         names.ShouldContain("source");
         names.ShouldContain("target");
         names.ShouldContain("port");
+    }
+
+    [Fact]
+    public async Task Update_WhenStopFails_ReturnsNonZeroAndDoesNotStartGateway()
+    {
+        var pm = Substitute.For<IGatewayProcessManager>();
+        pm.StopAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new GatewayStopResult(false, "Kill failed"));
+        var cmd = new NoOpPreStopUpdateCommand(pm);
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"botnexus-update-stopfail-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            var exitCode = await cmd.ExecuteAsync(
+                repoRoot: tempDir,
+                home: tempDir,
+                port: 5005,
+                verbose: false,
+                cancellationToken: CancellationToken.None);
+
+            exitCode.ShouldNotBe(0);
+            await pm.DidNotReceive().StartAsync(Arg.Any<GatewayStartOptions>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Update_WhenGatewayStillRunningAfterStop_DoesNotStartGateway()
+    {
+        // Bind a real TCP port so IsPortAvailable(port) returns false.
+        // This simulates the gateway surviving stop (port still in use).
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var busyPort = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+        var pm = Substitute.For<IGatewayProcessManager>();
+        pm.StopAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new GatewayStopResult(true, "Stopped"));
+        var cmd = new NoOpPreStopUpdateCommand(pm);
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"botnexus-update-portbusy-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            var exitCode = await cmd.ExecuteAsync(
+                repoRoot: tempDir,
+                home: tempDir,
+                port: busyPort,
+                verbose: false,
+                cancellationToken: CancellationToken.None);
+
+            // Should fail because port is still in use after stop
+            exitCode.ShouldNotBe(0);
+            await pm.DidNotReceive().StartAsync(Arg.Any<GatewayStartOptions>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            listener.Stop();
+            Directory.Delete(tempDir, recursive: true);
+        }
     }
 
     [Fact]
