@@ -17,7 +17,7 @@ public class MessageFlowTests : E2ETestBase
         await SelectAgentAsync(AgentId);
         await Page.WaitForSelectorAsync(".conversation-list-item", new() { Timeout = 10000, State = WaitForSelectorState.Attached });
 
-        await Page.Locator(".conversation-list-item").First.ClickAsync();
+        await SelectDefaultConversationAsync();
         await Page.WaitForTimeoutAsync(500);
 
         // The chat input is a textarea with class "chat-input"
@@ -46,7 +46,7 @@ public class MessageFlowTests : E2ETestBase
         await WaitForPortalReadyAsync();
         await SelectAgentAsync(AgentId);
         await Page.WaitForSelectorAsync(".conversation-list-item", new() { Timeout = 10000, State = WaitForSelectorState.Attached });
-        await Page.Locator(".conversation-list-item").First.ClickAsync();
+        await SelectDefaultConversationAsync();
 
         var input = Page.Locator("textarea.chat-input").First;
         await input.FillAsync("Reply with one word: OK");
