@@ -44,6 +44,19 @@ public sealed record InboundMessage
     /// <summary>Extensible metadata from the channel adapter.</summary>
     public IReadOnlyDictionary<string, object?> Metadata { get; init; } =
         new Dictionary<string, object?>();
+
+    /// <summary>
+    /// Native thread or topic identifier within the channel address.
+    /// For Telegram group topics, Signal threads, Teams threads, etc.
+    /// When non-null, used to route into a thread-specific conversation binding.
+    /// </summary>
+    public string? ThreadId { get; init; }
+
+    /// <summary>
+    /// The channel binding ID this message arrived on, if known.
+    /// Used by fan-out to exclude the originating binding from echo.
+    /// </summary>
+    public string? BindingId { get; init; }
 }
 
 /// <summary>
@@ -62,6 +75,26 @@ public sealed record OutboundMessage
 
     /// <summary>The session this message belongs to.</summary>
     public string? SessionId { get; init; }
+
+    /// <summary>
+    /// Native thread or topic identifier for the target channel.
+    /// When non-null, adapters should deliver the message into the specified thread
+    /// (e.g. Telegram <c>message_thread_id</c>, Teams thread id).
+    /// </summary>
+    public string? ThreadId { get; init; }
+
+    /// <summary>
+    /// Stable identifier of the channel binding that this message is being sent to.
+    /// Populated during fan-out to allow adapters and logging to correlate delivery.
+    /// </summary>
+    public string? BindingId { get; init; }
+
+    /// <summary>
+    /// Optional display prefix prepended to outbound content when
+    /// <see cref="BotNexus.Gateway.Abstractions.Models.ThreadingMode.Prefix"/> is in use.
+    /// Null when no prefix is needed.
+    /// </summary>
+    public string? DisplayPrefix { get; init; }
 
     /// <summary>Extensible metadata for the channel adapter.</summary>
     public IReadOnlyDictionary<string, object?> Metadata { get; init; } =

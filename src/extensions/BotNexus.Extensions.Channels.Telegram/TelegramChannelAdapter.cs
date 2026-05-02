@@ -127,8 +127,13 @@ public sealed class TelegramChannelAdapter(
 
         EnsureChatAllowed(chatId);
         var formatted = BuildOutboundText(message.Content, message.Metadata);
+        // Parse thread id from the outbound message so we can deliver into the correct forum topic.
+        int? threadId = null;
+        if (!string.IsNullOrEmpty(message.ThreadId) && int.TryParse(message.ThreadId, out var parsedThreadId))
+            threadId = parsedThreadId;
+
         foreach (var chunk in SplitMessage(formatted, Math.Max(1, _options.MaxMessageLength)))
-            await _apiClient.SendMessageAsync(chatId, chunk, cancellationToken);
+            await _apiClient.SendMessageAsync(chatId, chunk, threadId, cancellationToken);
     }
 
     public override async Task SendStreamDeltaAsync(
@@ -286,6 +291,11 @@ public sealed class TelegramChannelAdapter(
             SenderId = senderId,
             ChannelAddress = chatIdText,
             Content = message.Text,
+            // Propagate Telegram forum-topic thread id so the conversation router
+            // can route topics into their own conversation bindings.
+            ThreadId = message.MessageThreadId.HasValue
+                ? message.MessageThreadId.Value.ToString(CultureInfo.InvariantCulture)
+                : null,
             Metadata = new Dictionary<string, object?>
             {
                 ["telegramUpdateId"] = update.UpdateId,

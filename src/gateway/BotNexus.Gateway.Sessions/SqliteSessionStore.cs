@@ -6,6 +6,7 @@ using ChannelKey = BotNexus.Domain.Primitives.ChannelKey;
 using MessageRole = BotNexus.Domain.Primitives.MessageRole;
 using SessionType = BotNexus.Domain.Primitives.SessionType;
 using SessionParticipant = BotNexus.Domain.Primitives.SessionParticipant;
+using ConversationId = BotNexus.Domain.Primitives.ConversationId;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Abstractions.Sessions;
 using Microsoft.Data.Sqlite;
@@ -227,7 +228,8 @@ public sealed class SqliteSessionStore : SessionStoreBase
                     status TEXT,
                     metadata TEXT,
                     created_at TEXT,
-                    updated_at TEXT
+                    updated_at TEXT,
+                    conversation_id TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS session_history (
@@ -281,7 +283,8 @@ public sealed class SqliteSessionStore : SessionStoreBase
         foreach (var migration in new[]
                  {
                      ("session_type", "TEXT"),
-                     ("participants_json", "TEXT")
+                     ("participants_json", "TEXT"),
+                     ("conversation_id", "TEXT")
                  })
         {
             try
@@ -313,7 +316,7 @@ public sealed class SqliteSessionStore : SessionStoreBase
     {
         await using var sessionCommand = connection.CreateCommand();
         sessionCommand.CommandText = """
-            SELECT id, agent_id, channel_type, caller_id, session_type, participants_json, status, metadata, created_at, updated_at
+            SELECT id, agent_id, channel_type, caller_id, session_type, participants_json, status, metadata, created_at, updated_at, conversation_id
             FROM sessions
             WHERE id = $sessionId
             """;
@@ -336,6 +339,10 @@ public sealed class SqliteSessionStore : SessionStoreBase
         if (string.IsNullOrWhiteSpace(agentIdValue))
             return null;
 
+        ConversationId? conversationId = null;
+        if (reader.FieldCount > 10 && !reader.IsDBNull(10))
+            conversationId = ConversationId.From(reader.GetString(10));
+
         var session = new GatewaySession
         {
             SessionId = SessionId.From(reader.GetString(0)),
@@ -349,6 +356,7 @@ public sealed class SqliteSessionStore : SessionStoreBase
             UpdatedAt = updatedAt,
             Metadata = metadata
         };
+        session.Session.ConversationId = conversationId;
 
         await reader.DisposeAsync().ConfigureAwait(false);
 
@@ -393,8 +401,8 @@ public sealed class SqliteSessionStore : SessionStoreBase
     {
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            INSERT INTO sessions (id, agent_id, channel_type, caller_id, session_type, participants_json, status, metadata, created_at, updated_at)
-            VALUES ($id, $agentId, $channelType, $callerId, $sessionType, $participantsJson, $status, $metadata, $createdAt, $updatedAt)
+            INSERT INTO sessions (id, agent_id, channel_type, caller_id, session_type, participants_json, status, metadata, created_at, updated_at, conversation_id)
+            VALUES ($id, $agentId, $channelType, $callerId, $sessionType, $participantsJson, $status, $metadata, $createdAt, $updatedAt, $conversationId)
             ON CONFLICT(id) DO UPDATE SET
                 agent_id = excluded.agent_id,
                 channel_type = excluded.channel_type,
@@ -404,7 +412,8 @@ public sealed class SqliteSessionStore : SessionStoreBase
                 status = excluded.status,
                 metadata = excluded.metadata,
                 created_at = excluded.created_at,
-                updated_at = excluded.updated_at
+                updated_at = excluded.updated_at,
+                conversation_id = excluded.conversation_id
             """;
         command.Parameters.AddWithValue("$id", session.SessionId.Value);
         command.Parameters.AddWithValue("$agentId", session.AgentId.Value);
@@ -416,6 +425,7 @@ public sealed class SqliteSessionStore : SessionStoreBase
         command.Parameters.AddWithValue("$metadata", JsonSerializer.Serialize(session.Metadata, JsonOptions));
         command.Parameters.AddWithValue("$createdAt", session.CreatedAt.ToString("O"));
         command.Parameters.AddWithValue("$updatedAt", session.UpdatedAt.ToString("O"));
+        command.Parameters.AddWithValue("$conversationId", (object?)session.Session.ConversationId?.Value ?? DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 

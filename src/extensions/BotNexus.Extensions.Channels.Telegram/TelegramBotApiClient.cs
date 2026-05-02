@@ -19,14 +19,17 @@ public sealed class TelegramBotApiClient(
     private readonly ILogger<TelegramBotApiClient> _logger = logger;
 
     public Task<TelegramMessage> SendMessageAsync(long chatId, string text, CancellationToken cancellationToken = default)
+        => SendMessageAsync(chatId, text, messageThreadId: null, cancellationToken);
+
+    /// <summary>
+    /// Sends a text message, optionally into a forum topic thread.
+    /// </summary>
+    public Task<TelegramMessage> SendMessageAsync(long chatId, string text, int? messageThreadId, CancellationToken cancellationToken = default)
         => PostForResultAsync<TelegramMessage>(
             "sendMessage",
-            new
-            {
-                chat_id = chatId,
-                text,
-                parse_mode = "MarkdownV2"
-            },
+            messageThreadId.HasValue
+                ? new { chat_id = chatId, text, parse_mode = "MarkdownV2", message_thread_id = messageThreadId.Value }
+                : (object)new { chat_id = chatId, text, parse_mode = "MarkdownV2" },
             cancellationToken);
 
     public Task<TelegramMessage> EditMessageTextAsync(

@@ -41,7 +41,7 @@ public interface IConversationRouter
     /// </summary>
     Task<IReadOnlyList<ChannelBinding>> GetOutboundBindingsAsync(
         SessionId sessionId,
-        string originatingChannelAddress,
+        string? originatingBindingId,
         CancellationToken ct = default);
 }
 

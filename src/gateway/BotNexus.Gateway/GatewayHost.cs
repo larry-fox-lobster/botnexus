@@ -263,7 +263,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
                     AgentId.From(agentId),
                     message.ChannelType,
                     message.ChannelAddress ?? string.Empty,
-                    threadId: null,
+                    threadId: message.ThreadId,
                     cancellationToken);
                 sessionId = routingResult.SessionId.Value;
                 resolvedConversationId = routingResult.Conversation.ConversationId;
@@ -764,7 +764,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
         {
             var otherBindings = await _conversationRouter.GetOutboundBindingsAsync(
                 SessionId.From(sessionId),
-                message.ChannelAddress,
+                message.BindingId,
                 cancellationToken);
 
             if (otherBindings.Count == 0)
@@ -797,7 +797,12 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
                         ChannelType = binding.ChannelType,
                         ChannelAddress = binding.ChannelAddress,
                         Content = lastAssistantEntry.Content,
-                        SessionId = sessionId
+                        SessionId = sessionId,
+                        // Binding-aware fields: let the adapter deliver into the right thread/topic
+                        // and render prefix decoration when configured.
+                        ThreadId = binding.ThreadId,
+                        BindingId = binding.BindingId,
+                        DisplayPrefix = binding.DisplayPrefix
                     }, cancellationToken);
 
                     _logger.LogDebug(
