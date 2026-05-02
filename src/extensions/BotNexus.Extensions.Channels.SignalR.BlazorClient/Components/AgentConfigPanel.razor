@@ -36,7 +36,7 @@
 
                     <div class="config-field">
                         <label>Session ID</label>
-                        <span class="config-value mono">@(Agent?.SessionId ?? "—")</span>
+                        <span class="config-value mono">@(Agent?.ActiveConversationSessionId ?? "—")</span>
                     </div>
 
                     <div class="config-field">
@@ -226,11 +226,11 @@
 
             await ComputeInheritanceBadgesAsync(apiBase);
 
-            if (Agent.SessionId is not null)
+            if (Agent.ActiveConversationSessionId is not null)
             {
                 try
                 {
-                    var context = await Http.GetFromJsonAsync<ContextInfoDto>($"{apiBase}agents/{AgentId}/sessions/{Agent.SessionId}/context");
+                    var context = await Http.GetFromJsonAsync<ContextInfoDto>($"{apiBase}agents/{AgentId}/sessions/{Agent.ActiveConversationSessionId}/context");
                     _contextSize = context?.SystemPromptTokens is not null
                         ? $"{context.SystemPromptTokens:N0} tokens"
                         : "—";

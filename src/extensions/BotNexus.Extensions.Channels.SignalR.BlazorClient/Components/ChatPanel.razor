@@ -297,7 +297,7 @@
     private bool IsStreaming =>
         Agent?.ActiveConversationId is string activeConvId
             ? Store.GetStreamState(activeConvId).IsStreaming
-            : Agent?.IsStreaming ?? false;
+            : false; // no active conversation = not streaming
     private bool IsReadOnly => Agent?.IsReadOnly ?? false;
     private bool IsConnected => Agent?.IsConnected ?? false;
     private bool ShowThinking => Agent?.ShowThinking ?? true;

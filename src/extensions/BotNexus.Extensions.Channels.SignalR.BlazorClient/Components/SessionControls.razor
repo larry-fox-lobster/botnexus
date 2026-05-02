@@ -3,11 +3,11 @@
 @implements IDisposable
 
 <div class="session-controls">
-    @if (Agent?.SessionId is not null)
+    @if (Agent?.ActiveConversationSessionId is not null)
     {
-        <span class="session-id clickable" title="Click to copy session ID: @Agent.SessionId"
+        <span class="session-id clickable" title="Click to copy session ID: @Agent.ActiveConversationSessionId"
               @onclick="CopySessionId">
-            📋 @Agent.SessionId[..Math.Min(8, Agent.SessionId.Length)]…
+            📋 @Agent.ActiveConversationSessionId[..Math.Min(8, Agent.ActiveConversationSessionId.Length)]…
         </span>
     }
 </div>
@@ -38,10 +38,10 @@
 
     private async Task CopySessionId()
     {
-        if (Agent?.SessionId is null) return;
+        if (Agent?.ActiveConversationSessionId is null) return;
         try
         {
-            await JS.InvokeAsync<bool>("BotNexus.copyToClipboard", Agent.SessionId);
+            await JS.InvokeAsync<bool>("BotNexus.copyToClipboard", Agent.ActiveConversationSessionId);
             _copied = true;
             StateHasChanged();
             await Task.Delay(1500);

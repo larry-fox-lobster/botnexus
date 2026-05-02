@@ -74,13 +74,13 @@ public sealed class AgentInteractionService : IAgentInteractionService
     public async Task SteerAsync(string agentId, string content)
     {
         var agent = _store.GetAgent(agentId);
-        if (agent?.SessionId is null) return;
+        if (agent?.ActiveConversationSessionId is null) return;
 
         AppendUserMessage(agentId, $"🔀 {content}");
 
         try
         {
-            await _hub.SteerAsync(agentId, agent.SessionId, content);
+            await _hub.SteerAsync(agentId, agent.ActiveConversationSessionId!, content);
         }
         catch (Exception ex)
         {
@@ -91,13 +91,13 @@ public sealed class AgentInteractionService : IAgentInteractionService
     public async Task FollowUpAsync(string agentId, string content)
     {
         var agent = _store.GetAgent(agentId);
-        if (agent?.SessionId is null) return;
+        if (agent?.ActiveConversationSessionId is null) return;
 
         AppendUserMessage(agentId, content);
 
         try
         {
-            await _hub.FollowUpAsync(agentId, agent.SessionId, content);
+            await _hub.FollowUpAsync(agentId, agent.ActiveConversationSessionId!, content);
         }
         catch (Exception ex)
         {
@@ -108,11 +108,11 @@ public sealed class AgentInteractionService : IAgentInteractionService
     public async Task AbortAsync(string agentId)
     {
         var agent = _store.GetAgent(agentId);
-        if (agent?.SessionId is null) return;
+        if (agent?.ActiveConversationSessionId is null) return;
 
         try
         {
-            await _hub.AbortAsync(agentId, agent.SessionId);
+            await _hub.AbortAsync(agentId, agent.ActiveConversationSessionId!);
         }
         catch (Exception ex)
         {
@@ -125,7 +125,7 @@ public sealed class AgentInteractionService : IAgentInteractionService
     public async Task ResetSessionAsync(string agentId)
     {
         var agent = _store.GetAgent(agentId);
-        if (agent?.SessionId is null) return;
+        if (agent?.ActiveConversationSessionId is null) return;
 
         // Invalidate cached history so the reset conversation doesn't surface stale messages
         if (_featureFlags?.ConversationHistoryCache == true && _cache is not null &&
@@ -136,7 +136,7 @@ public sealed class AgentInteractionService : IAgentInteractionService
 
         try
         {
-            await _hub.ResetSessionAsync(agentId, agent.SessionId);
+            await _hub.ResetSessionAsync(agentId, agent.ActiveConversationSessionId!);
             // Server will send SessionReset event; GatewayEventHandler handles it
         }
         catch (Exception ex)
@@ -148,11 +148,11 @@ public sealed class AgentInteractionService : IAgentInteractionService
     public async Task<CompactSessionResult?> CompactSessionAsync(string agentId)
     {
         var agent = _store.GetAgent(agentId);
-        if (agent?.SessionId is null) return null;
+        if (agent?.ActiveConversationSessionId is null) return null;
 
         try
         {
-            var result = await _hub.CompactSessionAsync(agentId, agent.SessionId);
+            var result = await _hub.CompactSessionAsync(agentId, agent.ActiveConversationSessionId!);
             var convId = agent.ActiveConversationId;
             if (convId is not null && agent.Conversations.GetValueOrDefault(convId) is { } conv)
             {
