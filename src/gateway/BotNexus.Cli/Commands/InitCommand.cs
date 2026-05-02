@@ -50,7 +50,7 @@ internal sealed class InitCommand
         {
             Gateway = new GatewaySettingsConfig
             {
-                ListenUrl = "http://localhost:5005",
+                ListenUrl = "http://0.0.0.0:5005",
                 DefaultAgentId = "assistant",
                 SessionStore = new SessionStoreConfig
                 {
