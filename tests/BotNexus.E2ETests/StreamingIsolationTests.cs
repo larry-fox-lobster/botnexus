@@ -7,7 +7,7 @@ namespace BotNexus.E2ETests;
 /// </summary>
 public sealed class StreamingIsolationTests : E2ETestBase
 {
-    [Fact]
+    [SkippableFact]
     public async Task SwitchConversation_WhileStreaming_SendButtonDoesNotBecomeSteer()
     {
         // This test verifies that IsStreaming state is per-conversation,
@@ -63,7 +63,7 @@ public sealed class StreamingIsolationTests : E2ETestBase
             "Send button must not be disabled in a non-streaming conversation");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ActiveConversation_WhileStreaming_ShowsSteerNotSend()
     {
         // Verify the CORRECT state: the actively streaming conversation shows Steer
