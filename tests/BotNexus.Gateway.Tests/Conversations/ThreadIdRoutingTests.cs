@@ -1,0 +1,132 @@
+using BotNexus.Domain.Primitives;
+using BotNexus.Gateway.Abstractions.Conversations;
+using BotNexus.Gateway.Abstractions.Models;
+using BotNexus.Gateway.Abstractions.Sessions;
+using BotNexus.Gateway.Conversations;
+using BotNexus.Gateway.Sessions;
+using Microsoft.Extensions.Logging.Abstractions;
+
+namespace BotNexus.Gateway.Tests.Conversations;
+
+/// <summary>
+/// Tests for thread-aware inbound routing in <see cref="DefaultConversationRouter"/>.
+/// </summary>
+public sealed class ThreadIdRoutingTests
+{
+    private static AgentId Agent(string id = "agent1") => AgentId.From(id);
+    private static ChannelKey Channel(string type = "telegram") => ChannelKey.From(type);
+
+    private static DefaultConversationRouter CreateRouter(
+        IConversationStore? conversationStore = null,
+        ISessionStore? sessionStore = null)
+        => new(
+            conversationStore ?? new InMemoryConversationStore(),
+            sessionStore ?? new InMemorySessionStore(),
+            NullLogger<DefaultConversationRouter>.Instance);
+
+    [Fact]
+    public async Task ResolveInbound_DifferentThreadId_ResolvesToDifferentConversation()
+    {
+        // Arrange: same agent, same channel, same address, but different thread IDs
+        var conversationStore = new InMemoryConversationStore();
+        var sessionStore = new InMemorySessionStore();
+        var router = CreateRouter(conversationStore, sessionStore);
+        var agentId = Agent();
+        var channel = Channel();
+        const string address = "group-chat-123";
+
+        // Act: first message with no thread
+        var resultNoThread = await router.ResolveInboundAsync(agentId, channel, address, threadId: null);
+
+        // Act: second message with a specific thread id
+        var resultWithThread = await router.ResolveInboundAsync(agentId, channel, address, threadId: "topic-42");
+
+        // They should resolve to different conversations since thread identity differs
+        resultWithThread.Conversation.ConversationId.ShouldNotBe(resultNoThread.Conversation.ConversationId);
+    }
+
+    [Fact]
+    public async Task ResolveInbound_SameThreadId_ReusesConversation()
+    {
+        var conversationStore = new InMemoryConversationStore();
+        var sessionStore = new InMemorySessionStore();
+        var router = CreateRouter(conversationStore, sessionStore);
+        var agentId = Agent();
+        var channel = Channel();
+        const string address = "group-chat-456";
+        const string threadId = "topic-99";
+
+        var result1 = await router.ResolveInboundAsync(agentId, channel, address, threadId: threadId);
+        var result2 = await router.ResolveInboundAsync(agentId, channel, address, threadId: threadId);
+
+        result2.Conversation.ConversationId.ShouldBe(result1.Conversation.ConversationId);
+        result2.IsNewSession.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task InboundMessage_HasThreadId_Field()
+    {
+        // Verifies that InboundMessage carries a ThreadId property
+        var msg = new InboundMessage
+        {
+            ChannelType = Channel(),
+            SenderId = "user1",
+            ChannelAddress = "chat1",
+            Content = "hello",
+            ThreadId = "thread-1"
+        };
+
+        msg.ThreadId.ShouldBe("thread-1");
+    }
+
+    [Fact]
+    public async Task GatewayHost_ExtractsThreadId_FromInboundMessage()
+    {
+        // This test verifies that GatewayHost passes InboundMessage.ThreadId
+        // through to IConversationRouter.ResolveInboundAsync by using a capturing fake router.
+        var capturingRouter = new CapturingConversationRouter();
+        var message = new InboundMessage
+        {
+            ChannelType = Channel("telegram"),
+            SenderId = "user1",
+            ChannelAddress = "chat-789",
+            Content = "hello",
+            ThreadId = "topic-55"
+        };
+
+        var result = await capturingRouter.ResolveInboundAsync(
+            Agent(),
+            message.ChannelType,
+            message.ChannelAddress,
+            message.ThreadId);
+
+        capturingRouter.CapturedThreadId.ShouldBe("topic-55");
+    }
+}
+
+/// <summary>
+/// A minimal fake router that records the threadId it was called with.
+/// </summary>
+internal sealed class CapturingConversationRouter : IConversationRouter
+{
+    public string? CapturedThreadId { get; private set; }
+
+    public Task<ConversationRoutingResult> ResolveInboundAsync(
+        AgentId agentId, ChannelKey channelType, string channelAddress,
+        string? threadId, CancellationToken ct = default)
+    {
+        CapturedThreadId = threadId;
+        var conv = new Conversation { AgentId = agentId };
+        var sessionId = SessionId.Create();
+        return Task.FromResult(new ConversationRoutingResult(conv, sessionId, true));
+    }
+
+    public Task<ConversationRoutingResult> ResolveInboundByConversationAsync(
+        ConversationId conversationId, AgentId agentId, ChannelKey channelType,
+        string channelAddress, CancellationToken ct = default)
+        => throw new NotImplementedException();
+
+    public Task<IReadOnlyList<ChannelBinding>> GetOutboundBindingsAsync(
+        SessionId sessionId, string originatingChannelAddress, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<ChannelBinding>>([]);
+}

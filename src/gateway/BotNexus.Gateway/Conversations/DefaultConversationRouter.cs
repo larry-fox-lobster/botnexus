@@ -43,8 +43,29 @@ public sealed class DefaultConversationRouter : IConversationRouter
         var addedBinding = false;
         if (conversation is null)
         {
-            // 2. Fall back to the agent's default conversation and add a binding
-            conversation = await _conversationStore.GetOrCreateDefaultAsync(agentId, ct);
+            if (threadId is not null)
+            {
+                // A non-null thread id means this is a distinct sub-channel (e.g. Telegram topic).
+                // Create a new conversation so the thread gets its own history.
+                conversation = new Conversation
+                {
+                    ConversationId = ConversationId.Create(),
+                    AgentId = agentId,
+                    Title = $"{channelType}:{channelAddress}/{threadId}",
+                    IsDefault = false
+                };
+                _logger.LogDebug(
+                    "Creating new conversation for thread agent={AgentId} channel={ChannelType} address={ChannelAddress} thread={ThreadId}",
+                    agentId, channelType, channelAddress, threadId);
+            }
+            else
+            {
+                // 2. Fall back to the agent's default conversation and add a binding
+                conversation = await _conversationStore.GetOrCreateDefaultAsync(agentId, ct);
+                _logger.LogDebug(
+                    "No conversation found for agent={AgentId} channel={ChannelType} address={ChannelAddress}. Using default conversation {ConversationId}",
+                    agentId, channelType, channelAddress, conversation.ConversationId);
+            }
 
             var binding = new ChannelBinding
             {
@@ -55,10 +76,6 @@ public sealed class DefaultConversationRouter : IConversationRouter
             };
             conversation.ChannelBindings.Add(binding);
             addedBinding = true;
-
-            _logger.LogDebug(
-                "No conversation found for agent={AgentId} channel={ChannelType} address={ChannelAddress}. Using default conversation {ConversationId}",
-                agentId, channelType, channelAddress, conversation.ConversationId);
         }
 
         // 3. Resolve or create the active session

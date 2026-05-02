@@ -46,6 +46,10 @@ public sealed record TelegramMessage
     [JsonPropertyName("message_id")]
     public int MessageId { get; init; }
 
+    /// <summary>Topic/thread id for forum-group messages. Null for regular chats and DMs.</summary>
+    [JsonPropertyName("message_thread_id")]
+    public int? MessageThreadId { get; init; }
+
     [JsonPropertyName("chat")]
     public TelegramChat? Chat { get; init; }
 

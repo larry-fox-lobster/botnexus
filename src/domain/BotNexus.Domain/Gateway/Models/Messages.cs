@@ -44,6 +44,13 @@ public sealed record InboundMessage
     /// <summary>Extensible metadata from the channel adapter.</summary>
     public IReadOnlyDictionary<string, object?> Metadata { get; init; } =
         new Dictionary<string, object?>();
+
+    /// <summary>
+    /// Native thread or topic identifier within the channel address.
+    /// For Telegram group topics, Signal threads, Teams threads, etc.
+    /// When non-null, used to route into a thread-specific conversation binding.
+    /// </summary>
+    public string? ThreadId { get; init; }
 }
 
 /// <summary>

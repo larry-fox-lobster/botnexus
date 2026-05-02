@@ -286,6 +286,11 @@ public sealed class TelegramChannelAdapter(
             SenderId = senderId,
             ChannelAddress = chatIdText,
             Content = message.Text,
+            // Propagate Telegram forum-topic thread id so the conversation router
+            // can route topics into their own conversation bindings.
+            ThreadId = message.MessageThreadId.HasValue
+                ? message.MessageThreadId.Value.ToString(CultureInfo.InvariantCulture)
+                : null,
             Metadata = new Dictionary<string, object?>
             {
                 ["telegramUpdateId"] = update.UpdateId,
