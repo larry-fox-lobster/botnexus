@@ -9,12 +9,26 @@ public sealed class AgentInteractionService : IAgentInteractionService
     private readonly IClientStateStore _store;
     private readonly GatewayHubConnection _hub;
     private readonly IGatewayRestClient _restClient;
+    private readonly ConversationHistoryCache? _cache;
+    private readonly FeatureFlagsService? _featureFlags;
 
     public AgentInteractionService(IClientStateStore store, GatewayHubConnection hub, IGatewayRestClient restClient)
     {
         _store = store;
         _hub = hub;
         _restClient = restClient;
+    }
+
+    /// <summary>
+    /// Extended constructor used when the conversation history cache is enabled.
+    /// Injects the cache and feature-flag services required by <see cref="LoadConversationHistoryAsync"/>.
+    /// </summary>
+    public AgentInteractionService(IClientStateStore store, GatewayHubConnection hub, IGatewayRestClient restClient,
+        ConversationHistoryCache cache, FeatureFlagsService featureFlags)
+        : this(store, hub, restClient)
+    {
+        _cache = cache;
+        _featureFlags = featureFlags;
     }
 
     // ── Messaging ─────────────────────────────────────────────────────────
@@ -112,6 +126,13 @@ public sealed class AgentInteractionService : IAgentInteractionService
     {
         var agent = _store.GetAgent(agentId);
         if (agent?.SessionId is null) return;
+
+        // Invalidate cached history so the reset conversation doesn't surface stale messages
+        if (_featureFlags?.ConversationHistoryCache == true && _cache is not null &&
+            agent.ActiveConversationId is { } convId)
+        {
+            await _cache.InvalidateAsync(convId);
+        }
 
         try
         {
@@ -312,6 +333,20 @@ public sealed class AgentInteractionService : IAgentInteractionService
             return;
         }
 
+        // Cache hit: render immediately, then fall through to refresh from server
+        if (_featureFlags?.ConversationHistoryCache == true && _cache is not null)
+        {
+            var cached = await _cache.GetAsync(conversationId);
+            if (cached is { Messages.Count: > 0 })
+            {
+                foreach (var msg in cached.Messages)
+                    conv.Messages.Add(msg);
+                conv.HistoryLoaded = true;
+                _store.NotifyChanged();
+                // Don't return — fall through to refresh cache from server
+            }
+        }
+
         conv.IsLoadingHistory = true;
         _store.NotifyChanged();
 
@@ -320,6 +355,9 @@ public sealed class AgentInteractionService : IAgentInteractionService
             var response = await _restClient.GetHistoryAsync(conversationId, limit: 200);
             if (response?.Entries is { Count: > 0 })
             {
+                // Replace any cache-rendered messages with fresh server data
+                conv.Messages.Clear();
+
                 foreach (var entry in response.Entries)
                 {
                     if (entry.Kind == "boundary")
@@ -352,6 +390,11 @@ public sealed class AgentInteractionService : IAgentInteractionService
             }
 
             conv.HistoryLoaded = true;
+
+            // Write refreshed history to cache
+            if (_featureFlags?.ConversationHistoryCache == true && _cache is not null)
+                await _cache.SetAsync(conversationId, conv.Messages.ToList());
+
             // Sync session ID
             if (agent.ActiveConversationId == conversationId && conv.ActiveSessionId is not null)
                 agent.SessionId = conv.ActiveSessionId;

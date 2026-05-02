@@ -42,8 +42,15 @@ public abstract class E2ETestBase : IAsyncLifetime
         }
 
         Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
-        Browser = await Playwright.Chromium.LaunchAsync(new() { Headless = true });
-        Context = await Browser.NewContextAsync();
+        Browser = await Playwright.Chromium.LaunchAsync(new() 
+        { 
+            Headless = true,
+            Args = ["--disable-cache", "--disk-cache-size=0"]
+        });
+        Context = await Browser.NewContextAsync(new BrowserNewContextOptions
+        {
+            IgnoreHTTPSErrors = true
+        });
         Page = await Context.NewPageAsync();
 
         // Resolve agent ID: prefer "probe" but fall back to first available

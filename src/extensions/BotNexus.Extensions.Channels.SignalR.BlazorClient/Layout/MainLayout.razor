@@ -247,11 +247,17 @@
         UpdateStatus.StatusChanged += HandleStateChanged;
     }
 
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize feature flags before portal load so caching and other
+        // flags are available when PortalLoadService seeds conversations.
+        await FeatureFlags.InitializeAsync();
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await FeatureFlags.InitializeAsync();
             var stored = await JS.InvokeAsync<string?>("localStorage.getItem", SidebarKey);
             _sidebarOpen = stored == "true";
             _isMobile = await JS.InvokeAsync<bool>("chatScroll.isMobileView");
