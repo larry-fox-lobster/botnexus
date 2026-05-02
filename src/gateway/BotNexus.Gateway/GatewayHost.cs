@@ -797,7 +797,12 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
                         ChannelType = binding.ChannelType,
                         ChannelAddress = binding.ChannelAddress,
                         Content = lastAssistantEntry.Content,
-                        SessionId = sessionId
+                        SessionId = sessionId,
+                        // Binding-aware fields: let the adapter deliver into the right thread/topic
+                        // and render prefix decoration when configured.
+                        ThreadId = binding.ThreadId,
+                        BindingId = binding.BindingId,
+                        DisplayPrefix = binding.DisplayPrefix
                     }, cancellationToken);
 
                     _logger.LogDebug(
