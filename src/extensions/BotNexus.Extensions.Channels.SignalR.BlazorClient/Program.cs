@@ -17,5 +17,6 @@ builder.Services.AddScoped<IPortalLoadService, PortalLoadService>();
 builder.Services.AddScoped<PlatformConfigService>();
 builder.Services.AddScoped<GatewayInfoService>();
 builder.Services.AddScoped<FeatureFlagsService>();
+builder.Services.AddScoped<IUpdateStatusService, UpdateStatusService>();
 
 await builder.Build().RunAsync();
