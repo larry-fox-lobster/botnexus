@@ -2,6 +2,7 @@
 @inject IJSRuntime JS
 @inject IClientStateStore Store
 @inject IGatewayRestClient RestClient
+@implements IDisposable
 @using System.Text.Json
 
 @if (_showPanel)
@@ -161,6 +162,18 @@
 }
 
 @code {
+
+    protected override void OnInitialized()
+    {
+        Store.OnChanged += HandleStoreChanged;
+    }
+
+    private void HandleStoreChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Store.OnChanged -= HandleStoreChanged;
+    }
     [Parameter, EditorRequired]
     public string AgentId { get; set; } = default!;
 

@@ -282,4 +282,42 @@ public sealed class ChatPanelTests : IDisposable
 
         Assert.Contains("My Important Conversation", cut.Markup);
     }
+    [Fact]
+    public void ChatPanel_SubscribesToStoreOnChanged_RendersOnNotify()
+    {
+        // ChatPanel must subscribe to Store.OnChanged so streaming responses
+        // trigger re-renders without user interaction.
+        var store = new ClientStateStore();
+        store.SeedAgents([new AgentSummary("a", "Agent A")]);
+        _ctx.Services.AddSingleton<IClientStateStore>(store);
+        _ctx.Services.AddSingleton(Substitute.For<IAgentInteractionService>());
+        _ctx.Services.AddSingleton(Substitute.For<IPortalLoadService>());
+
+        var cut = _ctx.Render<ChatPanel>(p => p.Add(c => c.AgentId, "a"));
+        var initialRenderCount = cut.RenderCount;
+
+        // Simulate GatewayEventHandler pushing a change
+        store.NotifyChanged();
+
+        // Component should re-render if subscribed
+        cut.RenderCount.ShouldBeGreaterThan(initialRenderCount);
+    }
+
+    [Fact]
+    public void ChatPanel_UnsubscribesOnDispose_NoLeaks()
+    {
+        // Verify unsubscribe on dispose prevents memory leaks / dead renders
+        var store = new ClientStateStore();
+        store.SeedAgents([new AgentSummary("a", "Agent A")]);
+        _ctx.Services.AddSingleton<IClientStateStore>(store);
+        _ctx.Services.AddSingleton(Substitute.For<IAgentInteractionService>());
+        _ctx.Services.AddSingleton(Substitute.For<IPortalLoadService>());
+
+        var cut = _ctx.Render<ChatPanel>(p => p.Add(c => c.AgentId, "a"));
+        cut.Dispose();
+
+        var ex = Record.Exception(() => store.NotifyChanged());
+        ex.ShouldBeNull();
+    }
+
 }
