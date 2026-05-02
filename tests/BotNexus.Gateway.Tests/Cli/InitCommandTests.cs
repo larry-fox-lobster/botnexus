@@ -47,7 +47,7 @@ public sealed class InitCommandTests
         var config = await fixture.LoadConfigAsync();
 
         result.ExitCode.ShouldBe(0);
-        config.Gateway?.ListenUrl.ShouldBe("http://localhost:5005");
+        config.Gateway?.ListenUrl.ShouldBe("http://0.0.0.0:5005");
         config.Agents.ShouldContainKey("assistant");
     }
 

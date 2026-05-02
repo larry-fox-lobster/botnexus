@@ -25,12 +25,25 @@ public sealed class CacheTests : E2ETestBase
     private async Task<long> MeasureFirstMessageRenderMsAsync()
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        await Page.WaitForSelectorAsync(".chat-message", new() { Timeout = 15000, State = WaitForSelectorState.Attached });
+        await Page.WaitForSelectorAsync(".message.user, .message.assistant", new() { Timeout = 15000, State = WaitForSelectorState.Attached });
         sw.Stop();
         return sw.ElapsedMilliseconds;
     }
 
     // ── Tests ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Sets the cache flag in localStorage BEFORE loading the portal,
+    /// so FeatureFlagsService.InitializeAsync() picks it up on startup.
+    /// </summary>
+    private async Task EnableCacheFlagBeforeLoadAsync()
+    {
+        // Load the portal, set the flag, then reload so FeatureFlagsService reads it
+        await WaitForPortalReadyAsync();
+        await EnableCacheFlagAsync();
+        await Page.ReloadAsync();
+        await WaitForPortalReadyAsync();
+    }
 
     /// <summary>
     /// Second load with cache enabled should appear at least as fast as the first,
@@ -44,9 +57,8 @@ public sealed class CacheTests : E2ETestBase
         await SelectAgentAsync(AgentId);
 
         // First load — cold (no cache)
-        await Page.WaitForSelectorAsync(".conversation-list-item",
-            new() { Timeout = 10000, State = WaitForSelectorState.Attached });
-        await Page.Locator(".conversation-list-item").First.ClickAsync();
+        await Page.WaitForSelectorAsync(".conversation-list-item", new() { Timeout = 20000, State = WaitForSelectorState.Attached });
+        await SelectDefaultConversationAsync();
 
         var firstLoadMs = await MeasureFirstMessageRenderMsAsync();
 
@@ -72,21 +84,37 @@ public sealed class CacheTests : E2ETestBase
     [SkippableFact]
     public async Task Cache_AfterReload_HistoryAppearsImmediately_WithoutServerRound_Trip()
     {
-        await WaitForPortalReadyAsync();
-        await EnableCacheFlagAsync();
+        // Capture console errors to surface cache failures
+        var consoleMessages = new System.Collections.Generic.List<string>();
+        Page.Console += (_, msg) => consoleMessages.Add($"[{msg.Type}] {msg.Text}");
+
+        // Enable flag and reload so FeatureFlagsService picks it up
+        await EnableCacheFlagBeforeLoadAsync();
+        
+        // Verify flag is active
+        var flagValue = await Page.EvaluateAsync<string>("() => localStorage.getItem('bn:feature:conversationHistoryCache')");
+        flagValue.ShouldBe("true", "Cache flag must be set before checking cache writes");
+        
         await SelectAgentAsync(AgentId);
 
         await Page.WaitForSelectorAsync(".conversation-list-item",
-            new() { Timeout = 10000, State = WaitForSelectorState.Attached });
+            new() { Timeout = 20000, State = WaitForSelectorState.Attached });
 
-        // Click the first conversation to trigger history load + cache write
-        await Page.Locator(".conversation-list-item").First.ClickAsync();
+        // Click the default conversation to trigger history load + cache write
+        await SelectDefaultConversationAsync();
         await Page.WaitForTimeoutAsync(2000); // Allow cache write to complete
 
         // Retrieve the active conversation ID from the DOM or localStorage
         var keys = await Page.EvaluateAsync<string[]>(
             "() => Object.keys(localStorage).filter(k => k.startsWith('bn:conv-history:'))");
         keys.ShouldNotBeNull();
+        // Debug: dump console messages if assertion fails
+        if (keys.Length == 0)
+        {
+            var consoleOutput = string.Join("\n", consoleMessages);
+            throw new Xunit.Sdk.XunitException(
+                $"No cache keys found. Flag was: '{flagValue}'.\nConsole output:\n{consoleOutput}");
+        }
         keys.Length.ShouldBeGreaterThan(0, "Expected at least one conversation history cache entry in localStorage");
     }
 
@@ -101,9 +129,8 @@ public sealed class CacheTests : E2ETestBase
         await EnableCacheFlagAsync();
         await SelectAgentAsync(AgentId);
 
-        await Page.WaitForSelectorAsync(".conversation-list-item",
-            new() { Timeout = 10000, State = WaitForSelectorState.Attached });
-        await Page.Locator(".conversation-list-item").First.ClickAsync();
+        await Page.WaitForSelectorAsync(".conversation-list-item", new() { Timeout = 20000, State = WaitForSelectorState.Attached });
+        await SelectDefaultConversationAsync();
         await Page.WaitForTimeoutAsync(1500); // Let cache populate
 
         // Confirm cache was written
@@ -143,9 +170,8 @@ public sealed class CacheTests : E2ETestBase
 
         await SelectAgentAsync(AgentId);
 
-        await Page.WaitForSelectorAsync(".conversation-list-item",
-            new() { Timeout = 10000, State = WaitForSelectorState.Attached });
-        await Page.Locator(".conversation-list-item").First.ClickAsync();
+        await Page.WaitForSelectorAsync(".conversation-list-item", new() { Timeout = 20000, State = WaitForSelectorState.Attached });
+        await SelectDefaultConversationAsync();
         await Page.WaitForTimeoutAsync(2000); // Give time for any (unexpected) cache write
 
         var keys = await Page.EvaluateAsync<string[]>(

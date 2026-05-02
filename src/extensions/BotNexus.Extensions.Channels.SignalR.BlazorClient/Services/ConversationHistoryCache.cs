@@ -63,9 +63,10 @@ public sealed class ConversationHistoryCache
             var json = JsonSerializer.Serialize(entry, JsonOptions);
             await _js.InvokeVoidAsync("localStorage.setItem", CacheKey(conversationId), json);
         }
-        catch
+        catch (Exception ex)
         {
-            // Non-fatal — caching is best-effort
+            // Log so E2E tests can surface the actual failure reason
+            Console.Error.WriteLine($"ConversationHistoryCache.SetAsync failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 

@@ -19,7 +19,7 @@ public abstract class E2ETestBase : IAsyncLifetime
     protected IPage Page { get; private set; } = default!;
 
     protected const string BaseUrl = "http://localhost:5006";
-    protected const string PreferredAgentId = "probe";
+    protected const string PreferredAgentId = "assistant";
     protected string AgentId { get; private set; } = PreferredAgentId;
 
     public async Task InitializeAsync()
@@ -42,8 +42,15 @@ public abstract class E2ETestBase : IAsyncLifetime
         }
 
         Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
-        Browser = await Playwright.Chromium.LaunchAsync(new() { Headless = true });
-        Context = await Browser.NewContextAsync();
+        Browser = await Playwright.Chromium.LaunchAsync(new() 
+        { 
+            Headless = true,
+            Args = ["--disable-cache", "--disk-cache-size=0"]
+        });
+        Context = await Browser.NewContextAsync(new BrowserNewContextOptions
+        {
+            IgnoreHTTPSErrors = true
+        });
         Page = await Context.NewPageAsync();
 
         // Resolve agent ID: prefer "probe" but fall back to first available
@@ -103,4 +110,18 @@ public abstract class E2ETestBase : IAsyncLifetime
         await dropdown.SelectOptionAsync(new SelectOptionValue { Value = agentId });
         await Page.WaitForTimeoutAsync(500);
     }
+    /// <summary>
+    /// Clicks the Default conversation (one with the default badge).
+    /// Falls back to first available if no default badge found.
+    /// </summary>
+    protected async Task SelectDefaultConversationAsync()
+    {
+        var defaultConv = Page.Locator(".conversation-list-item:has(.conversation-default-badge)");
+        if (await defaultConv.CountAsync() > 0)
+            await defaultConv.First.ClickAsync();
+        else
+            await Page.Locator(".conversation-list-item").First.ClickAsync();
+        await Page.WaitForTimeoutAsync(500);
+    }
+
 }
