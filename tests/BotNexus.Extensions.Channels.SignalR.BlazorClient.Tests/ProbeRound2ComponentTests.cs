@@ -26,6 +26,7 @@ public sealed class ProbeRound2ComponentTests : IDisposable
         _ctx.Services.AddSingleton(_interaction);
         _ctx.Services.AddSingleton(Substitute.For<IGatewayRestClient>());
         _ctx.Services.AddSingleton(new HttpClient());
+        _ctx.Services.AddSingleton(Substitute.For<IUpdateStatusService>());
         _ctx.JSInterop.Mode = JSRuntimeMode.Loose;
     }
 

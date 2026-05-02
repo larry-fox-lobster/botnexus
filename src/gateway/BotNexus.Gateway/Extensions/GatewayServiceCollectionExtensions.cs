@@ -177,6 +177,13 @@ public static class GatewayServiceCollectionExtensions
         services.AddHostedService<SessionCleanupService>();
         services.AddHostedService<MemoryIndexer>();
 
+        // Auto-update: register once as singleton, expose as interface and hosted service.
+        services.AddSingleton<Updates.UpdateCheckService>();
+        services.AddSingleton<Updates.IUpdateCheckService>(sp =>
+            sp.GetRequiredService<Updates.UpdateCheckService>());
+        services.AddHostedService(sp =>
+            sp.GetRequiredService<Updates.UpdateCheckService>());
+
         // Default agent configuration from BotNexusHome (~/.botnexus/agents/)
         // This ensures agents created via the API are always persisted to disk.
         // Platform config can override this with an explicit agentsDirectory.
