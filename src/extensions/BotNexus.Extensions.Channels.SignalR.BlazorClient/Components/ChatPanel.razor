@@ -294,7 +294,10 @@
     private string DisplayName => Agent?.DisplayName ?? AgentId;
     private string? ActiveConversationId => Agent?.ActiveConversationId;
     private string? ActiveConversationTitle => ActiveConversation?.Title;
-    private bool IsStreaming => Agent?.IsStreaming ?? false;
+    private bool IsStreaming =>
+        Agent?.ActiveConversationId is string activeConvId
+            ? Store.GetStreamState(activeConvId).IsStreaming
+            : Agent?.IsStreaming ?? false;
     private bool IsReadOnly => Agent?.IsReadOnly ?? false;
     private bool IsConnected => Agent?.IsConnected ?? false;
     private bool ShowThinking => Agent?.ShowThinking ?? true;

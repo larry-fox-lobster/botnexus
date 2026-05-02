@@ -111,6 +111,7 @@ public sealed class ChatPanelTests : IDisposable
         var agent = CreateAndSeedAgent("agent-1", isStreaming: true);
         _store.SeedConversations("agent-1", [MakeConvDto("conv-1", "agent-1")]);
         _store.SetActiveConversation("agent-1", "conv-1");
+        _store.SetStreaming("conv-1", true); // ChatPanel.IsStreaming reads per-conversation
 
         var cut = _ctx.Render<ChatPanel>(p => p.Add(c => c.AgentId, "agent-1"));
 
@@ -319,5 +320,32 @@ public sealed class ChatPanelTests : IDisposable
         var ex = Record.Exception(() => store.NotifyChanged());
         ex.ShouldBeNull();
     }
+
+    [Fact]
+    public void Streaming_InOtherConversation_DoesNotShowSteerInActiveConversation()
+    {
+        // Regression: switching conversations while agent streams another
+        // conversation caused Send to become Steer in the inactive conversation.
+        CreateAndSeedAgent("agent-1", isStreaming: false);
+        _store.SeedConversations("agent-1", [
+            MakeConvDto("conv-streaming", "agent-1"),
+            MakeConvDto("conv-active", "agent-1")
+        ]);
+
+        // conv-streaming is streaming but NOT the active conversation
+        _store.SetStreaming("conv-streaming", true);
+
+        // Active conversation is conv-active (not streaming)
+        _store.SetActiveConversation("agent-1", "conv-active");
+
+        var cut = _ctx.Render<ChatPanel>(p => p.Add(c => c.AgentId, "agent-1"));
+
+        // Send button must be visible, steer must NOT appear
+        cut.FindAll(".steer-btn").ShouldBeEmpty(
+            "Steer button must not appear when active conversation is not streaming");
+        cut.FindAll(".send-btn").ShouldNotBeEmpty(
+            "Send button must be visible when active conversation is not streaming");
+    }
+
 
 }
