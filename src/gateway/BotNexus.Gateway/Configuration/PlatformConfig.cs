@@ -113,6 +113,48 @@ public sealed class GatewaySettingsConfig
     /// Ignored on non-Windows platforms where bash is always used.
     /// </summary>
     public string? ShellPreference { get; set; }
+
+    /// <summary>Auto-update settings for self-updating the gateway via the BotNexus CLI.</summary>
+    public AutoUpdateConfig? AutoUpdate { get; set; }
+}
+
+/// <summary>
+/// Configuration for the auto-update feature that polls GitHub and spawns the CLI updater.
+/// When <see cref="Enabled"/> is true, both <see cref="CliPath"/> and <see cref="SourcePath"/>
+/// must be provided or <c>POST /api/gateway/update/start</c> will return 412.
+/// </summary>
+public sealed class AutoUpdateConfig
+{
+    /// <summary>Enables background GitHub polling and the update endpoint. Defaults to false.</summary>
+    public bool Enabled { get; set; } = false;
+
+    /// <summary>How often to poll GitHub for a new commit. Minimum 5. Defaults to 60.</summary>
+    public int CheckIntervalMinutes { get; set; } = 60;
+
+    /// <summary>GitHub repository owner. Defaults to <c>sytone</c>.</summary>
+    public string RepositoryOwner { get; set; } = "sytone";
+
+    /// <summary>GitHub repository name. Defaults to <c>botnexus</c>.</summary>
+    public string RepositoryName { get; set; } = "botnexus";
+
+    /// <summary>Branch to track. Defaults to <c>main</c>.</summary>
+    public string Branch { get; set; } = "main";
+
+    /// <summary>
+    /// Absolute path to the BotNexus CLI entry point used to run the update.
+    /// Required when <see cref="Enabled"/> is true.
+    /// If the path ends with <c>.dll</c> it is launched via <c>dotnet</c>; otherwise it is run directly.
+    /// </summary>
+    public string? CliPath { get; set; }
+
+    /// <summary>
+    /// Absolute path to the BotNexus source tree. Passed to the CLI update command as <c>--source</c>.
+    /// Required when <see cref="Enabled"/> is true.
+    /// </summary>
+    public string? SourcePath { get; set; }
+
+    /// <summary>Seconds to wait after returning 202 before calling StopApplication(). Minimum 1. Defaults to 2.</summary>
+    public int ShutdownDelaySeconds { get; set; } = 2;
 }
 
 /// <summary>Named location configuration for resource access.</summary>
