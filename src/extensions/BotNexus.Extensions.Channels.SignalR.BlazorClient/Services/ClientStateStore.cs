@@ -206,12 +206,16 @@ public sealed class ClientStateStore : IClientStateStore
 
         conv.StreamState.IsStreaming = streaming;
 
-        // Keep agent-level IsStreaming in sync
+        // Only update agent-level IsStreaming if this is the active conversation
+        // — prevents streaming state from bleeding into inactive conversations
         foreach (var agent in _agents.Values)
         {
             if (agent.Conversations.ContainsKey(conversationId))
             {
-                agent.IsStreaming = streaming;
+                if (agent.ActiveConversationId == conversationId)
+                    agent.IsStreaming = streaming;
+                else if (streaming == false)
+                    agent.IsStreaming = agent.Conversations.Values.Any(c => c.StreamState.IsStreaming);
                 break;
             }
         }

@@ -100,6 +100,16 @@ public sealed class AgentState
     /// <summary>Active session ID (last established).</summary>
     public string? SessionId { get; set; }
 
+    /// <summary>
+    /// The session ID for the currently active conversation.
+    /// Prefers the active conversation's ActiveSessionId over the agent-level SessionId.
+    /// Use this for actions that target the current conversation (Steer, Abort, Reset, Compact).
+    /// </summary>
+    public string? ActiveConversationSessionId =>
+        ActiveConversationId is not null && Conversations.TryGetValue(ActiveConversationId, out var conv)
+            ? conv.ActiveSessionId ?? SessionId
+            : SessionId;
+
     /// <summary>Channel type for this session.</summary>
     public string? ChannelType { get; set; }
 

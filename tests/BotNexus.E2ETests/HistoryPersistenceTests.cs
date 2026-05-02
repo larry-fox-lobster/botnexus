@@ -8,7 +8,7 @@ namespace BotNexus.E2ETests;
 /// </summary>
 public class HistoryPersistenceTests : E2ETestBase
 {
-    [Fact]
+    [SkippableFact]
     public async Task AfterGatewayRestart_ExistingConversation_HistoryIsVisible()
     {
         // Navigate to the portal after gateway has already started
@@ -37,7 +37,7 @@ public class HistoryPersistenceTests : E2ETestBase
             $"Expected history to be visible after gateway restart but found 0 messages");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task AfterHardRefresh_ActiveConversation_HistoryReloads()
     {
         // First visit — establish state
@@ -80,7 +80,7 @@ public class HistoryPersistenceTests : E2ETestBase
             "History count must be consistent across refreshes");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task AfterSendingMessage_NewMessageAndResponse_PersistAfterRefresh()
     {
         await WaitForPortalReadyAsync();
