@@ -764,7 +764,7 @@ public sealed class GatewayHost : BackgroundService, IChannelDispatcher, IAsyncD
         {
             var otherBindings = await _conversationRouter.GetOutboundBindingsAsync(
                 SessionId.From(sessionId),
-                message.ChannelAddress,
+                message.BindingId,
                 cancellationToken);
 
             if (otherBindings.Count == 0)

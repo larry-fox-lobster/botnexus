@@ -211,7 +211,7 @@ public sealed class DefaultConversationRouter : IConversationRouter
     /// <inheritdoc />
     public async Task<IReadOnlyList<ChannelBinding>> GetOutboundBindingsAsync(
         SessionId sessionId,
-        string originatingChannelAddress,
+        string? originatingBindingId,
         CancellationToken ct = default)
     {
         // 1. Resolve the session to get ConversationId
@@ -236,10 +236,10 @@ public sealed class DefaultConversationRouter : IConversationRouter
             return [];
         }
 
-        // 2. Filter bindings: not muted, not the originating address
+        // 2. Filter bindings: not muted, not the originating binding
         return conversation.ChannelBindings
             .Where(b => b.Mode != BindingMode.Muted)
-            .Where(b => !string.Equals(b.ChannelAddress, originatingChannelAddress, StringComparison.Ordinal))
+            .Where(b => originatingBindingId is null || !string.Equals(b.BindingId, originatingBindingId, StringComparison.Ordinal))
             .ToList();
     }
 }

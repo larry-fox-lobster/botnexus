@@ -49,7 +49,7 @@ public sealed class FanOutBindingAwareTests
         await sessionStore.SaveAsync(session);
 
         var router = new DefaultConversationRouter(conversationStore, sessionStore, NullLogger<DefaultConversationRouter>.Instance);
-        var bindings = await router.GetOutboundBindingsAsync(sessionId, "conn-origin");
+        var bindings = await router.GetOutboundBindingsAsync(sessionId, "binding-src");
 
         // The telegram binding with ThreadId should be included
         bindings.Count.ShouldBe(1);

@@ -51,6 +51,12 @@ public sealed record InboundMessage
     /// When non-null, used to route into a thread-specific conversation binding.
     /// </summary>
     public string? ThreadId { get; init; }
+
+    /// <summary>
+    /// The channel binding ID this message arrived on, if known.
+    /// Used by fan-out to exclude the originating binding from echo.
+    /// </summary>
+    public string? BindingId { get; init; }
 }
 
 /// <summary>
