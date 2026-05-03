@@ -2,20 +2,23 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace BotNexus.Extensions.Channels.Telegram;
 
+/// <summary>
+/// Thin HTTP client for the Telegram Bot API.
+/// One instance per bot token.
+/// </summary>
 public sealed class TelegramBotApiClient(
     HttpClient httpClient,
-    IOptions<TelegramOptions> optionsAccessor,
+    string botToken,
     ILogger<TelegramBotApiClient> logger)
 {
     private const int MaxRateLimitRetries = 3;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _httpClient = httpClient;
-    private readonly TelegramOptions _options = optionsAccessor.Value;
+    private readonly string _botToken = botToken;
     private readonly ILogger<TelegramBotApiClient> _logger = logger;
 
     public Task<TelegramMessage> SendMessageAsync(long chatId, string text, CancellationToken cancellationToken = default)
@@ -68,28 +71,21 @@ public sealed class TelegramBotApiClient(
     public Task SetWebhookAsync(string url, CancellationToken cancellationToken = default)
         => PostForResultAsync<bool>(
             "setWebhook",
-            new
-            {
-                url
-            },
+            new { url },
             cancellationToken);
 
     public Task DeleteWebhookAsync(CancellationToken cancellationToken = default)
         => PostForResultAsync<bool>(
             "deleteWebhook",
-            new
-            {
-                drop_pending_updates = false
-            },
+            new { drop_pending_updates = false },
             cancellationToken);
 
     private async Task<T> PostForResultAsync<T>(string methodName, object payload, CancellationToken cancellationToken)
     {
-        var token = _options.BotToken;
-        if (string.IsNullOrWhiteSpace(token))
+        if (string.IsNullOrWhiteSpace(_botToken))
             throw new InvalidOperationException("Telegram BotToken is required.");
 
-        var endpoint = $"https://api.telegram.org/bot{token}/{methodName}";
+        var endpoint = $"https://api.telegram.org/bot{_botToken}/{methodName}";
         for (var attempt = 0; attempt <= MaxRateLimitRetries; attempt++)
         {
             using var response = await _httpClient.PostAsJsonAsync(endpoint, payload, JsonOptions, cancellationToken);

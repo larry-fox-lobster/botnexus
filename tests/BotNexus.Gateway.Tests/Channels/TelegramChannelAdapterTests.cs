@@ -431,12 +431,11 @@ public sealed class TelegramChannelAdapterTests
 
     private static TelegramChannelAdapter CreateAdapter(TelegramOptions options, HttpMessageHandler handler)
     {
-        var client = new HttpClient(handler);
-        var apiClient = new TelegramBotApiClient(client, Options.Create(options), NullLogger<TelegramBotApiClient>.Instance);
+        var factory = new StubHttpClientFactory(_ => new HttpClient(handler));
         return new TelegramChannelAdapter(
             NullLogger<TelegramChannelAdapter>.Instance,
-            Options.Create(options),
-            apiClient);
+            Options.Create((TelegramGatewayOptions)options),
+            factory);
     }
 
     private static HttpResponseMessage JsonOk<T>(T result)
@@ -457,6 +456,11 @@ public sealed class TelegramChannelAdapterTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             => responder(request, cancellationToken);
+    }
+
+    private sealed class StubHttpClientFactory(Func<string, HttpClient> factory) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => factory(name);
     }
 
     private sealed record ApiCall(string MethodName, string Body)
