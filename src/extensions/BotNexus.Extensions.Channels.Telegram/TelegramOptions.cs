@@ -21,6 +21,13 @@ public sealed class TelegramOptions
     public string? WebhookUrl { get; set; }
 
     /// <summary>
+    /// Gets or sets the default BotNexus agent ID for this Telegram bot.
+    /// When set, every inbound Telegram message targets this agent directly,
+    /// which makes one bot token map to one BotNexus agent.
+    /// </summary>
+    public string? AgentId { get; set; }
+
+    /// <summary>
     /// Gets the allow-list of Telegram chat IDs that can interact with this bot.
     /// </summary>
     public ICollection<long> AllowedChatIds { get; } = [];

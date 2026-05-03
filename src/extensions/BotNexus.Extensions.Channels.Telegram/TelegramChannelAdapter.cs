@@ -291,6 +291,10 @@ public sealed class TelegramChannelAdapter(
             SenderId = senderId,
             ChannelAddress = chatIdText,
             Content = message.Text,
+            // One Telegram bot represents one BotNexus agent. When AgentId is configured,
+            // stamp it directly so inbound Telegram messages target that agent instead of
+            // falling back to the platform default agent.
+            TargetAgentId = string.IsNullOrWhiteSpace(_options.AgentId) ? null : _options.AgentId,
             // Propagate Telegram forum-topic thread id so the conversation router
             // can route topics into their own conversation bindings.
             ThreadId = message.MessageThreadId.HasValue

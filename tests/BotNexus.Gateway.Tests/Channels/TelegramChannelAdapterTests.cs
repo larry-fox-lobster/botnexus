@@ -379,6 +379,56 @@ public sealed class TelegramChannelAdapterTests
             .Message.ShouldContain("not allowed");
     }
 
+    [Fact]
+    public async Task Polling_WithConfiguredAgentId_StampsTargetAgentId_OnInboundMessage()
+    {
+        var dispatched = new TaskCompletionSource<InboundMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new StubHttpMessageHandler(async (request, cancellationToken) =>
+        {
+            var call = await ApiCall.FromRequestAsync(request, cancellationToken);
+            return call.MethodName switch
+            {
+                "deleteWebhook" => JsonOk(true),
+                "getUpdates" => JsonOk(new[]
+                {
+                    new TelegramUpdate
+                    {
+                        UpdateId = 10,
+                        Message = new TelegramMessage
+                        {
+                            MessageId = 100,
+                            Chat = new TelegramChat { Id = 42 },
+                            From = new TelegramUser { Id = 7 },
+                            Text = "hello"
+                        }
+                    }
+                }),
+                _ => JsonOk(true)
+            };
+        });
+
+        var adapter = CreateAdapter(new TelegramOptions
+        {
+            BotToken = "token",
+            AgentId = "larry",
+            PollingTimeoutSeconds = 1,
+            AllowedChatIds = { 42 }
+        }, handler);
+
+        var dispatcher = new Mock<IChannelDispatcher>();
+        dispatcher.Setup(d => d.DispatchAsync(It.IsAny<InboundMessage>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask)
+            .Callback<InboundMessage, CancellationToken>((m, _) => dispatched.TrySetResult(m));
+
+        await adapter.StartAsync(dispatcher.Object, CancellationToken.None);
+        var message = await dispatched.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await adapter.StopAsync(CancellationToken.None);
+
+        message.TargetAgentId.ShouldBe("larry");
+        message.ChannelAddress.ShouldBe("42");
+        message.Content.ShouldBe("hello");
+    }
+
     private static TelegramChannelAdapter CreateAdapter(TelegramOptions options, HttpMessageHandler handler)
     {
         var client = new HttpClient(handler);
