@@ -2,7 +2,7 @@ namespace BotNexus.Extensions.Channels.Telegram;
 
 /// <summary>
 /// Top-level gateway configuration for the Telegram channel extension.
-/// Supports both single-bot (legacy) and multi-bot configurations.
+/// Supports both single-bot (convenience) and multi-bot configurations.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -10,54 +10,56 @@ namespace BotNexus.Extensions.Channels.Telegram;
 /// Telegram bot token. Each entry maps a named bot to a BotNexus agent.
 /// </para>
 /// <para>
-/// <b>Single-bot (legacy):</b> set <see cref="BotToken"/> and optionally
+/// <b>Single-bot (convenience):</b> set <see cref="BotToken"/> and optionally
 /// <see cref="AgentId"/> at the top level. When <see cref="Bots"/> is empty and
 /// <see cref="BotToken"/> is set, the adapter synthesises a single bot entry named
 /// <c>default</c> from the top-level fields.
 /// </para>
 /// </remarks>
-public class TelegramGatewayOptions
+public sealed class TelegramGatewayOptions
 {
-    // ── Legacy single-bot fields ──────────────────────────────────────────────
+    // ── Single-bot convenience fields ─────────────────────────────────────────
 
     /// <summary>
-    /// Legacy: bot token for a single-bot deployment.
+    /// Bot token for a single-bot deployment.
     /// Ignored when <see cref="Bots"/> is non-empty.
     /// </summary>
     public string? BotToken { get; set; }
 
     /// <summary>
-    /// Legacy: agent ID for a single-bot deployment.
+    /// Agent ID for a single-bot deployment.
     /// Ignored when <see cref="Bots"/> is non-empty.
     /// </summary>
     public string? AgentId { get; set; }
 
     /// <summary>
-    /// Legacy: webhook URL for a single-bot deployment.
+    /// Webhook URL for a single-bot deployment.
     /// Ignored when <see cref="Bots"/> is non-empty.
     /// </summary>
     public string? WebhookUrl { get; set; }
 
     /// <summary>
-    /// Legacy: allow-list of chat IDs for a single-bot deployment.
+    /// Allow-list of chat IDs for a single-bot deployment.
     /// Ignored when <see cref="Bots"/> is non-empty.
+    /// An empty list allows all chats.
     /// </summary>
     public ICollection<long> AllowedChatIds { get; } = [];
 
     /// <summary>
-    /// Legacy: polling timeout in seconds for a single-bot deployment.
+    /// Long polling timeout in seconds. Clamped to a minimum of 1.
     /// </summary>
     public int PollingTimeoutSeconds { get; set; } = 30;
 
     /// <summary>
-    /// Legacy: streaming buffer flush interval in milliseconds.
+    /// Flush interval in milliseconds for buffered streaming deltas.
     /// </summary>
     public int StreamingBufferMs { get; set; } = 500;
 
     /// <summary>
-    /// Legacy: maximum Telegram message length before splitting.
+    /// Maximum Telegram message length before payload splitting.
+    /// Conservative default (4000) stays safely below the 4096-byte Telegram limit.
     /// </summary>
-    public int MaxMessageLength { get; set; } = 4096;
+    public int MaxMessageLength { get; set; } = 4000;
 
     // ── Multi-bot configuration ───────────────────────────────────────────────
 
@@ -66,44 +68,47 @@ public class TelegramGatewayOptions
     /// logging and HTTP client naming; each value holds the token and agent
     /// binding for that bot.
     /// When this dictionary is non-empty it takes precedence over the
-    /// legacy top-level fields.
+    /// single-bot convenience fields above.
     /// </summary>
     public Dictionary<string, TelegramBotConfig> Bots { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    // ── Error reply controls ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Minimum time in milliseconds between error replies to the same chat.
+    /// Prevents error spam to users during outages or repeated failures.
+    /// </summary>
+    public int ErrorCooldownMs { get; set; } = 60_000;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Returns the effective list of bot configurations to activate.
     /// Uses <see cref="Bots"/> when populated; otherwise synthesises a single
-    /// <c>default</c> entry from the legacy top-level fields.
+    /// <c>default</c> entry from the single-bot convenience fields.
     /// </summary>
     internal IReadOnlyDictionary<string, TelegramBotConfig> ResolveActiveBots()
     {
         if (Bots.Count > 0)
             return Bots;
 
-        // Legacy fallback — synthesise a single "default" bot
-        var legacy = new TelegramBotConfig
+        // Single-bot fallback — synthesise a "default" bot entry
+        var single = new TelegramBotConfig
         {
             BotToken = BotToken,
             AgentId = AgentId,
             WebhookUrl = WebhookUrl,
             PollingTimeoutSeconds = PollingTimeoutSeconds,
             StreamingBufferMs = StreamingBufferMs,
-            MaxMessageLength = MaxMessageLength
+            MaxMessageLength = MaxMessageLength,
+            ErrorCooldownMs = ErrorCooldownMs
         };
         foreach (var id in AllowedChatIds)
-            legacy.AllowedChatIds.Add(id);
+            single.AllowedChatIds.Add(id);
 
         return new Dictionary<string, TelegramBotConfig>(StringComparer.OrdinalIgnoreCase)
         {
-            ["default"] = legacy
+            ["default"] = single
         };
     }
 }
-
-/// <summary>
-/// Alias kept for backward compatibility with existing code and tests that
-/// reference <see cref="TelegramOptions"/>.
-/// </summary>
-public sealed class TelegramOptions : TelegramGatewayOptions { }

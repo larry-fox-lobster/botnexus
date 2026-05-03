@@ -55,7 +55,7 @@ public sealed class ChannelCapabilityTests
     [Fact]
     public void TelegramAdapter_SupportsStreamingThinkingAndToolDisplay()
     {
-        var options = Options.Create<TelegramGatewayOptions>(new TelegramOptions { BotToken = "token" });
+        var options = Options.Create(new TelegramGatewayOptions { BotToken = "token" });
         var factory = new StubHttpClientFactory(_ => new HttpClient());
         var adapter = new TelegramChannelAdapter(
             NullLogger<TelegramChannelAdapter>.Instance,

@@ -40,6 +40,13 @@ public sealed class TelegramBotConfig
 
     /// <summary>
     /// Gets or sets the maximum Telegram message length before payload splitting.
+    /// Conservative default (4000) stays safely below the 4096-byte Telegram limit.
     /// </summary>
-    public int MaxMessageLength { get; set; } = 4096;
+    public int MaxMessageLength { get; set; } = 4000;
+
+    /// <summary>
+    /// Gets or sets the minimum time in milliseconds between error replies to this bot's chats.
+    /// Prevents error spam to users during outages or repeated failures.
+    /// </summary>
+    public int ErrorCooldownMs { get; set; } = 60_000;
 }

@@ -1,14 +1,14 @@
+using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net.Http;
+using System.Text;
 using BotNexus.Domain.Primitives;
 using BotNexus.Gateway.Abstractions.Channels;
-using Microsoft.Extensions.Logging.Abstractions;
 using BotNexus.Gateway.Abstractions.Models;
 using BotNexus.Gateway.Channels;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using System.Collections.Concurrent;
-using System.Globalization;
-using System.Text;
 
 namespace BotNexus.Extensions.Channels.Telegram;
 
@@ -26,21 +26,20 @@ public sealed class TelegramChannelAdapter(
     private readonly ILogger<TelegramChannelAdapter> _logger = logger;
     private readonly TelegramGatewayOptions _options = optionsAccessor.Value;
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
-
     private readonly ConcurrentDictionary<string, BotRuntime> _bots = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Gets the channel type identifier.
+    /// Telegram channel identifier used by BotNexus routing.
     /// </summary>
     public override ChannelKey ChannelType => ChannelKey.From("telegram");
 
     /// <summary>
-    /// Gets the human-readable channel display name.
+    /// Human-readable name shown in logs and diagnostics.
     /// </summary>
     public override string DisplayName => "Telegram Bot";
 
     /// <summary>
-    /// Gets a value indicating whether this channel supports streaming deltas.
+    /// Telegram supports message streaming via send + edit.
     /// </summary>
     public override bool SupportsStreaming => true;
 
@@ -113,6 +112,7 @@ public sealed class TelegramChannelAdapter(
 
             runtime.PollingCancellation?.Dispose();
             runtime.StreamingStates.Clear();
+            runtime.LastErrorReplyUtcByChat.Clear();
         }
 
         _bots.Clear();
@@ -121,6 +121,7 @@ public sealed class TelegramChannelAdapter(
 
     /// <summary>
     /// Sends a complete outbound message through the Telegram adapter.
+    /// Content is escaped for Telegram HTML parse mode.
     /// </summary>
     public override async Task SendAsync(OutboundMessage message, CancellationToken cancellationToken = default)
     {
@@ -141,33 +142,29 @@ public sealed class TelegramChannelAdapter(
         var formatted = BuildOutboundText(message.Content, message.Metadata, message.DisplayPrefix);
 
         int? threadId = null;
-        if (!string.IsNullOrEmpty(message.ThreadId) && int.TryParse(message.ThreadId, out var parsedThreadId))
+        if (!string.IsNullOrEmpty(message.ThreadId) && int.TryParse(message.ThreadId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedThreadId))
             threadId = parsedThreadId;
 
         foreach (var chunk in SplitMessage(formatted, Math.Max(1, runtime.Config.MaxMessageLength)))
             await runtime.ApiClient.SendMessageAsync(chatId, chunk, threadId, cancellationToken);
     }
 
-    public override async Task SendStreamDeltaAsync(
-        string conversationId,
-        string delta,
-        CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public override async Task SendStreamDeltaAsync(string conversationId, string delta, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         EnsureBotsInitialized();
-        if (string.IsNullOrEmpty(delta))
-            return;
-
-        if (!TryParseChatId(conversationId, out var chatId))
+        if (string.IsNullOrEmpty(delta) || !TryParseChatId(conversationId, out var chatId))
             return;
 
         var runtime = ResolveSingleConfiguredBot();
         EnsureChatAllowed(runtime.Config, chatId);
         var state = runtime.StreamingStates.GetOrAdd(conversationId, _ => new StreamingState(chatId));
+
         await state.Lock.WaitAsync(cancellationToken);
         try
         {
-            state.Buffer.Append(EscapeMarkdownV2(delta));
+            state.Buffer.Append(EscapeHtml(delta));
             state.PendingCharacterCount += delta.Length;
             if (ShouldFlush(state, runtime.Config))
                 await FlushStreamingStateAsync(runtime, state, force: false, cancellationToken);
@@ -178,10 +175,8 @@ public sealed class TelegramChannelAdapter(
         }
     }
 
-    public async Task SendStreamEventAsync(
-        string conversationId,
-        AgentStreamEvent streamEvent,
-        CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public async Task SendStreamEventAsync(string conversationId, AgentStreamEvent streamEvent, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         EnsureBotsInitialized();
@@ -191,6 +186,7 @@ public sealed class TelegramChannelAdapter(
         var runtime = ResolveSingleConfiguredBot();
         EnsureChatAllowed(runtime.Config, chatId);
         var state = runtime.StreamingStates.GetOrAdd(conversationId, _ => new StreamingState(chatId));
+
         await state.Lock.WaitAsync(cancellationToken);
         try
         {
@@ -199,44 +195,53 @@ public sealed class TelegramChannelAdapter(
                 case AgentStreamEventType.MessageStart:
                     state.Reset();
                     break;
+
                 case AgentStreamEventType.ContentDelta when streamEvent.ContentDelta is not null:
-                    state.Buffer.Append(EscapeMarkdownV2(streamEvent.ContentDelta));
+                    state.Buffer.Append(EscapeHtml(streamEvent.ContentDelta));
                     state.PendingCharacterCount += streamEvent.ContentDelta.Length;
                     break;
+
                 case AgentStreamEventType.ThinkingDelta when streamEvent.ThinkingContent is not null:
-                    state.Buffer.AppendLine();
-                    state.Buffer.Append("_Thinking:_ ");
-                    state.Buffer.Append(EscapeMarkdownV2(streamEvent.ThinkingContent));
+                    AppendLineIfNeeded(state.Buffer);
+                    state.Buffer.Append("Thinking: ");
+                    state.Buffer.Append(EscapeHtml(streamEvent.ThinkingContent));
                     state.PendingCharacterCount += streamEvent.ThinkingContent.Length;
                     break;
+
                 case AgentStreamEventType.ToolStart:
                 {
                     var toolName = streamEvent.ToolName ?? "tool";
-                    state.Buffer.AppendLine();
-                    state.Buffer.Append('`');
-                    state.Buffer.Append(EscapeInlineCode(toolName));
-                    state.Buffer.Append("` started");
-                    state.PendingCharacterCount += toolName.Length + 8;
+                    AppendLineIfNeeded(state.Buffer);
+                    state.Buffer.Append("[");
+                    state.Buffer.Append(EscapeHtml(toolName));
+                    state.Buffer.Append("] started");
+                    state.PendingCharacterCount += toolName.Length + 10;
                     break;
                 }
+
                 case AgentStreamEventType.ToolEnd:
                 {
                     var status = streamEvent.ToolIsError == true ? "failed" : "completed";
                     var toolName = streamEvent.ToolName ?? streamEvent.ToolCallId ?? "tool";
-                    state.Buffer.AppendLine();
-                    state.Buffer.Append('`');
-                    state.Buffer.Append(EscapeInlineCode(toolName));
-                    state.Buffer.Append("` ");
+                    AppendLineIfNeeded(state.Buffer);
+                    state.Buffer.Append("[");
+                    state.Buffer.Append(EscapeHtml(toolName));
+                    state.Buffer.Append("] ");
                     state.Buffer.Append(status);
-                    state.PendingCharacterCount += toolName.Length + status.Length + 2;
+                    state.PendingCharacterCount += toolName.Length + status.Length + 3;
                     break;
                 }
+
                 case AgentStreamEventType.Error when streamEvent.ErrorMessage is not null:
-                    state.Buffer.AppendLine();
+                    if (!ShouldSendErrorReply(runtime, chatId))
+                        return;
+
+                    AppendLineIfNeeded(state.Buffer);
                     state.Buffer.Append("⚠️ ");
-                    state.Buffer.Append(EscapeMarkdownV2(streamEvent.ErrorMessage));
+                    state.Buffer.Append(EscapeHtml(streamEvent.ErrorMessage));
                     state.PendingCharacterCount += streamEvent.ErrorMessage.Length + 2;
                     break;
+
                 case AgentStreamEventType.MessageEnd:
                     await FlushStreamingStateAsync(runtime, state, force: true, cancellationToken);
                     state.Reset();
@@ -397,10 +402,10 @@ public sealed class TelegramChannelAdapter(
         {
             if (_bots.TryGetValue(botName, out var runtimeByName))
                 return runtimeByName;
+
             throw new InvalidOperationException($"Telegram bot '{botName}' is not configured.");
         }
 
-        // If exactly one bot exists, use it implicitly.
         if (_bots.Count == 1)
             return _bots.Values.Single();
 
@@ -429,39 +434,57 @@ public sealed class TelegramChannelAdapter(
 
         if (!string.IsNullOrWhiteSpace(displayPrefix))
         {
-            builder.Append(EscapeMarkdownV2(displayPrefix));
+            builder.Append(EscapeHtml(displayPrefix));
             builder.Append(' ');
         }
 
         if (TryGetMetadataString(metadata, "thinking", out var thinking))
         {
-            builder.Append("_Thinking:_ ");
-            builder.Append(EscapeMarkdownV2(thinking));
+            builder.Append("Thinking: ");
+            builder.Append(EscapeHtml(thinking));
             builder.AppendLine();
             builder.AppendLine();
         }
 
-        builder.Append(EscapeMarkdownV2(content));
+        builder.Append(EscapeHtml(content));
 
         if (TryGetMetadataString(metadata, "toolCall", out var toolCall))
         {
             builder.AppendLine();
-            builder.Append('`');
-            builder.Append(EscapeInlineCode(toolCall));
-            builder.Append('`');
+            builder.Append('[');
+            builder.Append(EscapeHtml(toolCall));
+            builder.Append(']');
         }
 
         return builder.ToString();
     }
 
-    private static bool TryGetMetadataString(
-        IReadOnlyDictionary<string, object?> metadata,
-        string key,
-        out string value)
+    private bool ShouldSendErrorReply(BotRuntime runtime, long chatId)
     {
-        if (metadata.TryGetValue(key, out var raw) &&
-            raw is not null &&
-            !string.IsNullOrWhiteSpace(raw.ToString()))
+        var now = DateTimeOffset.UtcNow;
+        var cooldown = TimeSpan.FromMilliseconds(Math.Max(1, runtime.Config.ErrorCooldownMs));
+
+        while (true)
+        {
+            if (!runtime.LastErrorReplyUtcByChat.TryGetValue(chatId, out var lastSent))
+            {
+                if (runtime.LastErrorReplyUtcByChat.TryAdd(chatId, now))
+                    return true;
+
+                continue;
+            }
+
+            if (now - lastSent < cooldown)
+                return false;
+
+            if (runtime.LastErrorReplyUtcByChat.TryUpdate(chatId, now, lastSent))
+                return true;
+        }
+    }
+
+    private static bool TryGetMetadataString(IReadOnlyDictionary<string, object?> metadata, string key, out string value)
+    {
+        if (metadata.TryGetValue(key, out var raw) && raw is not null && !string.IsNullOrWhiteSpace(raw.ToString()))
         {
             value = raw.ToString()!;
             return true;
@@ -486,28 +509,21 @@ public sealed class TelegramChannelAdapter(
         }
     }
 
-    private static string EscapeInlineCode(string value)
-        => value.Replace(@"\", @"\\", StringComparison.Ordinal)
-            .Replace("`", "\\`", StringComparison.Ordinal);
+    private static void AppendLineIfNeeded(StringBuilder builder)
+    {
+        if (builder.Length > 0)
+            builder.AppendLine();
+    }
 
-    private static string EscapeMarkdownV2(string value)
+    private static string EscapeHtml(string value)
     {
         if (string.IsNullOrEmpty(value))
             return string.Empty;
 
-        var builder = new StringBuilder(value.Length + 16);
-        foreach (var ch in value)
-        {
-            if (ch is '_' or '*' or '[' or ']' or '(' or ')' or '~' or '`' or '>' or '#'
-                or '+' or '-' or '=' or '|' or '{' or '}' or '.' or '!' or '\\')
-            {
-                builder.Append('\\');
-            }
-
-            builder.Append(ch);
-        }
-
-        return builder.ToString();
+        return value
+            .Replace("&", "&amp;", StringComparison.Ordinal)
+            .Replace("<", "&lt;", StringComparison.Ordinal)
+            .Replace(">", "&gt;", StringComparison.Ordinal);
     }
 
     private sealed class BotRuntime(string botName, TelegramBotConfig config, TelegramBotApiClient apiClient)
@@ -516,6 +532,7 @@ public sealed class TelegramChannelAdapter(
         public TelegramBotConfig Config { get; } = config;
         public TelegramBotApiClient ApiClient { get; } = apiClient;
         public ConcurrentDictionary<string, StreamingState> StreamingStates { get; } = new(StringComparer.Ordinal);
+        public ConcurrentDictionary<long, DateTimeOffset> LastErrorReplyUtcByChat { get; } = new();
         public CancellationTokenSource? PollingCancellation { get; set; }
         public Task? PollingTask { get; set; }
     }
