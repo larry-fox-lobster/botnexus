@@ -4013,34 +4013,31 @@ Models with <code>tools</code> in the capabilities list will receive tool defini
 <div class="highlight"><pre><span></span><code><a id="__codelineno-80-1" name="__codelineno-80-1" href="#__codelineno-80-1"></a>~/.botnexus/logs/gateway.log
 <a id="__codelineno-80-2" name="__codelineno-80-2" href="#__codelineno-80-2"></a>~/.botnexus/logs/gateway-YYYYMMDD.log
 </code></pre></div></p>
-<p><strong>Session logs:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-81-1" name="__codelineno-81-1" href="#__codelineno-81-1"></a>~/.botnexus/workspace/sessions/&lt;agentId&gt;/&lt;sessionId&gt;.jsonl
-</code></pre></div></p>
 <h3 id="viewing-logs">Viewing Logs<a class="headerlink" href="#viewing-logs" title="Permanent link">&para;</a></h3>
 <p><strong>Real-time:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-82-1" name="__codelineno-82-1" href="#__codelineno-82-1"></a>tail<span class="w"> </span>-f<span class="w"> </span>~/.botnexus/logs/gateway.log
+<div class="highlight"><pre><span></span><code><a id="__codelineno-81-1" name="__codelineno-81-1" href="#__codelineno-81-1"></a>tail<span class="w"> </span>-f<span class="w"> </span>~/.botnexus/logs/gateway.log
 </code></pre></div></p>
 <p><strong>Filter by level:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-83-1" name="__codelineno-83-1" href="#__codelineno-83-1"></a><span class="c1"># Errors only</span>
-<a id="__codelineno-83-2" name="__codelineno-83-2" href="#__codelineno-83-2"></a>grep<span class="w"> </span><span class="s2">&quot;error:&quot;</span><span class="w"> </span>~/.botnexus/logs/gateway.log
-<a id="__codelineno-83-3" name="__codelineno-83-3" href="#__codelineno-83-3"></a>
-<a id="__codelineno-83-4" name="__codelineno-83-4" href="#__codelineno-83-4"></a><span class="c1"># Warnings and errors</span>
-<a id="__codelineno-83-5" name="__codelineno-83-5" href="#__codelineno-83-5"></a>grep<span class="w"> </span>-E<span class="w"> </span><span class="s2">&quot;(warn:|error:)&quot;</span><span class="w"> </span>~/.botnexus/logs/gateway.log
+<div class="highlight"><pre><span></span><code><a id="__codelineno-82-1" name="__codelineno-82-1" href="#__codelineno-82-1"></a><span class="c1"># Errors only</span>
+<a id="__codelineno-82-2" name="__codelineno-82-2" href="#__codelineno-82-2"></a>grep<span class="w"> </span><span class="s2">&quot;error:&quot;</span><span class="w"> </span>~/.botnexus/logs/gateway.log
+<a id="__codelineno-82-3" name="__codelineno-82-3" href="#__codelineno-82-3"></a>
+<a id="__codelineno-82-4" name="__codelineno-82-4" href="#__codelineno-82-4"></a><span class="c1"># Warnings and errors</span>
+<a id="__codelineno-82-5" name="__codelineno-82-5" href="#__codelineno-82-5"></a>grep<span class="w"> </span>-E<span class="w"> </span><span class="s2">&quot;(warn:|error:)&quot;</span><span class="w"> </span>~/.botnexus/logs/gateway.log
 </code></pre></div></p>
 <p><strong>Recent logs via API:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-84-1" name="__codelineno-84-1" href="#__codelineno-84-1"></a>curl<span class="w"> </span>http://localhost:5005/api/logs/recent?count<span class="o">=</span><span class="m">100</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-83-1" name="__codelineno-83-1" href="#__codelineno-83-1"></a>curl<span class="w"> </span>http://localhost:5005/api/logs/recent?count<span class="o">=</span><span class="m">100</span>
 </code></pre></div></p>
 <h3 id="increasing-log-verbosity">Increasing Log Verbosity<a class="headerlink" href="#increasing-log-verbosity" title="Permanent link">&para;</a></h3>
 <p><strong>Temporary (environment variable):</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-85-1" name="__codelineno-85-1" href="#__codelineno-85-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">Logging__LogLevel__Default</span><span class="o">=</span>Debug
-<a id="__codelineno-85-2" name="__codelineno-85-2" href="#__codelineno-85-2"></a>dotnet<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>src/gateway/BotNexus.Gateway.Api
+<div class="highlight"><pre><span></span><code><a id="__codelineno-84-1" name="__codelineno-84-1" href="#__codelineno-84-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">Logging__LogLevel__Default</span><span class="o">=</span>Debug
+<a id="__codelineno-84-2" name="__codelineno-84-2" href="#__codelineno-84-2"></a>dotnet<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>src/gateway/BotNexus.Gateway.Api
 </code></pre></div></p>
 <p><strong>Permanent (config.json):</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-86-1" name="__codelineno-86-1" href="#__codelineno-86-1"></a><span class="p">{</span>
-<a id="__codelineno-86-2" name="__codelineno-86-2" href="#__codelineno-86-2"></a><span class="w">  </span><span class="nt">&quot;gateway&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-86-3" name="__codelineno-86-3" href="#__codelineno-86-3"></a><span class="w">    </span><span class="nt">&quot;logLevel&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Debug&quot;</span>
-<a id="__codelineno-86-4" name="__codelineno-86-4" href="#__codelineno-86-4"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-86-5" name="__codelineno-86-5" href="#__codelineno-86-5"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-85-1" name="__codelineno-85-1" href="#__codelineno-85-1"></a><span class="p">{</span>
+<a id="__codelineno-85-2" name="__codelineno-85-2" href="#__codelineno-85-2"></a><span class="w">  </span><span class="nt">&quot;gateway&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-85-3" name="__codelineno-85-3" href="#__codelineno-85-3"></a><span class="w">    </span><span class="nt">&quot;logLevel&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Debug&quot;</span>
+<a id="__codelineno-85-4" name="__codelineno-85-4" href="#__codelineno-85-4"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-85-5" name="__codelineno-85-5" href="#__codelineno-85-5"></a><span class="p">}</span>
 </code></pre></div></p>
 <p><strong>Log Levels:</strong>
 - <code>Trace</code>: Most verbose (include everything)
@@ -4051,34 +4048,34 @@ Models with <code>tools</code> in the capabilities list will receive tool defini
 - <code>Critical</code>: Critical errors only</p>
 <h3 id="health-check">Health Check<a class="headerlink" href="#health-check" title="Permanent link">&para;</a></h3>
 <p><strong>Check Gateway health:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-87-1" name="__codelineno-87-1" href="#__codelineno-87-1"></a>curl<span class="w"> </span>http://localhost:5005/health
+<div class="highlight"><pre><span></span><code><a id="__codelineno-86-1" name="__codelineno-86-1" href="#__codelineno-86-1"></a>curl<span class="w"> </span>http://localhost:5005/health
 </code></pre></div></p>
 <p><strong>Response:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-88-1" name="__codelineno-88-1" href="#__codelineno-88-1"></a><span class="p">{</span>
-<a id="__codelineno-88-2" name="__codelineno-88-2" href="#__codelineno-88-2"></a><span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Healthy&quot;</span><span class="p">,</span>
-<a id="__codelineno-88-3" name="__codelineno-88-3" href="#__codelineno-88-3"></a><span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-06-12T10:00:00Z&quot;</span><span class="p">,</span>
-<a id="__codelineno-88-4" name="__codelineno-88-4" href="#__codelineno-88-4"></a><span class="w">  </span><span class="nt">&quot;checks&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-88-5" name="__codelineno-88-5" href="#__codelineno-88-5"></a><span class="w">    </span><span class="nt">&quot;providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Healthy&quot;</span><span class="p">,</span>
-<a id="__codelineno-88-6" name="__codelineno-88-6" href="#__codelineno-88-6"></a><span class="w">    </span><span class="nt">&quot;extensions&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Healthy&quot;</span><span class="p">,</span>
-<a id="__codelineno-88-7" name="__codelineno-88-7" href="#__codelineno-88-7"></a><span class="w">    </span><span class="nt">&quot;sessions&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Healthy&quot;</span>
-<a id="__codelineno-88-8" name="__codelineno-88-8" href="#__codelineno-88-8"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-88-9" name="__codelineno-88-9" href="#__codelineno-88-9"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-87-1" name="__codelineno-87-1" href="#__codelineno-87-1"></a><span class="p">{</span>
+<a id="__codelineno-87-2" name="__codelineno-87-2" href="#__codelineno-87-2"></a><span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Healthy&quot;</span><span class="p">,</span>
+<a id="__codelineno-87-3" name="__codelineno-87-3" href="#__codelineno-87-3"></a><span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-06-12T10:00:00Z&quot;</span><span class="p">,</span>
+<a id="__codelineno-87-4" name="__codelineno-87-4" href="#__codelineno-87-4"></a><span class="w">  </span><span class="nt">&quot;checks&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-87-5" name="__codelineno-87-5" href="#__codelineno-87-5"></a><span class="w">    </span><span class="nt">&quot;providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Healthy&quot;</span><span class="p">,</span>
+<a id="__codelineno-87-6" name="__codelineno-87-6" href="#__codelineno-87-6"></a><span class="w">    </span><span class="nt">&quot;extensions&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Healthy&quot;</span><span class="p">,</span>
+<a id="__codelineno-87-7" name="__codelineno-87-7" href="#__codelineno-87-7"></a><span class="w">    </span><span class="nt">&quot;sessions&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Healthy&quot;</span>
+<a id="__codelineno-87-8" name="__codelineno-87-8" href="#__codelineno-87-8"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-87-9" name="__codelineno-87-9" href="#__codelineno-87-9"></a><span class="p">}</span>
 </code></pre></div></p>
 <h3 id="distributed-tracing">Distributed Tracing<a class="headerlink" href="#distributed-tracing" title="Permanent link">&para;</a></h3>
 <p>BotNexus supports OpenTelemetry for distributed tracing:</p>
 <p><strong>Enable Jaeger (local):</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-89-1" name="__codelineno-89-1" href="#__codelineno-89-1"></a><span class="c1"># Start Jaeger</span>
-<a id="__codelineno-89-2" name="__codelineno-89-2" href="#__codelineno-89-2"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--name<span class="w"> </span>jaeger<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-89-3" name="__codelineno-89-3" href="#__codelineno-89-3"></a><span class="w">  </span>-p<span class="w"> </span><span class="m">16686</span>:16686<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-89-4" name="__codelineno-89-4" href="#__codelineno-89-4"></a><span class="w">  </span>-p<span class="w"> </span><span class="m">4318</span>:4318<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-89-5" name="__codelineno-89-5" href="#__codelineno-89-5"></a><span class="w">  </span>jaegertracing/all-in-one:latest
-<a id="__codelineno-89-6" name="__codelineno-89-6" href="#__codelineno-89-6"></a>
-<a id="__codelineno-89-7" name="__codelineno-89-7" href="#__codelineno-89-7"></a><span class="c1"># Configure BotNexus</span>
-<a id="__codelineno-89-8" name="__codelineno-89-8" href="#__codelineno-89-8"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_EXPORTER_OTLP_ENDPOINT</span><span class="o">=</span>http://localhost:4318
-<a id="__codelineno-89-9" name="__codelineno-89-9" href="#__codelineno-89-9"></a>dotnet<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>src/gateway/BotNexus.Gateway.Api
-<a id="__codelineno-89-10" name="__codelineno-89-10" href="#__codelineno-89-10"></a>
-<a id="__codelineno-89-11" name="__codelineno-89-11" href="#__codelineno-89-11"></a><span class="c1"># View traces</span>
-<a id="__codelineno-89-12" name="__codelineno-89-12" href="#__codelineno-89-12"></a>open<span class="w"> </span>http://localhost:16686
+<div class="highlight"><pre><span></span><code><a id="__codelineno-88-1" name="__codelineno-88-1" href="#__codelineno-88-1"></a><span class="c1"># Start Jaeger</span>
+<a id="__codelineno-88-2" name="__codelineno-88-2" href="#__codelineno-88-2"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--name<span class="w"> </span>jaeger<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-88-3" name="__codelineno-88-3" href="#__codelineno-88-3"></a><span class="w">  </span>-p<span class="w"> </span><span class="m">16686</span>:16686<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-88-4" name="__codelineno-88-4" href="#__codelineno-88-4"></a><span class="w">  </span>-p<span class="w"> </span><span class="m">4318</span>:4318<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-88-5" name="__codelineno-88-5" href="#__codelineno-88-5"></a><span class="w">  </span>jaegertracing/all-in-one:latest
+<a id="__codelineno-88-6" name="__codelineno-88-6" href="#__codelineno-88-6"></a>
+<a id="__codelineno-88-7" name="__codelineno-88-7" href="#__codelineno-88-7"></a><span class="c1"># Configure BotNexus</span>
+<a id="__codelineno-88-8" name="__codelineno-88-8" href="#__codelineno-88-8"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_EXPORTER_OTLP_ENDPOINT</span><span class="o">=</span>http://localhost:4318
+<a id="__codelineno-88-9" name="__codelineno-88-9" href="#__codelineno-88-9"></a>dotnet<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>src/gateway/BotNexus.Gateway.Api
+<a id="__codelineno-88-10" name="__codelineno-88-10" href="#__codelineno-88-10"></a>
+<a id="__codelineno-88-11" name="__codelineno-88-11" href="#__codelineno-88-11"></a><span class="c1"># View traces</span>
+<a id="__codelineno-88-12" name="__codelineno-88-12" href="#__codelineno-88-12"></a>open<span class="w"> </span>http://localhost:16686
 </code></pre></div></p>
 <p>See <a href="../../observability/">Observability Guide</a> for details.</p>
 <hr />
@@ -4145,7 +4142,7 @@ Models with <code>tools</code> in the capabilities list will receive tool defini
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 27, 2026 20:42:41 UTC">April 27, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="May 3, 2026 17:20:56 UTC">May 3, 2026</span>
   </span>
 
     
