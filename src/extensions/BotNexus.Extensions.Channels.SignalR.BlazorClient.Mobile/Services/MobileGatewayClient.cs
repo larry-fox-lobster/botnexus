@@ -124,6 +124,7 @@ public sealed class MobileGatewayClient : IAsyncDisposable
     /// <summary>Load conversations for an agent and optionally select the first one.</summary>
     public async Task LoadConversationsAsync(string baseUrl, string agentId, CancellationToken ct = default)
     {
+        baseUrl = baseUrl.TrimEnd('/') + "/";
         try
         {
             var convs = await _http.GetFromJsonAsync<List<ConversationSummaryDto>>(
@@ -153,6 +154,7 @@ public sealed class MobileGatewayClient : IAsyncDisposable
     /// <summary>Load message history for a conversation.</summary>
     public async Task LoadHistoryAsync(string baseUrl, string conversationId, CancellationToken ct = default)
     {
+        baseUrl = baseUrl.TrimEnd('/') + "/";
         try
         {
             var history = await _http.GetFromJsonAsync<ConversationHistoryResponseDto>(
